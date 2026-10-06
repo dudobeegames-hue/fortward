@@ -297,6 +297,7 @@
 
   function enterBuild() {
     st.phase = 'build';
+    st.moving = null;
     AUDIO.music('build');
     st.tool = null; st.sel = null;
     $('bottom').hidden = true;
@@ -314,7 +315,7 @@
     st.spawnQ = buildWave(st.wave);
     st.spawnT = 1.2;
     st.phase = 'battle';
-    st.tool = null; st.sel = null;
+    st.tool = null; st.sel = null; st.moving = null; bdrag = null;
     AUDIO.play('horn'); AUDIO.music('battle');
     $('build').hidden = true; $('bottom').hidden = false;
     for (const b of st.blds) if (b.kind === 'barracks') b.spawnT = 0.3;
@@ -1095,6 +1096,26 @@
       g.fillRect(x, y, 1, 1); g.fillRect(x + T - 1, y, 1, 1); g.fillRect(x, y + T - 1, 1, 1); g.fillRect(x + T - 1, y + T - 1, 1, 1);
     }
     const col = blink ? '#f8d048' : '#fff070';
+    // presúvanie: zvýrazni cieľ a ukáž polopriehľadnú stavbu
+    const mv = bdrag && bdrag.moved ? bdrag.b : st.moving;
+    if (mv) {
+      if (st.moving) for (let r = zt; r <= G.rows - 1; r++) for (let c = 0; c < G.cols; c++) {
+        if (!inHall(c, r) && !occAt(c, r)) { g.fillStyle = 'rgba(156,212,90,0.13)'; g.fillRect(tileX(c) + 1, tileY(r) + 1, T - 2, T - 2); }
+      }
+      const ox = tileX(mv.c), oy = tileY(mv.r);
+      g.fillStyle = 'rgba(28,20,14,0.45)'; g.fillRect(ox, oy, T, T); // pôvodné miesto
+      if (bdrag && bdrag.moved) {
+        const h = bdrag.hover, ok = canMoveTo(mv, h.c, h.r), hx = tileX(h.c), hy = tileY(h.r);
+        g.fillStyle = ok ? 'rgba(156,212,90,0.35)' : 'rgba(232,72,56,0.4)'; g.fillRect(hx, hy, T, T);
+        corners(hx, hy, hx + T - 1, hy + T - 1, ok ? '#9cd45a' : '#e84838');
+        const spr = mv.kind === 'wall' ? BSPR.wall[Math.max(1, Math.min(5, mv.lvl)) - 1][10] : TRAPS[mv.kind] ? BSPR[mv.kind] : bsprOf(mv.kind, mv.lvl);
+        g.globalAlpha = 0.7;
+        if (mv.kind === 'wall') g.drawImage(spr.c, hx, hy - 6);
+        else if (TRAPS[mv.kind]) g.drawImage(spr.c, hx, hy);
+        else g.drawImage(spr.c, hx + T / 2 - Math.floor(spr.w / 2), hy + T + 1 - spr.h);
+        g.globalAlpha = 1;
+      } else corners(ox, oy, ox + T - 1, oy + T - 1, blink ? '#9cd45a' : '#ffffff');
+    }
     if (st.sel === HALL) { const h = hallRect(); corners(h.x0, h.y0 - 8, h.x1 - 1, h.y1 - 1, col); }
     else if (st.sel) {
       const b = st.sel, x = tileX(b.c), y = tileY(b.r);
@@ -1469,7 +1490,7 @@
       }
       b.className = 'pcard' + (st.tool === kind ? ' sel' : '') + (st.gold < costOf(kind) ? ' poor' : '');
       b.innerHTML = '<span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost"><img class="coin" src="' + ICONS.coin + '">' + costOf(kind) + '</span>';
-      b.addEventListener('click', () => { st.tool = st.tool === kind ? null : kind; st.sel = null; AUDIO.play('click'); renderBuild(); });
+      b.addEventListener('click', () => { st.tool = st.tool === kind ? null : kind; st.sel = null; st.moving = null; AUDIO.play('click'); renderBuild(); });
       pal.appendChild(b);
     }
     const info = $('selInfo'); info.innerHTML = '';
@@ -1531,6 +1552,7 @@
         st.soldiers = st.soldiers.filter(s => !s.dead);
         rebuildOcc();
       }, 'sell'));
+      acts.appendChild(btn(st.moving === b ? 'Zrušiť presun' : 'Presunúť (zadarmo)', null, true, () => { st.moving = st.moving === b ? null : b; if (st.moving) hint('Ťukni na voľné políčko v zóne – alebo stavbu rovno potiahni prstom'); }, 'wide move'));
       if (b.kind === 'wall') {
         if (b.gate) acts.appendChild(btn('Zmeniť späť na hradbu', null, true, () => { b.gate = false; }, 'wide'));
         else if (b.unit) acts.appendChild(btn('Na bránu – najprv odvolaj strelca', null, false, () => { }, 'wide'));
@@ -1640,6 +1662,23 @@
     for (let k = 0; k < 5; k++) part(tileX(c) + 8 + (Math.random() - 0.5) * 12, tileY(r) + 12, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.4, '#c6a272', 60);
     return true;
   }
+  // ---- presúvanie stavieb (ťahaním alebo tlačidlom „Presunúť“) ----
+  let bdrag = null;                       // ťahaná stavba {b, start, hover, moved}
+  const canMoveTo = (b, c, r) => inZone(c, r) && !inHall(c, r) && (!occAt(c, r) || occAt(c, r) === b);
+  function moveBuilding(b, c, r) {
+    if (b.c === c && b.r === r) return true;
+    if (!canMoveTo(b, c, r)) { toast('Sem sa stavba nedá presunúť'); AUDIO.play('deny'); return false; }
+    const ox = tileX(b.c) + T / 2, oy = tileY(b.r) + T / 2;
+    b.c = c; b.r = r;
+    rebuildOcc();
+    for (let k = 0; k < 6; k++) part(ox + (Math.random() - 0.5) * 12, oy + 4, (Math.random() - 0.5) * 20, -Math.random() * 15, 0.4, '#c6a272', 60);
+    for (let k = 0; k < 8; k++) part(tileX(c) + 8 + (Math.random() - 0.5) * 12, tileY(r) + 12, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.4, '#c6a272', 60);
+    AUDIO.play('build');
+    st.sel = b; st.tool = null; st.moving = null;
+    renderBuild();
+    return true;
+  }
+
   screen.addEventListener('pointerdown', ev => {
     const p = evPos(ev);
     if (st.phase === 'battle' && p.y > 4) { volley(p.x, p.y); return; }
@@ -1650,6 +1689,18 @@
     }
     if (st.phase !== 'build') return;
     const t = evTile(p);
+    if (st.moving) { // režim presunu z tlačidla: ťuk na cieľové políčko
+      const b = st.moving;
+      if (occAt(t.c, t.r) === b) { st.moving = null; renderBuild(); return; }
+      moveBuilding(b, t.c, t.r);
+      return;
+    }
+    const o = occAt(t.c, t.r);
+    if (o && o !== HALL) { // chytenie stavby: ťuk = výber, ťahanie = presun
+      bdrag = { b: o, start: t, hover: t, moved: false };
+      try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
+      return;
+    }
     if (st.tool === 'wall' && inZone(t.c, t.r) && !inHall(t.c, t.r) && !occAt(t.c, t.r)) {
       drag = { last: t, warned: false };
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
@@ -1665,6 +1716,12 @@
       const dy = (ev.clientY - mapDrag.y0) / r.height * H;
       if (Math.abs(dy) > 3) mapDrag.moved = true;
       if (mapDrag.moved) { mapCam = clampMap(mapDrag.cam0 - dy); mapCamTarget = mapCam; }
+      return;
+    }
+    if (bdrag && st.phase === 'build') {
+      const t = evTile(evPos(ev));
+      if (t.c !== bdrag.start.c || t.r !== bdrag.start.r) bdrag.moved = true;
+      bdrag.hover = t;
       return;
     }
     if (!drag || st.phase !== 'build') return;
@@ -1685,6 +1742,13 @@
     if (mapDrag) { // krátky ťuk bez posunu = výber misie
       const md = mapDrag; mapDrag = null;
       if (!md.moved && st.phase === 'map') tapMap(md.p.x, md.p.y);
+      return;
+    }
+    if (bdrag) {
+      const bd = bdrag; bdrag = null;
+      if (st.phase !== 'build') return;
+      if (!bd.moved) { st.sel = bd.b; st.tool = null; st.moving = null; AUDIO.play('click'); renderBuild(); }
+      else moveBuilding(bd.b, bd.hover.c, bd.hover.r);
       return;
     }
     if (drag) { drag = null; if (st.gold < costOf('wall')) st.tool = null; renderBuild(); }
@@ -1887,6 +1951,6 @@
     for (const s of list) { x.drawImage(s.c, px * scale, (h - 3 - s.h) * scale, s.w * scale, s.h * scale); px += s.w + 3; }
     return postPNG(c, name);
   }
-  window.FW = { DIFF, meta, perk, st, G, costOf, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon,
+  window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon,
     enterBuild, volley, has, lvlCap, hallCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax };
 })();
