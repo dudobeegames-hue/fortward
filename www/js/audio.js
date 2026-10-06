@@ -31,14 +31,45 @@ const AUDIO = (() => {
       const nd = noiseBuf.getChannelData(0);
       for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
     }
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx.state !== 'running') ctx.resume(); // 'suspended' aj iOS 'interrupted' (napr. po hovore)
     return true;
   }
-  const unlock = () => { if (ensure() && wantTrack && !seq) startTrack(wantTrack); };
-  ['pointerdown', 'touchend', 'keydown'].forEach(ev => window.addEventListener(ev, unlock, { passive: true }));
+
+  // iOS: pri tichom prepínači je Web Audio stlmené. Prehrávanie tichej <audio> stopy
+  // prepne zvukovú reláciu do režimu „playback“, v ktorom hra znie aj v tichom režime.
+  let silentEl = null;
+  function silentWavURL() {
+    const n = 4000, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+    const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVE'); str(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+    str(36, 'data'); v.setUint32(40, n, true);
+    for (let i = 0; i < n; i++) v.setUint8(44 + i, 128); // 8-bitové ticho
+    return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  }
+  function iosPlayback() {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* staršie iOS */ }
+    try {
+      if (!silentEl) { silentEl = new Audio(silentWavURL()); silentEl.loop = true; silentEl.setAttribute('playsinline', ''); }
+      if (silentEl.paused) { const pr = silentEl.play(); if (pr && pr.catch) pr.catch(() => { }); }
+    } catch (e) { /* bez <audio> */ }
+  }
+  let primed = false;
+  const unlock = () => {
+    iosPlayback();
+    if (!ensure()) return;
+    if (!primed) { // staršie iOS sa „odomknú“ až prehratím zvuku priamo v dotyku
+      primed = true;
+      const b = ctx.createBufferSource(); b.buffer = ctx.createBuffer(1, 1, 22050); b.connect(ctx.destination); b.start(0);
+    }
+    if (wantTrack && !seq) startTrack(wantTrack);
+  };
+  ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown'].forEach(ev => window.addEventListener(ev, unlock, { passive: true }));
   document.addEventListener('visibilitychange', () => {
     if (!ctx) return;
-    if (document.hidden) ctx.suspend(); else ctx.resume();
+    if (document.hidden) { ctx.suspend(); if (silentEl) silentEl.pause(); }
+    else ctx.resume(); // tichá stopa sa znova spustí pri najbližšom dotyku
   });
 
   // ---- základné nástroje ----
