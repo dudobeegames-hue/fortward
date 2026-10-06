@@ -1267,7 +1267,31 @@
     sctx.drawImage(buf, 0, 0, W, H, sx * S, (sy - Math.round(camY)) * S, W * S, H * S);
   }
   // cieľový posun kamery: v stavaní o výšku panela, v boji o spodné tlačidlá
+  // ---- posúvanie mapy prstom ----
+  let mapCam = 0, mapCamTarget = 0, mapDrag = null;
+  const MAP_HEAD = 26; // hlavička mapy (v herných px)
+  function mapCamMax() {
+    if (!island) return 0;
+    const panelLow = $('mapPanel').offsetHeight * DPR / S;
+    const lowest = Math.max(...island.nodes.map(n => n.y)) + 22; // hrad + tabuľka s hviezdami
+    return Math.max(0, lowest - (H - panelLow) + 4);
+  }
+  const clampMap = v => Math.max(0, Math.min(mapCamMax(), v));
+  function focusMapNode(num, instant) {
+    const n = island && island.nodes[num - 1];
+    if (!n) return;
+    const panelLow = $('mapPanel').offsetHeight * DPR / S;
+    const mid = MAP_HEAD + (H - panelLow - MAP_HEAD) / 2;
+    mapCamTarget = clampMap(n.y - 6 - mid);
+    if (instant) mapCam = mapCamTarget;
+  }
+
   function camTick(dt) {
+    if (st.phase === 'map') {
+      if (!mapDrag) mapCam += (mapCamTarget - mapCam) * Math.min(1, dt * 8);
+      camY = mapCam;
+      return;
+    }
     let target = 0;
     const cssToLow = DPR / S;
     if (st.phase === 'build' && !$('build').hidden) target = $('build').offsetHeight * cssToLow;
@@ -1303,7 +1327,7 @@
   }
 
   function render(time) {
-    if (st.phase === 'map') { camY = 0; renderMap(time); present(); return; }
+    if (st.phase === 'map') { renderMap(time); present(); return; }
     g.drawImage(scene.bg, 0, 0);
     drawSceneFx(time);
     const playing = st.phase !== 'title';
@@ -1619,7 +1643,11 @@
   screen.addEventListener('pointerdown', ev => {
     const p = evPos(ev);
     if (st.phase === 'battle' && p.y > 4) { volley(p.x, p.y); return; }
-    if (st.phase === 'map') { tapMap(p.x, p.y); return; }
+    if (st.phase === 'map') {
+      mapDrag = { y0: ev.clientY, cam0: mapCam, moved: false, p };
+      try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
+      return;
+    }
     if (st.phase !== 'build') return;
     const t = evTile(p);
     if (st.tool === 'wall' && inZone(t.c, t.r) && !inHall(t.c, t.r) && !occAt(t.c, t.r)) {
@@ -1632,6 +1660,13 @@
     tapBuild(p.x, p.y);
   });
   screen.addEventListener('pointermove', ev => {
+    if (mapDrag && st.phase === 'map') {
+      const r = screen.getBoundingClientRect();
+      const dy = (ev.clientY - mapDrag.y0) / r.height * H;
+      if (Math.abs(dy) > 3) mapDrag.moved = true;
+      if (mapDrag.moved) { mapCam = clampMap(mapDrag.cam0 - dy); mapCamTarget = mapCam; }
+      return;
+    }
     if (!drag || st.phase !== 'build') return;
     const t = evTile(evPos(ev));
     if (t.c === drag.last.c && t.r === drag.last.r) return;
@@ -1646,7 +1681,14 @@
     drag.last = t;
     if (placed) renderBuild();
   });
-  const endDrag = () => { if (drag) { drag = null; if (st.gold < costOf('wall')) st.tool = null; renderBuild(); } };
+  const endDrag = () => {
+    if (mapDrag) { // krátky ťuk bez posunu = výber misie
+      const md = mapDrag; mapDrag = null;
+      if (!md.moved && st.phase === 'map') tapMap(md.p.x, md.p.y);
+      return;
+    }
+    if (drag) { drag = null; if (st.gold < costOf('wall')) st.tool = null; renderBuild(); }
+  };
   screen.addEventListener('pointerup', endDrag);
   screen.addEventListener('pointercancel', endDrag);
 
@@ -1677,6 +1719,7 @@
     $('map').hidden = false;
     if (!st.mapAnim) st.mapSel = Math.min(st.unlocked, MISSIONS.length);
     renderMapPanel();
+    focusMapNode(st.mapAnim ? st.mapAnim.seg + 2 : st.mapSel, true);
   }
 
   function renderMapPanel() {
@@ -1742,6 +1785,7 @@
       if (n) {
         for (let k = 0; k < 30; k++) part(n.x, n.y, (Math.random() - 0.5) * 70, -Math.random() * 70, 0.9, ['#f8d048', '#fff070', '#88b4ff'][k % 3], 90);
         st.mapSel = a.seg + 2; renderMapPanel();
+        focusMapNode(st.mapSel);
         AUDIO.play('unlock');
       }
     }
