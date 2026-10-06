@@ -1,0 +1,14 @@
+# súkromné poznámky a inšpirácie (nepatria do verejného repozitára)
+Inšpirácie/
+nápady.txt
+
+# ladiace snímky a lokálne nastavenia
+tools/snaps/
+.claude/
+__pycache__/
+*.pyc
+
+# systém
+Thumbs.db
+desktop.ini
+.DS_Store
