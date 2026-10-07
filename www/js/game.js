@@ -758,10 +758,10 @@
     return best;
   }
 
-  // rytieri obchádzajú vlastné stavby a hradbami prejdú len cez bránu
+  // vlastné budovy (veže, bane, kaplnky…) rytieri prejdú – hradby len cez bránu, radnicu obchádzajú
   const knightPass = (c, r) => {
     const o = occAt(c, r);
-    return !o || (o !== HALL && (!BUILD[o.kind].block || (o.kind === 'wall' && o.gate)));
+    return !o || (o !== HALL && (o.kind !== 'wall' || o.gate));
   };
   function knightStep(a, b) {
     const n = G.cols * G.rows, dist = new Int16Array(n).fill(-1);
