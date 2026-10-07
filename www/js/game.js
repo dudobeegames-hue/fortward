@@ -1039,7 +1039,7 @@
         g.globalCompositeOperation = 'source-over';
       }
     }
-    if (b.lvl > 1) pxText(g, String(b.lvl), x0 + T - 3, y0 + T - 6, '#f8d048');
+    if (b.lvl > 1 && b.kind !== 'wall') pxText(g, String(b.lvl), x0 + T - 3, y0 + T - 6, '#f8d048');
   }
   const JOINERS = { wall: 1, tower: 1, mage: 1, barracks: 1, catapult: 1, mine: 1, chapel: 1, bell: 1, well: 1 };
   const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL || !!JOINERS[o.kind]); };
@@ -1119,6 +1119,7 @@
       } else corners(ox, oy, ox + T - 1, oy + T - 1, blink ? '#9cd45a' : '#ffffff');
     }
     if (st.sel === HALL) { const h = hallRect(); corners(h.x0, h.y0 - 8, h.x1 - 1, h.y1 - 1, col); }
+    else if (selGroup()) for (const w of st.selGroup) corners(tileX(w.c), tileY(w.r), tileX(w.c) + T - 1, tileY(w.r) + T - 1, col);
     else if (st.sel) {
       const b = st.sel, x = tileX(b.c), y = tileY(b.r);
       corners(x, y, x + T - 1, y + T - 1, col);
@@ -1469,12 +1470,14 @@
     const sn = undoStack.pop();
     if (!sn || st.phase !== 'build') return;
     Object.assign(st, { gold: sn.gold, hallLvl: sn.hallLvl, hallHp: sn.hallHp, volleyLvl: sn.volleyLvl, blds: sn.blds });
-    st.sel = null; st.tool = null; st.moving = null;
+    st.sel = null; st.selGroup = null; st.tool = null; st.moving = null;
     if (st.king) st.king.hp = kingMax();
     rebuildOcc();
     AUDIO.play('sell');
     renderBuild(); updateHud();
   }
+
+  const selGroup = () => st.selGroup && st.selGroup.length > 1 && st.selGroup.includes(st.sel) && st.selGroup.every(w => st.blds.includes(w));
 
   function btn(label, cost, enabled, onClick, cls) {
     const b = document.createElement('button');
@@ -1525,7 +1528,7 @@
     const acts = document.createElement('div'); acts.className = 'acts';
     if (st.tool) {
       const d = BUILD[st.tool];
-      card(ICONS[st.tool], d.name, d.desc + (st.tool === 'wall' ? '. Ťukni pre jednu, potiahni prstom pre celý rad.' : '. Ťukni na voľné políčko v zóne.'));
+      card(ICONS[st.tool], d.name, d.desc + (st.tool === 'wall' ? '. Ťukni pre jednu, potiahni prstom pre celý rad. Dvojťukom na hradbu označíš celý rad.' : '. Ťukni na voľné políčko v zóne.'));
     } else if (st.sel === HALL) {
       card(ICONS.hall, 'Radnica · úr. ' + st.hallLvl, 'Kráľ ju bráni. Vylepšenie pridá zdravie, silu kráľa a rozšíri územie o 1 rad.');
       if (st.hallLvl < hallCap()) {
@@ -1539,6 +1542,29 @@
         const vc = volleyUpCost();
         acts.appendChild(btn('Salva úr. ' + (st.volleyLvl + 1), vc, st.gold >= vc, () => { st.gold -= vc; st.volleyLvl++; }));
       } else acts.appendChild(lockBtn('Salva', 'volleyUp'));
+      info.appendChild(acts);
+    } else if (selGroup()) {
+      const grp = st.selGroup, cap = lvlCap();
+      const minL = Math.min(...grp.map(w => w.lvl)), maxL = Math.max(...grp.map(w => w.lvl));
+      card(ICONS.wall, 'Rad hradieb · ' + grp.length + ' ks', 'Úroveň ' + (minL === maxL ? minL : minL + '–' + maxL) + '. Vylepšenie zdvihne o 1 úroveň každú hradbu v rade (najprv tie najslabšie).');
+      // najslabšie hradby prvé, toľko, koľko zlato dovolí
+      const cand = grp.filter(w => w.lvl < cap).sort((a, b) => a.lvl - b.lvl);
+      let sum = 0; const pick = [];
+      for (const w of cand) { const c = bUpCost(w); if (sum + c > st.gold) break; sum += c; pick.push(w); }
+      if (cand.length) {
+        const all = pick.length === cand.length;
+        const label = all ? 'Vylepšiť všetky (' + cand.length + ')' : pick.length ? 'Vylepšiť ' + pick.length + ' z ' + cand.length : 'Vylepšiť všetky (' + cand.length + ')';
+        const cost = pick.length ? sum : cand.reduce((s, w) => s + bUpCost(w), 0);
+        acts.appendChild(btn(label, cost, pick.length > 0, () => {
+          for (const w of pick) {
+            const ratio = w.hp / bMaxHp(w), c = bUpCost(w);
+            st.gold -= c; w.spent += c; w.lvl++;
+            w.hp = Math.ceil(bMaxHp(w) * ratio);
+          }
+          rebuildOcc();
+        }, 'up wide'));
+      } else if (maxL < MAX_LVL) acts.appendChild(lockBtn('Úr. ' + (minL + 1), 'lvl5', true));
+      else acts.appendChild(btn('Max. úroveň', null, false, () => { }, 'wide'));
       info.appendChild(acts);
     } else if (st.sel) {
       const b = st.sel, d = BUILD[b.kind];
@@ -1689,6 +1715,19 @@
   }
   // ---- presúvanie stavieb (ťahaním alebo tlačidlom „Presunúť“) ----
   let bdrag = null;                       // ťahaná stavba {b, start, hover, moved}
+  let lastTap = null;                     // posledný ťuk na stavbu – pre dvojťuk na hradbu
+  // celý súvislý rad hradieb (susedia hore/dole/vľavo/vpravo, vrátane brán)
+  function wallRow(start) {
+    const seen = new Set([start]), q = [start];
+    while (q.length) {
+      const w = q.pop();
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const o = occAt(w.c + dc, w.r + dr);
+        if (o && o !== HALL && o.kind === 'wall' && !seen.has(o)) { seen.add(o); q.push(o); }
+      }
+    }
+    return [...seen];
+  }
   const canMoveTo = (b, c, r) => inZone(c, r) && !inHall(c, r) && (!occAt(c, r) || occAt(c, r) === b);
   function moveBuilding(b, c, r) {
     if (b.c === c && b.r === r) return true;
@@ -1700,7 +1739,7 @@
     for (let k = 0; k < 6; k++) part(ox + (Math.random() - 0.5) * 12, oy + 4, (Math.random() - 0.5) * 20, -Math.random() * 15, 0.4, '#c6a272', 60);
     for (let k = 0; k < 8; k++) part(tileX(c) + 8 + (Math.random() - 0.5) * 12, tileY(r) + 12, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.4, '#c6a272', 60);
     AUDIO.play('build');
-    st.sel = b; st.tool = null; st.moving = null;
+    st.sel = b; st.selGroup = null; st.tool = null; st.moving = null;
     renderBuild();
     return true;
   }
@@ -1774,7 +1813,12 @@
     if (bdrag) {
       const bd = bdrag; bdrag = null;
       if (st.phase !== 'build') return;
-      if (!bd.moved) { st.sel = bd.b; st.tool = null; st.moving = null; AUDIO.play('click'); renderBuild(); }
+      if (!bd.moved) {
+        const now = performance.now(), dbl = bd.b.kind === 'wall' && lastTap && lastTap.b === bd.b && now - lastTap.t < 400;
+        lastTap = dbl ? null : { b: bd.b, t: now };
+        st.sel = bd.b; st.selGroup = dbl ? wallRow(bd.b) : null; st.tool = null; st.moving = null;
+        AUDIO.play('click'); renderBuild();
+      }
       else moveBuilding(bd.b, bd.hover.c, bd.hover.r);
       return;
     }
