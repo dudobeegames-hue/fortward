@@ -401,6 +401,7 @@
     $('build').hidden = true; $('bottom').hidden = false;
     for (const b of st.blds) if (b.kind === 'barracks') b.spawnT = 0.3;
     banner(st.wave === MISSION_WAVES ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + MISSION_WAVES);
+    if (blockedBarracks().length) setTimeout(() => toast('Rytieri sa nedostanú von – chýba brána'), 900);
     updateHud();
   }
 
@@ -763,6 +764,27 @@
     const o = occAt(c, r);
     return !o || (o !== HALL && (o.kind !== 'wall' || o.gate));
   };
+  const musterYOf = () => Math.max(G.gy0 + 30, tileY(zoneTopRow()) - 28);
+  // dostanú sa rytieri z kasární von k zhromaždisku pred zónou? (pri budovaní upozorní, ak nie)
+  function knightsBlocked(b) {
+    const sc = b.c, sr = Math.min(G.rows - 1, b.r + 1), goalR = Math.floor((musterYOf() - G.gy0) / T);
+    const seen = new Uint8Array(G.cols * G.rows), q = [sr * G.cols + sc];
+    seen[q[0]] = 1;
+    for (let h = 0; h < q.length; h++) {
+      const i = q[h], c = i % G.cols, r = (i / G.cols) | 0;
+      if (r <= goalR) return false;
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nc = c + dc, nr = r + dr;
+        if (nc < 0 || nr < 0 || nc >= G.cols || nr >= G.rows) continue;
+        const ni = nr * G.cols + nc;
+        if (seen[ni] || !knightPass(nc, nr)) continue;
+        seen[ni] = 1; q.push(ni);
+      }
+    }
+    return true;
+  }
+  const blockedBarracks = () => st.blds.filter(b => b.kind === 'barracks' && knightsBlocked(b));
+
   function knightStep(a, b) {
     const n = G.cols * G.rows, dist = new Int16Array(n).fill(-1);
     const q = [b.r * G.cols + b.c]; dist[q[0]] = 0;
@@ -954,7 +976,7 @@
     }
     // rytieri
     // rytieri: pochodujú pred zónu a bijú sa s najbližšou hordou (kým bojujú, horda stojí)
-    const musterY = Math.max(G.gy0 + 30, tileY(zoneTopRow()) - 28);
+    const musterY = musterYOf();
     for (const s of st.soldiers) {
       if (s.dead) continue;
       const mx = G.gx0 + ((s.slot * 37) % (G.cols * T - 16)) + 8;
@@ -1219,6 +1241,12 @@
     }
     const col = blink ? '#f8d048' : '#fff070';
     // presúvanie: zvýrazni cieľ a ukáž polopriehľadnú stavbu
+    for (const b of blockedBarracks()) { // červený výkričník: rytieri sa nedostanú von
+      const x = tileX(b.c) + T / 2 - 2, y = tileY(b.r) + T - bsprOf(b.kind, b.lvl).h - 11 + (blink ? -1 : 0);
+      g.fillStyle = PAL.K; g.fillRect(x - 1, y - 1, 5, 11);
+      g.fillStyle = '#e84838'; g.fillRect(x, y, 3, 6); g.fillRect(x, y + 7, 3, 2);
+      g.fillStyle = '#ff9a80'; g.fillRect(x, y, 1, 5);
+    }
     const mv = bdrag && bdrag.moved ? bdrag.b : st.moving;
     if (mv) {
       if (st.moving) for (let r = zt; r <= G.rows - 1; r++) for (let c = 0; c < G.cols; c++) {
@@ -1765,6 +1793,7 @@
       if (b.kind === 'wall' && b.nb) stats += ' · spojenie +' + Math.round(WALL_LINK * b.nb * 100) + ' %';
       if (b.spec) stats += ' · ' + SPECS[b.spec].name;
       if (b.kind === 'barracks') stats += ' · ' + KTYPES[b.ktype || 'knight'].name;
+      if (b.kind === 'barracks' && knightsBlocked(b)) stats += '<br><span class="warn">⚠ Rytieri sa nedostanú von – postav bránu v hradbách alebo uvoľni cestu</span>';
       card(b.gate ? ICONS.gate : ICONS[b.kind], (b.gate ? 'Brána' : d.name) + ' · úr. ' + b.lvl, stats);
       if (b.lvl < bCap()) {
         const c = bUpCost(b);
