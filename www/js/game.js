@@ -1530,8 +1530,8 @@
     }
     let target = 0;
     const cssToLow = DPR / S;
+    // pri budovaní posuň bojisko nad panel; v boji nie – spodné tlačidlá sú priehľadné nad mapou
     if (st.phase === 'build' && !$('build').hidden) target = $('build').offsetHeight * cssToLow;
-    else if (st.phase === 'battle' || st.phase === 'pause') target = 34 * cssToLow;
     target = Math.min(target, Math.max(0, H - 60));
     camY += (target - camY) * Math.min(1, dt * 10);
     if (Math.abs(target - camY) < 0.3) camY = target;
