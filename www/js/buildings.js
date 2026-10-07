@@ -537,6 +537,73 @@ function makeWell() {
   return p.finish();
 }
 
+// ---- Vodný mlyn (32x32): kamenné prízemie, hrázdené poschodie, slamená strecha, koleso s lopatkami a žľab ----
+const STRAW = ['#2e200c', '#4a3614', '#6a4e1e', '#8a6a2a', '#a8843a', '#c49e4e', '#dcba68', '#ecd28a'].map(hexRGB);
+const WATER_C = ['#2a5a8a', '#4a86c0', '#88c0ec', '#d8f0ff'].map(hexRGB);
+function makeMill() {
+  const p = painter(32, 32);
+  const BX0 = 16, BX1 = 31, AX = 23.5, DOOR = 22, WIN = 26; // múry budovy, os strechy, dvere, okno
+  // kamenné prízemie – riadky kvádrov s maltou, svetlo zľava
+  for (let y = 20; y <= 30; y++) for (let x = BX0; x <= BX1; x++) {
+    const row = Math.floor((y - 20) / 3), mortarH = (y - 20) % 3 === 2, mortarV = (x + row * 3) % 6 === 0;
+    let v = 0.62 - (x - BX0) / (BX1 - BX0) * 0.25 + (hash2(x, y, 171) - 0.5) * 0.12;
+    if ((y - 20) % 3 === 0) v += 0.08;
+    if (mortarH || mortarV) v = 0.18;
+    p.shade(x, y, RAMP.stone, v);
+  }
+  // drevené dvere s kovaním
+  for (let y = 23; y <= 30; y++) for (let x = DOOR; x <= DOOR + 4; x++) {
+    if (y === 23 && (x === DOOR || x === DOOR + 4)) continue;
+    const edge = x === DOOR || x === DOOR + 4 || y === 23;
+    p.shade(x, y, WOOD, edge ? 0.12 : 0.5 - (x - DOOR) * 0.05 + ((x - DOOR) % 2 ? -0.08 : 0));
+  }
+  p.set(DOOR + 3, 27, RIVET); p.shade(DOOR + 1, 26, WOOD, 0.75); p.shade(DOOR + 1, 28, WOOD, 0.75);
+  // hrázdené poschodie: omietka, trámy, šikmé vzpery
+  const MID = 23;
+  for (let y = 12; y <= 19; y++) for (let x = BX0; x <= BX1; x++) {
+    const beam = x === BX0 || x === BX1 || x === MID || y === 12 || y === 19;
+    const brace = (x < MID && x - BX0 === y - 12) || (x > MID && BX1 - x === y - 12);
+    if (beam) p.shade(x, y, WOOD, x === BX0 || y === 12 ? 0.55 : 0.3);
+    else if (brace) p.shade(x, y, WOOD, 0.4);
+    else p.shade(x, y, PLASTER, 0.66 - (x - BX0) / (BX1 - BX0) * 0.22 + (hash2(x, y, 173) - 0.5) * 0.1);
+  }
+  // okienko so svetlom
+  for (let y = 14; y <= 17; y++) for (let x = WIN; x <= WIN + 3; x++) {
+    const frame = x === WIN || x === WIN + 3 || y === 14 || y === 17, cross = x === WIN + 1 || y === 15;
+    p.set(x, y, frame ? WOOD[1] : cross ? WOOD[2] : (y === 16 && x === WIN + 2 ? GLOW2 : DARKWIN));
+  }
+  // slamená strecha s vrstvami a presahom
+  for (let y = 0; y <= 12; y++) {
+    const hw = (y + 1.5) / 13 * 9.8;
+    for (let x = Math.floor(AX - hw); x <= Math.ceil(AX + hw); x++) {
+      if (x < 0 || x > 31) continue;
+      const nx = (x - AX) / hw;
+      if (Math.abs(nx) > 1.05) continue;
+      let v = 0.66 - nx * 0.32 + (hash2(x, y, 177) - 0.5) * 0.14;
+      if ((x * 3 + y * 5) % 7 === 0) v -= 0.16;
+      if (y % 4 === 3) v -= 0.18;
+      if (y === 12) v = 0.1;
+      if (y <= 1) v += 0.12;
+      p.shade(x, y, STRAW, v);
+    }
+  }
+  // koleso vedľa múru: súvislá obruč, 8 lúčov, 8 lopatiek, os do múru
+  const WX = 7.5, WY = 22.5;
+  for (let x = Math.ceil(WX + 1); x < BX0; x++) { p.shade(x, 22, WOOD, 0.3); p.shade(x, 23, WOOD, 0.15); } // os
+  for (let y = 13; y <= 31; y++) for (let x = 0; x < BX0; x++) {
+    const dx = x - WX, dy = y - WY, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+    const light = -(dx + dy) / 40, spoke = Math.abs(Math.sin(a * 4));
+    if (r <= 1.5) p.set(x, y, r < 0.8 ? RIVET : IRON);                                   // náboj
+    else if (r < 5.3 && spoke < 0.2) p.shade(x, y, WOOD, 0.48 + light);                  // lúče
+    else if (r >= 5.3 && r <= 7.1) p.shade(x, y, WOOD, (r < 6.1 ? 0.36 : 0.62) + light); // obruč (vnútro tmavšie)
+    else if (r > 7.1 && r <= 8.4 && spoke < 0.42) p.shade(x, y, WOOD, 0.55 + light);     // lopatky
+  }
+  // drevený žľab privádza vodu zhora na lopatky
+  for (let x = 0; x <= 9; x++) { p.shade(x, 12, WOOD, 0.5); p.shade(x, 13, WOOD, 0.25); p.set(x, 11, WATER_C[x % 3 === 0 ? 3 : 2]); }
+  for (let y = 12; y <= 15; y++) p.set(10, y, WATER_C[y % 2 ? 3 : 2]);                  // voda padá na koleso
+  return p.finish();
+}
+
 const BSPR = {};
 function initBuildingSprites() {
   BSPR.hall = [1, 2, 3, 4, 5].map(l => makeHall(l));
@@ -551,6 +618,7 @@ function initBuildingSprites() {
   BSPR.firepit = makeFirepit();
   BSPR.beartrap = makeBeartrap();
   BSPR.well = makeWell();
+  BSPR.mill = makeMill();
   BSPR.wall = [];
   for (let l = 1; l <= 5; l++) { BSPR.wall[l - 1] = []; for (let m = 0; m < 16; m++) BSPR.wall[l - 1][m] = makeWall(m, l); }
   BSPR.gatehouse = [1, 2, 3, 4, 5].map(l => makeGatehouse(l));

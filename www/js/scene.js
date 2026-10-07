@@ -215,19 +215,12 @@ function buildScene(W, H, G, seed, themeIdx) {
         for (let dx = -2; dx <= 2; dx++) set(sx + dx, sy + 2, TR.water[1]);
       }
     }
-    if (th.mill && typeof BSPR !== 'undefined' && BSPR.barracks) { // mlyn s kolesom
-      const mx = W - 30, my = Math.round(rcy(W - 22) - R.hw - 26);
+    if (th.mill && typeof BSPR !== 'undefined' && BSPR.mill) { // vodný mlyn na brehu, koleso siaha do potoka
+      const spr = BSPR.mill, mx = W - spr.w - 2, my = Math.round(rcy(mx + 9) - R.hw - spr.h + 4);
       bx.putImageData(img, 0, 0);
-      bx.drawImage(BSPR.barracks.c, mx, my);
+      bx.drawImage(spr.c, mx, my);
       const id2 = bx.getImageData(0, 0, W, H); d.set(id2.data);
-      const wx = mx - 2, wy = my + 22;
-      for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
-        const r = Math.hypot(dx, dy);
-        if (r > 6.5) continue;
-        if (r > 5.3) set(wx + dx, wy + dy, K);
-        else if (r > 4.2 || dx === 0 || dy === 0 || Math.abs(dx) === Math.abs(dy)) set(wx + dx, wy + dy, pickRamp(WOOD, 0.6 - (dx + dy) * 0.03, wx + dx, wy + dy));
-      }
-      for (let x = mx; x < mx + 18; x++) for (let y = my; y < my + 27; y++) blocked[y * W + x] = 1;
+      for (let x = mx; x < mx + spr.w; x++) for (let y = my; y < my + spr.h; y++) if (y >= 0 && y < H && x >= 0 && x < W) blocked[y * W + x] = 1;
     }
   }
 
