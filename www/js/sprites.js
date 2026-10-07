@@ -260,6 +260,18 @@ const GOBLIN_BODY = [
   '.KoKLLLLKMK.',
   '..KKLlLdKoK.',
 ];
+// podkopník – goblin s bombou v ruke (horiaci knôt)
+const SAPPER_BODY = [
+  '....KKKK.......',
+  'KK.KooooK.KK...',
+  'KoKoooooOKqKy..',
+  '.KKoroorOKK.L..',
+  '..KoooOOOK.KLK.',
+  '..KOwOwOqKKDmDK',
+  '.KoKOOOqKoKDDDK',
+  '.KoKLLLLKoKDDDK',
+  '..KKLlLdK..KKK.',
+];
 const GOBLIN_LEGS = [
   ['...KqKKqK...',
    '...KoK.KqK..',
@@ -388,6 +400,7 @@ function initSprites() {
   SPR.bat = BAT_FRAMES.map(f => buildSprite(f, { P: '#4a3460', p: '#7a5aa0' }));
   SPR.ram = RAM_FRAMES.map(f => buildSprite(f));
   SPR.shaman = SHAMAN_LEGS.map(l => buildSprite(SHAMAN_BODY.concat(l)));
+  SPR.sapper = GOBLIN_LEGS.map(l => buildSprite(SAPPER_BODY.concat(l.map(r => r + '...'))));
   SPR.goblin = GOBLIN_LEGS.map(l => buildSprite(GOBLIN_BODY.concat(l)));
   SPR.orc = ORC_LEGS.map(l => buildSprite(ORC_BODY.concat(l)));
   SPR.brute = BRUTE_LEGS.map(l => buildSprite(BRUTE_BODY.concat(l)));

@@ -160,7 +160,7 @@ const UNLOCKS = [
   [{ id: 'mage', name: 'Veža mága', icon: 'mage' }, { id: 'bell', name: 'Zvonica', icon: 'bell' }],
   [{ id: 'wallCrossbow', name: 'Kušník na hradbách', icon: 'u_crossbow' }, { id: 'chapel', name: 'Kaplnka', icon: 'chapel' }, { id: 'spikes', name: 'Ostnaté hradby', icon: 'wall' }],
   [{ id: 'volleyUp', name: 'Vylepšenie salvy', icon: 'u_archer' }, { id: 'firepit', name: 'Ohnivá jama', icon: 'firepit' }, { id: 'beartrap', name: 'Medvedia pasca', icon: 'beartrap' }, { id: 'knightTypes', name: 'Druhy rytierov', icon: 'barracks' }, { id: 'warcry', name: 'Kráľov pokrik', icon: 'king' }],
-  [{ id: 'lvl5', name: 'Stavby až do úrovne 5', icon: 'tower' }, { id: 'spec', name: 'Špecializácia veží', icon: 'tower' }, { id: 'well', name: 'Studňa', icon: 'well' }],
+  [{ id: 'lvl5', name: 'Stavby až do úrovne 5', icon: 'tower' }, { id: 'spec', name: 'Špecializácia veží', icon: 'tower' }, { id: 'well', name: 'Studňa', icon: 'well' }, { id: 'spikeTypes', name: 'Ohnivé a ľadové ostne', icon: 'wall' }],
   [{ id: 'hall5', name: 'Radnica až do úrovne 5', icon: 'hall' }, { id: 'freeze', name: 'Kráľov mráz', icon: 'king' }],
 ];
 // noví nepriatelia – predstavia sa v danej misii
@@ -169,6 +169,7 @@ const ENEMY_INTRO = {
   4: { id: 'bat', name: 'Netopiere', desc: 'preletia ponad hradby priamo k radnici' },
   5: { id: 'ram', name: 'Beranidlo', desc: 'rozbíja hradby a rytierov ignoruje' },
   6: { id: 'shaman', name: 'Šaman', desc: 'lieči ostatných – zabi ho ako prvého' },
+  8: { id: 'sapper', name: 'Podkopník', desc: 'beží k hradbám a vyhodí ich do vzduchu – zastreľ ho skôr' },
 };
 function techFor(m) {
   const s = new Set();

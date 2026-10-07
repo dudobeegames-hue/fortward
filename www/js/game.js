@@ -43,8 +43,14 @@
     rider:  { name: 'Jazdec',      spr: 'rider',   hp: 0.9, dmg: 1.25, spd: 46, desc: 'rýchly, ide ďaleko' },
     shield: { name: 'Štítonosič',  spr: 'shield',  hp: 2.3, dmg: 0.5,  spd: 20, desc: 'útoky naň majú polovičnú silu' },
   };
-  const KTYPE_COST = 50, SPIKE_COST = 25;
+  const KTYPE_COST = 50, SPIKE_COST = 25, SPIKE_TYPE_COST = 40;
   const spikeDmg = b => 4 + 3 * (b.lvl - 1);
+  // druhy ostňov (od misie 9): ohnivé zapália, ľadové spomalia útočníka
+  const SPIKE_TYPES = {
+    fire: { name: 'Ohnivé ostne', tip: '#f89838', body: '#d83818', desc: 'útočník horí' },
+    ice:  { name: 'Ľadové ostne', tip: '#e0f4ff', body: '#88b4ff', desc: 'útočník sa spomalí' },
+  };
+  const WALL_LINK = 0.1; // +10 % zdravia hradby za každú susednú hradbu
   // kráľove schopnosti
   const ABIL = {
     warcry: { name: 'Pokrik', dur: 6, cd: 30 },
@@ -75,13 +81,14 @@
     bat:     { spr: 'bat',     hp: 9,   speed: 30, atk: 4,  atkCd: 1.0, gold: 4,  blood: '#4a3460', fly: true },
     ram:     { spr: 'ram',     hp: 170, speed: 9,  atk: 48, atkCd: 1.6, gold: 22, blood: '#6e4422', ram: true },
     shaman:  { spr: 'shaman',  hp: 45,  speed: 12, atk: 5,  atkCd: 1.2, gold: 15, blood: '#62a03a', heals: true },
+    sapper:  { spr: 'sapper',  hp: 16,  speed: 22, atk: 90, atkCd: 0.5, gold: 8,  blood: '#62a03a', sapper: true },
   };
 
   const lvlMul = (b, k) => 1 + k * (b.lvl - 1);
   const bDmg = b => BUILD[b.kind].dmg * lvlMul(b, 0.4) * (SHOOTERS[b.kind] ? 1 + 0.1 * perk('fletching') : 1) * (b.spec ? SPECS[b.spec].dmg : 1);
   const bCd = b => BUILD[b.kind].cd * Math.pow(0.92, b.lvl - 1) * (b.spec ? SPECS[b.spec].cd : 1);
   const bRange = b => BUILD[b.kind].range + 4 * (b.lvl - 1) + (b.spec ? SPECS[b.spec].range : 0);
-  const bMaxHp = b => Math.round((BUILD[b.kind].hp || 1) * lvlMul(b, 0.35));
+  const bMaxHp = b => Math.round((BUILD[b.kind].hp || 1) * lvlMul(b, 0.35) * (b.kind === 'wall' ? 1 + WALL_LINK * (b.nb || 0) : 1));
   const bUpCost = b => Math.round(BUILD[b.kind].cost * 0.9 * Math.pow(1.6, b.lvl - 1));
   const knightCap = b => 2 + b.lvl;
   const knightEvery = b => Math.max(3, 7 - 0.8 * (b.lvl - 1));
@@ -155,6 +162,11 @@
     st.occ = new Array(G.cols * G.rows).fill(null);
     for (let r = G.hr0; r < G.hr0 + 3; r++) for (let c = G.hc0; c < G.hc0 + 3; c++) st.occ[r * G.cols + c] = HALL;
     for (const b of st.blds) st.occ[b.r * G.cols + b.c] = b;
+    for (const b of st.blds) if (b.kind === 'wall') {
+      let nb = 0;
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const o = occAt(b.c + dc, b.r + dr); if (o && o !== HALL && o.kind === 'wall') nb++; }
+      if (nb !== (b.nb || 0)) { const old = bMaxHp(b); b.nb = nb; b.hp = b.hp * bMaxHp(b) / old; }
+    }
     computeFlow();
   }
 
@@ -263,7 +275,7 @@
     typeShift: 0.8, bruteFrom: 5, bruteRate: 0.03,         // ako rýchlo pribúdajú orkovia a surovci
     startGold: 150, startGoldMission: 80, goldMission: 0.15, // ekonomika (každá misia začína od nuly)
     bossBase: 0.6, bossMission: 0.33, bossLast: 1.0,       // sila vojvodcu v 5. a 10. vlne
-    pArcher: 0.12, pBat: 0.12, pRam: 0.05, pShaman: 0.04,  // podiel nových nepriateľov
+    pArcher: 0.12, pBat: 0.12, pRam: 0.05, pShaman: 0.04, pSapper: 0.06, // podiel nových nepriateľov
   };
   const goldMul = () => 1 + DIFF.goldMission * (st.mission - 1);
 
@@ -281,6 +293,8 @@
       let type = r < pBrute ? 'brute' : r < pBrute + pOrc ? 'orc' : 'goblin';
       // noví nepriatelia od misie, v ktorej sa predstavia
       const r2 = Math.random();
+      const pSap = m >= 8 && w >= 2 ? DIFF.pSapper : 0;
+      if (r2 >= 1 - pSap) type = 'sapper';
       const pSh = m >= 6 && w >= 2 ? DIFF.pShaman : 0, pRam = m >= 5 && w >= 3 ? DIFF.pRam : 0, pBat = m >= 4 ? DIFF.pBat : 0, pArc = m >= 3 ? DIFF.pArcher : 0;
       if (r2 < pSh) type = 'shaman';
       else if (r2 < pSh + pRam) type = 'ram';
@@ -398,7 +412,7 @@
       hp: d.hp * item.hpMul, max: d.hp * item.hpMul, spd: d.speed * (0.9 + Math.random() * 0.2),
       atk: Math.random() * d.atkCd, anim: Math.random() * 2, flash: 0, lunge: 0,
       jx: (Math.random() - 0.5) * 7, jy: (Math.random() - 0.5) * 5, ph: Math.random() * 6.28,
-      w: spr.w, h: spr.h, dead: false, foe: null, trap: null, attacking: false,
+      w: spr.w, h: spr.h, dead: false, foe: null, trap: null, attacking: false, pow: Math.sqrt(item.hpMul),
     };
     st.enemies.push(e);
     if (d.boss) { st.boss = e; banner('Prichádza Vojvodca!'); AUDIO.play('boss'); }
@@ -431,7 +445,11 @@
 
   function hitBuilding(b, dmg, attacker) {
     b.hp -= dmg; b.flash = 0.08;
-    if (b.spikes && attacker && !attacker.dead) { damage(attacker, spikeDmg(b)); part(attacker.x, attacker.y - 6, 0, -10, 0.3, '#f4f4f8', 60); }
+    if (b.spikes && attacker && !attacker.dead) {
+      damage(attacker, spikeDmg(b)); part(attacker.x, attacker.y - 6, 0, -10, 0.3, b.spikeType ? SPIKE_TYPES[b.spikeType].tip : '#f4f4f8', 60);
+      if (b.spikeType === 'fire') { attacker.burnT = 3; attacker.burnDps = Math.max(attacker.burnDps || 0, spikeDmg(b) * 0.6); }
+      else if (b.spikeType === 'ice') attacker.chillT = 2.5;
+    }
     AUDIO.play(b.hp <= 0 ? 'crumble' : 'thud');
     const c = bCenter(b);
     for (let k = 0; k < 3; k++) part(c.x + (Math.random() - 0.5) * 10, c.y - 4, (Math.random() - 0.5) * 30, -10 - Math.random() * 25, 0.45, Math.random() < 0.5 ? '#848490' : '#6e4422', 90);
@@ -442,6 +460,22 @@
       rebuildOcc();
       st.shake = Math.max(st.shake, 0.12);
     }
+  }
+
+  // podkopník vybuchne: zrania stavby v okolí (najviac hradby), sám zahynie bez koristi
+  function explode(e) {
+    if (e.dead) return;
+    e.dead = true;
+    const R = 20, dmg = e.d.atk * e.pow;
+    AUDIO.play('boom'); st.shake = Math.max(st.shake, 0.2);
+    for (let k = 0; k < 26; k++) { const a = Math.random() * 6.28, sp = 20 + Math.random() * 55; part(e.x, e.y - 4, Math.cos(a) * sp, Math.sin(a) * sp - 20, 0.3 + Math.random() * 0.35, ['#fff070', '#f89838', '#d83818', '#3e2614', '#525262'][k % 5], 60); }
+    for (const b of st.blds.slice()) {
+      if (!BUILD[b.kind].block || !st.blds.includes(b)) continue;
+      const c = bCenter(b);
+      if (Math.hypot(c.x - e.x, c.y - e.y) <= R) hitBuilding(b, b.kind === 'wall' ? dmg : dmg * 0.5, null);
+    }
+    const hr = hallRect();
+    if (e.x > hr.x0 - R && e.x < hr.x1 + R && e.y > hr.y0 - R && e.y < hr.y1) hitHall(dmg * 0.4, e.x);
   }
 
   function hitHall(dmg, x) {
@@ -479,7 +513,8 @@
       if (e.hp <= 0) { kill(e); return; }
     }
     if (e.stunT > 0) { e.stunT -= dt; return; }
-    const slow = st.freezeT > 0 ? 0.35 : 1;
+    if (e.chillT > 0) { e.chillT -= dt; if (Math.random() < 0.2) part(e.x + (Math.random() - 0.5) * e.w * 0.5, e.y - Math.random() * e.h, 0, -6, 0.4, '#e0f4ff', 0); }
+    const slow = (st.freezeT > 0 ? 0.35 : 1) * (e.chillT > 0 ? 0.5 : 1);
     const attackFn = (fn) => {
       e.attacking = true;
       e.atk -= dt * slow;
@@ -526,10 +561,11 @@
       }
     } else e.trap = null;
 
-    const attack = attackFn;
+    // podkopník namiesto úderu vybuchne
+    const attack = e.d.sapper ? () => explode(e) : attackFn;
 
-    // súboj s rytierom / kráľom (beranidlo rytierov ignoruje)
-    if (e.d.ram) e.foe = null;
+    // súboj s rytierom / kráľom (beranidlo a podkopník rytierov ignorujú)
+    if (e.d.ram || e.d.sapper) e.foe = null;
     if (e.foe && (e.foe.dead || e.foe.down > 0)) e.foe = null;
     if (e.foe) {
       if (Math.hypot(e.foe.x - e.x, e.foe.y - e.y) < 12) { attack(() => hitUnit(e.foe, e.d.atk * 0.7 * (e.foe.ktype === 'shield' ? 0.5 : 1))); return; }
@@ -568,6 +604,12 @@
       if (d < nd) { nd = d; nearB = b; }
     }
     if (nearB) { attack(() => hitBuilding(nearB, e.d.atk, e)); return; }
+    // podkopník beží rovno k najbližšej hradbe
+    if (e.d.sapper && e.y > 4) {
+      let tw = null, td = 1e9;
+      for (const b of st.blds) if (b.kind === 'wall') { const d = Math.hypot(tileX(b.c) + T / 2 - e.x, tileY(b.r) + T / 2 - e.y); if (d < td) { td = d; tw = b; } }
+      if (tw) { moveTo(e, tileX(tw.c) + T / 2, tileY(tw.r) + T / 2, spd, dt); return; }
+    }
     // pri radnici?
     const hr = hallRect();
     const qx = Math.max(hr.x0 + 2, Math.min(hr.x1 - 2, e.x)), qy = Math.max(hr.y0 - 1, Math.min(hr.y1 - 1, e.y));
@@ -1007,7 +1049,9 @@
       if (joinsBuilding(b.c + 1, b.r)) slice(x0 + T, 4);
       if (joinsBuilding(b.c - 1, b.r)) slice(x0 - 4, 4);
       if (b.spikes) { // ostne na čele hradby
-        for (let k = 1; k < T - 1; k += 3) { g.fillStyle = PAL.K; g.fillRect(x0 + k, y0 + 6, 1, 3); g.fillStyle = '#f4f4f8'; g.fillRect(x0 + k, y0 + 5, 1, 1); g.fillStyle = '#bcc0cc'; g.fillRect(x0 + k, y0 + 6, 1, 2); }
+        const sk = b.spikeType ? SPIKE_TYPES[b.spikeType] : null;
+        for (let k = 1; k < T - 1; k += 3) { g.fillStyle = PAL.K; g.fillRect(x0 + k, y0 + 6, 1, 3); g.fillStyle = sk ? sk.tip : '#f4f4f8'; g.fillRect(x0 + k, y0 + 5, 1, 1); g.fillStyle = sk ? sk.body : '#bcc0cc'; g.fillRect(x0 + k, y0 + 6, 1, 2); }
+        if (b.spikeType === 'fire' && Math.random() < 0.04) part(x0 + 2 + Math.random() * (T - 4), y0 + 5, 0, -10, 0.4, '#f89838', -5);
       }
       if (b.gate) {
         const gh = BSPR.gatehouse[wl];
@@ -1117,6 +1161,21 @@
         else g.drawImage(spr.c, hx + T / 2 - Math.floor(spr.w / 2), hy + T + 1 - spr.h);
         g.globalAlpha = 1;
       } else corners(ox, oy, ox + T - 1, oy + T - 1, blink ? '#9cd45a' : '#ffffff');
+    }
+    if (drag) { // náhľad radu hradieb pred pustením prsta
+      const key = (c, r) => c + ',' + r, inPath = new Set(drag.path.map(q => key(q.c, q.r))), ok = wallsAfford();
+      const j = (c, r) => inPath.has(key(c, r)) || joins(c, r);
+      g.globalAlpha = 0.65;
+      drag.path.forEach((q, i) => {
+        const x = tileX(q.c), y = tileY(q.r);
+        const m = (j(q.c, q.r - 1) ? 1 : 0) | (j(q.c + 1, q.r) ? 2 : 0) | (j(q.c, q.r + 1) ? 4 : 0) | (j(q.c - 1, q.r) ? 8 : 0);
+        g.drawImage(BSPR.wall[0][m].c, x, y - 6);
+        if (i >= ok) { g.fillStyle = 'rgba(232,72,56,0.55)'; g.fillRect(x, y - 6, T, T + 6); }
+      });
+      g.globalAlpha = 1;
+      const q = drag.path[drag.path.length - 1], n = Math.min(drag.path.length, ok);
+      const s = String(n * costOf('wall')), tx = Math.max(2, Math.min(W - s.length * 4 - 2, tileX(q.c) + T / 2 - s.length * 2)), ty = tileY(q.r) - 14;
+      pxText(g, s, tx, ty, n < drag.path.length ? '#e84838' : '#f8d048');
     }
     if (st.sel === HALL) { const h = hallRect(); corners(h.x0, h.y0 - 8, h.x1 - 1, h.y1 - 1, col); }
     else if (selGroup()) for (const w of st.selGroup) corners(tileX(w.c), tileY(w.r), tileX(w.c) + T - 1, tileY(w.r) + T - 1, col);
@@ -1450,7 +1509,7 @@
     ICONS.u_crossbow = spriteURL(SPR.knight[0], 3);
     ICONS.hall = spriteURL(BSPR.hall[2], 2);
     ICONS.king = spriteURL(SPR.king[0], 3);
-    for (const k of ['garcher', 'bat', 'ram', 'shaman']) ICONS['e_' + k] = spriteURL(SPR[k][0], 3);
+    for (const k of ['garcher', 'bat', 'ram', 'shaman', 'sapper']) ICONS['e_' + k] = spriteURL(SPR[k][0], 3);
     ICONS.coin = spriteURL(SPR.coin[0], 4);
     ICONS.gem = spriteURL(SPR.gem[0], 4);
     document.querySelectorAll('img.coin').forEach(i => { i.src = ICONS.coin; });
@@ -1528,7 +1587,7 @@
     const acts = document.createElement('div'); acts.className = 'acts';
     if (st.tool) {
       const d = BUILD[st.tool];
-      card(ICONS[st.tool], d.name, d.desc + (st.tool === 'wall' ? '. Ťukni pre jednu, potiahni prstom pre celý rad. Dvojťukom na hradbu označíš celý rad.' : '. Ťukni na voľné políčko v zóne.'));
+      card(ICONS[st.tool], d.name, d.desc + (st.tool === 'wall' ? '. Ťukni pre jednu alebo potiahni prstom – pustením sa rad postaví. Dvojťukom na hradbu označíš celý rad.' : '. Ťukni na voľné políčko v zóne.'));
     } else if (st.sel === HALL) {
       card(ICONS.hall, 'Radnica · úr. ' + st.hallLvl, 'Kráľ ju bráni. Vylepšenie pridá zdravie, silu kráľa a rozšíri územie o 1 rad.');
       if (st.hallLvl < hallCap()) {
@@ -1544,40 +1603,66 @@
       } else acts.appendChild(lockBtn('Salva', 'volleyUp'));
       info.appendChild(acts);
     } else if (selGroup()) {
-      const grp = st.selGroup, cap = lvlCap();
+      // hromadné akcie pre označenú skupinu (rad hradieb alebo všetky stavby jedného druhu)
+      const grp = st.selGroup, kind = grp[0].kind, d = BUILD[kind], isWall = kind === 'wall', cap = lvlCap();
       const minL = Math.min(...grp.map(w => w.lvl)), maxL = Math.max(...grp.map(w => w.lvl));
-      card(ICONS.wall, 'Rad hradieb · ' + grp.length + ' ks', 'Úroveň ' + (minL === maxL ? minL : minL + '–' + maxL) + '. Vylepšenie zdvihne o 1 úroveň každú hradbu v rade (najprv tie najslabšie).');
-      // najslabšie hradby prvé, toľko, koľko zlato dovolí
-      const cand = grp.filter(w => w.lvl < cap).sort((a, b) => a.lvl - b.lvl);
-      let sum = 0; const pick = [];
-      for (const w of cand) { const c = bUpCost(w); if (sum + c > st.gold) break; sum += c; pick.push(w); }
-      if (cand.length) {
-        const all = pick.length === cand.length;
-        const label = all ? 'Vylepšiť všetky (' + cand.length + ')' : pick.length ? 'Vylepšiť ' + pick.length + ' z ' + cand.length : 'Vylepšiť všetky (' + cand.length + ')';
-        const cost = pick.length ? sum : cand.reduce((s, w) => s + bUpCost(w), 0);
-        acts.appendChild(btn(label, cost, pick.length > 0, () => {
-          for (const w of pick) {
-            const ratio = w.hp / bMaxHp(w), c = bUpCost(w);
-            st.gold -= c; w.spent += c; w.lvl++;
-            w.hp = Math.ceil(bMaxHp(w) * ratio);
-          }
-          rebuildOcc();
-        }, 'up wide'));
-      } else if (maxL < MAX_LVL) acts.appendChild(lockBtn('Úr. ' + (minL + 1), 'lvl5', true));
+      card(ICONS[kind], (isWall ? 'Rad hradieb' : d.name + ' – všetky') + ' · ' + grp.length + ' ks',
+        'Úroveň ' + (minL === maxL ? minL : minL + '–' + maxL) + '. Akcie platia pre každú stavbu v skupine – najprv pre tie najslabšie, kým stačí zlato.');
+      // tlačidlo „pre všetky“: ak zlato nestačí, urobí toľko, koľko sa dá („3 z 6“)
+      const bulk = (to, name, list, costFn, apply, cls) => {
+        if (!list.length) return;
+        let sum = 0; const pick = [];
+        for (const x of list) { const c = costFn(x); if (sum + c > st.gold) break; sum += c; pick.push(x); }
+        const all = pick.length === list.length;
+        to.appendChild(btn(name + (all || !pick.length ? ' (' + list.length + ')' : ' · ' + pick.length + ' z ' + list.length),
+          pick.length ? sum : list.reduce((t, x) => t + costFn(x), 0), pick.length > 0, () => { for (const x of pick) apply(x); rebuildOcc(); }, cls));
+      };
+      const byLvl = (a, b) => a.lvl - b.lvl;
+      const cand = grp.filter(w => w.lvl < cap).sort(byLvl);
+      if (cand.length) bulk(acts, 'Vylepšiť všetky', cand, bUpCost, w => {
+        const ratio = d.hp ? w.hp / bMaxHp(w) : 1, c = bUpCost(w);
+        st.gold -= c; w.spent += c; w.lvl++;
+        if (d.hp) w.hp = Math.ceil(bMaxHp(w) * ratio);
+      }, 'up wide');
+      else if (maxL < MAX_LVL) acts.appendChild(lockBtn('Úr. ' + (minL + 1), 'lvl5', true));
       else acts.appendChild(btn('Max. úroveň', null, false, () => { }, 'wide'));
-      // ostne pre celý rad – na tie, ktoré ich ešte nemajú, kým stačí zlato
-      const bare = grp.filter(w => !w.spikes);
-      if (bare.length) {
-        if (!has('spikes')) acts.appendChild(lockBtn('Ostne', 'spikes', true));
-        else {
-          const n = Math.min(bare.length, Math.floor(st.gold / SPIKE_COST)), all = n === bare.length;
-          const label = 'Ostne ' + (all || !n ? 'na všetky (' + bare.length + ')' : 'na ' + n + ' z ' + bare.length);
-          acts.appendChild(btn(label, (n || bare.length) * SPIKE_COST, n > 0, () => {
-            for (const w of bare.slice(0, n)) { st.gold -= SPIKE_COST; w.spent += SPIKE_COST; w.spikes = true; }
-          }, 'wide'));
+      if (d.hp) {
+        const fixC = w => Math.ceil((bMaxHp(w) - w.hp) * 0.15);
+        bulk(acts, 'Opraviť', grp.filter(w => fixC(w) > 0), fixC, w => { st.gold -= fixC(w); w.hp = bMaxHp(w); });
+      }
+      const refund = grp.reduce((t, w) => t + Math.floor(w.spent / 2) + (w.unit ? Math.floor(w.unit.spent / 2) : 0), 0);
+      acts.appendChild(btn('Predať všetky +' + refund, null, true, () => {
+        st.gold += refund; st.blds = st.blds.filter(x => !grp.includes(x)); st.sel = null; st.selGroup = null;
+        for (const s of st.soldiers) if (grp.includes(s.home)) s.dead = true;
+        st.soldiers = st.soldiers.filter(s => !s.dead);
+        rebuildOcc();
+      }, 'sell'));
+      info.appendChild(acts);
+      const section = (title) => { const t = document.createElement('div'); t.className = 'secTitle'; t.textContent = title; info.appendChild(t); const a = document.createElement('div'); a.className = 'acts'; info.appendChild(a); return a; };
+      if (isWall) {
+        // ostne a ich druh
+        const bare = grp.filter(w => !w.spikes), plain = grp.filter(w => w.spikes && !w.spikeType);
+        if (bare.length || plain.length) {
+          const sa = section('Ostne');
+          if (!has('spikes')) sa.appendChild(lockBtn('Ostne', 'spikes', true));
+          else bulk(sa, 'Ostne na všetky', bare, () => SPIKE_COST, w => { st.gold -= SPIKE_COST; w.spent += SPIKE_COST; w.spikes = true; }, 'wide');
+          if (plain.length) {
+            if (!has('spikeTypes')) sa.appendChild(lockBtn('Ohnivé a ľadové ostne', 'spikeTypes', true));
+            else for (const k in SPIKE_TYPES) bulk(sa, SPIKE_TYPES[k].name, plain, () => SPIKE_TYPE_COST, w => { st.gold -= SPIKE_TYPE_COST; w.spent += SPIKE_TYPE_COST; w.spikeType = k; }, 'wide');
+          }
+        }
+        // strelci na hradbách
+        const free = grp.filter(w => !w.gate && !w.unit), manned = grp.filter(w => w.unit && w.unit.lvl < cap).sort((a, b) => a.unit.lvl - b.unit.lvl);
+        if (has('wallArcher') && (free.length || manned.length)) {
+          const ua = section('Strelci na hradbách');
+          if (free.length) for (const type in WUNIT) {
+            const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
+            if (!has(tid)) { ua.appendChild(lockBtn(wd.name, tid)); continue; }
+            bulk(ua, '<img class="uicon" src="' + ICONS['u_' + type] + '">' + wd.name, free, () => wd.cost, w => { st.gold -= wd.cost; w.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit');
+          }
+          if (manned.length) bulk(ua, 'Vylepšiť strelcov', manned, w => uUpCost(w.unit), w => { const c = uUpCost(w.unit); st.gold -= c; w.unit.spent += c; w.unit.lvl++; }, 'up wide');
         }
       }
-      info.appendChild(acts);
     } else if (st.sel) {
       const b = st.sel, d = BUILD[b.kind];
       let stats = '';
@@ -1592,7 +1677,8 @@
       else if (b.kind === 'pit') stats = 'Poškodenie ' + Math.round(bDmg(b));
       if (d.hp) stats += (stats ? ' · ' : '') + 'zdravie ' + Math.ceil(b.hp) + '/' + bMaxHp(b);
       if (b.gate) stats += ' · rytieri cez ňu prejdú';
-      if (b.spikes) stats += ' · ostne ' + spikeDmg(b);
+      if (b.spikes) stats += ' · ' + (b.spikeType ? SPIKE_TYPES[b.spikeType].name.toLowerCase() : 'ostne') + ' ' + spikeDmg(b);
+      if (b.kind === 'wall' && b.nb) stats += ' · spojenie +' + Math.round(WALL_LINK * b.nb * 100) + ' %';
       if (b.spec) stats += ' · ' + SPECS[b.spec].name;
       if (b.kind === 'barracks') stats += ' · ' + KTYPES[b.ktype || 'knight'].name;
       card(b.gate ? ICONS.gate : ICONS[b.kind], (b.gate ? 'Brána' : d.name) + ' · úr. ' + b.lvl, stats);
@@ -1623,6 +1709,10 @@
       if (b.kind === 'wall' && !b.spikes) {
         if (has('spikes')) acts.appendChild(btn('Ostne (zrania útočníkov)', SPIKE_COST, st.gold >= SPIKE_COST, () => { st.gold -= SPIKE_COST; b.spent += SPIKE_COST; b.spikes = true; }, 'wide'));
         else acts.appendChild(lockBtn('Ostne', 'spikes', true));
+      }
+      if (b.kind === 'wall' && b.spikes && !b.spikeType) {
+        if (!has('spikeTypes')) acts.appendChild(lockBtn('Ohnivé a ľadové ostne', 'spikeTypes', true));
+        else for (const k in SPIKE_TYPES) acts.appendChild(btn(SPIKE_TYPES[k].name, SPIKE_TYPE_COST, st.gold >= SPIKE_TYPE_COST, () => { st.gold -= SPIKE_TYPE_COST; b.spent += SPIKE_TYPE_COST; b.spikeType = k; }, 'wide'));
       }
       info.appendChild(acts);
       const section = (title) => { const t = document.createElement('div'); t.className = 'secTitle'; t.textContent = title; info.appendChild(t); const a = document.createElement('div'); a.className = 'acts'; info.appendChild(a); return a; };
@@ -1673,7 +1763,7 @@
         info.appendChild(ua);
       }
     } else {
-      card(ICONS.hall, 'Vyber stavbu', 'Zvoľ stavbu dole a ťukni na voľné políčko. Ťuknutím na stavbu alebo radnicu ju vylepšíš.');
+      card(ICONS.hall, 'Vyber stavbu', 'Zvoľ stavbu dole a ťukni na voľné políčko. Ťuknutím na stavbu alebo radnicu ju vylepšíš, dvojťukom označíš všetky rovnaké (pri hradbách celý rad).');
     }
     const rc = repairCost();
     $('undoBtn').disabled = !undoStack.length;
@@ -1714,16 +1804,14 @@
   };
   const evTile = p => ({ c: Math.floor((p.x - G.gx0) / T), r: Math.floor((p.y - G.gy0) / T) });
 
-  // hradby: ťuk = jedna, držanie a ťahanie = rad hradieb, kým stačí zlato
-  let drag = null;
+  // hradby: ťuk = jedna, ťahanie = náhľad radu s cenou, pustením prsta sa postaví (kým stačí zlato)
+  let drag = null;                        // {path: [{c, r}], last}
+  const wallFree = (c, r) => inZone(c, r) && !inHall(c, r) && !occAt(c, r);
+  const wallsAfford = () => Math.floor(st.gold / costOf('wall'));
   function placeWall(c, r) {
-    if (!inZone(c, r) || inHall(c, r) || occAt(c, r)) return false;
-    if (st.gold < costOf('wall')) { if (!drag.warned) { drag.warned = true; toast('Nedostatok zlata'); } return false; }
     st.gold -= costOf('wall');
     addBuilding('wall', c, r);
-    AUDIO.play('build');
     for (let k = 0; k < 5; k++) part(tileX(c) + 8 + (Math.random() - 0.5) * 12, tileY(r) + 12, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.4, '#c6a272', 60);
-    return true;
   }
   // ---- presúvanie stavieb (ťahaním alebo tlačidlom „Presunúť“) ----
   let bdrag = null;                       // ťahaná stavba {b, start, hover, moved}
@@ -1778,12 +1866,9 @@
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
       return;
     }
-    if (st.tool === 'wall' && inZone(t.c, t.r) && !inHall(t.c, t.r) && !occAt(t.c, t.r)) {
-      snapshot();
-      drag = { last: t, warned: false, placed: 0 };
+    if (st.tool === 'wall' && wallFree(t.c, t.r)) {
+      drag = { path: [t], last: t };
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
-      if (placeWall(t.c, t.r)) drag.placed++;
-      renderBuild();
       return;
     }
     tapBuild(p.x, p.y);
@@ -1807,14 +1892,14 @@
     if (t.c === drag.last.c && t.r === drag.last.r) return;
     // prejdi všetky políčka medzi poslednou a aktuálnou pozíciou (aby rýchly ťah nič nepreskočil)
     let { c, r } = drag.last;
-    let placed = false;
     while (c !== t.c || r !== t.r) {
       const dc = t.c - c, dr = t.r - r;
       if (Math.abs(dc) >= Math.abs(dr)) c += Math.sign(dc); else r += Math.sign(dr);
-      if (placeWall(c, r)) { placed = true; drag.placed++; }
+      const back = drag.path.findIndex(q => q.c === c && q.r === r);
+      if (back >= 0) drag.path.length = back + 1;          // návrat prstom späť skráti rad
+      else if (wallFree(c, r)) drag.path.push({ c, r });
     }
     drag.last = t;
-    if (placed) renderBuild();
   });
   const endDrag = () => {
     if (mapDrag) { // krátky ťuk bez posunu = výber misie
@@ -1826,17 +1911,26 @@
       const bd = bdrag; bdrag = null;
       if (st.phase !== 'build') return;
       if (!bd.moved) {
-        const now = performance.now(), dbl = bd.b.kind === 'wall' && lastTap && lastTap.b === bd.b && now - lastTap.t < 400;
+        const now = performance.now(), dbl = lastTap && lastTap.b === bd.b && now - lastTap.t < 400;
         lastTap = dbl ? null : { b: bd.b, t: now };
-        st.sel = bd.b; st.selGroup = dbl ? wallRow(bd.b) : null; st.tool = null; st.moving = null;
+        st.sel = bd.b; st.selGroup = dbl ? (bd.b.kind === 'wall' ? wallRow(bd.b) : st.blds.filter(x => x.kind === bd.b.kind)) : null; st.tool = null; st.moving = null;
         AUDIO.play('click'); renderBuild();
       }
       else moveBuilding(bd.b, bd.hover.c, bd.hover.r);
       return;
     }
     if (drag) {
-      if (!drag.placed) undoStack.pop(); // nič sa nepostavilo – krok sa neráta
-      drag = null; if (st.gold < costOf('wall')) st.tool = null; renderBuild();
+      const path = drag.path; drag = null;
+      if (st.phase !== 'build') return;
+      const n = Math.min(path.length, wallsAfford());
+      if (n < path.length) { toast('Nedostatok zlata'); AUDIO.play('deny'); }
+      if (n > 0) {
+        snapshot();
+        for (const q of path.slice(0, n)) placeWall(q.c, q.r);
+        AUDIO.play('build');
+      }
+      if (st.gold < costOf('wall')) st.tool = null;
+      renderBuild();
     }
   };
   screen.addEventListener('pointerup', endDrag);
