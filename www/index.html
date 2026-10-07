@@ -42,14 +42,21 @@
   #hud {
     position: absolute; left: 0; right: 0; top: 0;
     padding: calc(env(safe-area-inset-top) + 8px) 10px 0;
-    display: grid; grid-template-columns: auto auto 1fr auto; gap: 8px; align-items: center;
+    display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: 'wave wall gold' 'king . .';
+    gap: 6px 8px; align-items: center;
     pointer-events: none; z-index: 5;
   }
-  /* kráľ v hornom paneli: zdravie, pri nízkom bliká načerveno, padnutý je sivý a prečiarknutý */
-  #hud-king { position: relative; flex-direction: column; gap: 2px; padding: 3px 6px; align-self: stretch; justify-content: center; }
-  #hud-king img { height: 20px; }
-  #hud-king .bar { width: 24px; height: 4px; }
-  #hud-king .bar i { background: linear-gradient(#fff070, #d8a030); transition: width .2s; }
+  /* kráľ v hornom paneli: pod vlnou, rovnako široký; dole zdravie a XP. Pri nízkom zdraví bliká, padnutý je sivý a prečiarknutý */
+  #hud-wave { grid-area: wave; justify-content: center; }
+  #hud-wall { grid-area: wall; }
+  #hud-gold { grid-area: gold; }
+  #hud-king {
+    grid-area: king; position: relative; flex-direction: column; align-items: stretch; gap: 3px;
+    padding: 4px 8px 6px;
+  }
+  #hud-king img { height: 34px; align-self: center; }
+  #hud-king .bar { height: 5px; }
+  #hud-king .bar.hp i { background: linear-gradient(#fff070, #d8a030); transition: width .2s; }
   #hud-king.hurt { animation: kingHurt .5s infinite; }
   @keyframes kingHurt { 50% { border-color: var(--red); box-shadow: 0 0 10px rgba(232,72,56,.8); } }
   #hud-king.dead img { filter: grayscale(1) brightness(.6); }
@@ -67,14 +74,14 @@
   .bar { height: 8px; background: #3a1410; border: 1px solid var(--ink); border-radius: 2px; overflow: hidden; }
   .bar i { display: block; height: 100%; width: 100%; background: linear-gradient(#9cd45a, #62a03a); transition: width .15s; }
   .bar i.low { background: linear-gradient(#ff7a5a, #c83020); }
-  .bar.xp { height: 4px; background: #16222e; }
+  .bar.xp { background: #16222e; }
   .bar.xp i { width: 0; background: linear-gradient(#cdeaff, #7ab8ee); transition: width .5s; }
   #hallTxt { font-size: 11px; color: var(--muted); text-align: center; line-height: 1; }
   img.coin, img.gem { width: 16px; height: 16px; }
   #goldTxt { color: var(--gold); }
 
   #bossbar {
-    position: absolute; left: 14%; right: 14%; top: calc(env(safe-area-inset-top) + 52px);
+    position: absolute; left: 34%; right: 6%; top: calc(env(safe-area-inset-top) + 52px);
     text-align: center; font-size: 13px; font-weight: 700; color: #ffb090; text-shadow: 1px 1px 0 var(--ink);
     pointer-events: none;
   }
@@ -417,9 +424,9 @@
 
   <div id="hud" hidden>
     <div class="pill" id="hud-wave"><span id="waveTxt">Vlna 1</span></div>
-    <div class="pill" id="hud-king" title="Kráľ"><img id="kingIcon" alt=""><div class="bar"><i id="kingFill"></i></div></div>
-    <div class="pill" id="hud-wall"><div class="bar"><i id="hallFill"></i></div><div class="bar xp" title="Skúsenosti kráľa"><i id="xpFill"></i></div><span id="hallTxt"></span></div>
-    <div class="pill"><img class="coin" alt=""><span id="goldTxt">0</span></div>
+    <div class="pill" id="hud-wall"><div class="bar"><i id="hallFill"></i></div><span id="hallTxt"></span></div>
+    <div class="pill" id="hud-gold"><img class="coin" alt=""><span id="goldTxt">0</span></div>
+    <div class="pill" id="hud-king" title="Kráľ"><img id="kingIcon" alt=""><div class="bar hp"><i id="kingFill"></i></div><div class="bar xp" title="Skúsenosti kráľa"><i id="xpFill"></i></div></div>
   </div>
   <div id="bossbar" hidden>Vojvodca orkov<div class="bar"><i id="bossFill"></i></div></div>
   <div id="banner"></div>
