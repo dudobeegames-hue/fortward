@@ -9,6 +9,7 @@
   const T = 16;            // veľkosť políčka mriežky
   const MAX_LVL = 5;
   const GRID_COLS = 11;     // šírka hracej mriežky v políčkach
+  const GROUND_PAD = 10;    // pás terénu pod mriežkou (herné px), aby radnica nestála priamo na paneli
   let W = 180, H = 360, S = 1, DPR = 1, scene = null;
   let camY = 0; // o koľko herných pixelov je bojisko posunuté nahor (kvôli panelu dole)
   const G = { T, gx0: 0, gy0: 0, cols: 11, rows: 24, hc0: 4, hr0: 20, hallCx: 0, hallTop: 0, hallBot: 0, zoneTopMax: 0 };
@@ -254,7 +255,7 @@
     const oldHc = G.hc0, oldHr = G.hr0, had = !!scene;
     // pevný počet stĺpcov na každom zariadení (zmestí sa aj do najužšej plochy 180 px) – zmena okna tak mriežku neposúva
     G.cols = Math.min(GRID_COLS, Math.floor(W / T)); G.gx0 = Math.floor((W - G.cols * T) / 2);
-    G.rows = Math.floor(H / T); G.gy0 = H - G.rows * T;
+    G.rows = Math.floor((H - GROUND_PAD) / T); G.gy0 = H - GROUND_PAD - G.rows * T;
     G.hc0 = Math.floor(G.cols / 2) - 1; G.hr0 = G.rows - 3;
     G.hallCx = tileX(G.hc0) + 1.5 * T; G.hallTop = tileY(G.hr0); G.hallBot = G.hallTop + 3 * T;
     G.zoneTopMax = tileY(G.rows - (5 + MAX_LVL));
@@ -1225,14 +1226,18 @@
     g.fillStyle = 'rgba(255,240,112,0.55)';
     const yb = tileY(zt);
     for (let x = G.gx0; x < G.gx0 + G.cols * T; x += 4) g.fillRect(x, yb, 2, 1);
+    // mriežka: tenké čiary po okrajoch políčok, výraznejšie keď je zvolená stavba
+    const lineCol = st.tool ? 'rgba(255,255,255,0.24)' : 'rgba(255,255,255,0.13)';
     for (let r = zt; r <= G.rows - 1; r++) for (let c = 0; c < G.cols; c++) {
       if (inHall(c, r)) continue;
       const x = tileX(c), y = tileY(r), o = occAt(c, r);
-      if (!o && st.tool) {
-        g.fillStyle = 'rgba(255,255,255,0.07)'; g.fillRect(x + 1, y + 1, T - 2, T - 2);
-        g.fillStyle = 'rgba(255,255,255,0.3)';
-      } else g.fillStyle = 'rgba(255,255,255,0.18)';
-      g.fillRect(x, y, 1, 1); g.fillRect(x + T - 1, y, 1, 1); g.fillRect(x, y + T - 1, 1, 1); g.fillRect(x + T - 1, y + T - 1, 1, 1);
+      if (!o && st.tool) { g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(x + 1, y + 1, T - 2, T - 2); }
+      g.fillStyle = lineCol;
+      g.fillRect(x + 1, y, T - 1, 1); g.fillRect(x, y + 1, 1, T - 1);       // horná a ľavá hrana
+      if (c === G.cols - 1 || inHall(c + 1, r)) g.fillRect(x + T - 1, y + 1, 1, T - 1);
+      if (r === G.rows - 1 || inHall(c, r + 1)) g.fillRect(x + 1, y + T - 1, T - 1, 1);
+      g.fillStyle = st.tool ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.3)'; // rohy
+      g.fillRect(x, y, 1, 1);
     }
     const col = blink ? '#f8d048' : '#fff070';
     // presúvanie: zvýrazni cieľ a ukáž polopriehľadnú stavbu
@@ -2058,7 +2063,7 @@
     rebuildOcc(); renderBuild();
   });
   $('speedBtn').addEventListener('click', () => {
-    st.speed = st.speed === 1 ? 2 : 1;
+    st.speed = st.speed >= 3 ? 1 : st.speed + 1;
     $('speedBtn').textContent = 'x' + st.speed;
   });
   function clearBattle() {
