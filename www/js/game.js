@@ -93,14 +93,14 @@
   const bUpCost = b => Math.round(BUILD[b.kind].cost * 0.9 * Math.pow(1.6, b.lvl - 1));
   const knightCap = b => 2 + b.lvl;
   const knightEvery = b => Math.max(3, 7 - 0.8 * (b.lvl - 1));
-  const knightHp = b => 40 * lvlMul(b, 0.3) * (1 + 0.2 * perk('drill'));
-  const knightDmg = b => 6 * lvlMul(b, 0.35) * (1 + 0.2 * perk('drill'));
+  const knightHp = b => 40 * lvlMul(b, 0.3) * (1 + 0.2 * perk('drill')) * (1 + 0.1 * tal('command'));
+  const knightDmg = b => 6 * lvlMul(b, 0.35) * (1 + 0.2 * perk('drill')) * (1 + 0.1 * tal('command'));
   const hallMax = () => Math.round((400 + 200 * (st.hallLvl - 1)) * (1 + 0.15 * perk('foundations')));
   const hallUpCost = () => Math.round(110 * Math.pow(1.7, st.hallLvl - 1)); // lacnejšie – radnica odomyká aj úrovne stavieb
   const zoneRows = () => 5 + st.hallLvl;
-  const kingMax = () => 120 * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.25 * perk('armor'));
-  const kingDmg = () => 12 * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.25 * perk('armor'));
-  const volleyDmg = () => (6 + 4 * (st.volleyLvl - 1)) * (1 + 0.25 * perk('archery'));
+  const kingMax = () => 120 * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.25 * perk('armor')) * (1 + 0.2 * tal('vit'));
+  const kingDmg = () => 12 * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.25 * perk('armor')) * (1 + 0.15 * tal('str'));
+  const volleyDmg = () => (6 + 4 * (st.volleyLvl - 1)) * (1 + 0.25 * perk('archery')) * (1 + 0.15 * tal('archers'));
   const volleyCd = () => Math.max(2, 5 - 0.25 * (st.volleyLvl - 1) - 0.4 * perk('archery'));
   const volleyUpCost = () => Math.round(60 * Math.pow(1.6, st.volleyLvl - 1));
 
@@ -120,6 +120,34 @@
   const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } };
   const meta = { stars: loadJSON('fortward.stars', []), perks: loadJSON('fortward.perks', {}) };
   const perk = id => meta.perks[id] || 0;
+
+  // ---- Levelovanie kráľa: XP za prežité vlny, na každej novej úrovni výber z 3 vylepšení (natrvalo) ----
+  const KING_MAX_LVL = 15, TAL_MAX = 3;
+  const TALENTS = [
+    { id: 'str',     name: 'Kráľovská sila',  desc: 'Kráľ udiera o 15 % silnejšie',                    icon: 'king' },
+    { id: 'vit',     name: 'Pevné zdravie',   desc: 'Kráľ má o 20 % viac zdravia',                     icon: 'king' },
+    { id: 'swift',   name: 'Rýchly meč',      desc: 'Kráľ udiera o 12 % rýchlejšie',                   icon: 'king' },
+    { id: 'reach',   name: 'Bdelé oko',       desc: 'Kráľ vyráža na hordu ďalej od radnice',           icon: 'king' },
+    { id: 'regen',   name: 'Kráľovská krv',   desc: 'Kráľ sa v boji sám lieči',                         icon: 'king' },
+    { id: 'rally',   name: 'Nezlomný',        desc: 'Zranený kráľ sa vráti do boja o 2 s skôr',         icon: 'king' },
+    { id: 'tax',     name: 'Kráľovská daň',   desc: 'Po každej vlne +6 zlata navyše',                   icon: 'coin' },
+    { id: 'command', name: 'Velenie',         desc: 'Rytieri o 10 % silnejší a odolnejší',              icon: 'barracks', need: 'barracks' },
+    { id: 'archers', name: 'Kráľovská salva', desc: 'Šípová salva o 15 % silnejšia',                    icon: 'u_archer' },
+    { id: 'roar',    name: 'Hromový hlas',    desc: 'Pokrik trvá o 2 s dlhšie',                         icon: 'king', need: 'warcry' },
+    { id: 'frost',   name: 'Ľadový dych',     desc: 'Mráz trvá o 1,5 s dlhšie',                         icon: 'king', need: 'freeze' },
+  ];
+  const kingMeta = Object.assign({ lvl: 1, xp: 0, pending: 0, tal: {} }, loadJSON('fortward.king', {}));
+  const tal = id => kingMeta.tal[id] || 0;
+  const kingXpNeed = l => 60 + 40 * (l - 1);
+  const saveKing = () => saveJSON('fortward.king', kingMeta);
+  function gainKingXp(n) {
+    if (kingMeta.lvl >= KING_MAX_LVL) return 0;
+    kingMeta.xp += n;
+    while (kingMeta.lvl < KING_MAX_LVL && kingMeta.xp >= kingXpNeed(kingMeta.lvl)) { kingMeta.xp -= kingXpNeed(kingMeta.lvl); kingMeta.lvl++; kingMeta.pending++; }
+    if (kingMeta.lvl >= KING_MAX_LVL) kingMeta.xp = 0;
+    saveKing();
+    return n;
+  }
   const starsTotal = () => meta.stars.reduce((a, b) => a + (b || 0), 0);
   const starsSpent = () => Object.values(meta.perks).reduce((a, l) => a + l * (l + 1) / 2, 0); // úroveň n stojí 1+2+…+n
   const starsFree = () => starsTotal() - starsSpent();
@@ -346,6 +374,7 @@
     $('build').hidden = false;
     renderBuild();
     updateHud();
+    if (kingMeta.pending) setTimeout(() => { if (st.phase === 'build') showTalentPick(); }, 600);
   }
 
   function startWave() {
@@ -363,8 +392,11 @@
   }
 
   function endWave() {
-    const bonus = Math.round((10 + st.wave * 4) * goldMul());
+    const bonus = Math.round((10 + st.wave * 4) * goldMul()) + 6 * tal('tax');
     st.gold += bonus;
+    const lvl0 = kingMeta.lvl;
+    st.lastXp = gainKingXp(8 + 2 * st.wave + (st.wave >= MISSION_WAVES ? 40 : 0));
+    if (kingMeta.lvl > lvl0 && st.king) for (let k = 0; k < 24; k++) part(st.king.x, st.king.y - 8, (Math.random() - 0.5) * 50, -Math.random() * 60, 0.9, ['#f8d048', '#fff070', '#ffffff'][k % 3], 60);
     let mined = 0;
     for (const b of st.blds) if (b.kind === 'mine') {
       const gm = Math.round(mineGold(b) * goldMul()); mined += gm;
@@ -377,7 +409,7 @@
     for (const sd of st.soldiers) for (let k = 0; k < 5; k++) part(sd.x, sd.y - 5, (Math.random() - 0.5) * 20, -Math.random() * 20, 0.4, '#88b4ff', 30);
     st.soldiers = [];
     if (st.wave >= MISSION_WAVES) { missionWon(); return; }
-    banner('Vlna prežitá! +' + bonus + ' zlata');
+    banner('Vlna prežitá! +' + bonus + ' zlata' + (st.lastXp ? ' · kráľ +' + st.lastXp + ' XP' : ''));
     AUDIO.play('cleared');
     setTimeout(() => { if (st.phase === 'pause') enterBuild(); }, 1000);
     updateHud();
@@ -408,7 +440,8 @@
       : 'Misia ' + m + ' · ' + MISSIONS[m - 1].name + '<br>Všetkých ' + MISSION_WAVES + ' vĺn odrazených.' + (first ? '<br>Odomkla sa misia ' + (m + 1) + '.<br><span class="newTech">Nové: ' + UNLOCKS[m].map(u => u.name).join(', ') + '</span>' : '');
     const starLine = '<span class="bigStars">' + '★'.repeat(stars) + '<i>' + '★'.repeat(3 - stars) + '</i></span>' +
       (stars > prevStars ? '<br><span class="newTech">+' + (stars - prevStars) + ' ★ do Kráľovskej siene</span>' : '');
-    setTimeout(() => showOver(m === MISSIONS.length ? 'Víťazstvo!' : 'Misia splnená!', starLine + '<br>' + text, true), 1200);
+    const xpLine = st.lastXp ? '<br><span class="newTech">Kráľ +' + st.lastXp + ' XP' + (kingMeta.pending ? ' · nová úroveň ' + kingMeta.lvl + '!' : '') + '</span>' : '';
+    setTimeout(() => showOver(m === MISSIONS.length ? 'Víťazstvo!' : 'Misia splnená!', starLine + '<br>' + text + xpLine, true), 1200);
     updateHud();
   }
 
@@ -688,7 +721,7 @@
     part(u.x, u.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.3, '#e84838', 100);
     if (u.hp > 0) return;
     if (u.isKing) {
-      u.down = 8; u.tgt = null;
+      u.down = 8 - 2 * tal('rally'); u.tgt = null;
       for (let k = 0; k < 10; k++) part(u.x, u.y - 6, (Math.random() - 0.5) * 40, -Math.random() * 40, 0.6, '#f8d048', 80);
       toast('Kráľ je zranený – stiahol sa do radnice');
     } else {
@@ -770,7 +803,7 @@
       else {
         if (!t.foe) t.foe = u;
         if (u.cd <= 0) {
-          u.cd = 0.8; u.swing = 0.15;
+          u.cd = u.isKing ? 0.8 * (1 - 0.12 * tal('swift')) : 0.8; u.swing = 0.15;
           AUDIO.play(u.isKing ? 'kingHit' : 'clang');
           if (cleave) { for (const e of st.enemies) if (!e.dead && Math.hypot(e.x - t.x, e.y - t.y) < 10) damage(e, dmg); }
           else damage(t, dmg);
@@ -865,10 +898,10 @@
     const a = ABIL[id];
     if (id === 'warcry') {
       if (st.cryCd > 0) { AUDIO.play('deny'); return; }
-      st.cryT = a.dur; st.cryCd = a.cd; AUDIO.play('horn'); banner('Za kráľa!');
+      st.cryT = a.dur + 2 * tal('roar'); st.cryCd = a.cd; AUDIO.play('horn'); banner('Za kráľa!');
     } else {
       if (st.freezeCd > 0) { AUDIO.play('deny'); return; }
-      st.freezeT = a.dur; st.freezeCd = a.cd; AUDIO.play('unlock'); banner('Mráz!');
+      st.freezeT = a.dur + 1.5 * tal('frost'); st.freezeCd = a.cd; AUDIO.play('unlock'); banner('Mráz!');
     }
   }
 
@@ -915,7 +948,10 @@
     // kráľ
     const k = st.king;
     if (k.down > 0) { k.down -= dt; if (k.down <= 0) { k.hp = kingMax(); k.x = G.hallCx; k.y = G.hallTop + 2; } }
-    else updateFighter(k, dt, k.hx, k.hy, 40, kingDmg(), true, moveKnight); // aj kráľ chodí len cez brány
+    else {
+      updateFighter(k, dt, k.hx, k.hy, 40 + 10 * tal('reach'), kingDmg(), true, moveKnight); // aj kráľ chodí len cez brány
+      if (tal('regen') && k.hp < kingMax()) k.hp = Math.min(kingMax(), k.hp + kingMax() * 0.015 * tal('regen') * dt);
+    }
     // strely
     for (const p of st.proj) {
       if (p.arc) { // balvan z katapultu letí po oblúku na miesto
@@ -1631,6 +1667,7 @@
         acts.appendChild(btn('Salva úr. ' + (st.volleyLvl + 1), vc, st.gold >= vc, () => { st.gold -= vc; st.volleyLvl++; }));
       } else acts.appendChild(lockBtn('Salva', 'volleyUp'));
       info.appendChild(acts);
+      card(ICONS.king, 'Kráľ · úr. ' + kingMeta.lvl, kingSummary());
     } else if (selGroup()) {
       // hromadné akcie pre označenú skupinu (rad hradieb alebo všetky stavby jedného druhu)
       const grp = st.selGroup, kind = grp[0].kind, d = BUILD[kind], isWall = kind === 'wall', cap = bCap();
@@ -1998,6 +2035,7 @@
     if (!st.mapAnim) st.mapSel = Math.min(st.unlocked, MISSIONS.length);
     renderMapPanel();
     focusMapNode(st.mapAnim ? st.mapAnim.seg + 2 : st.mapSel, true);
+    if (!st.mapAnim) afterDeck(); // pri odomykaní hradu príde výber až po kartičkách
   }
 
   function renderMapPanel() {
@@ -2019,9 +2057,18 @@
     $('hallBtnTxt').textContent = starsFree();
   }
 
+  function kingSummary() {
+    const xp = kingMeta.lvl >= KING_MAX_LVL ? 'najvyššia úroveň' : 'XP ' + kingMeta.xp + ' / ' + kingXpNeed(kingMeta.lvl);
+    const taken = TALENTS.filter(t => tal(t.id)).map(t => t.name + (tal(t.id) > 1 ? ' ' + tal(t.id) + '×' : ''));
+    return xp + ' · ' + (taken.length ? taken.join(', ') : 'XP získava za každú prežitú vlnu');
+  }
   function renderPerks() {
     $('perkStars').textContent = starsFree() + ' / ' + starsTotal();
     const list = $('perkList'); list.innerHTML = '';
+    const kr = document.createElement('div'); kr.className = 'perk kingRow';
+    const need = kingXpNeed(kingMeta.lvl), pct = kingMeta.lvl >= KING_MAX_LVL ? 100 : Math.round(kingMeta.xp / need * 100);
+    kr.innerHTML = '<img src="' + ICONS.king + '"><div class="info"><b>Kráľ · úroveň ' + kingMeta.lvl + '</b><span class="xpBar"><i style="width:' + pct + '%"></i></span><small>' + kingSummary() + '</small></div>';
+    list.appendChild(kr);
     for (const pk of PERKS) {
       const lvl = perk(pk.id), cost = lvl + 1;
       const row = document.createElement('div'); row.className = 'perk';
@@ -2084,7 +2131,7 @@
   }
   function showUnlockDeck(m) {
     const items = unlockItems(m);
-    if (!items.length) return;
+    if (!items.length) { afterDeck(); return; }
     const deck = $('unlockDeck'), stack = $('udStack');
     stack.innerHTML = '';
     const cards = items.map((it, i) => {
@@ -2114,8 +2161,44 @@
       AUDIO.play('click');
       setTimeout(() => c.remove(), 400);
       if (top < cards.length) { layout(); return; }
-      setTimeout(() => { deck.classList.add('out'); setTimeout(() => { deck.hidden = true; deck.classList.remove('out'); }, 300); }, 250);
+      setTimeout(() => { deck.classList.add('out'); setTimeout(() => { deck.hidden = true; deck.classList.remove('out'); afterDeck(); }, 300); }, 250);
     };
+  }
+
+  const afterDeck = () => { if (kingMeta.pending && st.phase === 'map') setTimeout(showTalentPick, 300); };
+  // výber jedného z 3 náhodných vylepšení kráľa
+  function showTalentPick() {
+    const box = $('talentPick');
+    if (!box.hidden || !kingMeta.pending) return;
+    const avail = TALENTS.filter(t => tal(t.id) < TAL_MAX && (!t.need || has(t.need)));
+    if (!avail.length) { kingMeta.pending = 0; saveKing(); return; }
+    for (let i = avail.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [avail[i], avail[j]] = [avail[j], avail[i]]; }
+    $('tpLvl').textContent = kingMeta.lvl - kingMeta.pending + 1;
+    const list = $('tpList'); list.innerHTML = '';
+    let chosen = false;
+    avail.slice(0, 3).forEach((t, i) => {
+      const lv = tal(t.id);
+      const c = document.createElement('button');
+      c.className = 'tpCard';
+      c.style.setProperty('--d', (0.1 + i * 0.12) + 's');
+      c.innerHTML = '<img src="' + ICONS[t.icon] + '"><span class="info"><b>' + t.name + ' <span class="pips">' + '●'.repeat(lv + 1) + '<i>' + '●'.repeat(TAL_MAX - lv - 1) + '</i></span></b><small>' + t.desc + '</small></span>';
+      c.addEventListener('click', () => {
+        if (chosen) return;
+        chosen = true;
+        kingMeta.tal[t.id] = lv + 1; kingMeta.pending--; saveKing();
+        if (st.king && st.phase === 'build') st.king.hp = kingMax();
+        AUDIO.play('upgrade');
+        c.classList.add('pick'); box.classList.add('done');
+        setTimeout(() => {
+          box.hidden = true; box.classList.remove('done');
+          if (st.phase === 'build') renderBuild();
+          if (kingMeta.pending) setTimeout(showTalentPick, 250);
+        }, 650);
+      });
+      list.appendChild(c);
+    });
+    box.hidden = false;
+    AUDIO.play('unlock');
   }
 
   $('playBtn').addEventListener('click', showMap);
@@ -2215,5 +2298,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon,
-    enterBuild, showUnlockDeck, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax };
+    enterBuild, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax };
 })();
