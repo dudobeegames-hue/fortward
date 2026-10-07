@@ -8,6 +8,7 @@
 
   const T = 16;            // veľkosť políčka mriežky
   const MAX_LVL = 5;
+  const GRID_COLS = 11;     // šírka hracej mriežky v políčkach
   let W = 180, H = 360, S = 1, DPR = 1, scene = null;
   let camY = 0; // o koľko herných pixelov je bojisko posunuté nahor (kvôli panelu dole)
   const G = { T, gx0: 0, gy0: 0, cols: 11, rows: 24, hc0: 4, hr0: 20, hallCx: 0, hallTop: 0, hallBot: 0, zoneTopMax: 0 };
@@ -212,7 +213,8 @@
     buf.width = W; buf.height = H;
 
     const oldHc = G.hc0, oldHr = G.hr0, had = !!scene;
-    G.cols = Math.floor(W / T); G.gx0 = Math.floor((W - G.cols * T) / 2);
+    // pevný počet stĺpcov na každom zariadení (zmestí sa aj do najužšej plochy 180 px) – zmena okna tak mriežku neposúva
+    G.cols = Math.min(GRID_COLS, Math.floor(W / T)); G.gx0 = Math.floor((W - G.cols * T) / 2);
     G.rows = Math.floor(H / T); G.gy0 = H - G.rows * T;
     G.hc0 = Math.floor(G.cols / 2) - 1; G.hr0 = G.rows - 3;
     G.hallCx = tileX(G.hc0) + 1.5 * T; G.hallTop = tileY(G.hr0); G.hallBot = G.hallTop + 3 * T;
