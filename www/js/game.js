@@ -238,6 +238,7 @@
   }
 
   function newGame() {
+    undoStack = [];
     Object.assign(st, {
       wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.15 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, tool: null, sel: null, hallFlash: 0, shake: 0, soldierN: 0,
       blds: [], enemies: [], soldiers: [], proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
@@ -311,6 +312,7 @@
   }
 
   function startWave() {
+    undoStack = [];
     st.wave++;
     st.spawnQ = buildWave(st.wave);
     st.spawnT = 1.2;
@@ -1454,14 +1456,35 @@
     document.querySelectorAll('img.gem').forEach(i => { i.src = ICONS.gem; });
   }
 
+  // ---- „Späť“: história krokov počas jedného budovania (snímky stavu, vráti aj zlato) ----
+  let undoStack = [];
+  function snapshot() {
+    undoStack.push({
+      gold: st.gold, hallLvl: st.hallLvl, hallHp: st.hallHp, volleyLvl: st.volleyLvl,
+      blds: st.blds.map(b => Object.assign({}, b, { unit: b.unit ? Object.assign({}, b.unit) : null })),
+    });
+    if (undoStack.length > 40) undoStack.shift();
+  }
+  function doUndo() {
+    const sn = undoStack.pop();
+    if (!sn || st.phase !== 'build') return;
+    Object.assign(st, { gold: sn.gold, hallLvl: sn.hallLvl, hallHp: sn.hallHp, volleyLvl: sn.volleyLvl, blds: sn.blds });
+    st.sel = null; st.tool = null; st.moving = null;
+    if (st.king) st.king.hp = kingMax();
+    rebuildOcc();
+    AUDIO.play('sell');
+    renderBuild(); updateHud();
+  }
+
   function btn(label, cost, enabled, onClick, cls) {
     const b = document.createElement('button');
     b.className = 'btn ' + (cls || '');
     b.innerHTML = '<span>' + label + '</span>' + (cost != null ? '<span class="cost"><img class="coin" src="' + ICONS.coin + '">' + cost + '</span>' : '');
     b.disabled = !enabled;
     b.addEventListener('click', () => {
-      onClick();
       const c = cls || '';
+      if (st.phase === 'build' && !c.includes('move')) snapshot();
+      onClick();
       AUDIO.play(c.includes('up') ? 'upgrade' : c.includes('sell') ? 'sell' : c.includes('unit') ? 'build' : 'click');
       renderBuild(); updateHud();
     });
@@ -1615,6 +1638,7 @@
       card(ICONS.hall, 'Vyber stavbu', 'Zvoľ stavbu dole a ťukni na voľné políčko. Ťuknutím na stavbu alebo radnicu ju vylepšíš.');
     }
     const rc = repairCost();
+    $('undoBtn').disabled = !undoStack.length;
     const rb = $('repairBtn');
     rb.innerHTML = '<span>Opraviť všetko</span>' + (rc ? '<span class="cost"><img class="coin" src="' + ICONS.coin + '">' + rc + '</span>' : '');
     rb.disabled = !rc || st.gold < rc;
@@ -1633,6 +1657,7 @@
       if (!inZone(c, r)) { toast('Stavať sa dá len v zóne pri radnici'); AUDIO.play('deny'); return; }
       const d = BUILD[st.tool], dc = costOf(st.tool);
       if (st.gold < dc) { toast('Nedostatok zlata'); AUDIO.play('deny'); return; }
+      snapshot();
       st.gold -= dc;
       addBuilding(st.tool, c, r);
       AUDIO.play('build');
@@ -1668,6 +1693,7 @@
   function moveBuilding(b, c, r) {
     if (b.c === c && b.r === r) return true;
     if (!canMoveTo(b, c, r)) { toast('Sem sa stavba nedá presunúť'); AUDIO.play('deny'); return false; }
+    snapshot();
     const ox = tileX(b.c) + T / 2, oy = tileY(b.r) + T / 2;
     b.c = c; b.r = r;
     rebuildOcc();
@@ -1702,9 +1728,10 @@
       return;
     }
     if (st.tool === 'wall' && inZone(t.c, t.r) && !inHall(t.c, t.r) && !occAt(t.c, t.r)) {
-      drag = { last: t, warned: false };
+      snapshot();
+      drag = { last: t, warned: false, placed: 0 };
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
-      placeWall(t.c, t.r);
+      if (placeWall(t.c, t.r)) drag.placed++;
       renderBuild();
       return;
     }
@@ -1733,7 +1760,7 @@
     while (c !== t.c || r !== t.r) {
       const dc = t.c - c, dr = t.r - r;
       if (Math.abs(dc) >= Math.abs(dr)) c += Math.sign(dc); else r += Math.sign(dr);
-      placed = placeWall(c, r) || placed;
+      if (placeWall(c, r)) { placed = true; drag.placed++; }
     }
     drag.last = t;
     if (placed) renderBuild();
@@ -1751,17 +1778,22 @@
       else moveBuilding(bd.b, bd.hover.c, bd.hover.r);
       return;
     }
-    if (drag) { drag = null; if (st.gold < costOf('wall')) st.tool = null; renderBuild(); }
+    if (drag) {
+      if (!drag.placed) undoStack.pop(); // nič sa nepostavilo – krok sa neráta
+      drag = null; if (st.gold < costOf('wall')) st.tool = null; renderBuild();
+    }
   };
   screen.addEventListener('pointerup', endDrag);
   screen.addEventListener('pointercancel', endDrag);
 
   $('nextWave').addEventListener('click', startWave);
+  $('undoBtn').addEventListener('click', doUndo);
   $('warcryBtn').addEventListener('click', () => ability('warcry'));
   $('freezeBtn').addEventListener('click', () => ability('freeze'));
   $('repairBtn').addEventListener('click', () => {
     const rc = repairCost();
     if (!rc || st.gold < rc) return;
+    snapshot();
     st.gold -= rc; st.hallHp = hallMax();
     for (const b of st.blds) if (BUILD[b.kind].hp) b.hp = bMaxHp(b);
     rebuildOcc(); renderBuild();
