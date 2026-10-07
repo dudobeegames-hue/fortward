@@ -1877,8 +1877,6 @@
         }
         info.appendChild(ua);
       }
-    } else {
-      card(ICONS.hall, 'Vyber stavbu', 'Zvoľ stavbu dole a ťukni na voľné políčko. Ťuknutím na stavbu alebo radnicu ju vylepšíš, dvojťukom označíš všetky rovnaké (pri hradbách celý rad).');
     }
     const rc = repairCost();
     $('undoBtn').disabled = !undoStack.length;
@@ -2093,7 +2091,6 @@
     $('mName').textContent = def.name;
     const diff = Math.ceil(m / 2);
     $('mMeta').innerHTML = MISSION_WAVES + ' vĺn · obtiažnosť <span class="stars">' + '●'.repeat(diff) + '<i>' + '●'.repeat(5 - diff) + '</i></span>' + (done ? ' · <span class="ok">splnená ✓</span>' : '');
-    $('mDesc').textContent = def.desc;
     const foe = ENEMY_INTRO[m];
     $('mNew').innerHTML = (foe ? '<span>Nepriateľ:</span><em class="foe"><img src="' + ICONS['e_' + foe.id] + '">' + foe.name + '</em>' : '') +
       '<span>' + (m === 1 ? 'Výbava:' : 'Novinka:') + '</span>' + UNLOCKS[m - 1].map(u => '<em><img src="' + ICONS[u.icon] + '">' + u.name + '</em>').join('');
@@ -2114,7 +2111,7 @@
       });
       tb.appendChild(b);
     });
-    $('mapPlay').textContent = starsOf(m, st.mapTier) ? 'Hrať znova ▶' : 'Brániť ▶';
+    $('mapPlay').textContent = starsOf(m, st.mapTier) ? 'Hrať znova ▶' : 'Spustiť ▶';
     $('mStars').innerHTML = '';
     $('hallBtnTxt').textContent = starsFree();
   }
