@@ -27,7 +27,7 @@
     bell:     { name: 'Zvonica',      short: 'Zvonica', cost: 110, hp: 200, range: 44, block: true, support: true, desc: 'Veže v okolí strieľajú rýchlejšie' },
     firepit:  { name: 'Ohnivá jama',  short: 'Oheň',   cost: 50,  dmg: 5, block: false, desc: 'Kto ňou prejde, niekoľko sekúnd horí' },
     beartrap: { name: 'Medvedia pasca', short: 'Pasca', cost: 40, block: false, desc: 'Chytí nepriateľa a na chvíľu ho zastaví' },
-    well:     { name: 'Studňa',       short: 'Studňa', cost: 90,  hp: 160, block: true, desc: 'Počas boja pomaly opravuje radnicu' },
+    well:     { name: 'Studňa',       short: 'Studňa', cost: 90,  hp: 160, range: 56, block: true, support: true, desc: 'Počas boja opravuje poškodené budovy v okolí' },
   };
   const TRAPS = { pit: 1, firepit: 1, beartrap: 1 };
   const SHOOTERS = { tower: 1, mage: 1, catapult: 1 };
@@ -129,7 +129,7 @@
     { id: 'swift',   name: 'Rýchly meč',      desc: 'Kráľ udiera o 12 % rýchlejšie',                   icon: 'king' },
     { id: 'reach',   name: 'Bdelé oko',       desc: 'Kráľ vyráža na hordu ďalej od radnice',           icon: 'king' },
     { id: 'regen',   name: 'Kráľovská krv',   desc: 'Kráľ sa v boji sám lieči',                         icon: 'king' },
-    { id: 'rally',   name: 'Nezlomný',        desc: 'Zranený kráľ sa vráti do boja o 2 s skôr',         icon: 'king' },
+    { id: 'rally',   name: 'Nezlomný',        desc: 'Oživenie padnutého kráľa o 25 % lacnejšie',       icon: 'king' },
     { id: 'tax',     name: 'Kráľovská daň',   desc: 'Po každej vlne +6 zlata navyše',                   icon: 'coin' },
     { id: 'command', name: 'Velenie',         desc: 'Rytieri o 10 % silnejší a odolnejší',              icon: 'barracks', need: 'barracks' },
     { id: 'archers', name: 'Kráľovská salva', desc: 'Šípová salva o 15 % silnejšia',                    icon: 'u_archer' },
@@ -379,7 +379,7 @@
     $('bottom').hidden = true;
     // rytieri a kráľ sa vrátia a vyliečia
     for (const s of st.soldiers) { s.hp = s.max; s.tgt = null; }
-    if (st.king) { st.king.hp = kingMax(); st.king.down = 0; st.king.tgt = null; st.king.flash = 0; st.king.swing = 0; st.king.x = st.king.hx; st.king.y = st.king.hy; }
+    if (st.king && !st.king.dead) { st.king.hp = kingMax(); st.king.down = 0; st.king.tgt = null; st.king.flash = 0; st.king.swing = 0; st.king.x = st.king.hx; st.king.y = st.king.hy; }
     for (const b of st.blds) b.flash = 0;
     $('build').hidden = false;
     renderBuild();
@@ -733,10 +733,11 @@
     u.hp -= dmg; u.flash = 0.08;
     part(u.x, u.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.3, '#e84838', 100);
     if (u.hp > 0) return;
-    if (u.isKing) {
-      u.down = 8 - 2 * tal('rally'); u.tgt = null;
+    if (u.isKing) { // kráľ padol – do konca vlny nebojuje, po vlne ho možno oživiť za zlato
+      u.dead = true; u.deadT = 0; u.tgt = null; u.flash = 0;
       for (let k = 0; k < 10; k++) part(u.x, u.y - 6, (Math.random() - 0.5) * 40, -Math.random() * 40, 0.6, '#f8d048', 80);
-      toast('Kráľ je zranený – stiahol sa do radnice');
+      AUDIO.play('crumble');
+      toast('Kráľ padol! Po vlne ho môžeš oživiť.');
     } else {
       u.dead = true;
       for (let k = 0; k < 8; k++) part(u.x, u.y - 6, (Math.random() - 0.5) * 40, -Math.random() * 40, 0.5, ['#3c64c8', '#bcc0cc', '#e84838'][k % 3], 120);
@@ -909,6 +910,19 @@
     return true;
   }
 
+  // studňa počas boja opravuje poškodené budovy v okolí (radnicu nie)
+  function repairAround(b, dt) {
+    const c = bCenter(b), R = bRange(b), hb = wellRegen(b) * 2 * dt;
+    let fixed = false;
+    for (const o of st.blds) {
+      if (!BUILD[o.kind].hp || o.hp >= bMaxHp(o)) continue;
+      if (Math.hypot(tileX(o.c) + T / 2 - c.x, tileY(o.r) + T / 2 - c.y) > R) continue;
+      o.hp = Math.min(bMaxHp(o), o.hp + hb); fixed = true;
+      if (Math.random() < 0.03) part(tileX(o.c) + 3 + Math.random() * 10, tileY(o.r) + 4, 0, -10, 0.5, '#88b4ff', 0);
+    }
+    if (fixed && Math.random() < 0.05) part(c.x + (Math.random() - 0.5) * 6, tileY(b.r) - 2, 0, -8, 0.6, '#88b4ff', 0);
+  }
+
   // kaplnka lieči budovy, rytierov a kráľa v okolí
   function healAround(b, dt) {
     const c = bCenter(b), R = bRange(b), hb = chapelHeal(b) * dt;
@@ -918,7 +932,7 @@
       if (Math.hypot(tileX(o.c) + T / 2 - c.x, tileY(o.r) + T / 2 - c.y) > R) continue;
       o.hp = Math.min(bMaxHp(o), o.hp + hb); healed = true;
     }
-    for (const u of st.soldiers.concat(st.king && st.king.down <= 0 ? [st.king] : [])) {
+    for (const u of st.soldiers.concat(st.king && !st.king.dead ? [st.king] : [])) {
       const mx = u.isKing ? kingMax() : u.max;
       if (u.hp >= mx || Math.hypot(u.x - c.x, u.y - c.y) > R) continue;
       u.hp = Math.min(mx, u.hp + hb * 1.5); healed = true;
@@ -967,7 +981,7 @@
       else if (b.unit) { b.unit.cd -= dt; if (b.unit.cd <= 0 && fireWallUnit(b)) b.unit.cd = uCd(b.unit) * hasteMul(b); }
       else if (b.kind === 'barracks') updateBarracks(b, dt);
       else if (b.kind === 'chapel') healAround(b, dt);
-      else if (b.kind === 'well' && st.hallHp < hallMax()) st.hallHp = Math.min(hallMax(), st.hallHp + wellRegen(b) * dt);
+      else if (b.kind === 'well') repairAround(b, dt);
       else if (b.kind === 'beartrap' && b.armT > 0) b.armT -= dt;
     }
     // rytieri
@@ -981,7 +995,7 @@
     st.soldiers = st.soldiers.filter(s => !s.dead);
     // kráľ
     const k = st.king;
-    if (k.down > 0) { k.down -= dt; if (k.down <= 0) { k.hp = kingMax(); k.x = G.hallCx; k.y = G.hallTop + 2; } }
+    if (k.dead) k.deadT += dt;
     else {
       updateFighter(k, dt, k.hx, k.hy, 40 + 10 * tal('reach'), kingDmg(), true, moveKnight); // aj kráľ chodí len cez brány
       if (tal('regen') && k.hp < kingMax()) k.hp = Math.min(kingMax(), k.hp + kingMax() * 0.015 * tal('regen') * dt);
@@ -1116,6 +1130,32 @@
       g.fillStyle = '#ffffff';
       g.fillRect(x + fr.w - 1, y - 2, 1, 3); g.fillRect(x + fr.w, y - 3, 1, 2);
     }
+  }
+
+  // padnutý kráľ: preklopí sa na zem, okolo hlavy mu krúžia hviezdičky, potom zmizne
+  const KING_GONE = 3.2;
+  function drawDeadKing(k, time) {
+    const fr = SPR.king[0], t = k.deadT;
+    const fall = Math.min(1, t / 0.3), alpha = t < 2.6 ? 1 : Math.max(0, 1 - (t - 2.6) / 0.6);
+    g.save();
+    g.imageSmoothingEnabled = false;
+    g.globalAlpha = alpha;
+    shadow(k.x + fr.h * 0.4 * fall, k.y, 4 + Math.round(3 * fall));
+    g.translate(Math.round(k.x), Math.round(k.y));
+    g.rotate(fall * Math.PI / 2);
+    g.drawImage(fr.c, -Math.round(fr.w / 2), -fr.h);
+    g.restore();
+    if (fall < 1 || alpha <= 0) return;
+    // hviezdičky okolo hlavy (hlava leží vpravo od nôh)
+    const hx = k.x + fr.h - 4, hy = k.y - 4;
+    g.globalAlpha = alpha;
+    for (let i = 0; i < 3; i++) {
+      const a = time * 5 + i * 2.094, sx = Math.round(hx + Math.cos(a) * 6), sy = Math.round(hy - 4 + Math.sin(a) * 2);
+      g.fillStyle = PAL.K; g.fillRect(sx - 2, sy - 1, 5, 3); g.fillRect(sx - 1, sy - 2, 3, 5);
+      g.fillStyle = '#f8d048'; g.fillRect(sx - 1, sy, 3, 1); g.fillRect(sx, sy - 1, 1, 3);
+      g.fillStyle = '#ffffff'; g.fillRect(sx, sy, 1, 1);
+    }
+    g.globalAlpha = 1;
   }
 
   function bar(cx, y, w, ratio, col) {
@@ -1529,7 +1569,8 @@
       objs.push({ y: G.hallBot, f: () => drawHall(time) });
       for (const b of st.blds) if (!TRAPS[b.kind]) objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), f: () => drawBuilding(b, time) });
       for (const s of st.soldiers) objs.push({ y: s.y, f: () => drawFighter(s, s.spr || 'soldier') });
-      if (st.king && st.king.down <= 0) objs.push({ y: st.king.y, f: () => drawFighter(st.king, 'king') });
+      if (st.king && !st.king.dead) objs.push({ y: st.king.y, f: () => drawFighter(st.king, 'king') });
+      else if (st.king && st.king.deadT < KING_GONE) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
     }
     for (const e of st.enemies) objs.push({ y: e.y, f: () => drawEnemy(e, time) });
     objs.sort((a, b) => a.y - b.y);
@@ -1538,7 +1579,7 @@
     for (const e of st.enemies) if (e.hp < e.max && !e.d.boss) bar(e.x, Math.round(e.y - e.h - 3), Math.max(6, e.w - 4), e.hp / e.max, '#e84838');
     for (const b of st.blds) if (BUILD[b.kind].hp && b.hp < bMaxHp(b)) bar(tileX(b.c) + T / 2, b.kind === 'wall' ? tileY(b.r) - 9 : tileY(b.r) + T - bsprOf(b.kind, b.lvl).h - 2, 12, b.hp / bMaxHp(b), '#9cd45a');
     for (const s of st.soldiers) if (s.hp < s.max) bar(s.x, Math.round(s.y - 17), 8, s.hp / s.max, '#88b4ff');
-    if (st.king && st.king.down <= 0 && st.king.hp < kingMax()) bar(st.king.x, Math.round(st.king.y - 19), 10, st.king.hp / kingMax(), '#f8d048');
+    if (st.king && !st.king.dead && st.king.hp < kingMax()) bar(st.king.x, Math.round(st.king.y - 19), 10, st.king.hp / kingMax(), '#f8d048');
     for (const p of st.proj) drawProj(p);
     for (const p of st.eproj) { // šíp goblina (tmavý)
       const cols = ['#bcc0cc', '#3e2614', '#3e2614', '#3e2614', '#62a03a'];
@@ -1581,6 +1622,7 @@
     $('hallFill').style.width = (r * 100) + '%';
     $('hallFill').className = r < 0.3 ? 'low' : '';
     $('hallTxt').textContent = 'Radnica ' + Math.max(0, Math.ceil(st.hallHp)) + ' / ' + hallMax();
+    $('xpFill').style.width = (kingMeta.lvl >= KING_MAX_LVL ? 100 : Math.min(100, kingMeta.xp / kingXpNeed(kingMeta.lvl) * 100)) + '%';
   }
 
   function hudTick() {
@@ -1626,7 +1668,7 @@
   let undoStack = [];
   function snapshot() {
     undoStack.push({
-      gold: st.gold, hallLvl: st.hallLvl, hallHp: st.hallHp, volleyLvl: st.volleyLvl,
+      gold: st.gold, hallLvl: st.hallLvl, hallHp: st.hallHp, volleyLvl: st.volleyLvl, kingDead: !!(st.king && st.king.dead),
       blds: st.blds.map(b => Object.assign({}, b, { unit: b.unit ? Object.assign({}, b.unit) : null })),
     });
     if (undoStack.length > 40) undoStack.shift();
@@ -1636,7 +1678,11 @@
     if (!sn || st.phase !== 'build') return;
     Object.assign(st, { gold: sn.gold, hallLvl: sn.hallLvl, hallHp: sn.hallHp, volleyLvl: sn.volleyLvl, blds: sn.blds });
     st.sel = null; st.selGroup = null; st.tool = null; st.moving = null;
-    if (st.king) st.king.hp = kingMax();
+    if (st.king) {
+      if (sn.kingDead && !st.king.dead) Object.assign(st.king, { dead: true, deadT: KING_GONE });
+      else if (!sn.kingDead) st.king.dead = false;
+      st.king.hp = kingMax(); st.king.x = st.king.hx; st.king.y = st.king.hy;
+    }
     rebuildOcc();
     AUDIO.play('sell');
     renderBuild(); updateHud();
@@ -1663,8 +1709,17 @@
   // vždy menej než predať (vráti 50 %) a postaviť znova
   const REPAIR_SHARE = 0.4;
   const bRepairCost = b => !BUILD[b.kind].hp || b.hp >= bMaxHp(b) ? 0 : Math.max(1, Math.ceil(b.spent * REPAIR_SHARE * (1 - b.hp / bMaxHp(b))));
+  // radnica sa počas misie opravovať nedá – len budovy
+  const reviveCost = () => Math.round((40 + 5 * kingMeta.lvl) * goldMul() * (1 - 0.25 * tal('rally')));
+  function reviveKing() {
+    const k = st.king, c = reviveCost();
+    if (!k || !k.dead || st.gold < c) return;
+    st.gold -= c;
+    Object.assign(k, { dead: false, deadT: 0, hp: kingMax(), x: k.hx, y: k.hy, tgt: null, flash: 0, swing: 0, cd: 0 });
+    for (let q = 0; q < 24; q++) part(k.x + (Math.random() - 0.5) * 10, k.y - Math.random() * 14, (Math.random() - 0.5) * 30, -20 - Math.random() * 30, 0.8, ['#f8d048', '#fff070', '#ffffff'][q % 3], 30);
+  }
   function repairCost() {
-    let c = Math.ceil((hallMax() - st.hallHp) * 0.25);
+    let c = 0;
     for (const b of st.blds) c += bRepairCost(b);
     return c;
   }
@@ -1713,7 +1768,13 @@
         acts.appendChild(btn('Salva úr. ' + (st.volleyLvl + 1), vc, st.gold >= vc, () => { st.gold -= vc; st.volleyLvl++; }));
       } else acts.appendChild(lockBtn('Salva', 'volleyUp'));
       info.appendChild(acts);
-      card(ICONS.king, 'Kráľ · úr. ' + kingMeta.lvl, kingSummary());
+      card(ICONS.king, 'Kráľ · úr. ' + kingMeta.lvl + (st.king && st.king.dead ? ' · padol' : ''), kingSummary());
+      if (st.king && st.king.dead) {
+        const ka = document.createElement('div'); ka.className = 'acts';
+        const c = reviveCost();
+        ka.appendChild(btn('Oživiť kráľa', c, st.gold >= c, reviveKing, 'up wide'));
+        info.appendChild(ka);
+      }
     } else if (selGroup()) {
       // hromadné akcie pre označenú skupinu (rad hradieb alebo všetky stavby jedného druhu)
       const grp = st.selGroup, kind = grp[0].kind, d = BUILD[kind], isWall = kind === 'wall', cap = bCap();
@@ -1781,7 +1842,7 @@
       if (b.kind === 'chapel') stats = 'Lieči ' + chapelHeal(b).toFixed(1) + '/s v okruhu ' + bRange(b);
       else if (b.kind === 'bell') stats = 'Veže v okruhu ' + bRange(b) + ' o ' + Math.round(bellHaste(b) * 100) + ' % rýchlejšie';
       else if (b.kind === 'mine') stats = 'Po vlne +' + Math.round(mineGold(b) * goldMul()) + ' zlata';
-      else if (b.kind === 'well') stats = 'Opravuje radnicu ' + wellRegen(b).toFixed(1) + '/s';
+      else if (b.kind === 'well') stats = 'Opravuje budovy v okruhu ' + bRange(b) + ' · ' + (wellRegen(b) * 2).toFixed(1) + '/s';
       else if (b.kind === 'firepit') stats = 'Horenie ' + Math.round(bDmg(b)) + '/s počas 3 s';
       else if (b.kind === 'beartrap') stats = 'Zastaví na ' + trapStun(b).toFixed(1) + ' s';
       else if (d.range) stats = 'Poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);
@@ -1878,6 +1939,11 @@
         }
         info.appendChild(ua);
       }
+    } else if (st.king && st.king.dead) {
+      card(ICONS.king, 'Kráľ padol', 'Bez kráľa radnicu nikto nebráni. Oživ ho pred ďalšou vlnou.');
+      const c = reviveCost();
+      acts.appendChild(btn('Oživiť kráľa', c, st.gold >= c, reviveKing, 'up wide'));
+      info.appendChild(acts);
     }
     const rc = repairCost();
     $('undoBtn').disabled = !undoStack.length;
@@ -2058,7 +2124,7 @@
     const rc = repairCost();
     if (!rc || st.gold < rc) return;
     snapshot();
-    st.gold -= rc; st.hallHp = hallMax();
+    st.gold -= rc;
     for (const b of st.blds) if (BUILD[b.kind].hp) b.hp = bMaxHp(b);
     rebuildOcc(); renderBuild();
   });
@@ -2358,5 +2424,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon,
-    enterBuild, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax };
+    enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax };
 })();

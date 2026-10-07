@@ -17,10 +17,11 @@ window.SIM = (() => {
     const order = [...Array(cols).keys()].sort((a, b) => Math.abs(a - hc) - Math.abs(b - hc));
     const pitRow = hr0 - 3, wallRow = hr0 - 2, towerRow = hr0 - 1;
     const rc = F.repairCost();
-    if (rc && s.gold >= rc && (s.hallHp < F.hallMax() * 0.8 || rc >= 15)) {
-      s.gold -= rc; s.hallHp = F.hallMax();
+    if (rc && s.gold >= rc && rc >= 15) {
+      s.gold -= rc;
       s.blds.forEach(b => { if (F.BUILD[b.kind].hp) b.hp = F.bMaxHp(b); }); F.rebuildOcc();
     }
+    if (s.king.dead && s.gold >= F.reviveCost()) F.reviveKing();
     if (s.hallLvl < F.hallCap() && s.gold >= F.hallUpCost() + 60) { s.gold -= F.hallUpCost(); s.hallLvl++; s.hallHp += 200; s.king.hp = F.kingMax(); F.rebuildOcc(); }
     // najprv aspoň 3 veže, až potom hradby
     for (const c of order) { if (count('tower') >= 3) break; if (c !== hc) place('tower', c, towerRow); }
