@@ -42,8 +42,20 @@
   #hud {
     position: absolute; left: 0; right: 0; top: 0;
     padding: calc(env(safe-area-inset-top) + 8px) 10px 0;
-    display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center;
+    display: grid; grid-template-columns: auto auto 1fr auto; gap: 8px; align-items: center;
     pointer-events: none; z-index: 5;
+  }
+  /* kráľ v hornom paneli: zdravie, pri nízkom bliká načerveno, padnutý je sivý a prečiarknutý */
+  #hud-king { position: relative; flex-direction: column; gap: 2px; padding: 3px 6px; align-self: stretch; justify-content: center; }
+  #hud-king img { height: 20px; }
+  #hud-king .bar { width: 24px; height: 4px; }
+  #hud-king .bar i { background: linear-gradient(#fff070, #d8a030); transition: width .2s; }
+  #hud-king.hurt { animation: kingHurt .5s infinite; }
+  @keyframes kingHurt { 50% { border-color: var(--red); box-shadow: 0 0 10px rgba(232,72,56,.8); } }
+  #hud-king.dead img { filter: grayscale(1) brightness(.6); }
+  #hud-king.dead::after {
+    content: '✕'; position: absolute; inset: 0; display: grid; place-items: center;
+    color: var(--red); font-size: 26px; font-weight: 700; text-shadow: 1px 1px 0 var(--ink), -1px -1px 0 var(--ink);
   }
   .pill {
     background: rgba(28, 20, 14, .82); border: 2px solid var(--ink);
@@ -405,6 +417,7 @@
 
   <div id="hud" hidden>
     <div class="pill" id="hud-wave"><span id="waveTxt">Vlna 1</span></div>
+    <div class="pill" id="hud-king" title="Kráľ"><img id="kingIcon" alt=""><div class="bar"><i id="kingFill"></i></div></div>
     <div class="pill" id="hud-wall"><div class="bar"><i id="hallFill"></i></div><div class="bar xp" title="Skúsenosti kráľa"><i id="xpFill"></i></div><span id="hallTxt"></span></div>
     <div class="pill"><img class="coin" alt=""><span id="goldTxt">0</span></div>
   </div>

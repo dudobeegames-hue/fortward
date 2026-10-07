@@ -737,6 +737,7 @@
       u.dead = true; u.deadT = 0; u.tgt = null; u.flash = 0;
       for (let k = 0; k < 10; k++) part(u.x, u.y - 6, (Math.random() - 0.5) * 40, -Math.random() * 40, 0.6, '#f8d048', 80);
       AUDIO.play('crumble');
+      slowmoT = SLOWMO_DUR;
       toast('Kráľ padol! Po vlne ho môžeš oživiť.');
     } else {
       u.dead = true;
@@ -1134,6 +1135,9 @@
 
   // padnutý kráľ: klesne na kolená (nohy zmiznú pod ním), plášť sa zavlní, nad korunou krúžia hviezdičky, potom zmizne
   const KING_GONE = 3.2;
+  // pri páde kráľa sa boj na chvíľu spomalí na tretinu (v reálnom čase), aby si to hráč všimol
+  const SLOWMO_DUR = 1.0;
+  let slowmoT = 0;
   function drawDeadKing(k, time) {
     const fr = SPR.king[0], t = k.deadT;
     const fall = Math.min(1, t / 0.45), drop = Math.round(4 * fall * fall);
@@ -1628,6 +1632,13 @@
   }
 
   function hudTick() {
+    const k = st.king, kp = $('hud-king');
+    if (k) {
+      const r = k.dead ? 0 : Math.max(0, k.hp / kingMax());
+      $('kingFill').style.width = (r * 100) + '%';
+      kp.classList.toggle('dead', !!k.dead);
+      kp.classList.toggle('hurt', !k.dead && r < 0.35 && st.phase === 'battle');
+    }
     for (const [id, cd, max] of [['warcry', st.cryCd, ABIL.warcry.cd], ['freeze', st.freezeCd, ABIL.freeze.cd]]) {
       const el = $(id + 'Btn');
       el.hidden = !has(id);
@@ -1659,6 +1670,7 @@
     ICONS.u_crossbow = spriteURL(SPR.knight[0], 3);
     ICONS.hall = spriteURL(BSPR.hall[2], 2);
     ICONS.king = spriteURL(SPR.king[0], 3);
+    $('kingIcon').src = ICONS.king;
     for (const k of ['garcher', 'bat', 'ram', 'shaman', 'sapper']) ICONS['e_' + k] = spriteURL(SPR[k][0], 3);
     ICONS.coin = spriteURL(SPR.coin[0], 4);
     ICONS.gem = spriteURL(SPR.gem[0], 4);
@@ -2383,7 +2395,10 @@
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
     if (!scene) { resize(); requestAnimationFrame(frame); return; }
     if (st.phase === 'battle') {
-      acc += dt * st.speed;
+      // spomalenie na tretinu, posledných 0,3 s sa plynulo vráti na plnú rýchlosť
+      const slow = slowmoT <= 0 ? 1 : slowmoT > 0.3 ? 0.33 : 0.33 + 0.67 * (1 - slowmoT / 0.3);
+      slowmoT = Math.max(0, slowmoT - dt);
+      acc += dt * st.speed * slow;
       while (acc >= DT && st.phase === 'battle') { update(DT); acc -= DT; }
     } else { acc = 0; updateFx(dt); mapTick(dt); }
     camTick(dt);
@@ -2425,6 +2440,6 @@
     for (const s of list) { x.drawImage(s.c, px * scale, (h - 3 - s.h) * scale, s.w * scale, s.h * scale); px += s.w + 3; }
     return postPNG(c, name);
   }
-  window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon,
+  window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon,
     enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax };
 })();
