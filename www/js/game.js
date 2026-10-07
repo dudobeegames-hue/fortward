@@ -1132,28 +1132,30 @@
     }
   }
 
-  // padnutý kráľ: preklopí sa na zem, okolo hlavy mu krúžia hviezdičky, potom zmizne
+  // padnutý kráľ: klesne na kolená (nohy zmiznú pod ním), plášť sa zavlní, nad korunou krúžia hviezdičky, potom zmizne
   const KING_GONE = 3.2;
   function drawDeadKing(k, time) {
     const fr = SPR.king[0], t = k.deadT;
-    const fall = Math.min(1, t / 0.3), alpha = t < 2.6 ? 1 : Math.max(0, 1 - (t - 2.6) / 0.6);
-    g.save();
-    g.imageSmoothingEnabled = false;
+    const fall = Math.min(1, t / 0.45), drop = Math.round(4 * fall * fall);
+    const alpha = t < 2.6 ? 1 : Math.max(0, 1 - (t - 2.6) / 0.6);
+    const x0 = Math.round(k.x - fr.w / 2), y0 = Math.round(k.y - fr.h) + drop, gy = Math.round(k.y);
+    const amp = t < 1.3 ? 1.6 * (1 - t / 1.3) : 0; // vlnenie plášťa doznieva
     g.globalAlpha = alpha;
-    shadow(k.x + fr.h * 0.4 * fall, k.y, 4 + Math.round(3 * fall));
-    g.translate(Math.round(k.x), Math.round(k.y));
-    g.rotate(fall * Math.PI / 2);
-    g.drawImage(fr.c, -Math.round(fr.w / 2), -fr.h);
-    g.restore();
-    if (fall < 1 || alpha <= 0) return;
-    // hviezdičky okolo hlavy (hlava leží vpravo od nôh)
-    const hx = k.x + fr.h - 4, hy = k.y - 4;
-    g.globalAlpha = alpha;
-    for (let i = 0; i < 3; i++) {
-      const a = time * 5 + i * 2.094, sx = Math.round(hx + Math.cos(a) * 6), sy = Math.round(hy - 4 + Math.sin(a) * 2);
-      g.fillStyle = PAL.K; g.fillRect(sx - 2, sy - 1, 5, 3); g.fillRect(sx - 1, sy - 2, 3, 5);
-      g.fillStyle = '#f8d048'; g.fillRect(sx - 1, sy, 3, 1); g.fillRect(sx, sy - 1, 1, 3);
-      g.fillStyle = '#ffffff'; g.fillRect(sx, sy, 1, 1);
+    shadow(k.x, k.y, 5);
+    for (let r = 0; r < fr.h; r++) {
+      const y = y0 + r;
+      if (y >= gy) break; // pod zemou (nohy) sa nekreslí
+      const dx = r >= 6 ? Math.round(Math.sin(t * 14 - r * 0.9) * amp * (r - 5) / 7) : 0;
+      g.drawImage(fr.c, 0, r, fr.w, 1, x0 + dx, y, fr.w, 1);
+    }
+    if (fall >= 1 && alpha > 0) { // hviezdičky okolo koruny
+      const cx = k.x, cy = y0 - 2;
+      for (let i = 0; i < 3; i++) {
+        const a = time * 5 + i * 2.094, sx = Math.round(cx + Math.cos(a) * 7), sy = Math.round(cy + Math.sin(a) * 2);
+        g.fillStyle = PAL.K; g.fillRect(sx - 2, sy - 1, 5, 3); g.fillRect(sx - 1, sy - 2, 3, 5);
+        g.fillStyle = '#f8d048'; g.fillRect(sx - 1, sy, 3, 1); g.fillRect(sx, sy - 1, 1, 3);
+        g.fillStyle = '#ffffff'; g.fillRect(sx, sy, 1, 1);
+      }
     }
     g.globalAlpha = 1;
   }
