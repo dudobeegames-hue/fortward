@@ -306,6 +306,18 @@
   .mInfo .stars { color: var(--gold); letter-spacing: 1px; }
   .mInfo .stars i { color: #4a3a2c; font-style: normal; }
   .mInfo .ok { color: #9cd45a; }
+  .mTiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .tierBtn {
+    display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 4px;
+    background: rgba(0,0,0,.3); border: 2px solid var(--ink); border-radius: 8px; font-size: 12px;
+  }
+  .tierBtn b { font-size: 12px; color: var(--muted); }
+  .tierBtn .st { font-size: 14px; letter-spacing: 1px; line-height: 1.1; }
+  .tierBtn .st i { color: #4a3a2c; font-style: normal; }
+  .tierBtn.sel { border-color: var(--tc); background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 1px var(--tc); }
+  .tierBtn.sel b { color: var(--tc); }
+  .tierBtn.locked { opacity: .45; }
+  #over .dim { color: var(--muted); font-size: 13px; }
   .mInfo p { margin: 4px 0 0; font-size: 14px; line-height: 1.35; }
   #over .row { display: flex; gap: 8px; width: 100%; }
   #over .row .btn { flex: 1; justify-content: center; font-size: 17px; }
@@ -439,6 +451,7 @@
         <div class="mInfo"><b id="mName"></b><small id="mMeta"></small><p id="mDesc"></p></div>
         <span id="mStars" class="mStars"></span>
       </div>
+      <div id="mTiers" class="mTiers"></div>
       <div id="mNew" class="mNew"></div>
       <div class="brow three">
         <button id="mapBack" class="btn">Menu</button>
@@ -462,7 +475,7 @@
 
   <div id="perks" class="screenOverlay perksScreen" hidden>
     <div class="perkHead"><b>Kráľovská sieň</b><span class="pill">★ <span id="perkStars">0</span></span></div>
-    <p class="perkNote">Za každú misiu získaš 1 až 3 hviezdy podľa zdravia radnice na konci. Hviezdami kúpiš trvalé bonusy – nákup je natrvalo, vyber si rozumne.</p>
+    <p class="perkNote">Každý hrad môžeš dobyť na medenej, striebornej a zlatej úrovni – za každú 1 až 3 hviezdy podľa zdravia radnice na konci. Hviezdami kúpiš trvalé bonusy – nákup je natrvalo, vyber si rozumne.</p>
     <div id="perkList"></div>
     <div class="row">
       <button id="perkBack" class="btn up">Späť na mapu</button>

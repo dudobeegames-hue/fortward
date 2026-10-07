@@ -98,8 +98,8 @@
   const hallMax = () => Math.round((400 + 200 * (st.hallLvl - 1)) * (1 + 0.15 * perk('foundations')));
   const hallUpCost = () => Math.round(110 * Math.pow(1.7, st.hallLvl - 1)); // lacnejšie – radnica odomyká aj úrovne stavieb
   const zoneRows = () => 5 + st.hallLvl;
-  const kingMax = () => 120 * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.25 * perk('armor')) * (1 + 0.2 * tal('vit'));
-  const kingDmg = () => 12 * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.25 * perk('armor')) * (1 + 0.15 * tal('str'));
+  const kingMax = () => 120 * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.2 * tal('vit'));
+  const kingDmg = () => 12 * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.15 * tal('str'));
   const volleyDmg = () => (6 + 4 * (st.volleyLvl - 1)) * (1 + 0.25 * perk('archery')) * (1 + 0.15 * tal('archers'));
   const volleyCd = () => Math.max(2, 5 - 0.25 * (st.volleyLvl - 1) - 0.4 * perk('archery'));
   const volleyUpCost = () => Math.round(60 * Math.pow(1.6, st.volleyLvl - 1));
@@ -113,7 +113,6 @@
     { id: 'fletching',   name: 'Ostré hroty',           desc: 'Veže a strelci +10 % poškodenia',               icon: 'tower' },
     { id: 'archery',     name: 'Kráľovskí lukostrelci', desc: 'Šípová salva +25 % poškodenia, rýchlejšie nabitie', icon: 'u_archer' },
     { id: 'drill',       name: 'Výcvik rytierov',       desc: 'Rytieri +20 % zdravia a sily',                  icon: 'barracks' },
-    { id: 'armor',       name: 'Kráľova zbroj',         desc: 'Kráľ +25 % zdravia a sily',                     icon: 'king' },
   ];
   const PERK_MAX = 3;
   const loadJSON = (k, def) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? def : v; } catch (e) { return def; } };
@@ -148,7 +147,19 @@
     saveKing();
     return n;
   }
-  const starsTotal = () => meta.stars.reduce((a, b) => a + (b || 0), 0);
+  // každá misia má 3 úrovne: medená → strieborná → zlatá; ďalšia sa odomkne až za 3 hviezdy na predošlej
+  const TIERS = [
+    { name: 'Medená',     col: '#e0905a', hi: '#f8c08a', hp: 1,    extra: 0, xp: 1 },
+    { name: 'Strieborná', col: '#c8ccd8', hi: '#ffffff', hp: 1.3,  extra: 2, xp: 1.4 },
+    { name: 'Zlatá',      col: '#f8d048', hi: '#fff070', hp: 1.65, extra: 4, xp: 1.8 },
+  ];
+  // staré uloženie (jedno číslo na misiu) = medená úroveň
+  meta.stars = meta.stars.map(v => Array.isArray(v) ? v : [v || 0, 0, 0]);
+  if (meta.perks.armor) { delete meta.perks.armor; saveJSON('fortward.perks', meta.perks); } // zrušený bonus – hviezdy sa vrátia
+  const starsOf = (m, t) => (meta.stars[m - 1] || [])[t] || 0;
+  const tierOpen = (m, t) => t === 0 ? m <= st.unlocked : starsOf(m, t - 1) >= 3;
+  const starSpan = (n, t) => '<span style="color:' + TIERS[t].col + '">' + '★'.repeat(n) + '</span><i>' + '★'.repeat(3 - n) + '</i>';
+  const starsTotal = () => meta.stars.reduce((a, b) => a + (b || []).reduce((x, y) => x + (y || 0), 0), 0);
   const starsSpent = () => Object.values(meta.perks).reduce((a, l) => a + l * (l + 1) / 2, 0); // úroveň n stojí 1+2+…+n
   const starsFree = () => starsTotal() - starsSpent();
   const starsFor = ratio => ratio >= 0.8 ? 3 : ratio >= 0.4 ? 2 : 1;
@@ -289,13 +300,14 @@
     return b;
   }
 
-  function startMission(m) {
+  function startMission(m, tier) {
     st.mission = m;
+    st.tier = tier || 0;
     st.tech = techFor(Math.max(m, st.unlocked)); // platí všetko, čo hráč už odomkol
     scene = buildScene(W, H, G, 7 + m * 13, m - 1); // každá misia má vlastnú krajinu
     $('map').hidden = true;
     newGame();
-    banner('Misia ' + m + ': ' + MISSIONS[m - 1].name);
+    banner('Misia ' + m + ': ' + MISSIONS[m - 1].name + (st.tier ? ' · ' + TIERS[st.tier].name : ''));
     if (m > 1 && m === st.unlocked) setTimeout(() => { if (st.phase === 'build') hint('Nové: ' + UNLOCKS[m - 1].map(u => u.name).join(', ')); }, 1900);
     if (ENEMY_INTRO[m] && m === st.unlocked) setTimeout(() => { if (st.phase === 'build') hint('Pozor – ' + ENEMY_INTRO[m].name + ': ' + ENEMY_INTRO[m].desc); }, 6600);
   }
@@ -333,9 +345,10 @@
   function buildWave(w) {
     const m = st.mission, ew = w + (m - 1) * DIFF.typeShift;
     const q = [];
-    const n = 6 + Math.round(w * DIFF.countWave + (m - 1) * DIFF.countMission);
+    const tr = TIERS[st.tier || 0];
+    const n = 6 + Math.round(w * DIFF.countWave + (m - 1) * DIFF.countMission) + tr.extra;
     const mHp = DIFF.missionHp ? DIFF.missionHp[m - 1] : 1 + DIFF.hpMission * (m - 1);
-    const hpMul = Math.pow(DIFF.hpWave + DIFF.hpWaveMission * (m - 1), w - 1) * mHp;
+    const hpMul = Math.pow(DIFF.hpWave + DIFF.hpWaveMission * (m - 1), w - 1) * mHp * tr.hp;
     const gap = Math.max(0.3, 1.3 - ew * 0.04);
     for (let i = 0; i < n; i++) {
       const r = Math.random();
@@ -354,7 +367,7 @@
       q.push({ type, gap: gap * (0.6 + Math.random() * 0.8), hpMul });
     }
     if (w % 5 === 0) { // boss v 5. a 10. vlne, v posledných misiách dvaja
-      const bossMul = (w === MISSION_WAVES ? DIFF.bossLast : 1) * (DIFF.bossBase + DIFF.bossMission * (m - 1));
+      const bossMul = (w === MISSION_WAVES ? DIFF.bossLast : 1) * (DIFF.bossBase + DIFF.bossMission * (m - 1)) * tr.hp;
       q.push({ type: 'warlord', gap: 2.5, hpMul: bossMul });
       if (w === MISSION_WAVES && m >= 8) q.push({ type: 'warlord', gap: 3, hpMul: bossMul });
     }
@@ -395,7 +408,7 @@
     const bonus = Math.round((10 + st.wave * 4) * goldMul()) + 6 * tal('tax');
     st.gold += bonus;
     const lvl0 = kingMeta.lvl;
-    st.lastXp = gainKingXp(8 + 2 * st.wave + (st.wave >= MISSION_WAVES ? 40 : 0));
+    st.lastXp = gainKingXp(Math.round((8 + 2 * st.wave + (st.wave >= MISSION_WAVES ? 40 : 0)) * TIERS[st.tier || 0].xp));
     if (kingMeta.lvl > lvl0 && st.king) for (let k = 0; k < 24; k++) part(st.king.x, st.king.y - 8, (Math.random() - 0.5) * 50, -Math.random() * 60, 0.9, ['#f8d048', '#fff070', '#ffffff'][k % 3], 60);
     let mined = 0;
     for (const b of st.blds) if (b.kind === 'mine') {
@@ -427,19 +440,22 @@
   function missionWon() {
     const m = st.mission;
     st.phase = 'won';
-    const stars = starsFor(st.hallHp / hallMax()), prevStars = meta.stars[m - 1] || 0;
-    if (stars > prevStars) { meta.stars[m - 1] = stars; saveJSON('fortward.stars', meta.stars); }
+    const t = st.tier || 0, stars = starsFor(st.hallHp / hallMax()), prevStars = starsOf(m, t);
+    const nextWasOpen = t < 2 && tierOpen(m, t + 1);
+    if (stars > prevStars) { const a = (meta.stars[m - 1] || [0, 0, 0]).slice(); a[t] = stars; meta.stars[m - 1] = a; saveJSON('fortward.stars', meta.stars); }
+    const tierNote = t >= 2 ? '' : !nextWasOpen && tierOpen(m, t + 1) ? '<br><span class="newTech">Odomkla sa ' + TIERS[t + 1].name.toLowerCase() + ' úroveň!</span>'
+      : !tierOpen(m, t + 1) ? '<br><small class="dim">Za 3 hviezdy (radnica nad 80 % zdravia) sa odomkne ' + TIERS[t + 1].name.toLowerCase() + ' úroveň.</small>' : '';
     $('bossbar').hidden = true; $('bottom').hidden = true;
-    const first = m >= st.unlocked;
+    const first = t === 0 && m >= st.unlocked;
     if (first) { st.unlocked = Math.min(11, m + 1); saveProgress(); st.mapAnim = { seg: m - 1, t: 0 }; }
     banner('Misia splnená!');
     AUDIO.music(null); AUDIO.play('win');
     for (let k = 0; k < 80; k++) part(Math.random() * W, H * 0.3 + Math.random() * 30, (Math.random() - 0.5) * 60, -30 - Math.random() * 60, 1.4, ['#f8d048', '#fff070', '#88b4ff', '#e84838'][k % 4], 60);
     const text = m === MISSIONS.length
       ? 'Porazil si poslednú hordu. <b>Ostrov je oslobodený!</b>'
-      : 'Misia ' + m + ' · ' + MISSIONS[m - 1].name + '<br>Všetkých ' + MISSION_WAVES + ' vĺn odrazených.' + (first ? '<br>Odomkla sa misia ' + (m + 1) + '.<br><span class="newTech">Nové: ' + UNLOCKS[m].map(u => u.name).join(', ') + '</span>' : '');
-    const starLine = '<span class="bigStars">' + '★'.repeat(stars) + '<i>' + '★'.repeat(3 - stars) + '</i></span>' +
-      (stars > prevStars ? '<br><span class="newTech">+' + (stars - prevStars) + ' ★ do Kráľovskej siene</span>' : '');
+      : 'Misia ' + m + ' · ' + MISSIONS[m - 1].name + ' · ' + TIERS[t].name.toLowerCase() + ' úroveň<br>Všetkých ' + MISSION_WAVES + ' vĺn odrazených.' + (first ? '<br>Odomkla sa misia ' + (m + 1) + '.<br><span class="newTech">Nové: ' + UNLOCKS[m].map(u => u.name).join(', ') + '</span>' : '');
+    const starLine = '<span class="bigStars">' + starSpan(stars, t) + '</span>' +
+      (stars > prevStars ? '<br><span class="newTech">+' + (stars - prevStars) + ' ★ do Kráľovskej siene</span>' : '') + tierNote;
     const xpLine = st.lastXp ? '<br><span class="newTech">Kráľ +' + st.lastXp + ' XP' + (kingMeta.pending ? ' · nová úroveň ' + kingMeta.lvl + '!' : '') + '</span>' : '';
     setTimeout(() => showOver(m === MISSIONS.length ? 'Víťazstvo!' : 'Misia splnená!', starLine + '<br>' + text + xpLine, true), 1200);
     updateHud();
@@ -456,7 +472,7 @@
     }
     st.shake = 0.6;
     AUDIO.music(null); AUDIO.play('crumble'); setTimeout(() => AUDIO.play('lose'), 500);
-    setTimeout(() => showOver('Radnica padla!', 'Misia ' + st.mission + ' · ' + MISSIONS[st.mission - 1].name + '<br>Prežité vlny: <b>' + survived + ' / ' + MISSION_WAVES + '</b>', false), 1200);
+    setTimeout(() => showOver('Radnica padla!', 'Misia ' + st.mission + ' · ' + MISSIONS[st.mission - 1].name + (st.tier ? ' · ' + TIERS[st.tier].name.toLowerCase() + ' úroveň' : '') + '<br>Prežité vlny: <b>' + survived + ' / ' + MISSION_WAVES + '</b>', false), 1200);
     updateHud();
   }
 
@@ -1359,8 +1375,9 @@
     g.fillStyle = status === 'done' ? '#b88420' : status === 'open' ? '#22337a' : '#2c2c38'; g.fillRect(tx, ty, tw, 7);
     g.fillStyle = status === 'done' ? '#f8d048' : status === 'open' ? '#3c64c8' : '#3e3e4c'; g.fillRect(tx, ty, tw, 1);
     pxText(g, sn, tx + 2, ty + 1, status === 'locked' ? '#848490' : '#ffffff');
-    const ns = meta.stars[i] || 0;
-    if (ns) for (let k = 0; k < 3; k++) drawStar(n.x - 7 + k * 5, ty + 9, k < ns);
+    let bt = 2; while (bt > 0 && !starsOf(num, bt)) bt--;
+    const ns = starsOf(num, bt);
+    if (ns) for (let k = 0; k < 3; k++) drawStar(n.x - 7 + k * 5, ty + 9, k < ns, bt);
     if (st.mapSel === num) {
       const col = Math.floor(time * 4) % 2 ? '#f8d048' : '#ffffff';
       corners(n.x - 13, top - 3, n.x + 13, n.y + 12, col);
@@ -1368,11 +1385,12 @@
   }
 
   // malá pixelová hviezdička 5x5
-  function drawStar(x, y, on) {
+  function drawStar(x, y, on, tier) {
+    const tc = TIERS[tier || 0];
     const rows = ['..1..', '.111.', '11111', '.111.', '.1.1.'];
     g.fillStyle = PAL.K;
     for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) if (rows[r][c] === '1') g.fillRect(x + c - 1, y + r, 3, 1);
-    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) if (rows[r][c] === '1') { g.fillStyle = on ? (r < 2 ? '#fff070' : '#f8d048') : '#3e3e4c'; g.fillRect(x + c, y + r, 1, 1); }
+    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) if (rows[r][c] === '1') { g.fillStyle = on ? (r < 2 ? tc.hi : tc.col) : '#3e3e4c'; g.fillRect(x + c, y + r, 1, 1); }
   }
 
   function renderMap(time) {
@@ -1624,7 +1642,7 @@
   }
 
   function renderBuild() {
-    $('buildWave').textContent = 'Pred vlnou ' + (st.wave + 1);
+    $('buildWave').textContent = 'Pred vlnou ' + (st.wave + 1) + (st.tier ? ' · ' + TIERS[st.tier].name.toLowerCase() : '');
     const pal = $('palette'); pal.innerHTML = '';
     for (const kind of BUILD_ORDER) {
       const d = BUILD[kind];
@@ -2051,9 +2069,25 @@
     const foe = ENEMY_INTRO[m];
     $('mNew').innerHTML = (foe ? '<span>Nepriateľ:</span><em class="foe"><img src="' + ICONS['e_' + foe.id] + '">' + foe.name + '</em>' : '') +
       '<span>' + (m === 1 ? 'Výbava:' : 'Novinka:') + '</span>' + UNLOCKS[m - 1].map(u => '<em><img src="' + ICONS[u.icon] + '">' + u.name + '</em>').join('');
-    $('mapPlay').textContent = done ? 'Hrať znova ▶' : 'Brániť ▶';
-    const ms = meta.stars[m - 1] || 0;
-    $('mStars').innerHTML = done ? '★'.repeat(ms) + '<i>' + '★'.repeat(3 - ms) + '</i>' : '';
+    // úroveň misie: predvolene prvá otvorená bez plných 3 hviezd
+    if (st.mapTierFor !== m) {
+      st.mapTierFor = m; st.mapTier = 0;
+      while (st.mapTier < 2 && tierOpen(m, st.mapTier + 1)) st.mapTier++;
+    }
+    const tb = $('mTiers'); tb.innerHTML = '';
+    TIERS.forEach((tr, t) => {
+      const open = tierOpen(m, t), b = document.createElement('button');
+      b.className = 'tierBtn' + (t === st.mapTier ? ' sel' : '') + (open ? '' : ' locked');
+      b.style.setProperty('--tc', tr.col);
+      b.innerHTML = '<b>' + tr.name + '</b><span class="st">' + (open ? starSpan(starsOf(m, t), t) : '🔒') + '</span>';
+      b.addEventListener('click', () => {
+        if (!open) { toast(t === 0 ? 'Najprv dobyj predošlý hrad' : 'Najprv získaj 3 hviezdy na úrovni ' + TIERS[t - 1].name.toLowerCase()); AUDIO.play('deny'); return; }
+        st.mapTier = t; AUDIO.play('click'); renderMapPanel();
+      });
+      tb.appendChild(b);
+    });
+    $('mapPlay').textContent = starsOf(m, st.mapTier) ? 'Hrať znova ▶' : 'Brániť ▶';
+    $('mStars').innerHTML = '';
     $('hallBtnTxt').textContent = starsFree();
   }
 
@@ -2203,8 +2237,8 @@
 
   $('playBtn').addEventListener('click', showMap);
   $('overMap').addEventListener('click', showMap);
-  $('overRetry').addEventListener('click', () => startMission(st.mission));
-  $('mapPlay').addEventListener('click', () => { if (!st.mapAnim) startMission(st.mapSel); });
+  $('overRetry').addEventListener('click', () => startMission(st.mission, st.tier));
+  $('mapPlay').addEventListener('click', () => { if (!st.mapAnim && tierOpen(st.mapSel, st.mapTier || 0)) startMission(st.mapSel, st.mapTier || 0); });
   $('mapBack').addEventListener('click', () => { st.phase = 'title'; $('map').hidden = true; showTitle(); });
   function syncSound() {
     document.querySelectorAll('.sndBtn').forEach(b => {
@@ -2298,5 +2332,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon,
-    enterBuild, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax };
+    enterBuild, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax };
 })();
