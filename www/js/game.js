@@ -1565,6 +1565,18 @@
         }, 'up wide'));
       } else if (maxL < MAX_LVL) acts.appendChild(lockBtn('Úr. ' + (minL + 1), 'lvl5', true));
       else acts.appendChild(btn('Max. úroveň', null, false, () => { }, 'wide'));
+      // ostne pre celý rad – na tie, ktoré ich ešte nemajú, kým stačí zlato
+      const bare = grp.filter(w => !w.spikes);
+      if (bare.length) {
+        if (!has('spikes')) acts.appendChild(lockBtn('Ostne', 'spikes', true));
+        else {
+          const n = Math.min(bare.length, Math.floor(st.gold / SPIKE_COST)), all = n === bare.length;
+          const label = 'Ostne ' + (all || !n ? 'na všetky (' + bare.length + ')' : 'na ' + n + ' z ' + bare.length);
+          acts.appendChild(btn(label, (n || bare.length) * SPIKE_COST, n > 0, () => {
+            for (const w of bare.slice(0, n)) { st.gold -= SPIKE_COST; w.spent += SPIKE_COST; w.spikes = true; }
+          }, 'wide'));
+        }
+      }
       info.appendChild(acts);
     } else if (st.sel) {
       const b = st.sel, d = BUILD[b.kind];
