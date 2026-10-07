@@ -2059,8 +2059,57 @@
         st.mapSel = a.seg + 2; renderMapPanel();
         focusMapNode(st.mapSel);
         AUDIO.play('unlock');
+        const nm = st.mapSel;
+        setTimeout(() => { if (st.phase === 'map') showUnlockDeck(nm); }, 700);
       }
     }
+  }
+
+  // ---- kartičky s novinkami: po rozsvietení ďalšieho hradu, hráč ich odťuká jednu po druhej ----
+  function unlockItems(m) {
+    const items = (UNLOCKS[m - 1] || []).map(u => ({
+      icon: ICONS[u.icon], name: u.name,
+      tag: BUILD[u.id] ? 'Nová stavba' : ABIL[u.id] ? 'Kráľova schopnosť' : 'Nové vylepšenie',
+      desc: u.desc || (BUILD[u.id] ? BUILD[u.id].desc + '.' : ''),
+    }));
+    const foe = ENEMY_INTRO[m];
+    if (foe) items.push({ icon: ICONS['e_' + foe.id], name: foe.name, tag: 'Pozor – nový nepriateľ', desc: foe.desc.charAt(0).toUpperCase() + foe.desc.slice(1) + '.', foe: true });
+    return items;
+  }
+  function showUnlockDeck(m) {
+    const items = unlockItems(m);
+    if (!items.length) return;
+    const deck = $('unlockDeck'), stack = $('udStack');
+    stack.innerHTML = '';
+    const cards = items.map((it, i) => {
+      const c = document.createElement('div');
+      c.className = 'uCard deal' + (it.foe ? ' foe' : '');
+      c.style.setProperty('--d', (0.15 + i * 0.12) + 's');
+      c.innerHTML = '<span class="cnt">' + (i + 1) + ' / ' + items.length + '</span><span class="tag">' + it.tag + '</span>' +
+        '<span class="pic"><img src="' + it.icon + '"></span><b>' + it.name + '</b><p>' + it.desc + '</p>';
+      return c;
+    });
+    for (const c of cards.slice().reverse()) stack.appendChild(c); // prvá karta navrchu
+    let top = 0;
+    const layout = () => cards.forEach((c, i) => {
+      const k = i - top;
+      if (k < 0) return;
+      c.style.zIndex = 50 - k;
+      c.style.transform = 'translate(' + k * 6 + 'px,' + k * 6 + 'px) rotate(' + k * 2.5 + 'deg)';
+      c.style.opacity = k > 3 ? 0 : 1;
+    });
+    layout();
+    deck.classList.remove('out');
+    deck.hidden = false;
+    stack.onclick = () => {
+      if (top >= cards.length) return;
+      const c = cards[top++];
+      c.classList.add('gone');
+      AUDIO.play('click');
+      setTimeout(() => c.remove(), 400);
+      if (top < cards.length) { layout(); return; }
+      setTimeout(() => { deck.classList.add('out'); setTimeout(() => { deck.hidden = true; deck.classList.remove('out'); }, 300); }, 250);
+    };
   }
 
   $('playBtn').addEventListener('click', showMap);
@@ -2160,5 +2209,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon,
-    enterBuild, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax };
+    enterBuild, showUnlockDeck, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax };
 })();
