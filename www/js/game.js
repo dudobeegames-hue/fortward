@@ -1059,7 +1059,8 @@
     const x0 = tileX(b.c), y0 = tileY(b.r);
     let spr;
     if (b.kind === 'wall') {
-      const edgeL = b.c === 0 && G.gx0 > 0, edgeR = b.c === G.cols - 1 && W - (x0 + T) > 0;
+      const edgeL = b.c === 0 && G.gx0 > 0 && !scene.theme.sea, // pri mori hradba končí na pláži
+        edgeR = b.c === G.cols - 1 && W - (x0 + T) > 0;
       const m = (joins(b.c, b.r - 1) ? 1 : 0) | (joins(b.c + 1, b.r) || edgeR ? 2 : 0) | (joins(b.c, b.r + 1) ? 4 : 0) | (joins(b.c - 1, b.r) || edgeL ? 8 : 0);
       const wl = Math.max(1, Math.min(5, b.lvl)) - 1;
       spr = BSPR.wall[wl][m];

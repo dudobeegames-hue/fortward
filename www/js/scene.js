@@ -144,7 +144,10 @@ function buildScene(W, H, G, seed, themeIdx) {
   let spawn = [G.gx0 + 8, G.gx0 + G.cols * G.T - 8];
 
   if (th.sea) { // more na ľavom okraji
-    const edge = y => 36 - 24 * (y / H) + Math.sin(y * 0.05 + seed) * 4 + (fbm(0.5, y * 0.04, seed + 41) - 0.5) * 8;
+    const rawEdge = y => 36 - 24 * (y / H) + Math.sin(y * 0.05 + seed) * 4 + (fbm(0.5, y * 0.04, seed + 41) - 0.5) * 8;
+    // voda nesmie siahať do zóny na stavanie: pri zóne končí pred mriežkou (piesok smie), nad ňou sa plynulo vracia
+    const shore = y => G.gx0 + 5 + Math.max(0, zoneTop - 10 - y) * 0.7;
+    const edge = y => Math.min(rawEdge(y), shore(y));
     for (let y = 0; y < H; y++) {
       const e = edge(y);
       for (let x = 0; x < Math.ceil(e) + 1 && x < W; x++) {
