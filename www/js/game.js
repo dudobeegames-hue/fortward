@@ -757,10 +757,11 @@
     return best;
   }
 
-  // vlastné budovy (veže, bane, kaplnky…) rytieri prejdú – hradby len cez bránu, radnicu obchádzajú
+  // vlastné budovy (veže, bane, kaplnky…) rytieri prejdú – hradby len cez bránu, radnicou len jej horným radom
   const knightPass = (c, r) => {
     const o = occAt(c, r);
-    return !o || (o !== HALL && (o.kind !== 'wall' || o.gate));
+    if (o === HALL) return r === G.hr0;
+    return !o || o.kind !== 'wall' || o.gate;
   };
   const musterYOf = () => Math.max(G.gy0 + 30, tileY(zoneTopRow()) - 28);
   // dostanú sa rytieri z kasární von k zhromaždisku pred zónou? (pri budovaní upozorní, ak nie)
