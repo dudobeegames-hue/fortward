@@ -69,8 +69,8 @@ window.SIM = (() => {
       if (F.has('knightTypes')) { const bk = s.blds.find(b => b.kind === 'barracks' && !b.ktype); if (bk && s.gold >= 50) { s.gold -= 50; bk.ktype = 'spear'; acted = true; continue; } }
       const ups = [];
       for (const b of s.blds) {
-        if (['tower', 'mage', 'barracks', 'catapult', 'mine', 'bell', 'chapel'].includes(b.kind) && b.lvl < F.lvlCap()) ups.push({ c: F.bUpCost(b), f: () => { b.spent += F.bUpCost(b); b.lvl++; b.hp = F.bMaxHp(b); } });
-        if (b.kind === 'wall' && b.lvl < Math.min(F.lvlCap(), 3) && s.wave >= 4) ups.push({ c: F.bUpCost(b) * 6, real: F.bUpCost(b), f: () => { b.lvl++; b.hp = F.bMaxHp(b); } });
+        if (['tower', 'mage', 'barracks', 'catapult', 'mine', 'bell', 'chapel'].includes(b.kind) && b.lvl < F.bCap()) ups.push({ c: F.bUpCost(b), f: () => { b.spent += F.bUpCost(b); b.lvl++; b.hp = F.bMaxHp(b); } });
+        if (b.kind === 'wall' && b.lvl < Math.min(F.bCap(), 3) && s.wave >= 4) ups.push({ c: F.bUpCost(b) * 6, real: F.bUpCost(b), f: () => { b.lvl++; b.hp = F.bMaxHp(b); } });
         if (b.unit && b.unit.lvl < F.lvlCap()) ups.push({ c: F.uUpCost(b.unit), f: () => { b.unit.lvl++; } });
       }
       if (F.has('volleyUp') && s.volleyLvl < 6) ups.push({ c: F.volleyUpCost(), f: () => { s.volleyLvl++; } });

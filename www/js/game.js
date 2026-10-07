@@ -95,7 +95,7 @@
   const knightHp = b => 40 * lvlMul(b, 0.3) * (1 + 0.2 * perk('drill'));
   const knightDmg = b => 6 * lvlMul(b, 0.35) * (1 + 0.2 * perk('drill'));
   const hallMax = () => Math.round((400 + 200 * (st.hallLvl - 1)) * (1 + 0.15 * perk('foundations')));
-  const hallUpCost = () => Math.round(150 * Math.pow(1.8, st.hallLvl - 1));
+  const hallUpCost = () => Math.round(110 * Math.pow(1.7, st.hallLvl - 1)); // lacnejšie – radnica odomyká aj úrovne stavieb
   const zoneRows = () => 5 + st.hallLvl;
   const kingMax = () => 120 * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.25 * perk('armor'));
   const kingDmg = () => 12 * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.25 * perk('armor'));
@@ -138,7 +138,10 @@
   Object.assign(st, { mission: 1, unlocked: 1, mapSel: 1, mapAnim: null, tech: techFor(1) });
   const has = id => st.tech.has(id);
   const lvlCap = () => has('lvl5') ? MAX_LVL : 3;                       // úroveň stavieb a strelcov
-  const hallCap = () => has('hall5') ? MAX_LVL : has('hall3') ? 3 : 1;  // úroveň radnice
+  const hallCap = lvlCap;                                                // úroveň radnice
+  // stavby majú najviac úroveň radnice: drevená radnica = drevené stavby, kameň až po jej vylepšení
+  const bCap = () => Math.min(lvlCap(), st.hallLvl);
+  const LVL_NAME = ['', 'drevo', 'kameň', 'kameň s kovaním', 'tmavé opevnenie', 'kráľovský kameň'];
   const lockBtn = (label, id, wide) => btn('🔒 ' + label + ' · misia ' + unlockMissionOf(id), null, false, () => { }, 'locked' + (wide ? ' wide' : ''));
   try { st.unlocked = Math.max(1, Math.min(11, parseInt(localStorage.getItem('fortward.unlocked') || '1', 10) || 1)); } catch (e) { /* bez úložiska */ }
   const saveProgress = () => { try { localStorage.setItem('fortward.unlocked', String(st.unlocked)); } catch (e) { } };
@@ -1589,13 +1592,14 @@
       const d = BUILD[st.tool];
       card(ICONS[st.tool], d.name, d.desc + (st.tool === 'wall' ? '. Ťukni pre jednu alebo potiahni prstom – pustením sa rad postaví. Dvojťukom na hradbu označíš celý rad.' : '. Ťukni na voľné políčko v zóne.'));
     } else if (st.sel === HALL) {
-      card(ICONS.hall, 'Radnica · úr. ' + st.hallLvl, 'Kráľ ju bráni. Vylepšenie pridá zdravie, silu kráľa a rozšíri územie o 1 rad.');
+      card(ICONS.hall, 'Radnica · úr. ' + st.hallLvl + ' (' + LVL_NAME[st.hallLvl] + ')', 'Kráľ ju bráni. Vylepšenie pridá zdravie, silu kráľa, rozšíri územie o 1 rad' +
+        (st.hallLvl < MAX_LVL ? ' a dovolí vylepšiť stavby na úroveň ' + (st.hallLvl + 1) + ' (' + LVL_NAME[st.hallLvl + 1] + ').' : '.'));
       if (st.hallLvl < hallCap()) {
         const c = hallUpCost();
         acts.appendChild(btn('Vylepšiť radnicu', c, st.gold >= c, () => {
           st.gold -= c; st.hallLvl++; st.hallHp += 200; st.king.hp = kingMax();
         }, 'up'));
-      } else if (st.hallLvl < MAX_LVL) acts.appendChild(lockBtn('Radnica úr. ' + (st.hallLvl + 1), st.hallLvl < 3 ? 'hall3' : 'hall5'));
+      } else if (st.hallLvl < MAX_LVL) acts.appendChild(lockBtn('Radnica úr. ' + (st.hallLvl + 1), 'lvl5'));
       else acts.appendChild(btn('Max. úroveň', null, false, () => { }));
       if (has('volleyUp')) {
         const vc = volleyUpCost();
@@ -1604,7 +1608,7 @@
       info.appendChild(acts);
     } else if (selGroup()) {
       // hromadné akcie pre označenú skupinu (rad hradieb alebo všetky stavby jedného druhu)
-      const grp = st.selGroup, kind = grp[0].kind, d = BUILD[kind], isWall = kind === 'wall', cap = lvlCap();
+      const grp = st.selGroup, kind = grp[0].kind, d = BUILD[kind], isWall = kind === 'wall', cap = bCap();
       const minL = Math.min(...grp.map(w => w.lvl)), maxL = Math.max(...grp.map(w => w.lvl));
       card(ICONS[kind], (isWall ? 'Rad hradieb' : d.name + ' – všetky') + ' · ' + grp.length + ' ks',
         'Úroveň ' + (minL === maxL ? minL : minL + '–' + maxL) + '. Akcie platia pre každú stavbu v skupine – najprv pre tie najslabšie, kým stačí zlato.');
@@ -1624,6 +1628,7 @@
         st.gold -= c; w.spent += c; w.lvl++;
         if (d.hp) w.hp = Math.ceil(bMaxHp(w) * ratio);
       }, 'up wide');
+      else if (maxL < lvlCap()) acts.appendChild(btn('Úr. ' + (maxL + 1) + ' – najprv vylepši radnicu', null, false, () => { }, 'locked wide'));
       else if (maxL < MAX_LVL) acts.appendChild(lockBtn('Úr. ' + (minL + 1), 'lvl5', true));
       else acts.appendChild(btn('Max. úroveň', null, false, () => { }, 'wide'));
       if (d.hp) {
@@ -1652,7 +1657,7 @@
           }
         }
         // strelci na hradbách
-        const free = grp.filter(w => !w.gate && !w.unit), manned = grp.filter(w => w.unit && w.unit.lvl < cap).sort((a, b) => a.unit.lvl - b.unit.lvl);
+        const free = grp.filter(w => !w.gate && !w.unit), manned = grp.filter(w => w.unit && w.unit.lvl < lvlCap()).sort((a, b) => a.unit.lvl - b.unit.lvl);
         if (has('wallArcher') && (free.length || manned.length)) {
           const ua = section('Strelci na hradbách');
           if (free.length) for (const type in WUNIT) {
@@ -1682,7 +1687,7 @@
       if (b.spec) stats += ' · ' + SPECS[b.spec].name;
       if (b.kind === 'barracks') stats += ' · ' + KTYPES[b.ktype || 'knight'].name;
       card(b.gate ? ICONS.gate : ICONS[b.kind], (b.gate ? 'Brána' : d.name) + ' · úr. ' + b.lvl, stats);
-      if (b.lvl < lvlCap()) {
+      if (b.lvl < bCap()) {
         const c = bUpCost(b);
         acts.appendChild(btn('Vylepšiť', c, st.gold >= c, () => {
           const ratio = d.hp ? b.hp / bMaxHp(b) : 1;
@@ -1690,7 +1695,8 @@
           if (d.hp) b.hp = Math.ceil(bMaxHp(b) * ratio);
           rebuildOcc();
         }, 'up'));
-      } else if (b.lvl < MAX_LVL) acts.appendChild(lockBtn('Úr. ' + (b.lvl + 1), 'lvl5'));
+      } else if (b.lvl < lvlCap()) acts.appendChild(btn('Úr. ' + (b.lvl + 1) + ' – najprv radnica', null, false, () => { }, 'locked'));
+      else if (b.lvl < MAX_LVL) acts.appendChild(lockBtn('Úr. ' + (b.lvl + 1), 'lvl5'));
       else acts.appendChild(btn('Max. úroveň', null, false, () => { }));
       const refund = Math.floor(b.spent / 2) + (b.unit ? Math.floor(b.unit.spent / 2) : 0);
       acts.appendChild(btn('Predať +' + refund, null, true, () => {
@@ -2134,5 +2140,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon,
-    enterBuild, volley, has, lvlCap, hallCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax };
+    enterBuild, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax };
 })();

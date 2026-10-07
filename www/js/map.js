@@ -156,12 +156,12 @@ const UNLOCKS = [
   [{ id: 'pit', name: 'Jama s ostňami', icon: 'pit' }, { id: 'mine', name: 'Zlatá baňa', icon: 'mine' }],
   [{ id: 'gate', name: 'Brána', icon: 'gate' }, { id: 'wallArcher', name: 'Lukostrelec na hradbách', icon: 'u_archer' }],
   [{ id: 'barracks', name: 'Kasárne a rytieri', icon: 'barracks' }],
-  [{ id: 'hall3', name: 'Radnica do úrovne 3', icon: 'hall' }, { id: 'catapult', name: 'Katapult', icon: 'catapult' }],
+  [{ id: 'catapult', name: 'Katapult', icon: 'catapult' }],
   [{ id: 'mage', name: 'Veža mága', icon: 'mage' }, { id: 'bell', name: 'Zvonica', icon: 'bell' }],
   [{ id: 'wallCrossbow', name: 'Kušník na hradbách', icon: 'u_crossbow' }, { id: 'chapel', name: 'Kaplnka', icon: 'chapel' }, { id: 'spikes', name: 'Ostnaté hradby', icon: 'wall' }],
   [{ id: 'volleyUp', name: 'Vylepšenie salvy', icon: 'u_archer' }, { id: 'firepit', name: 'Ohnivá jama', icon: 'firepit' }, { id: 'beartrap', name: 'Medvedia pasca', icon: 'beartrap' }, { id: 'knightTypes', name: 'Druhy rytierov', icon: 'barracks' }, { id: 'warcry', name: 'Kráľov pokrik', icon: 'king' }],
-  [{ id: 'lvl5', name: 'Stavby až do úrovne 5', icon: 'tower' }, { id: 'spec', name: 'Špecializácia veží', icon: 'tower' }, { id: 'well', name: 'Studňa', icon: 'well' }, { id: 'spikeTypes', name: 'Ohnivé a ľadové ostne', icon: 'wall' }],
-  [{ id: 'hall5', name: 'Radnica až do úrovne 5', icon: 'hall' }, { id: 'freeze', name: 'Kráľov mráz', icon: 'king' }],
+  [{ id: 'lvl5', name: 'Radnica a stavby až do úrovne 5', icon: 'hall' }, { id: 'spec', name: 'Špecializácia veží', icon: 'tower' }, { id: 'well', name: 'Studňa', icon: 'well' }, { id: 'spikeTypes', name: 'Ohnivé a ľadové ostne', icon: 'wall' }],
+  [{ id: 'freeze', name: 'Kráľov mráz', icon: 'king' }],
 ];
 // noví nepriatelia – predstavia sa v danej misii
 const ENEMY_INTRO = {
