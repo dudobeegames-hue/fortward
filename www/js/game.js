@@ -1577,10 +1577,14 @@
     return b;
   }
 
+  // oprava stavby podľa jej hodnoty: úplne zničená by stála 40 % z toho, čo do nej hráč vložil –
+  // vždy menej než predať (vráti 50 %) a postaviť znova
+  const REPAIR_SHARE = 0.4;
+  const bRepairCost = b => !BUILD[b.kind].hp || b.hp >= bMaxHp(b) ? 0 : Math.max(1, Math.ceil(b.spent * REPAIR_SHARE * (1 - b.hp / bMaxHp(b))));
   function repairCost() {
-    let c = (hallMax() - st.hallHp) * 0.25;
-    for (const b of st.blds) if (BUILD[b.kind].hp) c += (bMaxHp(b) - b.hp) * 0.15;
-    return Math.ceil(c);
+    let c = Math.ceil((hallMax() - st.hallHp) * 0.25);
+    for (const b of st.blds) c += bRepairCost(b);
+    return c;
   }
 
   function renderBuild() {
@@ -1653,8 +1657,7 @@
       else if (maxL < MAX_LVL) acts.appendChild(lockBtn('Úr. ' + (minL + 1), 'lvl5', true));
       else acts.appendChild(btn('Max. úroveň', null, false, () => { }, 'wide'));
       if (d.hp) {
-        const fixC = w => Math.ceil((bMaxHp(w) - w.hp) * 0.15);
-        bulk(acts, 'Opraviť', grp.filter(w => fixC(w) > 0), fixC, w => { st.gold -= fixC(w); w.hp = bMaxHp(w); });
+        bulk(acts, 'Opraviť', grp.filter(w => bRepairCost(w) > 0), bRepairCost, w => { st.gold -= bRepairCost(w); w.hp = bMaxHp(w); });
       }
       const refund = grp.reduce((t, w) => t + Math.floor(w.spent / 2) + (w.unit ? Math.floor(w.unit.spent / 2) : 0), 0);
       acts.appendChild(btn('Predať všetky +' + refund, null, true, () => {
@@ -1719,6 +1722,8 @@
       } else if (b.lvl < lvlCap()) acts.appendChild(btn('Úr. ' + (b.lvl + 1) + ' – najprv radnica', null, false, () => { }, 'locked'));
       else if (b.lvl < MAX_LVL) acts.appendChild(lockBtn('Úr. ' + (b.lvl + 1), 'lvl5'));
       else acts.appendChild(btn('Max. úroveň', null, false, () => { }));
+      const fc = bRepairCost(b);
+      if (fc) acts.appendChild(btn('Opraviť', fc, st.gold >= fc, () => { st.gold -= fc; b.hp = bMaxHp(b); rebuildOcc(); }));
       const refund = Math.floor(b.spent / 2) + (b.unit ? Math.floor(b.unit.spent / 2) : 0);
       acts.appendChild(btn('Predať +' + refund, null, true, () => {
         st.gold += refund; st.blds = st.blds.filter(x => x !== b); st.sel = null;
@@ -2210,5 +2215,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon,
-    enterBuild, showUnlockDeck, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax };
+    enterBuild, showUnlockDeck, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax };
 })();
