@@ -308,8 +308,6 @@
     $('map').hidden = true;
     newGame();
     banner('Misia ' + m + ': ' + MISSIONS[m - 1].name + (st.tier ? ' · ' + TIERS[st.tier].name : ''));
-    if (m > 1 && m === st.unlocked) setTimeout(() => { if (st.phase === 'build') hint('Nové: ' + UNLOCKS[m - 1].map(u => u.name).join(', ')); }, 1900);
-    if (ENEMY_INTRO[m] && m === st.unlocked) setTimeout(() => { if (st.phase === 'build') hint('Pozor – ' + ENEMY_INTRO[m].name + ': ' + ENEMY_INTRO[m].desc); }, 6600);
   }
 
   function newGame() {
@@ -321,11 +319,9 @@
     });
     st.hallHp = hallMax();
     st.king = { x: G.hallCx, y: G.hallTop - 12, hx: G.hallCx, hy: G.hallTop - 12, hp: kingMax(), cd: 0, tgt: null, down: 0, anim: 0, flash: 0, isKing: true };
-    addBuilding('tower', G.hc0 - 1, G.hr0 - 1);
     $('title').hidden = true; $('over').hidden = true;
     $('hud').hidden = false;
     enterBuild();
-    if (st.mission === 1) hint('Postav obranu a stlač „Do boja“');
   }
 
   // ---- obtiažnosť (laďené simuláciou celej kampane) ----
@@ -336,7 +332,7 @@
     hpWave: 1.10, hpWaveMission: 0.006, hpMission: 0.25,   // rast zdravia počas misie (neskoršie misie rastú rýchlejšie)
     countWave: 2, countMission: 1,                         // počet nepriateľov vo vlne
     typeShift: 0.8, bruteFrom: 5, bruteRate: 0.03,         // ako rýchlo pribúdajú orkovia a surovci
-    startGold: 150, startGoldMission: 80, goldMission: 0.15, // ekonomika (každá misia začína od nuly)
+    startGold: 210, startGoldMission: 80, goldMission: 0.15, // ekonomika (každá misia začína od nuly)
     bossBase: 0.6, bossMission: 0.33, bossLast: 1.0,       // sila vojvodcu v 5. a 10. vlne
     pArcher: 0.12, pBat: 0.12, pRam: 0.05, pShaman: 0.04, pSapper: 0.06, // podiel nových nepriateľov
   };
@@ -2111,7 +2107,7 @@
       });
       tb.appendChild(b);
     });
-    $('mapPlay').textContent = starsOf(m, st.mapTier) ? 'Hrať znova ▶' : 'Spustiť ▶';
+    $('mapPlay').textContent = starsOf(m, st.mapTier) ? 'Hrať znova ▶' : 'Hrať ▶';
     $('mStars').innerHTML = '';
     $('hallBtnTxt').textContent = starsFree();
   }
