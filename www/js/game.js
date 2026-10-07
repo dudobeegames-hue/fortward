@@ -401,7 +401,6 @@
     $('build').hidden = true; $('bottom').hidden = false;
     for (const b of st.blds) if (b.kind === 'barracks') b.spawnT = 0.3;
     banner(st.wave === MISSION_WAVES ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + MISSION_WAVES);
-    if (blockedBarracks().length) setTimeout(() => toast('Rytieri sa nedostanú von – chýba brána'), 900);
     updateHud();
   }
 
