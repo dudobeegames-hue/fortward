@@ -223,7 +223,25 @@
     if (had) { // posuň stavby, ak sa zmenila mriežka
       const dc = G.hc0 - oldHc, dr = G.hr0 - oldHr;
       for (const b of st.blds) { b.c += dc; b.r += dr; }
-      st.blds = st.blds.filter(b => b.c >= 0 && b.c < G.cols && b.r >= 0 && b.r < G.rows && !inHall(b.c, b.r));
+      for (const sn of undoStack) for (const b of sn.blds) { b.c += dc; b.r += dr; }
+      // stavby, ktoré sa do užšej mriežky nezmestia, sa presunú na najbližšie voľné políčko (nikdy nezmiznú)
+      const fits = b => b.c >= 0 && b.c < G.cols && b.r >= 0 && b.r < G.rows && !inHall(b.c, b.r);
+      const out = st.blds.filter(b => !fits(b));
+      if (out.length) {
+        st.blds = st.blds.filter(fits);
+        rebuildOcc();
+        for (const b of out) {
+          let best = null, bd = 1e9;
+          for (let r = 0; r < G.rows; r++) for (let c = 0; c < G.cols; c++) {
+            if (inHall(c, r) || occAt(c, r)) continue;
+            const d = Math.hypot(c - b.c, r - b.r) + (inZone(c, r) ? 0 : 100); // radšej v zóne
+            if (d < bd) { bd = d; best = { c, r }; }
+          }
+          if (best) { b.c = best.c; b.r = best.r; st.blds.push(b); rebuildOcc(); }
+          else st.gold += b.spent; // mriežka je plná – vráť zlato
+        }
+        undoStack = []; // staré snímky by mali stavby mimo mriežky
+      }
       for (const o of st.enemies.concat(st.soldiers)) { o.x += dc * T; o.y += dr * T; }
     }
     if (st.king) { st.king.hx = G.hallCx; st.king.hy = G.hallTop - 12; }
