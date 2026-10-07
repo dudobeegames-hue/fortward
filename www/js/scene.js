@@ -141,6 +141,7 @@ function buildScene(W, H, G, seed, themeIdx) {
 
   // ---- špeciálne prvky krajiny ----
   const foam = [], lava = [];
+  const water = new Uint8Array(W * H); // 1 = voda (spomalí), 2 = plytčina brodu (spomalí menej)
   let spawn = [G.gx0 + 8, G.gx0 + G.cols * G.T - 8];
 
   if (th.sea) { // more na ľavom okraji
@@ -195,6 +196,7 @@ function buildScene(W, H, G, seed, themeIdx) {
         }
         let v = 0.62 - (1 - dy / hw) * 0.3 + ((x + Math.round(y * 2)) % 9 === 0 ? 0.18 : 0);
         if (onRoad && R.ford) v += 0.22; // plytčina na brode
+        water[y * W + x] = onRoad && R.ford ? 2 : 1;
         set(x, y, pickRamp(TR.water, v, x, y));
       }
       if (R.bridge && roadD(x, cy) < 1) { // tieň mosta / zábradlie
@@ -391,5 +393,5 @@ function buildScene(W, H, G, seed, themeIdx) {
   }
 
   bx.putImageData(img, 0, 0);
-  return { bg, theme: th, foam, lava, spawn };
+  return { bg, theme: th, foam, lava, spawn, water };
 }

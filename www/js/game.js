@@ -291,6 +291,16 @@
   }
 
   // ---------------- Hra ----------------
+  // rieka spomalí každého, kto ňou brodí (po moste nie); plytčina na brode spomalí menej
+  const WATER_MUL = [1, 0.5, 0.75];
+  function waterMul(o) {
+    const w = scene && scene.water, x = Math.round(o.x), y = Math.round(o.y);
+    if (!w || x < 0 || y < 0 || x >= W || y >= H) return 1;
+    const k = w[y * W + x];
+    if (k && Math.random() < 0.06) part(o.x + (Math.random() - 0.5) * 6, o.y - 1, (Math.random() - 0.5) * 12, -8 - Math.random() * 8, 0.35, Math.random() < 0.5 ? '#bcd8f0' : '#ffffff', 60); // čľapot
+    return WATER_MUL[k];
+  }
+
   function bCenter(b) { return { x: tileX(b.c) + T / 2, y: tileY(b.r) + T / 2 }; }
 
   function addBuilding(kind, c, r) {
@@ -614,7 +624,7 @@
     const { c, r } = tileAt(e.x, e.y);
     // pasce
     const here = occAt(c, r);
-    let spd = e.spd * slow;
+    let spd = e.spd * slow * waterMul(e);
     if (here && here !== HALL && TRAPS[here.kind] && !e.d.fly) {
       const fresh = e.trap !== here;
       e.trap = here;
@@ -832,7 +842,7 @@
     if (u.tgt && (u.tgt.dead || Math.hypot(u.tgt.x - homeX, u.tgt.y - homeY) > aggro + 16)) u.tgt = null;
     if (!u.tgt) u.tgt = nearestEnemy(homeX, homeY, aggro, true);
     const t = u.tgt;
-    const cry = st.cryT > 0 ? 1 : 0, spd = (u.spd || 26) * (1 + 0.4 * cry);
+    const cry = st.cryT > 0 ? 1 : 0, spd = (u.spd || 26) * (1 + 0.4 * cry) * waterMul(u);
     if (cry) dmg *= 1.6;
     if (t) {
       const d = Math.hypot(t.x - u.x, t.y - u.y);
