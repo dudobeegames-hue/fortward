@@ -1288,7 +1288,7 @@
     }
     if (b.lvl > 1 && b.kind !== 'wall') pxText(g, String(b.lvl), x0 + T - 3, y0 + T - 6, '#f8d048');
   }
-  const JOINERS = { wall: 1, tower: 1, mage: 1, barracks: 1, catapult: 1, mine: 1, chapel: 1, workshop: 1 };
+  const JOINERS = { wall: 1, tower: 1, mage: 1 }; // hradby sa napájajú len na hradby a veže (strážna, mága) – na ostatné budovy nie
   const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL || !!JOINERS[o.kind]); };
   const joinsBuilding = (c, r) => { const o = occAt(c, r); return !!o && o !== HALL && o.kind !== 'wall' && !!JOINERS[o.kind]; };
 
