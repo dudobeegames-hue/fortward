@@ -11,6 +11,18 @@ window.SIM = (() => {
     s.gold -= cost(kind); F.addBuilding(kind, c, r); return true;
   }
 
+  const attack = () => !!s.fort;
+  // rezerva zlata na obliehacie stroje a posily počas útoku
+  const reserve = () => !attack() ? 0 : F.has('siegeCat') ? 260 : F.has('siegeRam') ? 140 : 60;
+  function placeAny(kind, rows, order) {
+    for (const r of rows) for (const c of order) if (!F.inHall(c, r) && place(kind, c, r)) {
+      const b = s.blds[s.blds.length - 1];
+      if (F.knightsBlocked(b)) { s.gold += cost(kind); s.blds.pop(); F.rebuildOcc(); continue; } // vojaci by nevyšli
+      return true;
+    }
+    return false;
+  }
+
   // stavanie medzi vlnami – rozumný, nie dokonalý hráč
   function build() {
     const hr0 = G.hr0, hc = G.hc0 + 1, cols = G.cols;
@@ -35,6 +47,13 @@ window.SIM = (() => {
       const wantTowers = Math.min(cols - 1, 2 + Math.floor(wave / 2) + (s.mission > 3 ? 1 : 0));
       if (count('tower') < wantTowers) for (const c of order) { if (c === hc) continue; if (place('tower', c, towerRow)) { acted = true; break; } }
       if (acted) continue;
+      // útočná misia: armáda je hlavná vec – viac kasární a strelnica
+      if (attack() && F.has('barracks') && count('barracks') < Math.min(5, 2 + Math.floor(wave / 2))) {
+        if (placeAny('barracks', [hr0 + 1, hr0, hr0 + 2, hr0 - 1], order)) { acted = true; continue; }
+      }
+      if (attack() && F.has('range') && count('range') < (wave >= 4 ? 2 : 1)) {
+        if (placeAny('range', [hr0 + 1, hr0, hr0 + 2, hr0 - 1], order)) { acted = true; continue; }
+      }
       if (F.has('barracks') && count('barracks') < (wave >= 5 ? 2 : 1)) {
         for (const r of [hr0, hr0 + 1]) for (const c of [G.hc0 - 1, G.hc0 + 3]) if (!acted && place('barracks', c, r)) acted = true;
         if (acted) continue;
@@ -80,7 +99,7 @@ window.SIM = (() => {
       if (F.has('volleyUp') && s.volleyLvl < 6) ups.push({ c: F.volleyUpCost(), f: () => { s.volleyLvl++; } });
       ups.sort((a, b) => a.c - b.c);
       const u = ups[0];
-      if (u && s.gold >= (u.real || u.c)) { s.gold -= (u.real || u.c); u.f(); acted = true; F.rebuildOcc(); }
+      if (u && s.gold - (u.real || u.c) >= reserve()) { s.gold -= (u.real || u.c); u.f(); acted = true; F.rebuildOcc(); }
     }
   }
 
@@ -93,6 +112,16 @@ window.SIM = (() => {
       if (n > bn || (n === bn && best && e.y > best.y)) { bn = n; best = e; }
     }
     if (best) F.volley(best.x, best.y - 5);
+  }
+
+  // útok: dokupovanie strojov a posíl počas boja
+  function aiSiege() {
+    if (!attack() || s.fort.dead) return;
+    const n = k => s.soldiers.filter(u => u.siege === k && !u.dead).length;
+    if (F.has('siegeRam') && n('ram') < 2 && s.gold >= 90) { F.buyUnit('ram'); return; }
+    if (F.has('siegeCat') && n('cat') < 1 && s.gold >= 120) { F.buyUnit('cat'); return; }
+    const sieging = s.soldiers.some(u => !u.dead && !u.helper && u.y < 160);
+    if (sieging && s.gold >= 40 + (F.has('siegeRam') ? 90 : 0) && count('barracks')) F.buyUnit('knight');
   }
 
   // kráľove schopnosti
@@ -114,10 +143,12 @@ window.SIM = (() => {
     for (;;) {
       if (s.phase === 'build') { build(); F.startWave(); }
       let steps = 0;
-      while (s.phase === 'battle' && steps < 60 * 400) { F.update(1 / 60); steps++; if (steps % 15 === 0) { aiVolley(opts.volley); aiAbilities(); } }
+      const limit = 60 * (attack() ? 1500 : 400); // obliehanie môže trvať cez niekoľko vĺn
+      while (s.phase === 'battle' && steps < limit) { F.update(1 / 60); steps++; if (steps % 15 === 0) { aiVolley(opts.volley); aiAbilities(); if (steps % 60 === 0) aiSiege(); } }
       waves.push(Math.round(s.hallHp / F.hallMax() * 100));
       if (s.phase === 'pause') { F.enterBuild(); continue; }
-      return { m, won: s.phase === 'won' || !!(s.fort && s.fort.dead), wave: s.wave, minHall: Math.min(...waves), hallLvl: s.hallLvl, gold: s.gold, waves: waves.join(' ') };
+      const fort = s.fort ? { keep: Math.round(s.fort.hp / s.fort.max * 100), king: s.fort.kingE ? Math.round(Math.max(0, s.fort.kingE.hp) / s.fort.kingE.max * 100) : null } : null;
+      return { m, won: s.phase === 'won' || !!(s.fort && s.fort.dead), timeout: s.phase === 'battle', wave: s.wave, minHall: Math.min(...waves), hallLvl: s.hallLvl, gold: s.gold, waves: waves.join(' '), fort, enemies: s.enemies.length, soldiers: s.soldiers.length };
     }
   }
 

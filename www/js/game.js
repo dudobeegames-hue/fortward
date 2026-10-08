@@ -575,7 +575,7 @@
     Object.assign(st, {
       wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.15 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, tool: null, sel: null, hallFlash: 0, shake: 0, soldierN: 0,
       blds: [], enemies: [], soldiers: [], proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
-      cryT: 0, cryCd: 0, freezeT: 0, freezeCd: 0,
+      cryT: 0, cryCd: 0, freezeT: 0, freezeCd: 0, siegeHold: false, siegeT: 0,
     });
     rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
     st.fort = isAttack() ? makeFort() : null;
@@ -652,9 +652,13 @@
       const news = FORT_NEWS[st.mission - HOME_PROVINCES - 1];
       setTimeout(() => { if (st.phase === 'build') toast('Potiahni mapu nadol – uvidíš orkskú pevnosť'); }, 1500);
       if (news) setTimeout(() => { if (st.phase === 'build') toast(news); }, 3700);
+    } else if (isAttack() && st.siegeHold) {
+      st.siegeT = SIEGE_BUILD; // obliehanie: na budovanie je len chvíľa, potom útok pokračuje sám
+      setTimeout(() => { if (st.phase === 'build') toast('Hrad je obliehaný – orkovia ho neopravia. Útok pokračuje o ' + SIEGE_BUILD + ' s'); }, 400);
     } else if (isAttack()) repairFort();
   }
 
+  const SIEGE_BUILD = 20; // sekundy budovania počas obliehania
   // útočná misia: ľudia vyrážajú prví; vlna orkov vyjde pri prvom kontakte s obranou hradu
   const canMarch = () => st.blds.some(b => (b.kind === 'barracks' || b.kind === 'range') && !knightsBlocked(b));
   function triggerOrcWave() {
@@ -676,6 +680,7 @@
     if (isAttack()) {
       st.orcWaveOn = false;
       st.pendingWave = st.wave < MISSION_WAVES ? buildWave(st.wave + 1) : null;
+      st.siegeT = 0;
       st.spawnQ = [];
     } else {
       st.wave++;
@@ -707,24 +712,16 @@
       st.texts.push({ x: tileX(b.c) + T / 2, y: tileY(b.r) - 4, s: '+' + gm, life: 1.4, max: 1.4 });
     }
     st.gold += mined;
-    // útočná misia: ak vojaci práve dobýjajú pevnosť, budovanie sa preskočí – hneď ide ďalšia vlna (po 10. vlne záverečný útok)
-    if (isAttack() && sieging()) {
-      st.orcWaveOn = false;
-      AUDIO.play('cleared');
-      if (st.wave < MISSION_WAVES) {
-        st.pendingWave = buildWave(st.wave + 1);
-        banner('Vlna odrazená! +' + bonus + ' zlata – horda vysiela ďalšiu');
-        setTimeout(() => { if (st.phase === 'battle') triggerOrcWave(); }, 1200);
-      } else banner('Horde došli sily – dobi hrad!');
-      updateHud();
-      return;
-    }
+    // útočná misia: ak vojaci práve dobýjajú pevnosť, ostanú stáť pri nej – krátke budovanie s odpočtom, orkovia hrad neopravia
+    const hold = isAttack() && sieging();
+    st.siegeHold = hold;
     st.phase = 'pause';
     st.proj = []; st.eproj = []; st.drops = [];
     if (st.fort) { st.fort.rocks = []; st.fort.prock = []; }
-    // rytieri sa po vlne vrátia do kasární
-    for (const sd of st.soldiers) for (let k = 0; k < 5; k++) part(sd.x, sd.y - 5, (Math.random() - 0.5) * 20, -Math.random() * 20, 0.4, '#88b4ff', 30);
-    st.soldiers = st.soldiers.filter(s => s.siege); // obliehacie stroje ostanú stáť na bojisku
+    if (!hold) { // rytieri sa po vlne vrátia do kasární
+      for (const sd of st.soldiers) for (let k = 0; k < 5; k++) part(sd.x, sd.y - 5, (Math.random() - 0.5) * 20, -Math.random() * 20, 0.4, '#88b4ff', 30);
+      st.soldiers = st.soldiers.filter(s => s.siege); // obliehacie stroje ostanú stáť na bojisku
+    }
     st.orcWaveOn = false;
     if (st.wave >= MISSION_WAVES && !isAttack()) { missionWon(); return; }
     if (st.wave >= MISSION_WAVES) { // útočná misia: horde došli vlny, teraz treba dobyť hrad
@@ -733,7 +730,7 @@
       updateHud();
       return;
     }
-    banner('Vlna prežitá! +' + bonus + ' zlata' + (st.lastXp ? ' · kráľ +' + st.lastXp + ' XP' : ''));
+    banner(hold ? 'Vlna odrazená! +' + bonus + ' zlata · obliehanie trvá' : 'Vlna prežitá! +' + bonus + ' zlata' + (st.lastXp ? ' · kráľ +' + st.lastXp + ' XP' : ''));
     AUDIO.play('cleared');
     setTimeout(() => { if (st.phase === 'pause') enterBuild(); }, 1000);
     updateHud();
@@ -3113,6 +3110,14 @@
     }
   }
 
+  // odpočet budovania počas obliehania (stojí, kým kráľ vyberá talent)
+  function siegeTick(dt) {
+    if (st.phase !== 'build' || !(st.siegeT > 0) || kingMeta.pending) return;
+    st.siegeT -= dt;
+    if (st.siegeT <= 0) { startWave(); return; }
+    $('nextWave').textContent = (st.wave >= MISSION_WAVES ? 'Zaútočiť ▶ ' : 'Do útoku ▶ ') + Math.ceil(st.siegeT);
+  }
+
   // ---------------- Slučka ----------------
   let last = performance.now(), acc = 0;
   const DT = 1 / 60;
@@ -3125,7 +3130,7 @@
       slowmoT = Math.max(0, slowmoT - dt);
       acc += dt * st.speed * slow;
       while (acc >= DT && st.phase === 'battle') { update(DT); acc -= DT; }
-    } else { acc = 0; updateFx(dt); mapTick(dt); }
+    } else { acc = 0; updateFx(dt); mapTick(dt); siegeTick(dt); }
     camTick(dt);
     render(now / 1000);
     hudTick();
@@ -3166,5 +3171,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon,
-    enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax };
+    enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, buyUnit, knightsBlocked, get isAttack() { return isAttack(); } };
 })();
