@@ -567,7 +567,7 @@ function makeMillWheel(rot) {
   return spr;
 }
 function makeMill() {
-  const p = painter(32, 32);
+  const p = painter(36, 32); // rezerva vpravo pre presah strechy a obrys múru
   const BX0 = 16, BX1 = 31, AX = 23.5, DOOR = 22, WIN = 26; // múry budovy, os strechy, dvere, okno
   // kamenné prízemie – riadky kvádrov s maltou, svetlo zľava
   for (let y = 20; y <= 30; y++) for (let x = BX0; x <= BX1; x++) {
@@ -602,7 +602,7 @@ function makeMill() {
   for (let y = 0; y <= 12; y++) {
     const hw = (y + 1.5) / 13 * 9.8;
     for (let x = Math.floor(AX - hw); x <= Math.ceil(AX + hw); x++) {
-      if (x < 0 || x > 31) continue;
+      if (x < 0 || x > 35) continue;
       const nx = (x - AX) / hw;
       if (Math.abs(nx) > 1.05) continue;
       let v = 0.66 - nx * 0.32 + (hash2(x, y, 177) - 0.5) * 0.14;
