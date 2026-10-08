@@ -1718,6 +1718,7 @@
     $('hallFill').style.width = (r * 100) + '%';
     $('hallFill').className = r < 0.3 ? 'low' : '';
     $('hallTxt').textContent = 'Radnica ' + Math.max(0, Math.ceil(st.hallHp)) + ' / ' + hallMax();
+    $('kingLvl').textContent = kingMeta.lvl;
     $('xpFill').style.width = (kingMeta.lvl >= KING_MAX_LVL ? 100 : Math.min(100, kingMeta.xp / kingXpNeed(kingMeta.lvl) * 100)) + '%';
   }
 

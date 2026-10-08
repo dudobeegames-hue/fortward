@@ -54,7 +54,11 @@
     grid-area: king; position: relative; flex-direction: column; align-items: stretch; gap: 3px;
     padding: 4px 8px 6px;
   }
-  #hud-king img { height: 34px; align-self: center; }
+  #hud-king .kTop { display: flex; align-items: center; justify-content: center; gap: 6px; }
+  #hud-king img { height: 34px; }
+  #hud-king .kLvl { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+  #hud-king .kLvl small { font-size: 9px; color: var(--muted); text-transform: uppercase; }
+  #hud-king .kLvl b { font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 20px; color: var(--gold); text-shadow: 1px 1px 0 var(--ink); }
   #hud-king .kRow { display: flex; align-items: center; gap: 4px; }
   #hud-king .kRow b { font-size: 9px; line-height: 1; width: 14px; color: var(--muted); }
   #hud-king .kRow .bar { flex: 1; height: 5px; }
@@ -428,7 +432,7 @@
     <div class="pill" id="hud-wave"><span id="waveTxt">Vlna 1</span></div>
     <div class="pill" id="hud-wall"><div class="bar"><i id="hallFill"></i></div><span id="hallTxt"></span></div>
     <div class="pill" id="hud-gold"><img class="coin" alt=""><span id="goldTxt">0</span></div>
-    <div class="pill" id="hud-king" title="Kráľ"><img id="kingIcon" alt=""><div class="kRow"><b>HP</b><div class="bar hp" title="Zdravie kráľa"><i id="kingFill"></i></div></div><div class="kRow"><b>XP</b><div class="bar xp" title="Skúsenosti kráľa"><i id="xpFill"></i></div></div></div>
+    <div class="pill" id="hud-king" title="Kráľ"><div class="kTop"><img id="kingIcon" alt=""><span class="kLvl" title="Úroveň kráľa"><small>úr.</small><b id="kingLvl">1</b></span></div><div class="kRow"><b>HP</b><div class="bar hp" title="Zdravie kráľa"><i id="kingFill"></i></div></div><div class="kRow"><b>XP</b><div class="bar xp" title="Skúsenosti kráľa"><i id="xpFill"></i></div></div></div>
   </div>
   <div id="bossbar" hidden>Vojvodca orkov<div class="bar"><i id="bossFill"></i></div></div>
   <div id="banner"></div>
