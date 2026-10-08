@@ -334,6 +334,21 @@
     banner('Misia ' + m + ': ' + MISSIONS[m - 1].name + (st.tier ? ' · ' + TIERS[st.tier].name : ''));
   }
 
+  // ---- útočné misie (6–10): orkský hrad hore na bojisku, z jeho brány vychádza horda ----
+  const isAttack = () => st.mission > HOME_PROVINCES;
+  const FORT = { keepHp: 1500, towerHp: 320, palHp: 220, keepBot: 84, palY: 100 }; // y spodku hradu a palisády (herné px) – pod horným panelom
+  function makeFort() {
+    const x = scene.fortX, tr = TIERS[st.tier || 0].hp, mm = 1 + 0.2 * (st.mission - HOME_PROVINCES - 1);
+    const keepBot = FORT.keepBot, py = FORT.palY;
+    const pal = [];
+    for (let k = -3; k <= 3; k++) pal.push({ x: x + k * 16, y: py, hp: FORT.palHp * tr * mm, max: FORT.palHp * tr * mm, gate: k === 0, flash: 0 });
+    return {
+      x, y: keepBot, hp: FORT.keepHp * tr * mm, max: FORT.keepHp * tr * mm, flash: 0,
+      towers: [-1, 1].map(sd => ({ x: x + sd * 40, y: keepBot + 10, hp: FORT.towerHp * tr * mm, max: FORT.towerHp * tr * mm, cd: 1, flash: 0 })),
+      pal, gateX: x, gateY: py + 3,
+    };
+  }
+
   function newGame() {
     undoStack = [];
     Object.assign(st, {
@@ -342,6 +357,8 @@
       cryT: 0, cryCd: 0, freezeT: 0, freezeCd: 0,
     });
     rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
+    st.fort = isAttack() ? makeFort() : null;
+    if (isAttack()) { const bk = addBuilding('barracks', G.hc0 - 1, G.hr0 + 1); bk.spent = 0; } // predvolené kasárne zadarmo
     st.hallHp = hallMax();
     st.king = { x: G.hallCx, y: G.hallTop - 12, hx: G.hallCx, hy: G.hallTop - 12, hp: kingMax(), cd: 0, tgt: null, down: 0, anim: 0, flash: 0, isKing: true };
     $('title').hidden = true; $('over').hidden = true;
@@ -503,8 +520,10 @@
   function spawnEnemy(item) {
     const d = ENEMY[item.type];
     const spr = SPR[d.spr][0];
+    const fromGate = st.fort && !d.fly;
     const e = {
-      d, x: scene.spawn[0] + spr.w / 2 + Math.random() * Math.max(1, scene.spawn[1] - scene.spawn[0] - spr.w), y: -2,
+      d, x: fromGate ? st.fort.gateX + (Math.random() - 0.5) * 8 : scene.spawn[0] + spr.w / 2 + Math.random() * Math.max(1, scene.spawn[1] - scene.spawn[0] - spr.w),
+      y: fromGate ? st.fort.gateY : st.fort ? st.fort.y - 20 : -2,
       hp: d.hp * item.hpMul, max: d.hp * item.hpMul, spd: d.speed * (0.9 + Math.random() * 0.2),
       atk: Math.random() * d.atkCd, anim: Math.random() * 2, flash: 0, lunge: 0,
       jx: (Math.random() - 0.5) * 7, jy: (Math.random() - 0.5) * 5, ph: Math.random() * 6.28,
@@ -1263,6 +1282,19 @@
     g.globalAlpha = 1;
   }
 
+  // orkský hrad + zástavy zostávajúcich vĺn na cimburí
+  function drawFortKeep(F, time) {
+    const k = BSPR.orcKeep, x0 = Math.round(F.x - k.w / 2), y0 = F.y - k.h;
+    g.drawImage(F.flash > 0 ? k.f : k.c, x0, y0);
+    const left = Math.max(0, MISSION_WAVES - st.wave);
+    for (let i = 0; i < left; i++) { // 5 zástav na ľavých hradbách, 5 na pravých
+      const fx = x0 + (i < 5 ? 2 + i * 3 : 40 + (i - 5) * 3), fy = y0 + 9, wv = Math.floor(time * 5 + i) % 2;
+      g.fillStyle = '#3e2614'; g.fillRect(fx, fy, 1, 6);
+      g.fillStyle = '#8c2018'; g.fillRect(fx + 1, fy + wv, 2, 2);
+      g.fillStyle = '#e84838'; g.fillRect(fx + 1, fy + wv, 1, 1);
+    }
+  }
+
   function bar(cx, y, w, ratio, col) {
     const x = Math.round(cx - w / 2);
     g.fillStyle = PAL.K; g.fillRect(x - 1, y - 1, w + 2, 3);
@@ -1772,6 +1804,12 @@
       else if (st.king && st.king.deadT < KING_GONE) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
     }
     for (const e of st.enemies) objs.push({ y: e.y, f: () => drawEnemy(e, time) });
+    if (st.fort) {
+      const F = st.fort, keep = BSPR.orcKeep;
+      objs.push({ y: F.y, f: () => drawFortKeep(F, time) });
+      for (const t of F.towers) if (t.hp > 0) objs.push({ y: t.y, f: () => { const s2 = BSPR.orcTower; g.drawImage(t.flash > 0 ? s2.f : s2.c, Math.round(t.x - s2.w / 2), t.y - s2.h); } });
+      for (const q of F.pal) if (q.hp > 0) objs.push({ y: q.y, f: () => { const s2 = q.gate ? BSPR.palisadeGate : BSPR.palisade; g.drawImage(q.flash > 0 ? s2.f : s2.c, q.x - 8, q.y - s2.h); } });
+    }
     objs.sort((a, b) => a.y - b.y);
     for (const o of objs) o.f();
     if (st.phase === 'build') drawPlaceGhost(time);

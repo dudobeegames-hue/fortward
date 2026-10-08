@@ -137,6 +137,9 @@ function buildScene(W, H, G, seed, themeIdx) {
 
   const rnd = (() => { let s = (seed * 9301 + 49297) % 233280; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
   const blocked = new Uint8Array(W * H); // miesta s vodou/skalou – bez dekorácií
+  // útočné misie: hore pri ceste stojí orkský hrad – bez stromov a skál
+  const fortX = Math.round(roadCx(40));
+  if ((themeIdx || 0) >= HOME_PROVINCES) for (let y = 0; y < 116 && y < H; y++) for (let x = Math.max(0, fortX - 66); x < Math.min(W, fortX + 66); x++) blocked[y * W + x] = 1;
   const free = (x, y, m) => roadD(x, y) > m && yardD(x, y) > m && !blocked[(Math.max(0, Math.min(H - 1, y | 0))) * W + Math.max(0, Math.min(W - 1, x | 0))];
 
   // ---- špeciálne prvky krajiny ----
@@ -392,5 +395,5 @@ function buildScene(W, H, G, seed, themeIdx) {
   }
 
   bx.putImageData(img, 0, 0);
-  return { bg, theme: th, foam, lava, spawn, water, mill };
+  return { bg, theme: th, foam, lava, spawn, water, mill, fortX };
 }
