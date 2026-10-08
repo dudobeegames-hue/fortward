@@ -10,8 +10,10 @@
   const MAX_LVL = 5;
   const GRID_COLS = 11;     // šírka hracej mriežky v políčkach
   const GROUND_PAD = 10;    // pás terénu pod mriežkou (herné px), aby radnica nestála priamo na paneli
-  let W = 180, H = 360, S = 1, DPR = 1, scene = null;
-  let camY = 0; // o koľko herných pixelov je bojisko posunuté nahor (kvôli panelu dole)
+  let W = 180, H = 360, FH = 360, S = 1, DPR = 1, scene = null; // FH = výška bojiska (v útočných misiách vyššia ako obrazovka)
+  let camY = 0; // y hornej hrany obrazovky na bojisku (herné px)
+  const fieldExtra = () => st.mission > HOME_PROVINCES ? Math.round(H * 0.45) : 0; // útočné misie: hrad je ďalej, mapa sa posúva prstom
+  const camBase = () => FH - H; // kamera pri radnici
   const G = { T, gx0: 0, gy0: 0, cols: 11, rows: 24, hc0: 4, hr0: 20, hallCx: 0, hallTop: 0, hallBot: 0, zoneTopMax: 0 };
 
   // ---------------- Dáta ----------------
@@ -263,18 +265,21 @@
     screen.style.width = cw + 'px'; screen.style.height = ch + 'px';
     const game = $('game');
     game.style.width = cw + 'px'; game.style.height = ch + 'px';
-    buf.width = W; buf.height = H;
-
+    island = buildIsland(W, H, 21);
+    layoutField();
+  }
+  // mriežka a krajina bojiska (výška závisí od misie)
+  function layoutField() {
+    FH = H + fieldExtra();
+    buf.width = W; buf.height = FH;
     const oldHc = G.hc0, oldHr = G.hr0, had = !!scene;
     // pevný počet stĺpcov na každom zariadení (zmestí sa aj do najužšej plochy 180 px) – zmena okna tak mriežku neposúva
     G.cols = Math.min(GRID_COLS, Math.floor(W / T)); G.gx0 = Math.floor((W - G.cols * T) / 2);
-    G.rows = Math.floor((H - GROUND_PAD) / T); G.gy0 = H - GROUND_PAD - G.rows * T;
+    G.rows = Math.floor((FH - GROUND_PAD) / T); G.gy0 = FH - GROUND_PAD - G.rows * T;
     G.hc0 = Math.floor(G.cols / 2) - 1; G.hr0 = G.rows - 3;
     G.hallCx = tileX(G.hc0) + 1.5 * T; G.hallTop = tileY(G.hr0); G.hallBot = G.hallTop + 3 * T;
     G.zoneTopMax = tileY(G.rows - (5 + MAX_LVL));
-    game.style.setProperty('--hall-bot', (G.hallBot / H * 100) + '%');
-    scene = buildScene(W, H, G, 7 + st.mission * 13, st.mission - 1);
-    island = buildIsland(W, H, 21);
+    scene = buildScene(W, FH, G, 7 + st.mission * 13, st.mission - 1);
     if (had) { // posuň stavby, ak sa zmenila mriežka
       const dc = G.hc0 - oldHc, dr = G.hr0 - oldHr;
       for (const b of st.blds) { b.c += dc; b.r += dr; }
@@ -308,7 +313,7 @@
   const WATER_MUL = [1, 0.5, 0.75];
   function waterMul(o) {
     const w = scene && scene.water, x = Math.round(o.x), y = Math.round(o.y);
-    if (!w || x < 0 || y < 0 || x >= W || y >= H) return 1;
+    if (!w || x < 0 || y < 0 || x >= W || y >= FH) return 1;
     const k = w[y * W + x];
     if (k && Math.random() < 0.06) part(o.x + (Math.random() - 0.5) * 6, o.y - 1, (Math.random() - 0.5) * 12, -8 - Math.random() * 8, 0.35, Math.random() < 0.5 ? '#bcd8f0' : '#ffffff', 60); // čľapot
     return WATER_MUL[k];
@@ -328,7 +333,7 @@
     st.mission = m;
     st.tier = tier || 0;
     st.tech = techFor(Math.max(m, st.unlocked)); // platí všetko, čo hráč už odomkol
-    scene = buildScene(W, H, G, 7 + m * 13, m - 1); // každá misia má vlastnú krajinu
+    layoutField(); // každá misia má vlastnú krajinu (útočné misie dlhšie bojisko)
     $('map').hidden = true;
     newGame();
     banner('Misia ' + m + ': ' + MISSIONS[m - 1].name + (st.tier ? ' · ' + TIERS[st.tier].name : ''));
@@ -612,6 +617,7 @@
     st.phase = 'battle';
     st.tool = null; st.sel = null; st.moving = null; bdrag = null;
     AUDIO.play('horn'); AUDIO.music('battle');
+    st.viewUp = Math.max(0, (st.viewUp || 0) - panelLow()); // rovnaký pohľad aj bez panela
     $('build').hidden = true; $('bottom').hidden = false;
     for (const b of st.blds) if (b.kind === 'barracks' || b.kind === 'range' || HELPERS[b.kind]) b.spawnT = HELPERS[b.kind] ? 0.6 : 0.3;
     if (isAttack()) {
@@ -690,7 +696,7 @@
     }
     banner('Misia splnená!');
     AUDIO.music(null); AUDIO.play('win');
-    for (let k = 0; k < 80; k++) part(Math.random() * W, H * 0.3 + Math.random() * 30, (Math.random() - 0.5) * 60, -30 - Math.random() * 60, 1.4, ['#f8d048', '#fff070', '#88b4ff', '#e84838'][k % 4], 60);
+    for (let k = 0; k < 80; k++) part(Math.random() * W, camY + H * 0.3 + Math.random() * 30, (Math.random() - 0.5) * 60, -30 - Math.random() * 60, 1.4, ['#f8d048', '#fff070', '#88b4ff', '#e84838'][k % 4], 60);
     const text = m === MISSIONS.length
       ? 'Porazil si poslednú hordu. <b>Ostrov je oslobodený!</b>'
       : 'Misia ' + m + ' · ' + MISSIONS[m - 1].name + ' · ' + TIERS[t].name.toLowerCase() + ' úroveň<br>Všetkých ' + MISSION_WAVES + ' vĺn odrazených.' + (first ? '<br>Odomkla sa misia ' + (m + 1) + '.<br><span class="newTech">Nové: ' + UNLOCKS[m].map(u => u.name).join(', ') + '</span>' : '');
@@ -1772,16 +1778,17 @@
     QLUT[v * 16 + t] = Math.round(Math.min(QL, Math.floor(v * QL / 255 + BAYER4[t])) * 255 / QL);
   }
   function grain() {
-    const id = g.getImageData(0, 0, W, H), d = id.data;
+    const y0 = Math.max(0, Math.min(buf.height - H, Math.round(camY))), rows = Math.min(H, buf.height);
+    const id = g.getImageData(0, y0, W, rows), d = id.data;
     let i = 0;
-    for (let y = 0; y < H; y++) {
-      const by = (y & 3) * 4;
+    for (let y = 0; y < rows; y++) {
+      const by = ((y + y0) & 3) * 4;
       for (let x = 0; x < W; x++, i += 4) {
         const t = by + (x & 3);
         d[i] = QLUT[d[i] * 16 + t]; d[i + 1] = QLUT[d[i + 1] * 16 + t]; d[i + 2] = QLUT[d[i + 2] * 16 + t];
       }
     }
-    g.putImageData(id, 0, 0);
+    g.putImageData(id, 0, y0);
   }
 
   function drawMapNode(i, n, time) {
@@ -1943,7 +1950,7 @@
     if (st.shake > 0) { sx = Math.round((Math.random() - 0.5) * 3); sy = Math.round((Math.random() - 0.5) * 3); }
     sctx.imageSmoothingEnabled = false;
     sctx.fillStyle = '#000'; sctx.fillRect(0, 0, screen.width, screen.height);
-    sctx.drawImage(buf, 0, 0, W, H, sx * S, (sy - Math.round(camY)) * S, W * S, H * S);
+    sctx.drawImage(buf, 0, 0, W, buf.height, sx * S, (sy - Math.round(camY)) * S, W * S, buf.height * S);
   }
   // cieľový posun kamery: v stavaní o výšku panela, v boji o spodné tlačidlá
   // ---- posúvanie mapy prstom ----
@@ -1965,22 +1972,20 @@
     if (instant) mapCam = mapCamTarget;
   }
 
+  const panelLow = () => $('build').offsetHeight * DPR / S;
   function camTick(dt) {
     if (st.phase === 'map') {
       if (!mapDrag) mapCam += (mapCamTarget - mapCam) * Math.min(1, dt * 8);
       camY = mapCam;
       return;
     }
-    let target = 0;
-    const cssToLow = DPR / S;
     // pri budovaní posuň bojisko nad panel; v boji nie – spodné tlačidlá sú priehľadné nad mapou
-    if (st.phase === 'build' && !$('build').hidden) {
-      const full = $('build').offsetHeight * cssToLow;
-      st.viewUp = Math.max(0, Math.min(full, st.viewUp || 0));
-      target = full - st.viewUp; // potiahnutím mapy nadol sa ukáže vrch bojiska (pevnosť)
-      if (vscroll) camY = target;
-    }
-    target = Math.min(target, Math.max(0, H - 60));
+    // potiahnutím mapy nadol sa ukáže vrch bojiska (pevnosť); viewUp = o koľko je pohľad vyššie než pri radnici
+    const full = st.phase === 'build' && !$('build').hidden ? panelLow() : 0;
+    st.viewUp = Math.max(0, Math.min(full + camBase(), st.viewUp || 0));
+    let target = camBase() + full - st.viewUp;
+    if (vscroll) camY = target;
+    target = Math.min(target, Math.max(0, FH - 60));
     camY += (target - camY) * Math.min(1, dt * 10);
     if (Math.abs(target - camY) < 0.3) camY = target;
   }
@@ -2008,7 +2013,7 @@
       }
       if (Math.random() < 0.15 && scene.lava.length) { const l = scene.lava[Math.floor(Math.random() * scene.lava.length)]; part(l.x, l.y, (Math.random() - 0.5) * 6, -8 - Math.random() * 10, 1, '#f89838', -2); }
     } else if (a === 'embers') {
-      if (Math.random() < 0.3) part(Math.random() * W, H * (0.2 + Math.random() * 0.6), (Math.random() - 0.5) * 8, -6 - Math.random() * 10, 1.6, Math.random() < 0.5 ? '#f89838' : '#d83818', -3);
+      if (Math.random() < 0.3) part(Math.random() * W, FH * (0.2 + Math.random() * 0.6), (Math.random() - 0.5) * 8, -6 - Math.random() * 10, 1.6, Math.random() < 0.5 ? '#f89838' : '#d83818', -3);
     }
   }
   function drawFog(time) {
@@ -2068,7 +2073,7 @@
     }
     for (const dr of st.drops) drawDrop(dr);
     drawFog(time);
-    if (st.freezeT > 0) { g.fillStyle = 'rgba(140,190,255,0.12)'; g.fillRect(0, 0, W, H); }
+    if (st.freezeT > 0) { g.fillStyle = 'rgba(140,190,255,0.12)'; g.fillRect(0, 0, W, FH); }
     for (const q of st.parts) {
       g.globalAlpha = Math.min(1, q.life / q.max * 2);
       g.fillStyle = q.col; g.fillRect(Math.round(q.x), Math.round(q.y), 1, 1);
@@ -2544,6 +2549,11 @@
 
   screen.addEventListener('pointerdown', ev => {
     const p = evPos(ev);
+    if (st.phase === 'battle' && camBase() > 0) { // dlhé bojisko: ťah = posúvanie, ťuk = salva
+      vscroll = { y0: ev.clientY, v0: st.viewUp || 0, moved: false, p };
+      try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
+      return;
+    }
     if (st.phase === 'battle' && p.y > 4) { volley(p.x, p.y); return; }
     if (st.phase === 'map') {
       mapDrag = { y0: ev.clientY, cam0: mapCam, moved: false, p };
@@ -2612,7 +2622,7 @@
   window.addEventListener('pointercancel', () => { cardPress = null; pdrag = null; });
   screen.addEventListener('pointermove', ev => {
     if (pdrag) return;
-    if (vscroll && st.phase === 'build') {
+    if (vscroll && (st.phase === 'build' || st.phase === 'battle')) {
       const r = screen.getBoundingClientRect(), dy = (ev.clientY - vscroll.y0) / r.height * H;
       if (Math.abs(dy) > 4) vscroll.moved = true;
       if (vscroll.moved) st.viewUp = vscroll.v0 + dy;
@@ -2645,8 +2655,13 @@
     }
     drag.last = t;
   });
-  const endDrag = () => {
-    if (vscroll) { const v = vscroll; vscroll = null; if (!v.moved && st.phase === 'build') tapBuild(v.p.x, v.p.y); return; }
+  const endDrag = ev => {
+    if (vscroll) {
+      const v = vscroll; vscroll = null;
+      if (!v.moved && st.phase === 'build') tapBuild(v.p.x, v.p.y);
+      if (!v.moved && st.phase === 'battle' && ev && ev.type === 'pointerup') volley(v.p.x, v.p.y);
+      return;
+    }
     if (mapDrag) { // krátky ťuk bez posunu = výber misie
       const md = mapDrag; mapDrag = null;
       if (!md.moved && st.phase === 'map') tapMap(md.p.x, md.p.y);
@@ -2991,7 +3006,7 @@
   }
   function snap(name, scale) {
     scale = scale || 4;
-    const c = document.createElement('canvas'); c.width = W * scale; c.height = H * scale;
+    const c = document.createElement('canvas'); c.width = W * scale; c.height = buf.height * scale;
     const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
     x.drawImage(buf, 0, 0, c.width, c.height);
     return postPNG(c, name);
