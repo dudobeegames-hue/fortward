@@ -540,7 +540,7 @@ function makeWell() {
 // ---- Vodný mlyn (32x32): kamenné prízemie, hrázdené poschodie, slamená strecha, koleso s lopatkami a žľab ----
 const STRAW = ['#2e200c', '#4a3614', '#6a4e1e', '#8a6a2a', '#a8843a', '#c49e4e', '#dcba68', '#ecd28a'].map(hexRGB);
 // koleso mlyna: stred v sprite mlyna (vodorovne), polomer s lopatkami ~8,4 px
-const MILL_WHEEL = { cx: 7, frames: 6 };
+const MILL_WHEEL = { cx: 10, frames: 6 }; // koleso mierne prekrýva roh múru
 // jedna snímka otáčajúceho sa kolesa (19x19, stred 9,9): súvislá obruč, 8 tenkých lúčov, 8 lopatiek
 function makeMillWheel(rot) {
   const p = painter(19, 19), C = 9;

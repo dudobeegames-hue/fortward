@@ -217,10 +217,10 @@ function buildScene(W, H, G, seed, themeIdx) {
       }
     }
     if (th.mill && typeof BSPR !== 'undefined' && BSPR.mill) { // vodný mlyn stojí na brehu, koleso siaha do potoka
-      const spr = BSPR.mill, mx = W - spr.w - 2;
-      let bank = 1e9; // najvyšší okraj brehu pod budovou – budova celá na suchu
-      for (let x = mx + 14; x < mx + spr.w; x++) bank = Math.min(bank, rcy(x) - R.hw - 2);
-      const my = Math.floor(bank) - spr.h;
+      const spr = BSPR.mill, mx = W - spr.w - 8;
+      let surfTop = 1e9; // najvyššia hladina pod budovou – budova stojí na blatovom brehu tesne nad ňou, nie vo vode
+      for (let x = mx + 14; x < mx + spr.w; x++) surfTop = Math.min(surfTop, rcy(x) - R.hw);
+      const my = Math.floor(surfTop) - spr.h;
       bx.putImageData(img, 0, 0);
       bx.drawImage(spr.c, mx, my);
       const id2 = bx.getImageData(0, 0, W, H); d.set(id2.data);
