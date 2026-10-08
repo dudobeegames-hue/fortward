@@ -426,7 +426,8 @@
       banner('Hrad hordy padol!');
       st.lastXp = gainKingXp(Math.round(40 * TIERS[st.tier || 0].xp));
       st.enemies = []; st.spawnQ = [];
-      setTimeout(() => { if (st.phase === 'battle') missionWon(); }, 1200);
+      st.orcWaveOn = false; // pád hradu nie je koniec vlny – žiadne budovanie, len víťazstvo
+      setTimeout(() => { if (st.phase === 'battle' || st.phase === 'pause' || st.phase === 'build') missionWon(); }, 1200);
     }
   }
   // cieľ útočiaceho vojaka: najprv palisáda (kým nie je prelomená), potom veže, nakoniec hrad
@@ -670,6 +671,7 @@
   const fortContact = () => { if (st.fort && st.phase === 'battle' && !st.orcWaveOn && st.pendingWave) triggerOrcWave(); };
 
   function startWave() {
+    if (st.fort && st.fort.dead) { missionWon(); return; } // poistka: hrad už padol
     undoStack = [];
     if (isAttack()) {
       st.orcWaveOn = false;
@@ -1489,7 +1491,7 @@
     st.freezeT = Math.max(0, st.freezeT - dt); st.freezeCd = Math.max(0, st.freezeCd - dt);
     if (st.freezeT > 0 && Math.random() < 0.6) part(Math.random() * W, Math.random() * G.hallTop, (Math.random() - 0.5) * 6, 12, 1.2, Math.random() < 0.5 ? '#ffffff' : '#88b4ff', 0);
     updateFx(dt);
-    if (st.phase === 'battle' && !st.spawnQ.length && !st.enemies.length && (!st.fort || st.orcWaveOn)) endWave();
+    if (st.phase === 'battle' && !st.spawnQ.length && !st.enemies.length && (!st.fort || (st.orcWaveOn && !st.fort.dead))) endWave();
   }
 
   function impact(p) {
