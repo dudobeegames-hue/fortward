@@ -1328,6 +1328,22 @@
     g.fillRect(x1 - L + 1, y1, L, 1); g.fillRect(x1, y1 - L + 1, 1, L);
   }
 
+  // náhľad ťahanej novej stavby – kreslí sa nad stavbami, aby bolo červené políčko vidieť aj cez budovu
+  function drawPlaceGhost(time) {
+    if (!pdrag || !pdrag.t) return;
+    const blink = Math.floor(time * 4) % 2;
+    const { c, r } = pdrag.t, hx = tileX(c), hy = tileY(r), kind = pdrag.kind;
+    const ok = canPlace(c, r) && st.gold >= costOf(kind); // zelená = dá sa postaviť, červená = posuň prst ďalej
+    g.fillStyle = ok ? 'rgba(156,212,90,0.35)' : 'rgba(232,72,56,0.5)'; g.fillRect(hx, hy, T, T);
+    const spr = kind === 'wall' ? BSPR.wall[0][10] : TRAPS[kind] ? BSPR[kind] : bsprOf(kind, 1);
+    g.globalAlpha = ok ? 0.75 : 0.45;
+    if (kind === 'wall') g.drawImage(spr.c, hx, hy - 6);
+    else if (TRAPS[kind]) g.drawImage(spr.c, hx, hy);
+    else g.drawImage(spr.c, hx + T / 2 - Math.floor(spr.w / 2), hy + T + 1 - spr.h);
+    g.globalAlpha = 1;
+    corners(hx, hy, hx + T - 1, hy + T - 1, ok ? '#9cd45a' : (blink ? '#e84838' : '#ff9a80'));
+  }
+
   function drawBuildOverlay(time) {
     const zt = zoneTopRow();
     const blink = Math.floor(time * 4) % 2;
@@ -1654,6 +1670,7 @@
     for (const e of st.enemies) objs.push({ y: e.y, f: () => drawEnemy(e, time) });
     objs.sort((a, b) => a.y - b.y);
     for (const o of objs) o.f();
+    if (st.phase === 'build') drawPlaceGhost(time);
     // ukazovatele zdravia
     for (const e of st.enemies) if (e.hp < e.max && !e.d.boss) bar(e.x, Math.round(e.y - e.h - 3), Math.max(6, e.w - 4), e.hp / e.max, '#e84838');
     for (const b of st.blds) if (BUILD[b.kind].hp && b.hp < bMaxHp(b)) bar(tileX(b.c) + T / 2, b.kind === 'wall' ? tileY(b.r) - 9 : tileY(b.r) + T - bsprOf(b.kind, b.lvl).h - 2, 12, b.hp / bMaxHp(b), '#9cd45a');
@@ -1827,7 +1844,11 @@
       }
       b.className = 'pcard' + (st.tool === kind ? ' sel' : '') + (st.gold < costOf(kind) ? ' poor' : '');
       b.innerHTML = '<span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost"><img class="coin" src="' + ICONS.coin + '">' + costOf(kind) + '</span>';
-      b.addEventListener('click', () => { st.tool = st.tool === kind ? null : kind; st.sel = null; st.moving = null; AUDIO.play('click'); renderBuild(); });
+      b.addEventListener('pointerdown', ev => { if (st.phase === 'build') cardPress = { kind, x: ev.clientX, y: ev.clientY }; });
+      b.addEventListener('click', () => {
+        if (suppressCardClick) { suppressCardClick = false; return; } // bol to ťah, nie ťuk
+        st.tool = st.tool === kind ? null : kind; st.sel = null; st.moving = null; AUDIO.play('click'); renderBuild();
+      });
       pal.appendChild(b);
     }
     const info = $('selInfo'); info.innerHTML = '';
@@ -2039,6 +2060,24 @@
     updateHud();
   }
 
+  // dá sa na políčko postaviť? (na farbu náhľadu a pri pustení prsta)
+  const canPlace = (c, r) => inZone(c, r) && !inHall(c, r) && !occAt(c, r);
+  function placeAt(kind, c, r) {
+    const dc = costOf(kind);
+    if (!inZone(c, r)) { toast('Stavať sa dá len v zóne pri radnici'); AUDIO.play('deny'); return false; }
+    if (!canPlace(c, r)) { toast('Tu už niečo stojí – posuň stavbu na voľné políčko'); AUDIO.play('deny'); return false; }
+    if (st.gold < dc) { toast('Nedostatok zlata'); AUDIO.play('deny'); return false; }
+    snapshot();
+    st.gold -= dc;
+    addBuilding(kind, c, r);
+    AUDIO.play('build');
+    const cx = tileX(c) + T / 2, cy = tileY(r) + T / 2;
+    for (let k = 0; k < 8; k++) part(cx + (Math.random() - 0.5) * 12, cy + 4, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.4, '#c6a272', 60);
+    if (st.gold < dc) st.tool = null;
+    renderBuild();
+    return true;
+  }
+
   function tapBuild(x, y) {
     const c = Math.floor((x - G.gx0) / T), r = Math.floor((y - G.gy0) / T);
     if (c < 0 || c >= G.cols || r < 0 || r >= G.rows) return;
@@ -2047,20 +2086,7 @@
     if (x >= hr.x0 && x < hr.x1 && y >= hr.y0 - 8 && y < hr.y1) { st.sel = HALL; st.tool = null; renderBuild(); return; }
     const o = occAt(c, r);
     if (o && o !== HALL) { st.sel = o; st.tool = null; renderBuild(); return; }
-    if (st.tool) {
-      if (!inZone(c, r)) { toast('Stavať sa dá len v zóne pri radnici'); AUDIO.play('deny'); return; }
-      const d = BUILD[st.tool], dc = costOf(st.tool);
-      if (st.gold < dc) { toast('Nedostatok zlata'); AUDIO.play('deny'); return; }
-      snapshot();
-      st.gold -= dc;
-      addBuilding(st.tool, c, r);
-      AUDIO.play('build');
-      const cx = tileX(c) + T / 2, cy = tileY(r) + T / 2;
-      for (let k = 0; k < 8; k++) part(cx + (Math.random() - 0.5) * 12, cy + 4, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.4, '#c6a272', 60);
-      if (st.gold < dc) st.tool = null;
-      renderBuild();
-      return;
-    }
+    if (st.tool) { placeAt(st.tool, c, r); return; }
     st.sel = null; renderBuild();
   }
 
@@ -2081,6 +2107,8 @@
   }
   // ---- presúvanie stavieb (ťahaním alebo tlačidlom „Presunúť“) ----
   let bdrag = null;                       // ťahaná stavba {b, start, hover, moved}
+  let pdrag = null;                       // ťahanie novej stavby na miesto {kind, t: políčko pod prstom alebo null}
+  let cardPress = null, suppressCardClick = false; // stlačená karta v paneli (ťah začne po pohnutí prstom)
   let lastTap = null;                     // posledný ťuk na stavbu – pre dvojťuk na hradbu
   // celý súvislý rad hradieb (susedia hore/dole/vľavo/vpravo, vrátane brán)
   function wallRow(start) {
@@ -2137,9 +2165,44 @@
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
       return;
     }
+    const hr = hallRect(), onHall = p.x >= hr.x0 && p.x < hr.x1 && p.y >= hr.y0 - 8 && p.y < hr.y1;
+    if (st.tool && st.tool !== 'wall' && !onHall) { // prst po mape: náhľad, postaví sa po pustení
+      pdrag = { kind: st.tool, t };
+      try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
+      return;
+    }
     tapBuild(p.x, p.y);
   });
+  // políčko pod prstom pri ťahaní novej stavby (null, keď je prst nad panelom alebo mimo mapy)
+  function pdragTile(ev) {
+    const sr = screen.getBoundingClientRect(), br = $('build').getBoundingClientRect();
+    if (ev.clientX < sr.left || ev.clientX > sr.right || ev.clientY < sr.top || ev.clientY > sr.bottom) return null;
+    if (!$('build').hidden && ev.clientY >= br.top) return null;
+    const t = evTile(evPos(ev));
+    return t.c >= 0 && t.c < G.cols && t.r >= 0 && t.r < G.rows ? t : null;
+  }
+  window.addEventListener('pointermove', ev => {
+    const cdx = cardPress ? ev.clientX - cardPress.x : 0, cdy = cardPress ? ev.clientY - cardPress.y : 0;
+    if (cardPress && !pdrag && cdy < -10 && -cdy > Math.abs(cdx)) { // karta ťahaná hore k mape (do strany = posúvanie palety)
+      pdrag = { kind: cardPress.kind, t: null };
+      st.tool = cardPress.kind; st.sel = null; st.moving = null; suppressCardClick = true;
+      renderBuild();
+    }
+    if (pdrag && st.phase === 'build') pdrag.t = pdragTile(ev);
+  });
+  window.addEventListener('pointerup', ev => {
+    cardPress = null;
+    setTimeout(() => { suppressCardClick = false; }, 0); // prípadný klik po ťahu príde ešte pred týmto
+    if (!pdrag) return;
+    const pd = pdrag; pdrag = null;
+    if (st.phase !== 'build') return;
+    const t = pdragTile(ev);
+    if (!t) { renderBuild(); return; } // pustené nad panelom alebo mimo mapy – nič sa nestavia
+    placeAt(pd.kind, t.c, t.r);
+  });
+  window.addEventListener('pointercancel', () => { cardPress = null; pdrag = null; });
   screen.addEventListener('pointermove', ev => {
+    if (pdrag) return;
     if (mapDrag && st.phase === 'map') {
       const r = screen.getBoundingClientRect();
       const dy = (ev.clientY - mapDrag.y0) / r.height * H;
