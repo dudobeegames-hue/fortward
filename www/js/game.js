@@ -349,6 +349,78 @@
     };
   }
 
+  // zásah stavby pevnosti; hrad neklesne pod 10 %, kým nevyjde všetkých 10 vĺn
+  function hitFort(o, dmg) {
+    const F = st.fort;
+    if (!F || o.hp <= 0 || F.dead) return;
+    fortContact();
+    o.hp -= dmg; o.flash = 0.08;
+    const isKeep = o === F;
+    if (isKeep && st.wave < MISSION_WAVES) o.hp = Math.max(o.hp, o.max * 0.1);
+    const cx = o.x, cy = isKeep ? F.y - 16 : o.y - 8;
+    for (let k = 0; k < 2; k++) part(cx + (Math.random() - 0.5) * 12, cy, (Math.random() - 0.5) * 30, -10 - Math.random() * 20, 0.4, isKeep ? '#3c3846' : '#4a2e1a', 90);
+    if (o.hp > 0) return;
+    // zbúrané
+    AUDIO.play('crumble'); st.shake = Math.max(st.shake, isKeep ? 0.6 : 0.15);
+    for (let k = 0; k < (isKeep ? 80 : 20); k++) part(cx + (Math.random() - 0.5) * (isKeep ? 50 : 14), cy - Math.random() * 20, (Math.random() - 0.5) * 60, -Math.random() * 50, 0.9, ['#3c3846', '#22202a', '#4a2e1a', '#f89838'][k % 4], 110);
+    if (isKeep) { // hrad hordy padol – víťazstvo
+      F.dead = true;
+      banner('Hrad hordy padol!');
+      st.lastXp = gainKingXp(Math.round(40 * TIERS[st.tier || 0].xp));
+      st.enemies = []; st.spawnQ = [];
+      setTimeout(() => { if (st.phase === 'battle') missionWon(); }, 1200);
+    }
+  }
+  // cieľ útočiaceho vojaka: najprv palisáda (kým nie je prelomená), potom veže, nakoniec hrad
+  function fortTarget(u) {
+    const F = st.fort;
+    if (!F || F.dead) return null;
+    const near = list => { let b = null, bd = 1e9; for (const o of list) if (o.hp > 0) { const d = Math.hypot(o.x - u.x, o.y - u.y); if (d < bd) { bd = d; b = o; } } return b; };
+    const breach = F.pal.some(q => q.hp <= 0);
+    return (!breach && near(F.pal)) || near(F.towers) || F;
+  }
+  // bod, kam má vojak dôjsť, aby mohol udrieť (pod stavbou); cez palisádu len dierou
+  function fortApproach(u, o) {
+    const F = st.fort;
+    if (o !== F && !F.towers.includes(o)) return { x: o.x, y: o.y + 3 };
+    if (u.y > FORT.palY - 2) { // ešte pred palisádou – choď k diere
+      let gap = null, gd = 1e9;
+      for (const q of F.pal) if (q.hp <= 0) { const d = Math.abs(q.x - u.x); if (d < gd) { gd = d; gap = q; } }
+      if (gap && Math.abs(u.x - gap.x) > 4) return { x: gap.x, y: FORT.palY + 4 };
+      if (gap) return { x: gap.x, y: FORT.palY - 6 };
+    }
+    return o === F ? { x: F.x + Math.max(-20, Math.min(20, u.x - F.x)), y: F.y + 3 } : { x: o.x, y: o.y + 3 };
+  }
+  // rytier v útočnej misii: bije orkov, ktorých stretne, inak búra pevnosť
+  function updateAssault(u, dt) {
+    if (nearestEnemy(u.x, u.y, 60, true) || (u.tgt && !u.tgt.dead)) { updateFighter(u, dt, u.x, u.y, 60, u.dmg, false, moveKnight); return; }
+    u.flash = Math.max(0, u.flash - dt); u.cd = Math.max(0, u.cd - dt); u.swing = Math.max(0, (u.swing || 0) - dt);
+    const o = fortTarget(u);
+    if (!o) return;
+    const a = fortApproach(u, o), spd = (u.spd || 26) * (st.cryT > 0 ? 1.4 : 1) * waterMul(u);
+    if (Math.hypot(a.x - u.x, a.y - u.y) > 5) { if (u.y < FORT.palY + 30) moveTo(u, a.x, a.y, spd, dt); else moveKnight(u, a.x, a.y, spd, dt); return; }
+    if (u.cd <= 0) { u.cd = 0.8; u.swing = 0.15; AUDIO.play('clang'); hitFort(o, u.dmg * (st.cryT > 0 ? 1.6 : 1)); }
+  }
+  // orkské veže strieľajú na najbližšieho vojaka v dosahu
+  function updateFort(dt) {
+    const F = st.fort;
+    if (!F || F.dead) return;
+    F.flash = Math.max(0, F.flash - dt);
+    for (const q of F.pal) q.flash = Math.max(0, q.flash - dt);
+    for (const t of F.towers) {
+      t.flash = Math.max(0, t.flash - dt);
+      if (t.hp <= 0) continue;
+      t.cd -= dt;
+      if (t.cd > 0) continue;
+      let tg = null, td = 84;
+      for (const u of st.soldiers) { if (u.dead) continue; const d = Math.hypot(u.x - t.x, u.y - (t.y - 24)); if (d < td) { td = d; tg = u; } }
+      if (!tg) { t.cd = 0.3; continue; }
+      t.cd = 1.5;
+      st.eproj.push({ x: t.x, y: t.y - 28, tx: tg.x, ty: tg.y - 6, tgt: tg, dmg: 5 * (1 + 0.2 * (st.mission - HOME_PROVINCES - 1)) * Math.sqrt(TIERS[st.tier || 0].hp) });
+      fortContact();
+    }
+  }
+
   function newGame() {
     undoStack = [];
     Object.assign(st, {
@@ -426,19 +498,43 @@
     renderBuild();
     updateHud();
     if (kingMeta.pending) setTimeout(() => { if (st.phase === 'build') showTalentPick(); }, 600);
+    st.viewUp = 0;
+    if (isAttack() && st.wave === 0) setTimeout(() => { if (st.phase === 'build') toast('Potiahni mapu nadol – uvidíš orkskú pevnosť'); }, 1500);
   }
+
+  // útočná misia: ľudia vyrážajú prví; vlna orkov vyjde pri prvom kontakte s obranou hradu
+  const canMarch = () => st.blds.some(b => (b.kind === 'barracks' || b.kind === 'range') && !knightsBlocked(b));
+  function triggerOrcWave() {
+    if (!st.pendingWave) return;
+    st.wave++;
+    st.spawnQ = st.pendingWave; st.pendingWave = null;
+    st.spawnT = 0.8; st.orcWaveOn = true;
+    AUDIO.play('horn');
+    banner(st.wave === MISSION_WAVES ? 'Posledná vlna hordy!' : 'Horda vyráža! Vlna ' + st.wave + ' / ' + MISSION_WAVES);
+    updateHud();
+  }
+  const fortContact = () => { if (st.fort && st.phase === 'battle' && !st.orcWaveOn && st.pendingWave) triggerOrcWave(); };
 
   function startWave() {
     undoStack = [];
-    st.wave++;
-    st.spawnQ = buildWave(st.wave);
-    st.spawnT = 1.2;
+    if (isAttack()) {
+      st.orcWaveOn = false;
+      st.pendingWave = st.wave < MISSION_WAVES ? buildWave(st.wave + 1) : null;
+      st.spawnQ = [];
+    } else {
+      st.wave++;
+      st.spawnQ = buildWave(st.wave);
+      st.spawnT = 1.2;
+    }
     st.phase = 'battle';
     st.tool = null; st.sel = null; st.moving = null; bdrag = null;
     AUDIO.play('horn'); AUDIO.music('battle');
     $('build').hidden = true; $('bottom').hidden = false;
     for (const b of st.blds) if (b.kind === 'barracks' || b.kind === 'range' || HELPERS[b.kind]) b.spawnT = HELPERS[b.kind] ? 0.6 : 0.3;
-    banner(st.wave === MISSION_WAVES ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + MISSION_WAVES);
+    if (isAttack()) {
+      banner(st.pendingWave ? 'Do útoku!' : 'Zaútoč na hrad hordy!');
+      if (st.pendingWave && !canMarch()) triggerOrcWave(); // nemá kto vyraziť – orkovia útočia hneď
+    } else banner(st.wave === MISSION_WAVES ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + MISSION_WAVES);
     updateHud();
   }
 
@@ -459,7 +555,14 @@
     // rytieri sa po vlne vrátia do kasární
     for (const sd of st.soldiers) for (let k = 0; k < 5; k++) part(sd.x, sd.y - 5, (Math.random() - 0.5) * 20, -Math.random() * 20, 0.4, '#88b4ff', 30);
     st.soldiers = [];
-    if (st.wave >= MISSION_WAVES) { missionWon(); return; }
+    st.orcWaveOn = false;
+    if (st.wave >= MISSION_WAVES && !isAttack()) { missionWon(); return; }
+    if (st.wave >= MISSION_WAVES) { // útočná misia: horde došli vlny, teraz treba dobyť hrad
+      banner('Horde došli sily – zaútoč na hrad!'); AUDIO.play('cleared');
+      setTimeout(() => { if (st.phase === 'pause') enterBuild(); }, 1400);
+      updateHud();
+      return;
+    }
     banner('Vlna prežitá! +' + bonus + ' zlata' + (st.lastXp ? ' · kráľ +' + st.lastXp + ' XP' : ''));
     AUDIO.play('cleared');
     setTimeout(() => { if (st.phase === 'pause') enterBuild(); }, 1000);
@@ -974,6 +1077,18 @@
       u.swing = Math.max(0, (u.swing || 0) - dt);
       return;
     }
+    if (st.fort) { // útočná misia: strieľa na stavby pevnosti, inak sa k nim priblíži
+      const o = fortTarget(u);
+      if (!o) return;
+      const ox = o.x, oy = o === st.fort ? st.fort.y - 16 : o.y - 8, d = Math.hypot(ox - u.x, oy - u.y);
+      if (d <= ARCHER_RANGE) {
+        if (u.cd <= 0) { u.cd = ARCHER_CD; st.proj.push({ k: 'arrow', x: u.x, y: u.y - 9, tgt: null, tx: ox + (Math.random() - 0.5) * 8, ty: oy, dmg: u.dmg, spd: 180, splash: 0, vx: 0, vy: -1, fortT: o }); AUDIO.play('arrow'); }
+        return;
+      }
+      const sp = (u.spd || 24) * waterMul(u);
+      if (u.y < FORT.palY + 40) moveTo(u, ox, oy + ARCHER_RANGE - 8, sp, dt); else moveKnight(u, ox, oy + ARCHER_RANGE - 8, sp, dt);
+      return;
+    }
     moveKnight(u, hx, hy, (u.spd || 24) * waterMul(u), dt);
   }
 
@@ -1072,6 +1187,7 @@
       if (st.spawnT <= 0) { spawnEnemy(st.spawnQ.shift()); st.spawnT = st.spawnQ.length ? st.spawnQ[0].gap : 0; }
     }
     for (const e of st.enemies) { if (!e.dead) updateEnemy(e, dt); if (st.phase !== 'battle') return; }
+    updateFort(dt);
     separate();
     // budovy
     for (const b of st.blds) {
@@ -1091,6 +1207,7 @@
       if (s.dead) continue;
       if (s.helper) { updateHelper(s, dt); continue; }
       if (s.archer) { updateArcher(s, dt, G.gx0 + ((s.slot * 37 + 18) % (G.cols * T - 16)) + 8, musterY + 16); continue; }
+      if (st.fort) { updateAssault(s, dt); continue; }
       const mx = G.gx0 + ((s.slot * 37) % (G.cols * T - 16)) + 8;
       updateFighter(s, dt, mx, musterY, 9999, s.dmg, false, moveKnight);
     }
@@ -1151,10 +1268,11 @@
     st.freezeT = Math.max(0, st.freezeT - dt); st.freezeCd = Math.max(0, st.freezeCd - dt);
     if (st.freezeT > 0 && Math.random() < 0.6) part(Math.random() * W, Math.random() * G.hallTop, (Math.random() - 0.5) * 6, 12, 1.2, Math.random() < 0.5 ? '#ffffff' : '#88b4ff', 0);
     updateFx(dt);
-    if (st.phase === 'battle' && !st.spawnQ.length && !st.enemies.length) endWave();
+    if (st.phase === 'battle' && !st.spawnQ.length && !st.enemies.length && (!st.fort || st.orcWaveOn)) endWave();
   }
 
   function impact(p) {
+    if (p.fortT) { hitFort(p.fortT, p.dmg); return; } // šíp lukostrelca do stavby pevnosti
     if (p.k === 'rock') {
       AUDIO.play('boom');
       for (const e of st.enemies) if (!e.dead && !e.d.fly && Math.hypot(e.x - p.tx, (e.y - 3) - p.ty) <= p.splash) damage(e, p.dmg);
@@ -1745,7 +1863,12 @@
     let target = 0;
     const cssToLow = DPR / S;
     // pri budovaní posuň bojisko nad panel; v boji nie – spodné tlačidlá sú priehľadné nad mapou
-    if (st.phase === 'build' && !$('build').hidden) target = $('build').offsetHeight * cssToLow;
+    if (st.phase === 'build' && !$('build').hidden) {
+      const full = $('build').offsetHeight * cssToLow;
+      st.viewUp = Math.max(0, Math.min(full, st.viewUp || 0));
+      target = full - st.viewUp; // potiahnutím mapy nadol sa ukáže vrch bojiska (pevnosť)
+      if (vscroll) camY = target;
+    }
     target = Math.min(target, Math.max(0, H - 60));
     camY += (target - camY) * Math.min(1, dt * 10);
     if (Math.abs(target - camY) < 0.3) camY = target;
@@ -1806,7 +1929,7 @@
     for (const e of st.enemies) objs.push({ y: e.y, f: () => drawEnemy(e, time) });
     if (st.fort) {
       const F = st.fort, keep = BSPR.orcKeep;
-      objs.push({ y: F.y, f: () => drawFortKeep(F, time) });
+      if (!F.dead) objs.push({ y: F.y, f: () => drawFortKeep(F, time) });
       for (const t of F.towers) if (t.hp > 0) objs.push({ y: t.y, f: () => { const s2 = BSPR.orcTower; g.drawImage(t.flash > 0 ? s2.f : s2.c, Math.round(t.x - s2.w / 2), t.y - s2.h); } });
       for (const q of F.pal) if (q.hp > 0) objs.push({ y: q.y, f: () => { const s2 = q.gate ? BSPR.palisadeGate : BSPR.palisade; g.drawImage(q.flash > 0 ? s2.f : s2.c, q.x - 8, q.y - s2.h); } });
     }
@@ -1817,6 +1940,12 @@
     for (const e of st.enemies) if (e.hp < e.max && !e.d.boss) bar(e.x, Math.round(e.y - e.h - 3), Math.max(6, e.w - 4), e.hp / e.max, '#e84838');
     for (const b of st.blds) if (BUILD[b.kind].hp && b.hp < bMaxHp(b)) bar(tileX(b.c) + T / 2, b.kind === 'wall' ? tileY(b.r) - 9 : tileY(b.r) + T - bsprOf(b.kind, b.lvl).h - 2, 12, b.hp / bMaxHp(b), '#9cd45a');
     for (const s of st.soldiers) if (s.hp < s.max) bar(s.x, Math.round(s.y - 17), 8, s.hp / s.max, '#88b4ff');
+    if (st.fort && !st.fort.dead) {
+      const F = st.fort;
+      bar(F.x, F.y - BSPR.orcKeep.h - 4, 40, F.hp / F.max, '#e84838');
+      for (const t of F.towers) if (t.hp > 0 && t.hp < t.max) bar(t.x, t.y - 37, 12, t.hp / t.max, '#e84838');
+      for (const q of F.pal) if (q.hp > 0 && q.hp < q.max) bar(q.x, q.y - 21, 12, q.hp / q.max, '#e84838');
+    }
     if (st.king && !st.king.dead && st.king.hp < kingMax()) bar(st.king.x, Math.round(st.king.y - 19), 10, st.king.hp / kingMax(), '#f8d048');
     for (const p of st.proj) drawProj(p);
     for (const p of st.eproj) { // šíp goblina (tmavý)
@@ -2204,6 +2333,7 @@
       acts.appendChild(btn('Oživiť kráľa', c, st.gold >= c, reviveKing, 'up wide'));
       info.appendChild(acts);
     }
+    $('nextWave').textContent = !isAttack() ? 'Do boja ▶' : st.wave >= MISSION_WAVES ? 'Zaútočiť ▶' : 'Do útoku ▶';
     const rc = repairCost();
     $('undoBtn').disabled = !undoStack.length;
     const rb = $('repairBtn');
@@ -2260,6 +2390,7 @@
   // ---- presúvanie stavieb (ťahaním alebo tlačidlom „Presunúť“) ----
   let bdrag = null;                       // ťahaná stavba {b, start, hover, moved}
   let pdrag = null;                       // ťahanie novej stavby na miesto {kind, t: políčko pod prstom alebo null}
+  let vscroll = null;                     // posúvanie bojiska prstom pri budovaní {y0, v0, moved, p}
   let cardPress = null, suppressCardClick = false; // stlačená karta v paneli (ťah začne po pohnutí prstom)
   let lastTap = null;                     // posledný ťuk na stavbu – pre dvojťuk na hradbu
   // celý súvislý rad hradieb (susedia hore/dole/vľavo/vpravo, vrátane brán)
@@ -2323,6 +2454,11 @@
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
       return;
     }
+    if (!st.tool && !onHall) { // bez zvolenej stavby: ťah = posúvanie bojiska, ťuk = výber
+      vscroll = { y0: ev.clientY, v0: st.viewUp || 0, moved: false, p };
+      try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
+      return;
+    }
     tapBuild(p.x, p.y);
   });
   // políčko pod prstom pri ťahaní novej stavby (null, keď je prst nad panelom alebo mimo mapy)
@@ -2355,6 +2491,12 @@
   window.addEventListener('pointercancel', () => { cardPress = null; pdrag = null; });
   screen.addEventListener('pointermove', ev => {
     if (pdrag) return;
+    if (vscroll && st.phase === 'build') {
+      const r = screen.getBoundingClientRect(), dy = (ev.clientY - vscroll.y0) / r.height * H;
+      if (Math.abs(dy) > 4) vscroll.moved = true;
+      if (vscroll.moved) st.viewUp = vscroll.v0 + dy;
+      return;
+    }
     if (mapDrag && st.phase === 'map') {
       const r = screen.getBoundingClientRect();
       const dy = (ev.clientY - mapDrag.y0) / r.height * H;
@@ -2383,6 +2525,7 @@
     drag.last = t;
   });
   const endDrag = () => {
+    if (vscroll) { const v = vscroll; vscroll = null; if (!v.moved && st.phase === 'build') tapBuild(v.p.x, v.p.y); return; }
     if (mapDrag) { // krátky ťuk bez posunu = výber misie
       const md = mapDrag; mapDrag = null;
       if (!md.moved && st.phase === 'map') tapMap(md.p.x, md.p.y);

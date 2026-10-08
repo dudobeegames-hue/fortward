@@ -117,7 +117,7 @@ window.SIM = (() => {
       while (s.phase === 'battle' && steps < 60 * 400) { F.update(1 / 60); steps++; if (steps % 15 === 0) { aiVolley(opts.volley); aiAbilities(); } }
       waves.push(Math.round(s.hallHp / F.hallMax() * 100));
       if (s.phase === 'pause') { F.enterBuild(); continue; }
-      return { m, won: s.phase === 'won', wave: s.wave, minHall: Math.min(...waves), hallLvl: s.hallLvl, gold: s.gold, waves: waves.join(' ') };
+      return { m, won: s.phase === 'won' || !!(s.fort && s.fort.dead), wave: s.wave, minHall: Math.min(...waves), hallLvl: s.hallLvl, gold: s.gold, waves: waves.join(' ') };
     }
   }
 
