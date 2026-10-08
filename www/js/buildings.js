@@ -534,6 +534,33 @@ function makeWorkshop() {
   return p.finish();
 }
 
+// ---- Strelnica (18x24): drevená prístrešok s modrou strechou, stojan s lukmi a slamený terč ----
+function makeRange() {
+  const p = painter(18, 24);
+  // zadná doskova stena prístrešku
+  for (let y = 10; y <= 22; y++) for (let x = 1; x <= 12; x++) {
+    let v = 0.55 - (x - 1) / 11 * 0.2 + (hash2(x, y, 191) - 0.5) * 0.1;
+    if ((x - 1) % 3 === 2) v -= 0.2;
+    if (y === 22) v -= 0.2;
+    p.shade(x, y, WOOD, v);
+  }
+  // stojan s lukmi a tulcom
+  for (let y = 13; y <= 21; y++) { p.shade(3, y, WOOD, 0.7); p.shade(9, y, WOOD, 0.3); }
+  for (let x = 3; x <= 9; x++) { p.shade(x, 13, WOOD, 0.65); p.shade(x, 18, WOOD, 0.4); }
+  for (const bx of [5, 7]) for (let y = 14; y <= 17; y++) p.set(bx + (y === 14 || y === 17 ? 0 : 1), y, WOOD[5]);  // luky
+  for (let y = 19; y <= 21; y++) p.shade(5, y, WOOD, 0.5); p.set(5, 18, hexRGB('#f4f4f8')); p.set(6, 18, hexRGB('#e84838'));
+  // modrá strecha prístrešku
+  pGable(p, 6.5, 3, 10, 7, ROOF_BLUE);
+  // slamený terč na nohách (pred prístreškom vpravo)
+  for (const lx of [12, 16]) for (let y = 17; y <= 22; y++) p.shade(lx, y, WOOD, lx === 12 ? 0.6 : 0.35);
+  pDisk(p, 14, 14, 3.6, 3.6, (x, y, nx, ny, q) => {
+    const col = q < 0.12 ? hexRGB('#f8d048') : q < 0.35 ? hexRGB('#e84838') : q < 0.65 ? hexRGB('#f4f4f8') : null;
+    if (col) p.set(x, y, col); else p.shade(x, y, STRAW, 0.6 - nx * 0.2 - ny * 0.2);
+  });
+  p.set(15, 13, hexRGB('#6e4422')); p.set(16, 12, hexRGB('#f4f4f8'));                               // zapichnutý šíp
+  return p.finish();
+}
+
 // ---- Vodný mlyn (32x32): kamenné prízemie, hrázdené poschodie, slamená strecha, koleso s lopatkami a žľab ----
 const STRAW = ['#2e200c', '#4a3614', '#6a4e1e', '#8a6a2a', '#a8843a', '#c49e4e', '#dcba68', '#ecd28a'].map(hexRGB);
 // koleso mlyna: stred v sprite mlyna (vodorovne), polomer s lopatkami ~8,4 px
@@ -626,6 +653,7 @@ function initBuildingSprites() {
   BSPR.firepit = makeFirepit();
   BSPR.beartrap = makeBeartrap();
   BSPR.workshop = makeWorkshop();
+  BSPR.range = makeRange();
   BSPR.mill = makeMill();
   // 8-násobná súmernosť: 45° otočenia rozdelených do snímok sa plynulo opakuje
   BSPR.millWheel = Array.from({ length: MILL_WHEEL.frames }, (_, i) => makeMillWheel(i / MILL_WHEEL.frames * Math.PI / 4));

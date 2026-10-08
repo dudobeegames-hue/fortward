@@ -39,6 +39,10 @@ window.SIM = (() => {
         for (const r of [hr0, hr0 + 1]) for (const c of [G.hc0 - 1, G.hc0 + 3]) if (!acted && place('barracks', c, r)) acted = true;
         if (acted) continue;
       }
+      if (F.has('range') && count('range') < 1 && count('barracks') >= 1) {
+        for (const r of [hr0, hr0 + 1]) for (const c of [G.hc0 + 3, G.hc0 - 1, G.hc0 - 2, G.hc0 + 4]) if (!acted && place('range', c, r)) acted = true;
+        if (acted) continue;
+      }
       if (F.has('mage') && count('mage') < (wave >= 6 ? 3 : 2)) {
         for (const r of [hr0, hr0 + 1, hr0 + 2]) for (const c of order) if (!acted && !F.inHall(c, r) && place('mage', c, r)) acted = true;
         if (acted) continue;
@@ -69,7 +73,7 @@ window.SIM = (() => {
       if (F.has('knightTypes')) { const bk = s.blds.find(b => b.kind === 'barracks' && !b.ktype); if (bk && s.gold >= 50) { s.gold -= 50; bk.ktype = 'spear'; acted = true; continue; } }
       const ups = [];
       for (const b of s.blds) {
-        if (['tower', 'mage', 'barracks', 'catapult', 'mine', 'chapel', 'workshop'].includes(b.kind) && b.lvl < F.bCap()) ups.push({ c: F.bUpCost(b), f: () => { b.spent += F.bUpCost(b); b.lvl++; b.hp = F.bMaxHp(b); } });
+        if (['tower', 'mage', 'barracks', 'range', 'catapult', 'mine', 'chapel', 'workshop'].includes(b.kind) && b.lvl < F.bCap()) ups.push({ c: F.bUpCost(b), f: () => { b.spent += F.bUpCost(b); b.lvl++; b.hp = F.bMaxHp(b); } });
         if (b.kind === 'wall' && b.lvl < Math.min(F.bCap(), 3) && s.wave >= 4) ups.push({ c: F.bUpCost(b) * 6, real: F.bUpCost(b), f: () => { b.lvl++; b.hp = F.bMaxHp(b); } });
         if (b.unit && b.unit.lvl < F.lvlCap()) ups.push({ c: F.uUpCost(b.unit), f: () => { b.unit.lvl++; } });
       }

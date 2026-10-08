@@ -178,7 +178,7 @@ const UNLOCKS = [
   [{ id: 'pit', name: 'Jama s ostňami', icon: 'pit' }, { id: 'mine', name: 'Zlatá baňa', icon: 'mine' }],
   [{ id: 'gate', name: 'Brána', icon: 'gate', desc: 'Prerob hradbu na bránu – tvoji rytieri cez ňu prejdú, horda nie.' }, { id: 'wallArcher', name: 'Lukostrelec na hradbách', icon: 'u_archer', desc: 'Postav lukostrelca priamo na hradbu – strieľa rýchle šípy na hordu.' }],
   [{ id: 'barracks', name: 'Kasárne a rytieri', icon: 'barracks' }],
-  [{ id: 'catapult', name: 'Katapult', icon: 'catapult' }],
+  [{ id: 'range', name: 'Strelnica a lukostrelci', icon: 'range' }, { id: 'catapult', name: 'Katapult', icon: 'catapult' }],
   [{ id: 'mage', name: 'Veža mága', icon: 'mage' }],
   [{ id: 'wallCrossbow', name: 'Kušník na hradbách', icon: 'u_crossbow', desc: 'Silnejší strelec na hradby s väčším dosahom.' }, { id: 'chapel', name: 'Kaplnka', icon: 'chapel' }, { id: 'spikes', name: 'Ostnaté hradby', icon: 'wall', desc: 'Ostne zrania každého, kto do hradby udrie.' }],
   [{ id: 'volleyUp', name: 'Vylepšenie salvy', icon: 'u_archer', desc: 'V radnici vylepšíš šípovú salvu – silnejšia a rýchlejšie nabitá.' }, { id: 'firepit', name: 'Ohnivá jama', icon: 'firepit' }, { id: 'beartrap', name: 'Medvedia pasca', icon: 'beartrap' }, { id: 'knightTypes', name: 'Druhy rytierov', icon: 'barracks', desc: 'Kasárne môžu cvičiť kopijníkov, jazdcov alebo štítonosičov.' }, { id: 'warcry', name: 'Kráľov pokrik', icon: 'king', desc: 'Počas boja na chvíľu posilní a zrýchli kráľa aj rytierov.' }],

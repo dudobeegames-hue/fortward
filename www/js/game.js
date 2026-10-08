@@ -18,6 +18,7 @@
   const BUILD = {
     tower:    { name: 'Strážna veža', short: 'Veža',   cost: 60,  hp: 240, range: 80, dmg: 7,  cd: 0.9, proj: 'arrow', speed: 180, block: true, desc: 'Lukostrelec strieľa na hordu v dosahu' },
     barracks: { name: 'Kasárne',      short: 'Kasárne', cost: 90, hp: 220, block: true, desc: 'Posiela rytierov proti horde' },
+    range:    { name: 'Strelnica',    short: 'Strelnica', cost: 100, hp: 200, block: true, desc: 'Vysiela lukostrelcov, ktorí sa držia za rytiermi a strieľajú z diaľky' },
     mage:     { name: 'Veža mága',    short: 'Mág',    cost: 150, hp: 240, range: 70, dmg: 14, cd: 2.2, proj: 'fire', speed: 115, splash: 16, block: true, desc: 'Ohnivá guľa zasiahne celú skupinu' },
     wall:     { name: 'Hradby',       short: 'Hradby', cost: 12,  hp: 240, block: true, desc: 'Zatarasí cestu – horda ich musí rozbiť alebo obísť' },
     pit:      { name: 'Jama s ostňami', short: 'Jama', cost: 30,  dmg: 12, block: false, desc: 'Zraní a spomalí každého, kto ňou prejde' },
@@ -79,7 +80,7 @@
   const uCd = u => WUNIT[u.type].cd * Math.pow(0.92, u.lvl - 1);
   const uRange = u => WUNIT[u.type].range + 4 * (u.lvl - 1);
   const uUpCost = u => Math.round(WUNIT[u.type].cost * 0.9 * Math.pow(1.6, u.lvl - 1));
-  const BUILD_ORDER = ['tower', 'wall', 'pit', 'mine', 'barracks', 'catapult', 'mage', 'chapel', 'firepit', 'beartrap', 'workshop'];
+  const BUILD_ORDER = ['tower', 'wall', 'pit', 'mine', 'barracks', 'range', 'catapult', 'mage', 'chapel', 'firepit', 'beartrap', 'workshop'];
   const ENEMY = {
     goblin:  { spr: 'goblin',  hp: 12,  speed: 24, atk: 4,  atkCd: 0.8, gold: 3,  blood: '#62a03a' },
     orc:     { spr: 'orc',     hp: 32,  speed: 16, atk: 9,  atkCd: 1.0, gold: 6,  blood: '#62a03a' },
@@ -100,6 +101,12 @@
   const bUpCost = b => Math.round(BUILD[b.kind].cost * 0.9 * Math.pow(1.6, b.lvl - 1));
   const knightCap = b => 2 + b.lvl;
   const knightEvery = b => Math.max(3, 7 - 0.8 * (b.lvl - 1));
+  // lukostrelci zo strelnice: menej zdravia, strieľajú z diaľky (aj na netopiere), držia sa za rytiermi
+  const archerCap = b => 2 + b.lvl;
+  const archerEvery = b => Math.max(4, 8 - 0.8 * (b.lvl - 1));
+  const archerHp = b => 28 * lvlMul(b, 0.3) * (1 + 0.2 * perk('drill')) * (1 + 0.1 * tal('command'));
+  const archerDmg = b => 5 * lvlMul(b, 0.4) * (1 + 0.1 * perk('fletching')) * (1 + 0.1 * tal('command'));
+  const ARCHER_RANGE = 64, ARCHER_CD = 1.1;
   const knightHp = b => 40 * lvlMul(b, 0.3) * (1 + 0.2 * perk('drill')) * (1 + 0.1 * tal('command'));
   const knightDmg = b => 6 * lvlMul(b, 0.35) * (1 + 0.2 * perk('drill')) * (1 + 0.1 * tal('command'));
   const hallMax = () => Math.round((400 + 200 * (st.hallLvl - 1)) * (1 + 0.15 * perk('foundations')));
@@ -413,7 +420,7 @@
     st.tool = null; st.sel = null; st.moving = null; bdrag = null;
     AUDIO.play('horn'); AUDIO.music('battle');
     $('build').hidden = true; $('bottom').hidden = false;
-    for (const b of st.blds) if (b.kind === 'barracks' || HELPERS[b.kind]) b.spawnT = b.kind === 'barracks' ? 0.3 : 0.6;
+    for (const b of st.blds) if (b.kind === 'barracks' || b.kind === 'range' || HELPERS[b.kind]) b.spawnT = HELPERS[b.kind] ? 0.6 : 0.3;
     banner(st.wave === MISSION_WAVES ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + MISSION_WAVES);
     updateHud();
   }
@@ -657,7 +664,7 @@
     // súboj s rytierom / kráľom (beranidlo a podkopník rytierov ignorujú)
     if (e.d.ram || e.d.sapper) e.foe = null;
     if (e.foe && (e.foe.dead || e.foe.down > 0)) e.foe = null;
-    if (!e.foe && !e.d.ram && !e.d.sapper) for (const s of st.soldiers) if (s.helper && !s.dead && Math.hypot(s.x - e.x, s.y - e.y) < 9) { e.foe = s; break; }
+    if (!e.foe && !e.d.ram && !e.d.sapper) for (const s of st.soldiers) if ((s.helper || s.archer) && !s.dead && Math.hypot(s.x - e.x, s.y - e.y) < 9) { e.foe = s; break; }
     if (e.foe) {
       if (Math.hypot(e.foe.x - e.x, e.foe.y - e.y) < 12) { attack(() => hitUnit(e.foe, e.d.atk * 0.7 * (e.foe.ktype === 'shield' ? 0.5 : 1))); return; }
       e.foe = null;
@@ -804,7 +811,7 @@
     }
     return true;
   }
-  const blockedBarracks = () => st.blds.filter(b => b.kind === 'barracks' && knightsBlocked(b));
+  const blockedBarracks = () => st.blds.filter(b => (b.kind === 'barracks' || b.kind === 'range') && knightsBlocked(b));
 
   function knightStep(a, b) {
     const n = G.cols * G.rows, dist = new Int16Array(n).fill(-1);
@@ -927,6 +934,30 @@
     return true;
   }
 
+  // strelnica v intervaloch vyšle lukostrelca (najviac archerCap naraz)
+  function updateRange(b, dt) {
+    b.spawnT -= dt;
+    if (b.spawnT > 0) return;
+    if (st.soldiers.filter(s => s.home === b).length >= archerCap(b)) { b.spawnT = 0.5; return; }
+    b.spawnT = archerEvery(b);
+    const c = bCenter(b), hp = archerHp(b);
+    st.soldiers.push({ home: b, archer: true, x: c.x + 1, y: tileY(b.r) + T + 1, hp, max: hp, dmg: archerDmg(b), spd: 24, spr: 'footArcher', cd: 0.3, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
+    for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
+  }
+  // lukostrelec: stojí kúsok za rytiermi a strieľa na najbližšiu hordu v dosahu; keď nikto nie je v dosahu, ide na svoje miesto
+  function updateArcher(u, dt, hx, hy) {
+    u.flash = Math.max(0, u.flash - dt);
+    u.cd = Math.max(0, u.cd - dt);
+    let near = false;
+    for (const e of st.enemies) if (!e.dead && e.y > 4 && Math.hypot(e.x - u.x, e.y - u.y) <= ARCHER_RANGE) { near = true; break; }
+    if (near) {
+      if (u.cd <= 0 && shoot(u.x, u.y, u.x, u.y - 9, ARCHER_RANGE, 'arrow', 180, u.dmg, 0)) { u.cd = ARCHER_CD; u.swing = 0.1; }
+      u.swing = Math.max(0, (u.swing || 0) - dt);
+      return;
+    }
+    moveKnight(u, hx, hy, (u.spd || 24) * waterMul(u), dt);
+  }
+
   // pomocník vyjde z budovy, keď žiadny jej pomocník nežije (prvý hneď na začiatku vlny)
   function updateHelperHome(b, dt) {
     if (st.soldiers.some(s => s.home === b && s.helper && !s.dead)) return;
@@ -1030,6 +1061,7 @@
       else if (b.kind === 'catapult') { b.cd -= dt; if (b.cd <= 0 && fireCatapult(b)) b.cd = bCd(b); }
       else if (b.unit) { b.unit.cd -= dt; if (b.unit.cd <= 0 && fireWallUnit(b)) b.unit.cd = uCd(b.unit); }
       else if (b.kind === 'barracks') updateBarracks(b, dt);
+      else if (b.kind === 'range') updateRange(b, dt);
       else if (HELPERS[b.kind]) updateHelperHome(b, dt);
       else if (b.kind === 'beartrap' && b.armT > 0) b.armT -= dt;
     }
@@ -1039,6 +1071,7 @@
     for (const s of st.soldiers) {
       if (s.dead) continue;
       if (s.helper) { updateHelper(s, dt); continue; }
+      if (s.archer) { updateArcher(s, dt, G.gx0 + ((s.slot * 37 + 18) % (G.cols * T - 16)) + 8, musterY + 16); continue; }
       const mx = G.gx0 + ((s.slot * 37) % (G.cols * T - 16)) + 8;
       updateFighter(s, dt, mx, musterY, 9999, s.dmg, false, moveKnight);
     }
@@ -1826,7 +1859,7 @@
     ICONS.mage = spriteURL(BSPR.mage[0], 3);
     ICONS.wall = spriteURL(BSPR.wall[0][10], 3);
     ICONS.pit = spriteURL(BSPR.pit, 3);
-    for (const k of ['catapult', 'mine', 'chapel', 'firepit', 'beartrap', 'workshop']) ICONS[k] = spriteURL(BSPR[k], 3);
+    for (const k of ['catapult', 'mine', 'chapel', 'firepit', 'beartrap', 'workshop', 'range']) ICONS[k] = spriteURL(BSPR[k], 3);
     ICONS.gate = spriteURL(BSPR.gateIcon, 3);
     ICONS.u_archer = spriteURL(SPR.archer[0], 3);
     ICONS.u_crossbow = spriteURL(SPR.knight[0], 3);
@@ -2034,6 +2067,7 @@
       else if (b.kind === 'beartrap') stats = 'Zastaví na ' + trapStun(b).toFixed(1) + ' s';
       else if (d.range) stats = 'Poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);
       else if (b.kind === 'barracks') stats = 'Rytieri ' + knightCap(b) + ' · sila ' + Math.round(knightDmg(b));
+      else if (b.kind === 'range') stats = 'Lukostrelci ' + archerCap(b) + ' · poškodenie ' + Math.round(archerDmg(b)) + ' · dosah ' + ARCHER_RANGE;
       else if (b.kind === 'pit') stats = 'Poškodenie ' + Math.round(bDmg(b)) + ' · spomalí na polovicu';
       if (d.hp) stats += (stats ? ' · ' : '') + 'zdravie ' + Math.ceil(b.hp) + '/' + bMaxHp(b);
       if (b.gate) stats += ' · rytieri cez ňu prejdú';
@@ -2041,7 +2075,7 @@
       if (b.kind === 'wall' && b.nb) stats += ' · spojenie +' + Math.round(WALL_LINK * b.nb * 100) + ' %';
       if (b.spec) stats += ' · ' + SPECS[b.spec].name;
       if (b.kind === 'barracks') stats += ' · ' + KTYPES[b.ktype || 'knight'].name;
-      if (b.kind === 'barracks' && knightsBlocked(b)) stats += '<br><span class="warn">⚠ Rytieri sa nedostanú von – postav bránu v hradbách alebo uvoľni cestu</span>';
+      if ((b.kind === 'barracks' || b.kind === 'range') && knightsBlocked(b)) stats += '<br><span class="warn">⚠ Rytieri sa nedostanú von – postav bránu v hradbách alebo uvoľni cestu</span>';
       card(b.gate ? ICONS.gate : ICONS[b.kind], (b.gate ? 'Brána' : d.name) + ' · úr. ' + b.lvl, stats);
       if (b.lvl < bCap()) {
         const c = bUpCost(b);
