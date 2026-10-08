@@ -513,6 +513,8 @@
     banner(st.wave === MISSION_WAVES ? 'Posledná vlna hordy!' : 'Horda vyráža! Vlna ' + st.wave + ' / ' + MISSION_WAVES);
     updateHud();
   }
+  // sú vojaci pri pevnosti? (pri palisáde alebo za ňou)
+  const sieging = () => !!st.fort && !st.fort.dead && st.soldiers.some(u => !u.dead && !u.helper && u.y < FORT.palY + 40);
   const fortContact = () => { if (st.fort && st.phase === 'battle' && !st.orcWaveOn && st.pendingWave) triggerOrcWave(); };
 
   function startWave() {
@@ -550,6 +552,18 @@
       st.texts.push({ x: tileX(b.c) + T / 2, y: tileY(b.r) - 4, s: '+' + gm, life: 1.4, max: 1.4 });
     }
     st.gold += mined;
+    // útočná misia: ak vojaci práve dobýjajú pevnosť, budovanie sa preskočí – hneď ide ďalšia vlna (po 10. vlne záverečný útok)
+    if (isAttack() && sieging()) {
+      st.orcWaveOn = false;
+      AUDIO.play('cleared');
+      if (st.wave < MISSION_WAVES) {
+        st.pendingWave = buildWave(st.wave + 1);
+        banner('Vlna odrazená! +' + bonus + ' zlata – horda vysiela ďalšiu');
+        setTimeout(() => { if (st.phase === 'battle') triggerOrcWave(); }, 1200);
+      } else banner('Horde došli sily – dobi hrad!');
+      updateHud();
+      return;
+    }
     st.phase = 'pause';
     st.proj = []; st.eproj = []; st.drops = [];
     // rytieri sa po vlne vrátia do kasární
