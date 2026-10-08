@@ -352,7 +352,7 @@
     for (let k = -3; k <= 3; k++) pal.push({ x: x + k * 16, y: py, hp: ph, max: ph, gate: k === 0, flash: 0 });
     if (L.stakes) for (let k = -3; k <= 3; k++) stakes.push({ x: x + k * 16, y: FORT.stakeY, hp: FORT.stakeHp * tr * mm, max: FORT.stakeHp * tr * mm });
     return {
-      x, y: keepBot, hp: FORT.keepHp * tr * mm, max: FORT.keepHp * tr * mm, flash: 0, stone: L.stone, rockCd: L.rock, rockT: 3, rocks: [],
+      x, y: keepBot, hp: FORT.keepHp * tr * mm, max: FORT.keepHp * tr * mm, flash: 0, stone: L.stone, rockCd: L.rock, rockT: 3, rocks: [], prock: [],
       towers: L.towers.map(dx => ({ x: x + dx, y: Math.abs(dx) > 50 ? py - 3 : keepBot + 10, hp: FORT.towerHp * tr * mm, max: FORT.towerHp * tr * mm, cd: 1 + Math.random(), flash: 0 })),
       pal, stakes, gateX: x, gateY: py + 3,
     };
@@ -453,8 +453,72 @@
     }
     return o === F ? { x: F.x + Math.max(-20, Math.min(20, u.x - F.x)), y: F.y + 3 } : { x: o.x, y: o.y + 3 };
   }
+  // ---- obliehacie stroje hráča ----
+  const SIEGE = {
+    ram: { hp: 340, spd: 11, dmg: 70, cd: 1.6, armor: 0.5, spr: 'siegeRam' },              // rozbíja bránu, potom hrad; orkov si nevšíma
+    cat: { hp: 170, spd: 13, dmg: 55, cd: 3.6, armor: 0.8, spr: 'siegeCat', range: 105 },  // hádže balvany na veže a hrad
+  };
+  function spawnSiege(kind) {
+    const d = SIEGE[kind], a = st.mission - HOME_PROVINCES - 1, hp = d.hp * (1 + 0.15 * a);
+    st.soldiers.push({ siege: kind, x: G.hallCx + (Math.random() - 0.5) * 10, y: G.hallTop - 4, hp, max: hp, dmg: d.dmg * (1 + 0.15 * a), spd: d.spd, armor: d.armor, spr: d.spr, cd: 0.5, fired: 0, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
+    for (let k = 0; k < 8; k++) part(G.hallCx, G.hallTop - 2, (Math.random() - 0.5) * 30, -Math.random() * 14, 0.4, '#c6a272', 40);
+  }
+  // cieľ baranidla: súvislé koly, potom brána, potom ľubovoľný úsek hradieb (ak brána padla) a nakoniec hrad
+  function ramTarget(u) {
+    const F = st.fort;
+    const sk = u.y > FORT.stakeY - 6 && F.stakes.length && F.stakes.every(q => q.hp > 0) ? F.stakes[3] : null;
+    if (sk) return sk;
+    const gate = F.pal.find(q => q.gate);
+    return gate && gate.hp > 0 ? gate : F;
+  }
+  // cieľ katapultu: najbližšia veža, potom hrad
+  function catTarget(u) {
+    const F = st.fort;
+    let b = null, bd = 1e9;
+    for (const t of F.towers) if (t.hp > 0) { const d = Math.hypot(t.x - u.x, t.y - u.y); if (d < bd) { bd = d; b = t; } }
+    return b || F;
+  }
+  function updateSiege(u, dt) {
+    const F = st.fort;
+    u.flash = Math.max(0, u.flash - dt); u.cd = Math.max(0, u.cd - dt); u.fired = Math.max(0, u.fired - dt); u.swing = 0;
+    if (!F || F.dead) return;
+    const spd = u.spd * waterMul(u) * (stakeAt(u) && u.siege !== 'ram' ? 0.5 : 1);
+    const off = u.y > FORT.stakeY + 8 ? (u.slot % 2 ? -7 : 7) : 0; // dva stroje nejdú cez seba
+    const go = (x, y) => { if (u.y < FORT.palY + 30) moveTo(u, x, y, spd, dt); else moveKnight(u, x + off, y, spd, dt); };
+    if (u.siege === 'cat') {
+      const o = catTarget(u), oy = o === F ? F.y - 16 : o.y - 8;
+      if (Math.hypot(o.x - u.x, oy - u.y) > SIEGE.cat.range) { go(o.x + Math.max(-30, Math.min(30, u.x - o.x)), Math.max(FORT.stakeY + 12, oy + 60)); return; }
+      if (u.cd > 0) return;
+      u.cd = SIEGE.cat.cd; u.fired = 1.0;
+      F.prock.push({ sx: u.x, sy: u.y - 14, x: u.x, y: u.y - 14, gy: u.y - 14, tx: o.x + (Math.random() - 0.5) * 6, ty: oy, t: 0, dur: 0.9 + Math.hypot(o.x - u.x, oy - u.y) / 220, h: 34, tgt: o, dmg: u.dmg });
+      AUDIO.play('clang');
+      return;
+    }
+    const o = ramTarget(u), a = fortApproach(u, o);
+    if (Math.hypot(a.x - u.x, a.y - u.y) > 5) { go(a.x, a.y); return; }
+    if (u.cd > 0) return;
+    u.cd = SIEGE.ram.cd; u.swing = 0.2;
+    AUDIO.play('crumble'); st.shake = Math.max(st.shake, 0.08);
+    if (F.stakes.includes(o)) { o.hp -= u.dmg; if (o.hp <= 0) for (let k = 0; k < 10; k++) part(o.x + (Math.random() - 0.5) * 14, o.y - 4, (Math.random() - 0.5) * 40, -Math.random() * 30, 0.6, '#4a2e1a', 100); }
+    else hitFort(o, u.dmg);
+  }
+  // balvany pojazdných katapultov: dopadnú na stavbu pevnosti a zrania orkov okolo
+  function updatePlayerRocks(F, dt) {
+    for (const r of F.prock) {
+      r.t += dt / r.dur;
+      const t = Math.min(1, r.t);
+      r.x = r.sx + (r.tx - r.sx) * t; r.gy = r.sy + (r.ty - r.sy) * t; r.y = r.gy - Math.sin(Math.PI * t) * r.h;
+      if (r.t < 1) continue;
+      r.done = true;
+      if (r.tgt.hp > 0) hitFort(r.tgt, r.dmg);
+      for (const e of st.enemies) if (!e.dead && Math.hypot(e.x - r.tx, e.y - r.ty) < 16) damage(e, r.dmg * 0.4);
+      for (let k = 0; k < 10; k++) part(r.tx, r.ty, (Math.random() - 0.5) * 44, -Math.random() * 30, 0.5, ['#625a6c', '#967048', '#f89838'][k % 3], 100);
+    }
+    F.prock = F.prock.filter(r => !r.done);
+  }
   // rytier v útočnej misii: bije orkov, ktorých stretne, inak búra pevnosť
   function updateAssault(u, dt) {
+    if (u.siege) { updateSiege(u, dt); return; }
     if (nearestEnemy(u.x, u.y, 60, true) || (u.tgt && !u.tgt.dead)) { updateFighter(u, dt, u.x, u.y, 60, u.dmg, false, moveKnight); return; }
     u.flash = Math.max(0, u.flash - dt); u.cd = Math.max(0, u.cd - dt); u.swing = Math.max(0, (u.swing || 0) - dt);
     const o = fortTarget(u);
@@ -487,7 +551,7 @@
       q.hp -= 12 * dt;
       if (q.hp <= 0) { AUDIO.play('crumble'); for (let k = 0; k < 10; k++) part(q.x + (Math.random() - 0.5) * 14, q.y - 4, (Math.random() - 0.5) * 40, -Math.random() * 30, 0.6, '#4a2e1a', 100); }
     }
-    updateRocks(F, dt);
+    updateRocks(F, dt); updatePlayerRocks(F, dt);
     if (F.rockCd && st.phase === 'battle') { F.rockT -= dt; if (F.rockT <= 0) F.rockT = throwRock(F) ? F.rockCd : 0.5; }
     for (const t of F.towers) {
       t.flash = Math.max(0, t.flash - dt);
@@ -653,10 +717,10 @@
     }
     st.phase = 'pause';
     st.proj = []; st.eproj = []; st.drops = [];
-    if (st.fort) st.fort.rocks = [];
+    if (st.fort) { st.fort.rocks = []; st.fort.prock = []; }
     // rytieri sa po vlne vrátia do kasární
     for (const sd of st.soldiers) for (let k = 0; k < 5; k++) part(sd.x, sd.y - 5, (Math.random() - 0.5) * 20, -Math.random() * 20, 0.4, '#88b4ff', 30);
-    st.soldiers = [];
+    st.soldiers = st.soldiers.filter(s => s.siege); // obliehacie stroje ostanú stáť na bojisku
     st.orcWaveOn = false;
     if (st.wave >= MISSION_WAVES && !isAttack()) { missionWon(); return; }
     if (st.wave >= MISSION_WAVES) { // útočná misia: horde došli vlny, teraz treba dobyť hrad
@@ -983,7 +1047,7 @@
   }
 
   function hitUnit(u, dmg) {
-    u.hp -= dmg; u.flash = 0.08;
+    u.hp -= dmg * (u.armor || 1); u.flash = 0.08;
     part(u.x, u.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.3, '#e84838', 100);
     if (u.hp > 0) return;
     if (u.isKing) { // kráľ padol – do konca vlny nebojuje, po vlne ho možno oživiť za zlato
@@ -1465,13 +1529,13 @@
   }
   function drawFighter(u, sprName) {
     const frames = SPR[sprName];
-    const fi = Math.floor(u.anim) % 2, fr = frames[fi];
-    const x = Math.round(u.x - fr.w / 2), y = Math.round(u.y - fr.h - (u.swing > 0 ? 1 : 0));
-    shadow(u.x, u.y, 4);
+    const fi = u.siege === 'cat' ? (u.fired > 0 ? 1 : 0) : Math.floor(u.anim) % 2, fr = frames[fi];
+    const x = Math.round(u.x - fr.w / 2), y = Math.round(u.y - fr.h - (u.swing > 0 && !u.siege ? 1 : 0)) + (u.siege === 'ram' && u.swing > 0 ? -2 : 0);
+    shadow(u.x, u.y, u.siege ? 8 : 4);
     g.drawImage(u.flash > 0 ? fr.f : fr.c, x, y);
     if (sprName === 'craft') drawHammer(u, x, y);
     if (st.cryT > 0 && Math.random() < 0.15) part(u.x + (Math.random() - 0.5) * 8, u.y - 8, 0, -16, 0.4, '#f8d048', 0); // pokrik
-    if (u.swing > 0) { // záblesk meča
+    if (u.swing > 0 && !u.siege) { // záblesk meča
       g.fillStyle = '#ffffff';
       g.fillRect(x + fr.w - 1, y - 2, 1, 3); g.fillRect(x + fr.w, y - 3, 1, 2);
     }
@@ -2049,7 +2113,7 @@
       for (const t of F.towers) if (t.hp > 0) objs.push({ y: t.y, f: () => { const s2 = BSPR.orcTower; g.drawImage(t.flash > 0 ? s2.f : s2.c, Math.round(t.x - s2.w / 2), t.y - s2.h); } });
       for (const q of F.pal) if (q.hp > 0) objs.push({ y: q.y, f: () => { const s2 = F.stone ? (q.gate ? BSPR.orcWallGate : BSPR.orcWall) : q.gate ? BSPR.palisadeGate : BSPR.palisade; g.drawImage(q.flash > 0 ? s2.f : s2.c, q.x - 8, q.y - s2.h); } });
       for (const q of F.stakes) if (q.hp > 0) objs.push({ y: q.y, f: () => g.drawImage(BSPR.stakes.c, q.x - 8, q.y - BSPR.stakes.h) });
-      for (const r of F.rocks) objs.push({ y: 9999, f: () => drawRock(r) });
+      for (const r of F.rocks.concat(F.prock)) objs.push({ y: 9999, f: () => drawRock(r) });
     }
     objs.sort((a, b) => a.y - b.y);
     for (const o of objs) o.f();
@@ -2118,6 +2182,11 @@
       el.hidden = !exists;
       if (exists) el.disabled = st.gold < u.cost;
     }
+    for (const [id, key] of [['buyRam', 'ram'], ['buyCat', 'cat']]) {
+      const el = $(id), ok = canSiege(key);
+      el.hidden = !ok;
+      if (ok) el.disabled = st.gold < BUY[key].cost || siegeCount(key) >= SIEGE_MAX;
+    }
     const k = st.king, kp = $('hud-king');
     if (k) {
       const r = k.dead ? 0 : Math.max(0, k.hp / kingMax());
@@ -2158,6 +2227,8 @@
     ICONS.king = spriteURL(SPR.king[0], 3);
     ICONS.u_knight = spriteURL(SPR.soldier[0], 3); ICONS.u_footArcher = spriteURL(SPR.footArcher[0], 3);
     $('buyKnight').querySelector('img').src = ICONS.u_knight; $('buyArcher').querySelector('img').src = ICONS.u_footArcher;
+    ICONS.u_siegeRam = spriteURL(SPR.siegeRam[0], 2); ICONS.u_siegeCat = spriteURL(SPR.siegeCat[0], 2);
+    $('buyRam').querySelector('img').src = ICONS.u_siegeRam; $('buyCat').querySelector('img').src = ICONS.u_siegeCat;
     $('kingIcon').src = ICONS.king;
     for (const k of ['garcher', 'bat', 'ram', 'shaman', 'sapper']) ICONS['e_' + k] = spriteURL(SPR[k][0], 3);
     ICONS.coin = spriteURL(SPR.coin[0], 4);
@@ -2709,10 +2780,23 @@
     rebuildOcc(); renderBuild();
   });
   // dokupovanie vojakov počas boja: vyjde hneď z kasární / strelnice, navyše k bežnému počtu
-  const BUY = { knight: { cost: 40, kind: 'barracks', spawn: b => spawnKnight(b, true) }, archer: { cost: 50, kind: 'range', spawn: b => spawnArcher(b, true) } };
+  // obliehacie stroje (útočné misie): vyjdú od radnice, naraz najviac 2 z každého druhu
+  const BUY = {
+    knight: { cost: 40, kind: 'barracks', spawn: b => spawnKnight(b, true) }, archer: { cost: 50, kind: 'range', spawn: b => spawnArcher(b, true) },
+    ram: { cost: 90, siege: 'siegeRam', spawn: () => spawnSiege('ram') }, cat: { cost: 120, siege: 'siegeCat', spawn: () => spawnSiege('cat') },
+  };
+  const SIEGE_MAX = 2;
+  const siegeCount = kind => st.soldiers.filter(s => s.siege === kind && !s.dead).length;
+  const canSiege = key => !!st.fort && !st.fort.dead && st.tech.has(BUY[key].siege);
   function buyUnit(key) {
     const u = BUY[key];
     if (st.phase !== 'battle' || st.gold < u.cost) { AUDIO.play('deny'); return; }
+    if (u.siege) {
+      if (!canSiege(key) || siegeCount(key) >= SIEGE_MAX) { AUDIO.play('deny'); if (canSiege(key)) toast('Naraz najviac ' + SIEGE_MAX + ' – ' + (key === 'ram' ? 'baranidlá' : 'katapulty')); return; }
+      st.gold -= u.cost; u.spawn();
+      AUDIO.play('build'); updateHud();
+      return;
+    }
     const homes = st.blds.filter(b => b.kind === u.kind);
     if (!homes.length) { AUDIO.play('deny'); return; }
     const free = homes.filter(b => !knightsBlocked(b)), b = (free.length ? free : homes)[Math.floor(Math.random() * (free.length || homes.length))];
@@ -2721,6 +2805,8 @@
   }
   $('buyKnight').addEventListener('click', () => buyUnit('knight'));
   $('buyArcher').addEventListener('click', () => buyUnit('archer'));
+  $('buyRam').addEventListener('click', () => buyUnit('ram'));
+  $('buyCat').addEventListener('click', () => buyUnit('cat'));
   $('speedBtn').addEventListener('click', () => {
     st.speed = st.speed >= 3 ? 1 : st.speed + 1;
     $('speedBtn').textContent = 'x' + st.speed;

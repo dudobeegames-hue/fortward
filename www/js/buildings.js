@@ -664,6 +664,58 @@ function makeStakes() {
   }
   return p.finish();
 }
+// ---- Obliehacie stroje hráča (pohľad zozadu – idú hore k pevnosti) ----
+// baranidlo 18x16: sedlová strecha z modrých koží, železná hlavica trčí dopredu, vojaci tlačia zvnútra; f = fáza kolies/krokov
+function makeSiegeRam(f) {
+  const p = painter(18, 16);
+  for (let y = 0; y <= 2; y++) for (let x = 8; x <= 9; x++) p.set(x, y, y === 0 ? RIVET : x === 8 ? hexRGB('#80869a') : IRON); // hlavica
+  for (let y = 3; y <= 8; y++) {                                                              // strecha – koža na rebrách
+    const hw = 1.5 + (y - 3) * 1.25;
+    for (let x = Math.ceil(8.5 - hw); x <= Math.floor(8.5 + hw); x++) {
+      const t = (x - (8.5 - hw)) / (2 * hw), rib = (x + y) % 4 === 0;
+      p.shade(x, y, ROOF_BLUE, (rib ? 0.25 : 0.82 - t * 0.55) + (y === 3 ? 0.1 : 0));
+    }
+  }
+  for (let x = 1; x <= 16; x++) p.shade(x, 9, WOOD, 0.62 - x * 0.015);                       // spodný trám strechy
+  for (let y = 10; y <= 13; y++) for (let x = 4; x <= 13; x++) p.set(x, y, hexRGB('#1e120a')); // tmavé vnútro
+  for (const lx of [5, 10]) for (let y = 10; y <= 13; y++) {                                  // nohy tlačiacich vojakov
+    const step = (lx === 5) === (f === 0) ? 1 : 0;
+    if (y < 13 - step || y === 13 && step === 0) { p.set(lx, y, hexRGB(y === 10 ? '#88b4ff' : '#3c64c8')); p.set(lx + 2, y, hexRGB(y === 10 ? '#3c64c8' : '#22337a')); }
+    if (y === 13 - step) { p.set(lx, y, hexRGB('#3e2614')); p.set(lx + 2, y, hexRGB('#3e2614')); }
+  }
+  for (const sx of [2, 14]) for (let y = 10; y <= 14; y++) p.shade(sx + (sx === 2 ? 1 : 0), y, WOOD, sx === 2 ? 0.55 : 0.35); // stĺpiky
+  for (const wx of [0, 15]) for (let y = 10; y <= 15; y++) for (let x = wx; x <= wx + 2; x++) {          // kolesá (z boku úzke)
+    const spoke = (y + f) % 3 === 0;
+    p.shade(x, y, WOOD, spoke ? 0.2 : x === wx ? 0.7 : x === wx + 1 ? 0.5 : 0.32);
+  }
+  for (const wx of [1, 16]) p.set(wx, 12 + f, RIVET);                                                     // náboj
+  return p.finish();
+}
+// pojazdný katapult 16x19: rám na kolesách, rameno s miskou; loaded = rameno dole s balvanom, inak vztýčené po výstrele
+function makeSiegeCat(loaded) {
+  const p = painter(16, 19);
+  const STONE = ['#22202a', '#3c3846', '#4e4858', '#625a6c', '#7a7286', '#9a92a6'].map(hexRGB);
+  for (let y = 11; y <= 14; y++) for (let x = 2; x <= 13; x++) p.shade(x, y, WOOD, (y === 11 ? 0.78 : 0.6) - (x - 2) * 0.025 + ((x - 2) % 4 === 3 ? -0.18 : 0)); // podlaha z dosiek
+  for (let x = 2; x <= 13; x++) { p.shade(x, 15, WOOD, 0.3); p.shade(x, 16, WOOD, 0.18); }                                  // predný trám
+  for (const [px, v] of [[3, 0.78], [12, 0.42]]) for (let y = 3; y <= 14; y++) { p.shade(px, y, WOOD, v); p.shade(px + (px === 3 ? 1 : -1), y, WOOD, v - 0.2); } // stĺpy
+  for (let x = 3; x <= 12; x++) { p.shade(x, 3, WOOD, 0.72 - x * 0.02); p.set(x, 4, x % 3 === 0 ? RIVET : IRON); }            // priečka s kovaním
+  for (const wx of [0, 14]) for (let y = 11; y <= 18; y++) for (let x = wx; x <= wx + 1; x++)                                   // kolesá z boku
+    p.set(x, y, y === 11 || y === 18 ? IRON : (y + x) % 3 === 0 ? pickRamp(WOOD, 0.25, x, y) : pickRamp(WOOD, x === wx ? 0.7 : 0.45, x, y));
+  if (loaded) {                                                                    // rameno stiahnuté k nám, miska s balvanom visí pred trámom
+    for (let y = 5; y <= 14; y++) { p.shade(7, y, WOOD, 0.8); p.shade(8, y, WOOD, 0.5); }
+    for (let x = 5; x <= 10; x++) { p.shade(x, 15, WOOD, 0.55); p.shade(x, 18, WOOD, 0.3); }
+    for (let y = 16; y <= 17; y++) { p.shade(5, y, WOOD, 0.55); p.shade(10, y, WOOD, 0.3); }
+    for (let y = 14; y <= 17; y++) for (let x = 6; x <= 9; x++) if (!((y === 14 || y === 17) && (x === 6 || x === 9))) p.shade(x, y, STONE, 0.98 - (x - 6) * 0.14 - (y - 14) * 0.1);
+    p.set(6, 15, STONE[5]);
+  } else {                                                                         // po výstrele: rameno opreté o priečku, prázdna miska hore
+    for (let y = 2; y <= 14; y++) { p.shade(7, y, WOOD, 0.8); p.shade(8, y, WOOD, 0.5); }
+    for (let x = 5; x <= 10; x++) p.shade(x, 0, WOOD, x < 8 ? 0.7 : 0.4);
+    for (let x = 5; x <= 10; x++) p.set(x, 1, x === 5 || x === 10 ? pickRamp(WOOD, 0.4, x, 1) : hexRGB('#1e120a'));
+  }
+  p.set(3, 0, hexRGB('#3e2614')); p.set(3, 1, hexRGB('#3e2614')); p.set(3, 2, hexRGB('#3e2614'));                         // žrď
+  p.set(2, 0, hexRGB('#88b4ff')); p.set(1, 0, hexRGB('#5a86e8')); p.set(2, 1, hexRGB('#3c64c8'));                       // modrá zástavka
+  return p.finish();
+}
 
 // ---- Vodný mlyn (32x32): kamenné prízemie, hrázdené poschodie, slamená strecha, koleso s lopatkami a žľab ----
 const STRAW = ['#2e200c', '#4a3614', '#6a4e1e', '#8a6a2a', '#a8843a', '#c49e4e', '#dcba68', '#ecd28a'].map(hexRGB);
@@ -765,6 +817,8 @@ function initBuildingSprites() {
   BSPR.orcWall = makeOrcWall(false);
   BSPR.orcWallGate = makeOrcWall(true);
   BSPR.stakes = makeStakes();
+  SPR.siegeRam = [makeSiegeRam(0), makeSiegeRam(1)];
+  SPR.siegeCat = [makeSiegeCat(true), makeSiegeCat(false)];
   BSPR.mill = makeMill();
   // 8-násobná súmernosť: 45° otočenia rozdelených do snímok sa plynulo opakuje
   BSPR.millWheel = Array.from({ length: MILL_WHEEL.frames }, (_, i) => makeMillWheel(i / MILL_WHEEL.frames * Math.PI / 4));
