@@ -336,17 +336,68 @@
 
   // ---- útočné misie (6–10): orkský hrad hore na bojisku, z jeho brány vychádza horda ----
   const isAttack = () => st.mission > HOME_PROVINCES;
-  const FORT = { keepHp: 1500, towerHp: 320, palHp: 220, keepBot: 84, palY: 100 }; // y spodku hradu a palisády (herné px) – pod horným panelom
+  const FORT = { keepHp: 1500, towerHp: 320, palHp: 220, stakeHp: 90, keepBot: 84, palY: 100, stakeY: 116 }; // y spodku hradu, palisády a kolov (herné px) – pod horným panelom
+  // obrana hradu rastie s misiou: 6 palisáda + 2 veže, 7 + koly, 8 kamenný múr + 4 veže, 9 hrad hádže balvany, 10 hádže častejšie
+  const fortLayout = a => ({ stone: a >= 2, stakes: a >= 1, towers: a >= 2 ? [-60, -40, 40, 60] : [-40, 40], rock: a >= 4 ? 3.2 : a >= 3 ? 4.5 : 0 });
+  const FORT_NEWS = ['', 'Pred hradbami sú zahrotené koly – zraňujú a spomaľujú vojakov', 'Horda postavila kamenné hradby a ďalšie veže', 'Hrad hádže balvany na zhluky vojakov', 'Hlavný hrad hordy – balvany padajú častejšie'];
   function makeFort() {
-    const x = scene.fortX, tr = TIERS[st.tier || 0].hp, mm = 1 + 0.2 * (st.mission - HOME_PROVINCES - 1);
-    const keepBot = FORT.keepBot, py = FORT.palY;
-    const pal = [];
-    for (let k = -3; k <= 3; k++) pal.push({ x: x + k * 16, y: py, hp: FORT.palHp * tr * mm, max: FORT.palHp * tr * mm, gate: k === 0, flash: 0 });
+    const x = scene.fortX, tr = TIERS[st.tier || 0].hp, a = st.mission - HOME_PROVINCES - 1, mm = 1 + 0.2 * a, L = fortLayout(a);
+    const keepBot = FORT.keepBot, py = FORT.palY, ph = FORT.palHp * tr * mm * (L.stone ? 1.7 : 1);
+    const pal = [], stakes = [];
+    for (let k = -3; k <= 3; k++) pal.push({ x: x + k * 16, y: py, hp: ph, max: ph, gate: k === 0, flash: 0 });
+    if (L.stakes) for (let k = -3; k <= 3; k++) stakes.push({ x: x + k * 16, y: FORT.stakeY, hp: FORT.stakeHp * tr * mm, max: FORT.stakeHp * tr * mm });
     return {
-      x, y: keepBot, hp: FORT.keepHp * tr * mm, max: FORT.keepHp * tr * mm, flash: 0,
-      towers: [-1, 1].map(sd => ({ x: x + sd * 40, y: keepBot + 10, hp: FORT.towerHp * tr * mm, max: FORT.towerHp * tr * mm, cd: 1, flash: 0 })),
-      pal, gateX: x, gateY: py + 3,
+      x, y: keepBot, hp: FORT.keepHp * tr * mm, max: FORT.keepHp * tr * mm, flash: 0, stone: L.stone, rockCd: L.rock, rockT: 3, rocks: [],
+      towers: L.towers.map(dx => ({ x: x + dx, y: Math.abs(dx) > 50 ? py - 3 : keepBot + 10, hp: FORT.towerHp * tr * mm, max: FORT.towerHp * tr * mm, cd: 1 + Math.random(), flash: 0 })),
+      pal, stakes, gateX: x, gateY: py + 3,
     };
+  }
+  // medzi vlnami orkovia opravia opevnenie: celé stavby +30 %, až 2 zbúrané úseky hradieb znova postavia, koly obnovia
+  function repairFort() {
+    const F = st.fort;
+    if (!F || F.dead) return;
+    let fixed = false, rebuilt = 0;
+    for (const o of F.towers.concat(F.pal)) {
+      if (o.hp > 0 && o.hp < o.max) { o.hp = Math.min(o.max, o.hp + o.max * 0.3); fixed = true; }
+      else if (o.hp <= 0 && F.pal.includes(o) && rebuilt < 2) { o.hp = o.max * 0.35; rebuilt++; fixed = true; }
+    }
+    for (const q of F.stakes) if (q.hp < q.max) { q.hp = q.max; fixed = true; }
+    if (fixed) setTimeout(() => { if (st.phase === 'build') toast(rebuilt ? 'Orkovia opravili hradby – ' + (rebuilt > 1 ? 'zbúrané úseky stoja znova' : 'zbúraný úsek stojí znova') : 'Orkovia opravili opevnenie'); }, 400);
+  }
+  // koly: kto po nich ide, je zranený a spomalený; vojaci ich pritom pošliapu
+  function stakeAt(u) {
+    const F = st.fort;
+    if (!F || !F.stakes.length || Math.abs(u.y - (FORT.stakeY - 3)) > 5) return null;
+    for (const q of F.stakes) if (q.hp > 0 && Math.abs(u.x - q.x) <= 8) return q;
+    return null;
+  }
+  // balvan z hradu: letí po oblúku na najväčší zhluk vojakov v dosahu
+  function throwRock(F) {
+    let best = null, bn = 0;
+    for (const u of st.soldiers) {
+      if (u.dead || u.helper || Math.hypot(u.x - F.x, u.y - F.y) > 150) continue;
+      let n = 0; for (const v of st.soldiers) if (!v.dead && Math.hypot(v.x - u.x, v.y - u.y) < 14) n++;
+      if (n > bn) { bn = n; best = u; }
+    }
+    if (!best) return false;
+    const sx = F.x + (Math.random() < 0.5 ? -9 : 9), sy = F.y - 46, tx = best.x + (Math.random() - 0.5) * 6, ty = best.y;
+    F.rocks.push({ sx, sy, x: sx, y: sy, gy: sy, tx, ty, t: 0, dur: 1.1 + Math.hypot(tx - sx, ty - sy) / 260, h: 40 });
+    AUDIO.play('clang');
+    return true;
+  }
+  function updateRocks(F, dt) {
+    for (const r of F.rocks) {
+      r.t += dt / r.dur;
+      const t = Math.min(1, r.t);
+      r.x = r.sx + (r.tx - r.sx) * t; r.gy = r.sy + (r.ty - r.sy) * t; r.y = r.gy - Math.sin(Math.PI * t) * r.h;
+      if (r.t < 1) continue;
+      r.done = true;
+      const dmg = 16 * (1 + 0.2 * (st.mission - HOME_PROVINCES - 1)) * Math.sqrt(TIERS[st.tier || 0].hp);
+      for (const u of st.soldiers) if (!u.dead && Math.hypot(u.x - r.tx, u.y - r.ty) < 13) hitUnit(u, dmg);
+      st.shake = Math.max(st.shake, 0.12);
+      for (let k = 0; k < 12; k++) part(r.tx, r.ty - 2, (Math.random() - 0.5) * 50, -Math.random() * 35, 0.5, ['#3c3846', '#625a6c', '#967048'][k % 3], 100);
+    }
+    F.rocks = F.rocks.filter(r => !r.done);
   }
 
   // zásah stavby pevnosti; hrad neklesne pod 10 %, kým nevyjde všetkých 10 vĺn
@@ -377,12 +428,18 @@
     if (!F || F.dead) return null;
     const near = list => { let b = null, bd = 1e9; for (const o of list) if (o.hp > 0) { const d = Math.hypot(o.x - u.x, o.y - u.y); if (d < bd) { bd = d; b = o; } } return b; };
     const breach = F.pal.some(q => q.hp <= 0);
-    return (!breach && near(F.pal)) || near(F.towers) || F;
+    const sk = u.y > FORT.stakeY - 6 && F.stakes.length && F.stakes.every(q => q.hp > 0) ? near(F.stakes) : null; // súvislý rad kolov treba najprv prebiť
+    return sk || (!breach && near(F.pal)) || near(F.towers) || F;
   }
   // bod, kam má vojak dôjsť, aby mohol udrieť (pod stavbou); cez palisádu len dierou
   function fortApproach(u, o) {
     const F = st.fort;
     if (o !== F && !F.towers.includes(o)) return { x: o.x, y: o.y + 3 };
+    if (u.y > FORT.stakeY - 4) { // ešte pred kolmi – choď k prebitej diere
+      let gap = null, gd = 1e9;
+      for (const q of F.stakes) if (q.hp <= 0) { const d = Math.abs(q.x - u.x); if (d < gd) { gd = d; gap = q; } }
+      if (gap && Math.abs(u.x - gap.x) > 4) return { x: gap.x, y: FORT.stakeY + 4 };
+    }
     if (u.y > FORT.palY - 2) { // ešte pred palisádou – choď k diere
       let gap = null, gd = 1e9;
       for (const q of F.pal) if (q.hp <= 0) { const d = Math.abs(q.x - u.x); if (d < gd) { gd = d; gap = q; } }
@@ -397,7 +454,7 @@
     u.flash = Math.max(0, u.flash - dt); u.cd = Math.max(0, u.cd - dt); u.swing = Math.max(0, (u.swing || 0) - dt);
     const o = fortTarget(u);
     if (!o) return;
-    const a = fortApproach(u, o), spd = (u.spd || 26) * (st.cryT > 0 ? 1.4 : 1) * waterMul(u);
+    const a = fortApproach(u, o), spd = (u.spd || 26) * (st.cryT > 0 ? 1.4 : 1) * waterMul(u) * (stakeAt(u) ? 0.5 : 1);
     if (Math.hypot(a.x - u.x, a.y - u.y) > 5) { if (u.y < FORT.palY + 30) moveTo(u, a.x, a.y, spd, dt); else moveKnight(u, a.x, a.y, spd, dt); return; }
     if (u.cd <= 0) { u.cd = 0.8; u.swing = 0.15; AUDIO.play('clang'); hitFort(o, u.dmg * (st.cryT > 0 ? 1.6 : 1)); }
   }
@@ -418,6 +475,15 @@
       }
     }
     for (const q of F.pal) q.flash = Math.max(0, q.flash - dt);
+    for (const u of st.soldiers) { // koly zraňujú a vojaci ich pritom pošliapu
+      const q = !u.dead && !u.helper && stakeAt(u);
+      if (!q) continue;
+      hitUnit(u, 4 * dt); u.flash = 0;
+      q.hp -= 12 * dt;
+      if (q.hp <= 0) { AUDIO.play('crumble'); for (let k = 0; k < 10; k++) part(q.x + (Math.random() - 0.5) * 14, q.y - 4, (Math.random() - 0.5) * 40, -Math.random() * 30, 0.6, '#4a2e1a', 100); }
+    }
+    updateRocks(F, dt);
+    if (F.rockCd && st.phase === 'battle') { F.rockT -= dt; if (F.rockT <= 0) F.rockT = throwRock(F) ? F.rockCd : 0.5; }
     for (const t of F.towers) {
       t.flash = Math.max(0, t.flash - dt);
       if (t.hp <= 0) continue;
@@ -510,7 +576,11 @@
     updateHud();
     if (kingMeta.pending) setTimeout(() => { if (st.phase === 'build') showTalentPick(); }, 600);
     st.viewUp = 0;
-    if (isAttack() && st.wave === 0) setTimeout(() => { if (st.phase === 'build') toast('Potiahni mapu nadol – uvidíš orkskú pevnosť'); }, 1500);
+    if (isAttack() && st.wave === 0) {
+      const news = FORT_NEWS[st.mission - HOME_PROVINCES - 1];
+      setTimeout(() => { if (st.phase === 'build') toast('Potiahni mapu nadol – uvidíš orkskú pevnosť'); }, 1500);
+      if (news) setTimeout(() => { if (st.phase === 'build') toast(news); }, 3700);
+    } else if (isAttack()) repairFort();
   }
 
   // útočná misia: ľudia vyrážajú prví; vlna orkov vyjde pri prvom kontakte s obranou hradu
@@ -577,6 +647,7 @@
     }
     st.phase = 'pause';
     st.proj = []; st.eproj = []; st.drops = [];
+    if (st.fort) st.fort.rocks = [];
     // rytieri sa po vlne vrátia do kasární
     for (const sd of st.soldiers) for (let k = 0; k < 5; k++) part(sd.x, sd.y - 5, (Math.random() - 0.5) * 20, -Math.random() * 20, 0.4, '#88b4ff', 30);
     st.soldiers = [];
@@ -1432,6 +1503,15 @@
   }
 
   // orkský hrad + zástavy zostávajúcich vĺn na cimburí
+  function drawRock(r) {
+    const gx = Math.round(r.x), gy = Math.round(r.gy);
+    g.fillStyle = 'rgba(10,8,6,0.35)'; g.fillRect(gx - 2, gy, 5, 1); g.fillRect(gx - 1, gy - 1, 3, 3); // tieň na zemi
+    const x = gx - 1, y = Math.round(r.y) - 1;
+    g.fillStyle = PAL.K; g.fillRect(x - 1, y, 5, 3); g.fillRect(x, y - 1, 3, 5);
+    g.fillStyle = '#4e4858'; g.fillRect(x, y, 3, 3);
+    g.fillStyle = '#7a7286'; g.fillRect(x, y, 2, 1); g.fillRect(x, y + 1, 1, 1);
+    g.fillStyle = '#22202a'; g.fillRect(x + 2, y + 2, 1, 1);
+  }
   function drawFortKeep(F, time) {
     const k = BSPR.orcKeep, x0 = Math.round(F.x - k.w / 2), y0 = F.y - k.h;
     g.drawImage(F.flash > 0 ? k.f : k.c, x0, y0);
@@ -1962,7 +2042,9 @@
       const F = st.fort, keep = BSPR.orcKeep;
       if (!F.dead) objs.push({ y: F.y, f: () => drawFortKeep(F, time) });
       for (const t of F.towers) if (t.hp > 0) objs.push({ y: t.y, f: () => { const s2 = BSPR.orcTower; g.drawImage(t.flash > 0 ? s2.f : s2.c, Math.round(t.x - s2.w / 2), t.y - s2.h); } });
-      for (const q of F.pal) if (q.hp > 0) objs.push({ y: q.y, f: () => { const s2 = q.gate ? BSPR.palisadeGate : BSPR.palisade; g.drawImage(q.flash > 0 ? s2.f : s2.c, q.x - 8, q.y - s2.h); } });
+      for (const q of F.pal) if (q.hp > 0) objs.push({ y: q.y, f: () => { const s2 = F.stone ? (q.gate ? BSPR.orcWallGate : BSPR.orcWall) : q.gate ? BSPR.palisadeGate : BSPR.palisade; g.drawImage(q.flash > 0 ? s2.f : s2.c, q.x - 8, q.y - s2.h); } });
+      for (const q of F.stakes) if (q.hp > 0) objs.push({ y: q.y, f: () => g.drawImage(BSPR.stakes.c, q.x - 8, q.y - BSPR.stakes.h) });
+      for (const r of F.rocks) objs.push({ y: 9999, f: () => drawRock(r) });
     }
     objs.sort((a, b) => a.y - b.y);
     for (const o of objs) o.f();
@@ -1975,7 +2057,8 @@
       const F = st.fort;
       bar(F.x, F.y - BSPR.orcKeep.h - 4, 40, F.hp / F.max, '#e84838');
       for (const t of F.towers) if (t.hp > 0 && t.hp < t.max) bar(t.x, t.y - 37, 12, t.hp / t.max, '#e84838');
-      for (const q of F.pal) if (q.hp > 0 && q.hp < q.max) bar(q.x, q.y - 21, 12, q.hp / q.max, '#e84838');
+      for (const q of F.pal) if (q.hp > 0 && q.hp < q.max) bar(q.x, q.y - (F.stone ? 24 : 21), 12, q.hp / q.max, '#e84838');
+      for (const q of F.stakes) if (q.hp > 0 && q.hp < q.max) bar(q.x, q.y - 11, 10, q.hp / q.max, '#e84838');
     }
     if (st.king && !st.king.dead && st.king.hp < kingMax()) bar(st.king.x, Math.round(st.king.y - 19), 10, st.king.hp / kingMax(), '#f8d048');
     for (const p of st.proj) drawProj(p);
