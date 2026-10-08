@@ -937,20 +937,33 @@
     u.flash = Math.max(0, u.flash - dt);
     u.swing = Math.max(0, (u.swing || 0) - dt);
     if (u.home) u.rate = HELPERS[u.helper].rate(u.home);
-    let tgt = null, tx = 0, ty = 0, best = 1;
-    if (u.helper === 'chapel') {
-      for (const o of st.soldiers.concat(st.king && !st.king.dead ? [st.king] : [])) {
-        if (o === u || o.dead || o.helper) continue;
-        const mx = o.isKing ? kingMax() : o.max, r = o.hp / mx;
-        if (r < best) { best = r; tgt = o; tx = o.x + (u.x < o.x ? -6 : 6); ty = o.y + 1; }
-      }
-    } else {
-      for (const b of st.blds) {
-        if (!BUILD[b.kind].hp) continue;
-        const r = b.hp / bMaxHp(b);
-        if (r < best) { best = r; tgt = b; tx = tileX(b.c) + T / 2; ty = tileY(b.r) + T + 3; }
+    // drží sa svojho cieľa, kým ho úplne neopraví / nevylieči; až potom si vyberie najviac poškodený ďalší
+    const healMax = o => o.isKing ? kingMax() : o.max;
+    const valid = t => !!t && (u.helper === 'chapel'
+      ? !t.dead && (t.isKing || st.soldiers.includes(t)) && t.hp < healMax(t)
+      : st.blds.includes(t) && t.hp < bMaxHp(t));
+    if (!valid(u.tgt)) {
+      u.tgt = null;
+      let best = 1;
+      if (u.helper === 'chapel') {
+        for (const o of st.soldiers.concat(st.king && !st.king.dead ? [st.king] : [])) {
+          if (o === u || o.dead || o.helper) continue;
+          const r = o.hp / healMax(o);
+          if (r < best) { best = r; u.tgt = o; }
+        }
+      } else {
+        for (const b of st.blds) {
+          if (!BUILD[b.kind].hp) continue;
+          const r = b.hp / bMaxHp(b);
+          if (r < best) { best = r; u.tgt = b; }
+        }
       }
     }
+    const tgt = u.tgt;
+    let tx = 0, ty = 0;
+    if (tgt && u.helper === 'chapel') { tx = tgt.x + (u.x < tgt.x ? -6 : 6); ty = tgt.y + 1; }
+    else if (tgt) { tx = tileX(tgt.c) + T / 2; ty = tileY(tgt.r) + T + 3; }
+    u.working = false;
     const spd = u.spd * waterMul(u);
     if (!tgt) { // nikto nepotrebuje pomoc – späť k budove
       if (u.home) moveKnight(u, tileX(u.home.c) + T / 2 + 1, tileY(u.home.r) + T + 2, spd * 0.85, dt);
@@ -958,16 +971,18 @@
     }
     if (Math.hypot(tx - u.x, ty - u.y) > 7) { moveKnight(u, tx, ty, spd, dt); return; }
     // pri cieli: lieči / opravuje
+    u.working = true;
     if (u.helper === 'chapel') {
       tgt.hp = Math.min(tgt.isKing ? kingMax() : tgt.max, tgt.hp + u.rate * dt);
       if (Math.random() < 0.15) part(tgt.x + (Math.random() - 0.5) * 6, tgt.y - 6 - Math.random() * 6, 0, -12, 0.6, '#9cd45a', 0);
     } else {
       tgt.hp = Math.min(bMaxHp(tgt), tgt.hp + u.rate * dt);
-      u.cd -= dt;
-      if (u.cd <= 0) { // úder kladivom
-        u.cd = 0.45; u.swing = 0.15; AUDIO.play('thud');
-        for (let k = 0; k < 3; k++) part(tx + (Math.random() - 0.5) * 8, ty - 6, (Math.random() - 0.5) * 30, -10 - Math.random() * 20, 0.35, Math.random() < 0.5 ? '#f8d048' : '#c6a272', 80);
+      const prev = u.cd; u.cd -= dt;
+      if (prev >= 0.13 && u.cd < 0.13) { // kladivo dopadá: úder, zvuk a iskry
+        AUDIO.play('thud');
+        for (let k = 0; k < 4; k++) part(tx + (Math.random() - 0.5) * 8, ty - 6, (Math.random() - 0.5) * 30, -10 - Math.random() * 20, 0.35, Math.random() < 0.5 ? '#f8d048' : '#c6a272', 80);
       }
+      if (u.cd <= 0) u.cd = 0.5; // ďalší zdvih
     }
   }
 
@@ -1149,12 +1164,29 @@
     g.drawImage(e.flash > 0 ? fr.f : fr.c, x, y);
   }
 
+  // kladivo remeselníka: pri chôdzi na pleci, pri oprave sa napriahne do strany a švihne do budovy
+  function drawHammer(u, x, y) {
+    const hx = x + 11, hy = y + 6;                                  // ruka v sprite
+    // pri oprave: náprah = kladivo stiahnuté do strany, úder = švih hore do budovy pred ním (hra ho ukazuje zozadu)
+    const wind = u.working && u.cd >= 0.13, hit = u.working && u.cd < 0.13;
+    const px = (cx, cy, col) => { g.fillStyle = col; g.fillRect(cx, cy, 1, 1); };
+    const handle = wind ? [[1, 1], [2, 1], [3, 2], [4, 2]] : [[0, -1], [0, -2], [0, -3], [1, -4], [1, -5]].concat(hit ? [[1, -6]] : []);
+    const hd = wind ? { x: hx + 4, y: hy, w: 3, h: 4 } : { x: hx - 1, y: hy - (hit ? 9 : 8), w: 4, h: 3 };
+    g.fillStyle = PAL.K;                                            // obrys
+    for (const [dx, dy] of handle) g.fillRect(hx + dx - 1, hy + dy - 1, 3, 3);
+    g.fillRect(hd.x - 1, hd.y - 1, hd.w + 2, hd.h + 2);
+    for (const [dx, dy] of handle) px(hx + dx, hy + dy, '#a86c38');
+    g.fillStyle = '#80869a'; g.fillRect(hd.x, hd.y, hd.w, hd.h);   // hlava kladiva
+    g.fillStyle = '#bcc0cc'; g.fillRect(hd.x, hd.y, hd.w, 1); g.fillRect(hd.x, hd.y, 1, hd.h);
+    px(hd.x, hd.y, '#f4f4f8');
+  }
   function drawFighter(u, sprName) {
     const frames = SPR[sprName];
     const fi = Math.floor(u.anim) % 2, fr = frames[fi];
     const x = Math.round(u.x - fr.w / 2), y = Math.round(u.y - fr.h - (u.swing > 0 ? 1 : 0));
     shadow(u.x, u.y, 4);
     g.drawImage(u.flash > 0 ? fr.f : fr.c, x, y);
+    if (sprName === 'craft') drawHammer(u, x, y);
     if (st.cryT > 0 && Math.random() < 0.15) part(u.x + (Math.random() - 0.5) * 8, u.y - 8, 0, -16, 0.4, '#f8d048', 0); // pokrik
     if (u.swing > 0) { // záblesk meča
       g.fillStyle = '#ffffff';

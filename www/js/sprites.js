@@ -124,17 +124,17 @@ const MONK_LEGS = [
   ['.KdLLLLLLLdKlK',
    '...KKK.KKK..K.'],
 ];
-// Remeselník z dielne – čiapka, plátenná košeľa, kožená zástera, kladivo na pleci
+// Remeselník z dielne – čiapka, plátenná košeľa, kožená zástera (kladivo sa kreslí zvlášť, pohyblivé)
 const CRAFT_BODY = [
-  '.....KKKK..KKK',
-  '....KLlLLKKmMK',
-  '....KLLLdKKMDK',
-  '....KddddK.KlK',
-  '..KKeEEEEeKKlK',
-  '.KeELEEEELeKlK',
-  '.KeEELEELEeslK',
-  '.KeEEELLEEEKlK',
-  '.KLLLLLLLLLKlK',
+  '.....KKKK.....',
+  '....KLlLLK....',
+  '....KLLLdK....',
+  '....KddddK....',
+  '..KKeEEEEeKK..',
+  '.KeELEEEELeK..',
+  '.KeEELEELEesK.',
+  '.KeEEELLEEEK..',
+  '.KLLLLLLLLLK..',
   '.KdLLLLLLLdK..',
   '..KdLLLLLdK...',
 ];
