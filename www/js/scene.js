@@ -216,15 +216,17 @@ function buildScene(W, H, G, seed, themeIdx) {
         for (let dx = -2; dx <= 2; dx++) set(sx + dx, sy + 2, TR.water[1]);
       }
     }
-    if (th.mill && typeof BSPR !== 'undefined' && BSPR.mill) { // vodný mlyn na brehu, koleso siaha do potoka
-      const spr = BSPR.mill, mx = W - spr.w - 2, my = Math.round(rcy(mx + 9) - R.hw - spr.h + 4);
+    if (th.mill && typeof BSPR !== 'undefined' && BSPR.mill) { // vodný mlyn stojí na brehu, koleso siaha do potoka
+      const spr = BSPR.mill, mx = W - spr.w - 2;
+      let bank = 1e9; // najvyšší okraj brehu pod budovou – budova celá na suchu
+      for (let x = mx + 14; x < mx + spr.w; x++) bank = Math.min(bank, rcy(x) - R.hw - 2);
+      const my = Math.floor(bank) - spr.h;
       bx.putImageData(img, 0, 0);
       bx.drawImage(spr.c, mx, my);
       const id2 = bx.getImageData(0, 0, W, H); d.set(id2.data);
       for (let x = mx; x < mx + spr.w; x++) for (let y = my; y < my + spr.h; y++) if (y >= 0 && y < H && x >= 0 && x < W) blocked[y * W + x] = 1;
-      const wcx = mx + MILL_WHEEL.cx, wcy = my + MILL_WHEEL.cy;
-      const surf = Math.round(rcy(wcx) - R.hw);
-      mill = { x: wcx - 9, y: wcy - 9, cx: wcx, surfY: surf, waterY: surf + 3 }; // koleso sa ponorí ~3 px pod hladinu
+      const wcx = mx + MILL_WHEEL.cx, surf = Math.round(rcy(wcx) - R.hw), hub = surf - 4; // koleso sa ponorí ~4 px pod hladinu
+      mill = { x: wcx - 9, y: hub - 9, cx: wcx, cy: hub, wallX: mx + 16, surfY: surf, waterY: surf + 4 };
     }
   }
 

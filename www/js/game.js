@@ -1552,6 +1552,10 @@
   function drawSceneFx(time) {
     if (scene.mill) { // koleso mlyna sa točí, spodok je pod hladinou, pri hladine čľapot
       const m = scene.mill, fr = BSPR.millWheel[Math.floor(time * 7) % BSPR.millWheel.length];
+      // os od náboja do múru mlyna
+      g.fillStyle = PAL.K; g.fillRect(m.cx + 1, m.cy - 1, m.wallX - m.cx - 1, 4);
+      g.fillStyle = '#8a5a2e'; g.fillRect(m.cx + 1, m.cy, m.wallX - m.cx - 1, 1);
+      g.fillStyle = '#5a3a1e'; g.fillRect(m.cx + 1, m.cy + 1, m.wallX - m.cx - 1, 1);
       const vis = Math.max(0, Math.min(fr.h, m.waterY - m.y));
       if (vis) g.drawImage(fr.c, 0, 0, fr.w, vis, m.x, m.y, fr.w, vis);
       for (let k = -4; k <= 4; k++) if (Math.sin(time * 9 + k * 1.7) > 0.3) { g.fillStyle = k % 2 ? '#d8f0ff' : '#ffffff'; g.fillRect(m.cx + k, m.surfY + 1 - (Math.sin(time * 6 + k) > 0.7 ? 1 : 0), 1, 1); }
