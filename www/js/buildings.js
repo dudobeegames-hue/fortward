@@ -539,7 +539,21 @@ function makeWell() {
 
 // ---- Vodný mlyn (32x32): kamenné prízemie, hrázdené poschodie, slamená strecha, koleso s lopatkami a žľab ----
 const STRAW = ['#2e200c', '#4a3614', '#6a4e1e', '#8a6a2a', '#a8843a', '#c49e4e', '#dcba68', '#ecd28a'].map(hexRGB);
-const WATER_C = ['#2a5a8a', '#4a86c0', '#88c0ec', '#d8f0ff'].map(hexRGB);
+// koleso mlyna: stred v sprite mlyna, polomer s lopatkami ~8,4 px
+const MILL_WHEEL = { cx: 7, cy: 22, frames: 6 };
+// jedna snímka otáčajúceho sa kolesa (19x19, stred 9,9): súvislá obruč, 8 lúčov, 8 lopatiek
+function makeMillWheel(rot) {
+  const p = painter(19, 19), C = 9;
+  for (let y = 0; y < 19; y++) for (let x = 0; x < 19; x++) {
+    const dx = x - C, dy = y - C, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx) - rot;
+    const light = -(dx + dy) / 40, spoke = Math.abs(Math.sin(a * 4));
+    if (r <= 1.5) p.set(x, y, r < 0.8 ? RIVET : IRON);                                   // náboj
+    else if (r < 5.3 && spoke < 0.2) p.shade(x, y, WOOD, 0.48 + light);                  // lúče
+    else if (r >= 5.3 && r <= 7.1) p.shade(x, y, WOOD, (r < 6.1 ? 0.36 : 0.62) + light); // obruč
+    else if (r > 7.1 && r <= 8.4 && spoke < 0.42) p.shade(x, y, WOOD, 0.55 + light);     // lopatky
+  }
+  return p.finish();
+}
 function makeMill() {
   const p = painter(32, 32);
   const BX0 = 16, BX1 = 31, AX = 23.5, DOOR = 22, WIN = 26; // múry budovy, os strechy, dvere, okno
@@ -587,20 +601,8 @@ function makeMill() {
       p.shade(x, y, STRAW, v);
     }
   }
-  // koleso vedľa múru: súvislá obruč, 8 lúčov, 8 lopatiek, os do múru
-  const WX = 7.5, WY = 22.5;
-  for (let x = Math.ceil(WX + 1); x < BX0; x++) { p.shade(x, 22, WOOD, 0.3); p.shade(x, 23, WOOD, 0.15); } // os
-  for (let y = 13; y <= 31; y++) for (let x = 0; x < BX0; x++) {
-    const dx = x - WX, dy = y - WY, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
-    const light = -(dx + dy) / 40, spoke = Math.abs(Math.sin(a * 4));
-    if (r <= 1.5) p.set(x, y, r < 0.8 ? RIVET : IRON);                                   // náboj
-    else if (r < 5.3 && spoke < 0.2) p.shade(x, y, WOOD, 0.48 + light);                  // lúče
-    else if (r >= 5.3 && r <= 7.1) p.shade(x, y, WOOD, (r < 6.1 ? 0.36 : 0.62) + light); // obruč (vnútro tmavšie)
-    else if (r > 7.1 && r <= 8.4 && spoke < 0.42) p.shade(x, y, WOOD, 0.55 + light);     // lopatky
-  }
-  // drevený žľab privádza vodu zhora na lopatky
-  for (let x = 0; x <= 9; x++) { p.shade(x, 12, WOOD, 0.5); p.shade(x, 13, WOOD, 0.25); p.set(x, 11, WATER_C[x % 3 === 0 ? 3 : 2]); }
-  for (let y = 12; y <= 15; y++) p.set(10, y, WATER_C[y % 2 ? 3 : 2]);                  // voda padá na koleso
+  // os kolesa vychádza z múru (samotné koleso sa kreslí zvlášť a točí sa)
+  for (let x = MILL_WHEEL.cx + 2; x < BX0; x++) { p.shade(x, MILL_WHEEL.cy, WOOD, 0.32); p.shade(x, MILL_WHEEL.cy + 1, WOOD, 0.15); }
   return p.finish();
 }
 
@@ -619,6 +621,8 @@ function initBuildingSprites() {
   BSPR.beartrap = makeBeartrap();
   BSPR.well = makeWell();
   BSPR.mill = makeMill();
+  // 8-násobná súmernosť: 45° otočenia rozdelených do snímok sa plynulo opakuje
+  BSPR.millWheel = Array.from({ length: MILL_WHEEL.frames }, (_, i) => makeMillWheel(i / MILL_WHEEL.frames * Math.PI / 4));
   BSPR.wall = [];
   for (let l = 1; l <= 5; l++) { BSPR.wall[l - 1] = []; for (let m = 0; m < 16; m++) BSPR.wall[l - 1][m] = makeWall(m, l); }
   BSPR.gatehouse = [1, 2, 3, 4, 5].map(l => makeGatehouse(l));

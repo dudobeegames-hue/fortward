@@ -1550,6 +1550,12 @@
 
   // živé prvky krajiny: príboj, hmla, iskry, láva
   function drawSceneFx(time) {
+    if (scene.mill) { // koleso mlyna sa točí, spodok je pod hladinou, pri hladine čľapot
+      const m = scene.mill, fr = BSPR.millWheel[Math.floor(time * 7) % BSPR.millWheel.length];
+      const vis = Math.max(0, Math.min(fr.h, m.waterY - m.y));
+      if (vis) g.drawImage(fr.c, 0, 0, fr.w, vis, m.x, m.y, fr.w, vis);
+      for (let k = -4; k <= 4; k++) if (Math.sin(time * 9 + k * 1.7) > 0.3) { g.fillStyle = k % 2 ? '#d8f0ff' : '#ffffff'; g.fillRect(m.cx + k, m.surfY + 1 - (Math.sin(time * 6 + k) > 0.7 ? 1 : 0), 1, 1); }
+    }
     const a = scene.theme.anim;
     if (a === 'foam') {
       g.fillStyle = 'rgba(240,250,255,0.85)';

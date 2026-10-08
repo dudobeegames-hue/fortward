@@ -141,6 +141,7 @@ function buildScene(W, H, G, seed, themeIdx) {
 
   // ---- špeciálne prvky krajiny ----
   const foam = [], lava = [];
+  let mill = null;                     // poloha otáčajúceho sa kolesa mlyna a hladina vody pod ním
   const water = new Uint8Array(W * H); // 1 = voda (spomalí), 2 = plytčina brodu (spomalí menej)
   let spawn = [G.gx0 + 8, G.gx0 + G.cols * G.T - 8];
 
@@ -221,6 +222,9 @@ function buildScene(W, H, G, seed, themeIdx) {
       bx.drawImage(spr.c, mx, my);
       const id2 = bx.getImageData(0, 0, W, H); d.set(id2.data);
       for (let x = mx; x < mx + spr.w; x++) for (let y = my; y < my + spr.h; y++) if (y >= 0 && y < H && x >= 0 && x < W) blocked[y * W + x] = 1;
+      const wcx = mx + MILL_WHEEL.cx, wcy = my + MILL_WHEEL.cy;
+      const surf = Math.round(rcy(wcx) - R.hw);
+      mill = { x: wcx - 9, y: wcy - 9, cx: wcx, surfY: surf, waterY: surf + 3 }; // koleso sa ponorí ~3 px pod hladinu
     }
   }
 
@@ -386,5 +390,5 @@ function buildScene(W, H, G, seed, themeIdx) {
   }
 
   bx.putImageData(img, 0, 0);
-  return { bg, theme: th, foam, lava, spawn, water };
+  return { bg, theme: th, foam, lava, spawn, water, mill };
 }
