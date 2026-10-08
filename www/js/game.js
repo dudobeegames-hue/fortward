@@ -328,6 +328,7 @@
       blds: [], enemies: [], soldiers: [], proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
       cryT: 0, cryCd: 0, freezeT: 0, freezeCd: 0,
     });
+    rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
     st.hallHp = hallMax();
     st.king = { x: G.hallCx, y: G.hallTop - 12, hx: G.hallCx, hy: G.hallTop - 12, hp: kingMax(), cd: 0, tgt: null, down: 0, anim: 0, flash: 0, isKing: true };
     $('title').hidden = true; $('over').hidden = true;
