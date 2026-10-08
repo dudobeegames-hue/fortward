@@ -88,6 +88,7 @@
     orc:     { spr: 'orc',     hp: 32,  speed: 16, atk: 9,  atkCd: 1.0, gold: 6,  blood: '#62a03a' },
     brute:   { spr: 'brute',   hp: 120, speed: 11, atk: 22, atkCd: 1.3, gold: 18, blood: '#62a03a' },
     warlord: { spr: 'warlord', hp: 520, speed: 8,  atk: 45, atkCd: 1.5, gold: 90, blood: '#a8482c', boss: true },
+    orcKing: { spr: 'orcKing', hp: 2600, speed: 9, atk: 55, atkCd: 1.4, gold: 300, blood: '#a8482c', boss: true, king: true, name: 'Orkský veľkráľ' },
     garcher: { spr: 'garcher', hp: 14,  speed: 20, atk: 6,  atkCd: 1.7, gold: 5,  blood: '#62a03a', ranged: 54 },
     bat:     { spr: 'bat',     hp: 9,   speed: 30, atk: 4,  atkCd: 1.0, gold: 4,  blood: '#4a3460', fly: true },
     ram:     { spr: 'ram',     hp: 170, speed: 9,  atk: 48, atkCd: 1.6, gold: 22, blood: '#6e4422', ram: true },
@@ -413,6 +414,7 @@
     o.hp -= dmg; o.flash = 0.08;
     const isKeep = o === F;
     if (isKeep && st.wave < MISSION_WAVES) o.hp = Math.max(o.hp, o.max * 0.1);
+    if (isKeep && F.kingE && !F.kingE.dead) o.hp = Math.max(o.hp, o.max * 0.05); // kým žije veľkráľ, hrad nepadne
     const cx = o.x, cy = isKeep ? F.y - 16 : o.y - 8;
     for (let k = 0; k < 2; k++) part(cx + (Math.random() - 0.5) * 12, cy, (Math.random() - 0.5) * 30, -10 - Math.random() * 20, 0.4, isKeep ? '#3c3846' : '#4a2e1a', 90);
     if (o.hp > 0) return;
@@ -551,7 +553,7 @@
       q.hp -= 12 * dt;
       if (q.hp <= 0) { AUDIO.play('crumble'); for (let k = 0; k < 10; k++) part(q.x + (Math.random() - 0.5) * 14, q.y - 4, (Math.random() - 0.5) * 40, -Math.random() * 30, 0.6, '#4a2e1a', 100); }
     }
-    updateRocks(F, dt); updatePlayerRocks(F, dt);
+    updateRocks(F, dt); updatePlayerRocks(F, dt); maybeOrcKing(F);
     if (F.rockCd && st.phase === 'battle') { F.rockT -= dt; if (F.rockT <= 0) F.rockT = throwRock(F) ? F.rockCd : 0.5; }
     for (const t of F.towers) {
       t.flash = Math.max(0, t.flash - dt);
@@ -799,7 +801,8 @@
       w: spr.w, h: spr.h, dead: false, foe: null, trap: null, attacking: false, pow: Math.sqrt(item.hpMul),
     };
     st.enemies.push(e);
-    if (d.boss) { st.boss = e; banner('Prichádza Vojvodca!'); AUDIO.play('boss'); }
+    if (d.boss && !(st.boss && st.boss.d.king && !st.boss.dead)) { st.boss = e; $('bossName').textContent = d.name || 'Vojvodca orkov'; banner(d.king ? 'Orkský veľkráľ vychádza z hradu!' : 'Prichádza Vojvodca!'); AUDIO.play('boss'); }
+    return e;
   }
 
   function damage(e, dmg) {
@@ -823,7 +826,7 @@
       part(e.x + (Math.random() - 0.5) * e.w * 0.6, e.y - Math.random() * e.h,
         (Math.random() - 0.5) * 60, -20 - Math.random() * 50, 0.5 + Math.random() * 0.4, cols[k % cols.length], 140);
     }
-    if (e.d.boss) { st.boss = null; st.shake = 0.4; banner('Vojvodca padol!'); }
+    if (e.d.boss) { if (st.boss === e) st.boss = null; st.shake = e.d.king ? 0.8 : 0.4; banner(e.d.king ? 'Orkský veľkráľ padol!' : 'Vojvodca padol!'); }
     updateHud();
   }
 
@@ -886,6 +889,50 @@
     return false;
   }
 
+  // ---- orkský veľkráľ (boss 10. misie): vyjde z hradu pod 50 %, kým žije, hrad nepadne ----
+  const KING_STOMP = { cd: 6, r: 28, stun: 2 }, KING_SUMMON = { cd: 9, n: 3, max: 9 };
+  function maybeOrcKing(F) {
+    if (F.kingOut || st.mission !== MISSIONS.length || F.hp >= F.max * 0.5) return;
+    F.kingOut = true;
+    const e = spawnEnemy({ type: 'orcKing', hpMul: TIERS[st.tier || 0].hp });
+    e.stompT = 3; e.summonT = 4; F.kingE = e;
+    st.shake = 0.5;
+    for (let k = 0; k < 30; k++) part(F.gateX + (Math.random() - 0.5) * 20, F.gateY - Math.random() * 10, (Math.random() - 0.5) * 50, -Math.random() * 40, 0.8, ['#3c3846', '#625a6c', '#f89838'][k % 3], 90);
+    setTimeout(() => { if (st.phase === 'battle' && !e.dead) toast('Kým žije veľkráľ, hrad nepadne!'); }, 1800);
+  }
+  // vráti true, ak veľkráľ tento krok vybavil sám (dupnutie, súboj s vojakom); inak ide ako ostatní k radnici
+  function updateOrcKing(e, dt) {
+    e.stompT -= dt; e.summonT -= dt;
+    if (e.summonT <= 0) {
+      e.summonT = KING_SUMMON.cd;
+      const mine = st.enemies.filter(o => o.summoned && !o.dead).length;
+      for (let k = 0; k < Math.min(KING_SUMMON.n, KING_SUMMON.max - mine); k++) {
+        const gob = spawnEnemy({ type: 'goblin', hpMul: (DIFF.missionHp[st.mission - 1] || 3) * TIERS[st.tier || 0].hp * 1.4 });
+        const a = Math.random() * 6.28;
+        gob.x = e.x + Math.cos(a) * 12; gob.y = e.y + Math.sin(a) * 6; gob.summoned = true;
+        for (let q = 0; q < 8; q++) part(gob.x, gob.y - 4, (Math.random() - 0.5) * 24, -Math.random() * 24, 0.6, q % 2 ? '#5aff8a' : '#305c22', 0);
+      }
+      AUDIO.play('horn');
+    }
+    let tg = null, td = 90;
+    for (const u of st.soldiers) { if (u.dead || u.helper) continue; const d = Math.hypot(u.x - e.x, u.y - e.y); if (d < td) { td = d; tg = u; } }
+    if (!tg) return false;
+    // dupnutie: zraní a omráči všetkých vojakov okolo
+    if (e.stompT <= 0 && td < KING_STOMP.r) {
+      e.stompT = KING_STOMP.cd; e.lunge = 0.3;
+      AUDIO.play('boom'); st.shake = Math.max(st.shake, 0.35);
+      for (let k = 0; k < 28; k++) { const a = k / 28 * 6.28; part(e.x + Math.cos(a) * 6, e.y + Math.sin(a) * 3, Math.cos(a) * 60, Math.sin(a) * 30, 0.45, k % 2 ? '#967048' : '#c6a272', 0); }
+      for (const u of st.soldiers) if (!u.dead && !u.helper && Math.hypot(u.x - e.x, u.y - e.y) < KING_STOMP.r) { hitUnit(u, e.d.atk * 0.5 * e.pow); u.stunT = KING_STOMP.stun; }
+      return true;
+    }
+    e.attacking = false;
+    if (td > 11) { moveTo(e, tg.x, tg.y + 2, e.spd * (st.freezeT > 0 ? 0.35 : 1), dt); return true; }
+    e.attacking = true;
+    e.atk -= dt;
+    if (e.atk <= 0) { e.atk = e.d.atkCd; e.lunge = 0.15; AUDIO.play('clang'); hitUnit(tg, e.d.atk * e.pow); }
+    return true;
+  }
+
   function updateEnemy(e, dt) {
     e.flash = Math.max(0, e.flash - dt);
     e.lunge = Math.max(0, e.lunge - dt);
@@ -898,6 +945,7 @@
       if (e.hp <= 0) { kill(e); return; }
     }
     if (e.stunT > 0) { e.stunT -= dt; return; }
+    if (e.d.king && updateOrcKing(e, dt)) return;
     if (e.chillT > 0) { e.chillT -= dt; if (Math.random() < 0.2) part(e.x + (Math.random() - 0.5) * e.w * 0.5, e.y - Math.random() * e.h, 0, -6, 0.4, '#e0f4ff', 0); }
     const slow = (st.freezeT > 0 ? 0.35 : 1) * (e.chillT > 0 ? 0.5 : 1);
     const attackFn = (fn) => {
@@ -1377,6 +1425,7 @@
     const musterY = musterYOf();
     for (const s of st.soldiers) {
       if (s.dead) continue;
+      if (s.stunT > 0) { s.stunT -= dt; s.flash = Math.max(0, s.flash - dt); continue; } // omráčený dupnutím veľkráľa
       if (s.helper) { updateHelper(s, dt); continue; }
       if (s.archer) { updateArcher(s, dt, G.gx0 + ((s.slot * 37 + 18) % (G.cols * T - 16)) + 8, musterY + 16); continue; }
       if (st.fort) { updateAssault(s, dt); continue; }
@@ -1535,6 +1584,10 @@
     g.drawImage(u.flash > 0 ? fr.f : fr.c, x, y);
     if (sprName === 'craft') drawHammer(u, x, y);
     if (st.cryT > 0 && Math.random() < 0.15) part(u.x + (Math.random() - 0.5) * 8, u.y - 8, 0, -16, 0.4, '#f8d048', 0); // pokrik
+    if (u.stunT > 0) { // hviezdičky nad omráčeným
+      const t = performance.now() / 1000;
+      for (let k = 0; k < 2; k++) { const a = t * 6 + k * 3.14; g.fillStyle = k ? '#fff070' : '#f8d048'; g.fillRect(Math.round(u.x + Math.cos(a) * 4), Math.round(y - 3 + Math.sin(a) * 1.5), 1, 1); }
+    }
     if (u.swing > 0 && !u.siege) { // záblesk meča
       g.fillStyle = '#ffffff';
       g.fillRect(x + fr.w - 1, y - 2, 1, 3); g.fillRect(x + fr.w, y - 3, 1, 2);
@@ -2230,7 +2283,7 @@
     ICONS.u_siegeRam = spriteURL(SPR.siegeRam[0], 2); ICONS.u_siegeCat = spriteURL(SPR.siegeCat[0], 2);
     $('buyRam').querySelector('img').src = ICONS.u_siegeRam; $('buyCat').querySelector('img').src = ICONS.u_siegeCat;
     $('kingIcon').src = ICONS.king;
-    for (const k of ['garcher', 'bat', 'ram', 'shaman', 'sapper']) ICONS['e_' + k] = spriteURL(SPR[k][0], 3);
+    for (const k of ['garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' ? 2 : 3);
     ICONS.coin = spriteURL(SPR.coin[0], 4);
     ICONS.gem = spriteURL(SPR.gem[0], 4);
     document.querySelectorAll('img.coin').forEach(i => { i.src = ICONS.coin; });

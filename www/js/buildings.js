@@ -716,6 +716,66 @@ function makeSiegeCat(loaded) {
   p.set(2, 0, hexRGB('#88b4ff')); p.set(1, 0, hexRGB('#5a86e8')); p.set(2, 1, hexRGB('#3c64c8'));                       // modrá zástavka
   return p.finish();
 }
+// ---- Orkský veľkráľ (boss 10. misie) 26x30: koruna, kožušinový plášť, červená pelerína, obojručná sekera; step = krok nôh ----
+function makeOrcKing(step) {
+  const p = painter(26, 30);
+  const SKIN = ['#1e3a16', '#305c22', '#3e7a2a', '#62a03a', '#7cb848', '#9cd45a'].map(hexRGB);
+  const GOLDR = ['#4a3008', '#6e4a10', '#b88420', '#f8d048', '#fff070'].map(hexRGB);
+  const MET = ['#16161c', '#26262e', '#44444f', '#6a6a7a', '#a8a8b8', '#e0e0ea'].map(hexRGB);
+  const FUR = ['#1e1610', '#3a2e24', '#5a4a3a', '#7e6a52', '#a8927a', '#ccb89c'].map(hexRGB);
+  const LEATHER = ['#140e0a', '#1e1610', '#2e2218', '#3e2e20'].map(hexRGB);
+  const RED = ['#2e0806', '#4a100c', '#8c2018', '#c83020', '#e84838'].map(hexRGB);
+  const lit = (x, x0, x1) => 1 - (x - x0) / Math.max(1, x1 - x0); // svetlo zľava
+  // pelerína za telom
+  for (let y = 12; y <= 25; y++) for (let x = 4; x <= 19; x++) p.shade(x, y, RED, 0.25 + lit(x, 4, 19) * 0.45 + ((x + (y >> 1)) % 5 === 0 ? -0.15 : 0));
+  // nohy: kožené nohavice, železné čižmy
+  for (const [lx, dy] of [[8, step ? -1 : 0], [13, step ? 0 : -1]]) for (let y = 24; y <= 29; y++) for (let x = lx; x <= lx + 3; x++) {
+    const yy = y + dy; if (yy > 29) continue;
+    p.shade(x, yy, y >= 27 ? MET : LEATHER, (y >= 27 ? 0.35 : 0.3) + lit(x, lx, lx + 3) * 0.4 + (y === 27 ? 0.25 : 0));
+  }
+  // trup: holá hruď s remeňmi, opasok so zlatou prackou
+  for (let y = 13; y <= 23; y++) for (let x = 7; x <= 16; x++) {
+    const bulge = Math.abs(x - 11.5) < 3 && y < 18 ? 0.08 : 0;
+    p.shade(x, y, SKIN, 0.3 + lit(x, 7, 16) * 0.5 + bulge + (y === 16 && x % 4 === 1 ? -0.2 : 0));
+  }
+  pLine(p, 7, 13, 15, 21, (x, y) => p.shade(x, y, LEATHER, 0.9));                              // remeň cez hruď
+  for (let x = 7; x <= 16; x++) { p.shade(x, 21, LEATHER, 0.9 - x * 0.02); p.shade(x, 22, LEATHER, 0.5); }
+  for (let x = 10; x <= 13; x++) for (let y = 20; y <= 23; y++) p.shade(x, y, GOLDR, y === 20 || x === 10 ? 0.9 : 0.55); // pracka
+  // ruky: ľavá visí s náramkom, pravá drží sekeru
+  for (let y = 13; y <= 21; y++) for (let x = 3; x <= 5; x++) p.shade(x, y, y >= 17 && y <= 18 ? MET : SKIN, (y >= 17 && y <= 18 ? 0.55 : 0.35) + lit(x, 3, 5) * 0.4);
+  for (let y = 13; y <= 18; y++) for (let x = 17; x <= 19; x++) p.shade(x, y, y === 16 ? MET : SKIN, 0.3 + lit(x, 17, 19) * 0.3);
+  // kožušinový plášť na pleciach (nerovný okraj)
+  for (let y = 9; y <= 15; y++) for (let x = 2; x <= 20; x++) {
+    const edge = 13 + Math.round(hash2(x, 3, 77) * 2) - (x > 7 && x < 16 ? 2 : 0); // vpredu kratší – vidno hruď
+    if (y > edge || (y === 9 && (x < 6 || x > 17))) continue;
+    p.shade(x, y, FUR, 0.25 + lit(x, 2, 21) * 0.55 + (y === 9 ? 0.15 : 0) + (hash2(x, y, 91) - 0.5) * 0.3);
+  }
+  for (const sx of [3, 20]) { p.set(sx, 8, hexRGB('#eee6cc')); p.set(sx, 9, hexRGB('#a8a088')); }   // kostené hroty na pleciach
+  // hlava: ťažké obočie, červené oči, kly
+  for (let y = 3; y <= 11; y++) for (let x = 8; x <= 15; x++) {
+    if ((y === 3 || y === 11) && (x === 8 || x === 15)) continue;
+    p.shade(x, y, SKIN, 0.35 + lit(x, 8, 15) * 0.5 - (y === 6 ? 0.25 : 0));
+  }
+  for (const ex of [10, 13]) { p.set(ex, 7, RED[4]); p.set(ex + (ex === 10 ? -1 : 1), 7, RED[2]); }
+  for (let x = 9; x <= 14; x++) p.shade(x, 10, SKIN, 0.15);                                      // ústa
+  p.set(9, 9, hexRGB('#eee6cc')); p.set(14, 9, hexRGB('#a8a088')); p.set(9, 8, hexRGB('#eee6cc')); p.set(14, 8, hexRGB('#a8a088')); // kly
+  // koruna: obruč, hroty, rubín
+  for (let x = 8; x <= 15; x++) for (let y = 2; y <= 3; y++) p.shade(x, y, GOLDR, (y === 2 ? 0.85 : 0.5) + lit(x, 8, 15) * 0.15);
+  for (const cx of [8, 10, 13, 15]) { p.shade(cx, 1, GOLDR, 0.75); if (cx === 10 || cx === 13) p.shade(cx, 0, GOLDR, 0.95); }
+  p.set(11, 2, RED[4]); p.set(12, 2, RED[2]); p.set(11, 3, RED[3]); p.set(12, 3, RED[1]);
+  // obojručná sekera: porisko a dvojitá čepeľ
+  for (let y = 1; y <= 27; y++) p.shade(21, y, WOOD, (y % 5 === 0 ? 0.3 : 0.62));
+  for (let y = 1; y <= 9; y++) {
+    const hw = Math.round(3 - Math.abs(y - 5) * 0.55);
+    for (let x = 21 - hw - 1; x <= 21 + hw + 1; x++) {
+      if (x === 21) continue;
+      const edge = Math.abs(x - 21) === hw + 1;
+      p.shade(x, y, MET, edge ? 0.95 : 0.45 + lit(x, 17, 25) * 0.25);
+    }
+  }
+  p.set(21, 0, MET[4]);
+  return p.finish();
+}
 
 // ---- Vodný mlyn (32x32): kamenné prízemie, hrázdené poschodie, slamená strecha, koleso s lopatkami a žľab ----
 const STRAW = ['#2e200c', '#4a3614', '#6a4e1e', '#8a6a2a', '#a8843a', '#c49e4e', '#dcba68', '#ecd28a'].map(hexRGB);
@@ -819,6 +879,7 @@ function initBuildingSprites() {
   BSPR.stakes = makeStakes();
   SPR.siegeRam = [makeSiegeRam(0), makeSiegeRam(1)];
   SPR.siegeCat = [makeSiegeCat(true), makeSiegeCat(false)];
+  SPR.orcKing = [makeOrcKing(0), makeOrcKing(1)];
   BSPR.mill = makeMill();
   // 8-násobná súmernosť: 45° otočenia rozdelených do snímok sa plynulo opakuje
   BSPR.millWheel = Array.from({ length: MILL_WHEEL.frames }, (_, i) => makeMillWheel(i / MILL_WHEEL.frames * Math.PI / 4));
