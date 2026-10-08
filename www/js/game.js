@@ -406,6 +406,17 @@
     const F = st.fort;
     if (!F || F.dead) return;
     F.flash = Math.max(0, F.flash - dt);
+    // po 10. vlne: posádka robí výpady na radnicu hráča (malé skupinky), kým hrad stojí
+    if (st.wave >= MISSION_WAVES && !st.orcWaveOn) {
+      F.sortieT = (F.sortieT == null ? 6 : F.sortieT) - dt;
+      if (F.sortieT <= 0) {
+        F.sortieT = 14;
+        const pool = buildWave(MISSION_WAVES).filter(q => !ENEMY[q.type].boss && !ENEMY[q.type].fly);
+        for (let k = 0; k < 3 + Math.floor(Math.random() * 2) && pool.length; k++) st.spawnQ.push(Object.assign(pool.splice(Math.floor(Math.random() * pool.length), 1)[0], { gap: 0.6 }));
+        st.spawnT = Math.min(st.spawnT, 0.3);
+        toast('Výpad posádky hradu!');
+      }
+    }
     for (const q of F.pal) q.flash = Math.max(0, q.flash - dt);
     for (const t of F.towers) {
       t.flash = Math.max(0, t.flash - dt);
@@ -1019,12 +1030,15 @@
   function updateBarracks(b, dt) {
     b.spawnT -= dt;
     if (b.spawnT > 0) return;
-    const alive = st.soldiers.filter(s => s.home === b).length;
+    const alive = st.soldiers.filter(s => s.home === b && !s.extra).length;
     if (alive >= knightCap(b)) { b.spawnT = 0.5; return; }
     b.spawnT = knightEvery(b);
+    spawnKnight(b, false);
+  }
+  function spawnKnight(b, extra) {
     const c = bCenter(b);
     const kt = KTYPES[b.ktype || 'knight'], khp = knightHp(b) * kt.hp;
-    st.soldiers.push({ home: b, x: c.x + 1, y: tileY(b.r) + T + 1, hp: khp, max: khp, dmg: knightDmg(b) * kt.dmg, spd: kt.spd, spr: kt.spr, ktype: b.ktype || 'knight', cd: 0, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
+    st.soldiers.push({ home: b, extra, x: c.x + 1, y: tileY(b.r) + T + 1, hp: khp, max: khp, dmg: knightDmg(b) * kt.dmg, spd: kt.spd, spr: kt.spr, ktype: b.ktype || 'knight', cd: 0, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
     for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
   }
 
@@ -1074,10 +1088,13 @@
   function updateRange(b, dt) {
     b.spawnT -= dt;
     if (b.spawnT > 0) return;
-    if (st.soldiers.filter(s => s.home === b).length >= archerCap(b)) { b.spawnT = 0.5; return; }
+    if (st.soldiers.filter(s => s.home === b && !s.extra).length >= archerCap(b)) { b.spawnT = 0.5; return; }
     b.spawnT = archerEvery(b);
+    spawnArcher(b, false);
+  }
+  function spawnArcher(b, extra) {
     const c = bCenter(b), hp = archerHp(b);
-    st.soldiers.push({ home: b, archer: true, x: c.x + 1, y: tileY(b.r) + T + 1, hp, max: hp, dmg: archerDmg(b), spd: 24, spr: 'footArcher', cd: 0.3, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
+    st.soldiers.push({ home: b, archer: true, extra, x: c.x + 1, y: tileY(b.r) + T + 1, hp, max: hp, dmg: archerDmg(b), spd: 24, spr: 'footArcher', cd: 0.3, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
     for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
   }
   // lukostrelec: stojí kúsok za rytiermi a strieľa na najbližšiu hordu v dosahu; keď nikto nie je v dosahu, ide na svoje miesto
@@ -2008,6 +2025,11 @@
   }
 
   function hudTick() {
+    for (const [id, key] of [['buyKnight', 'knight'], ['buyArcher', 'archer']]) { // tlačidlá nákupu len keď stojí príslušná budova
+      const el = $(id), u = BUY[key], exists = st.blds.some(b => b.kind === u.kind);
+      el.hidden = !exists;
+      if (exists) el.disabled = st.gold < u.cost;
+    }
     const k = st.king, kp = $('hud-king');
     if (k) {
       const r = k.dead ? 0 : Math.max(0, k.hp / kingMax());
@@ -2046,6 +2068,8 @@
     ICONS.u_crossbow = spriteURL(SPR.knight[0], 3);
     ICONS.hall = spriteURL(BSPR.hall[2], 2);
     ICONS.king = spriteURL(SPR.king[0], 3);
+    ICONS.u_knight = spriteURL(SPR.soldier[0], 3); ICONS.u_footArcher = spriteURL(SPR.footArcher[0], 3);
+    $('buyKnight').querySelector('img').src = ICONS.u_knight; $('buyArcher').querySelector('img').src = ICONS.u_footArcher;
     $('kingIcon').src = ICONS.king;
     for (const k of ['garcher', 'bat', 'ram', 'shaman', 'sapper']) ICONS['e_' + k] = spriteURL(SPR[k][0], 3);
     ICONS.coin = spriteURL(SPR.coin[0], 4);
@@ -2586,6 +2610,19 @@
     for (const b of st.blds) if (BUILD[b.kind].hp) b.hp = bMaxHp(b);
     rebuildOcc(); renderBuild();
   });
+  // dokupovanie vojakov počas boja: vyjde hneď z kasární / strelnice, navyše k bežnému počtu
+  const BUY = { knight: { cost: 40, kind: 'barracks', spawn: b => spawnKnight(b, true) }, archer: { cost: 50, kind: 'range', spawn: b => spawnArcher(b, true) } };
+  function buyUnit(key) {
+    const u = BUY[key];
+    if (st.phase !== 'battle' || st.gold < u.cost) { AUDIO.play('deny'); return; }
+    const homes = st.blds.filter(b => b.kind === u.kind);
+    if (!homes.length) { AUDIO.play('deny'); return; }
+    const free = homes.filter(b => !knightsBlocked(b)), b = (free.length ? free : homes)[Math.floor(Math.random() * (free.length || homes.length))];
+    st.gold -= u.cost; u.spawn(b);
+    AUDIO.play('build'); updateHud();
+  }
+  $('buyKnight').addEventListener('click', () => buyUnit('knight'));
+  $('buyArcher').addEventListener('click', () => buyUnit('archer'));
   $('speedBtn').addEventListener('click', () => {
     st.speed = st.speed >= 3 ? 1 : st.speed + 1;
     $('speedBtn').textContent = 'x' + st.speed;
