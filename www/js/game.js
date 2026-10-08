@@ -461,7 +461,10 @@
       : !tierOpen(m, t + 1) ? '<br><small class="dim">Za 3 hviezdy (radnica nad 80 % zdravia) sa odomkne ' + TIERS[t + 1].name.toLowerCase() + ' úroveň.</small>' : '';
     $('bossbar').hidden = true; $('bottom').hidden = true;
     const first = t === 0 && m >= st.unlocked;
-    if (first) { st.unlocked = Math.min(11, m + 1); saveProgress(); st.mapAnim = { seg: m - 1, t: 0 }; }
+    if (first) {
+      st.provAnim = { i: m - 1, t: 0, from: m <= HOME_PROVINCES ? 'attacked' : 'horde' }; // provincia sa na mape prefarbí na modro
+      st.unlocked = Math.min(11, m + 1); saveProgress(); st.mapAnim = { seg: m - 1, t: 0 };
+    }
     banner('Misia splnená!');
     AUDIO.music(null); AUDIO.play('win');
     for (let k = 0; k < 80; k++) part(Math.random() * W, H * 0.3 + Math.random() * 30, (Math.random() - 0.5) * 60, -30 - Math.random() * 60, 1.4, ['#f8d048', '#fff070', '#88b4ff', '#e84838'][k % 4], 60);
@@ -1491,7 +1494,6 @@
     const num = i + 1, done = num < st.unlocked, open = num === st.unlocked;
     const anim = st.mapAnim && st.mapAnim.seg === i - 1; // hrad práve odomykaný
     const status = anim ? 'locked' : done ? 'done' : open ? 'open' : 'locked';
-    const last = num === MISSIONS.length;
     // tieň
     g.fillStyle = 'rgba(10,8,6,0.4)';
     for (let dx = -9; dx <= 9; dx++) g.fillRect(n.x + dx, n.y + 2, 1, Math.abs(dx) > 6 ? 1 : 2);
@@ -1501,7 +1503,7 @@
       for (let k = 0; k < cnt; k += 2) { const a = k / cnt * 6.283 + time; g.fillRect(Math.round(n.x + Math.cos(a) * rr), Math.round(n.y - 3 + Math.sin(a) * rr * 0.55), 1, 1); }
     }
     let top;
-    if (last) { // posledná misia = pevnosť orkov
+    if (num > HOME_PROVINCES && !done) { // hrad hordy = orkská pevnosť, kým ho hráč nedobyje
       const f = island.fort;
       g.drawImage(f.c, n.x - 12, n.y - 20);
       top = n.y - 20;
@@ -1511,7 +1513,7 @@
       top = n.y - 16;
     }
     if (status === 'done') { // modrá zástava = dobyté
-      const fx = n.x + (last ? 4 : 0), fy = top - 6;
+      const fx = n.x, fy = top - 6;
       g.fillStyle = '#4a4e60'; g.fillRect(fx, fy, 1, 7);
       const wv = Math.floor(time * 5 + i) % 2;
       g.fillStyle = '#3c64c8'; g.fillRect(fx + 1, fy + wv, 5, 3);
@@ -1546,11 +1548,80 @@
     for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) if (rows[r][c] === '1') { g.fillStyle = on ? (r < 2 ? tc.hi : tc.col) : '#3e3e4c'; g.fillRect(x + c, y + r, 1, 1); }
   }
 
+  // ---- provincie: juh (1–5) ľudia, sever (6–10) horda; neobránené južné sú napadnuté ----
+  const provState = i => { const num = i + 1, won = num < st.unlocked; return won ? 'ours' : num <= HOME_PROVINCES ? 'attacked' : 'horde'; };
+  const PROV_COL = { blue: [70, 120, 230, 0.24], red: [210, 40, 30, 0.3] };
+  function provLayers() { // farebné vrstvy jednotlivých provincií + hranice (počíta sa raz pre ostrov)
+    if (island.layers) return island.layers;
+    const mk = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; };
+    const P = island.prov, n = island.nodes.length;
+    const L = { blue: [], red: [], border: mk() };
+    for (let i = 0; i < n; i++) for (const key of ['blue', 'red']) {
+      const c = mk(), x = c.getContext('2d'), id = x.createImageData(W, H), [r, gg, b, a] = PROV_COL[key];
+      for (let k = 0; k < P.length; k++) if (P[k] === i) { id.data[k * 4] = r; id.data[k * 4 + 1] = gg; id.data[k * 4 + 2] = b; id.data[k * 4 + 3] = a * 255; }
+      x.putImageData(id, 0, 0); L[key][i] = c;
+    }
+    const bx = L.border.getContext('2d'), bd = bx.createImageData(W, H);
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+      const v = P[y * W + x]; if (v === 255) continue;
+      const nbs = [P[y * W + x + 1], P[(y + 1) * W + x]];
+      if (!nbs.some(q => q !== 255 && q !== v)) continue;
+      const front = nbs.some(q => q !== 255 && (q < HOME_PROVINCES) !== (v < HOME_PROVINCES)); // hranica ľudia × horda
+      const k = (y * W + x) * 4;
+      if (front) { bd.data[k] = 120; bd.data[k + 1] = 20; bd.data[k + 2] = 16; bd.data[k + 3] = 220; }
+      else if ((x + y) % 3) { bd.data[k] = 28; bd.data[k + 1] = 20; bd.data[k + 2] = 14; bd.data[k + 3] = 120; } // prerušovaná
+    }
+    bx.putImageData(bd, 0, 0);
+    island.layers = L;
+    return L;
+  }
+  function drawProvince(i, state, time) {
+    const L = provLayers();
+    if (state === 'horde') { g.drawImage(L.red[i], 0, 0); return; }
+    g.drawImage(L.blue[i], 0, 0);
+    if (state === 'attacked') { g.globalAlpha = 0.35 + 0.3 * Math.sin(time * 3 + i); g.drawImage(L.red[i], 0, 0); g.globalAlpha = 1; } // pulzuje do červena
+  }
+  function drawProvinces(time) {
+    const n = island.nodes.length, pa = st.provAnim;
+    for (let i = 0; i < n; i++) {
+      if (pa && pa.i === i) { // práve dobytá: nová farba sa rozleje od hradu
+        drawProvince(i, pa.from, time);
+        const nd = island.nodes[i], r = Math.max(1, Math.min(1, pa.t) * 90);
+        g.save(); g.beginPath(); g.arc(nd.x, nd.y, r, 0, 6.283); g.clip(); drawProvince(i, 'ours', time); g.restore();
+      } else drawProvince(i, provState(i), time);
+    }
+    g.drawImage(provLayers().border, 0, 0);
+  }
+  // ohne, dym a šípky útoku v napadnutých provinciách
+  function drawWarFx(time) {
+    island.nodes.forEach((nd, i) => {
+      if (provState(i) !== 'attacked' || (st.provAnim && st.provAnim.i === i)) return;
+      for (const f of island.fires[i]) {
+        const fl = Math.floor(time * 8 + f.ph) % 3, h = 3 + fl;
+        g.fillStyle = PAL.K; g.fillRect(f.x - 2, f.y - h, 5, h + 2);
+        g.fillStyle = '#d83818'; g.fillRect(f.x - 1, f.y - h + 1, 3, h);
+        g.fillStyle = '#f89838'; g.fillRect(f.x - 1, f.y - h + 2, 3, h - 1);
+        g.fillStyle = '#fff070'; g.fillRect(f.x, f.y - 1 - (fl === 2 ? 1 : 0), 1, 2);
+        if (Math.random() < 0.04) part(f.x, f.y - h - 1, (Math.random() - 0.5) * 4, -6 - Math.random() * 4, 1.6, Math.random() < 0.5 ? '#525262' : '#3e3e4c', -2);
+      }
+      // šípky útoku zo severu k hradu
+      for (let k = 0; k < 3; k++) {
+        const t = ((time * 0.8 + k / 3) % 1), ay = Math.round(nd.y - 40 + t * 18), ax = nd.x + 13;
+        g.globalAlpha = Math.sin(t * Math.PI);
+        for (let w = 0; w < 3; w++) { g.fillStyle = PAL.K; g.fillRect(ax - w - 1, ay + w - 1, w * 2 + 3, 1); }
+        for (let w = 0; w < 2; w++) { g.fillStyle = '#e84838'; g.fillRect(ax - (1 - w), ay + w, (1 - w) * 2 + 1, 1); }
+        g.globalAlpha = 1;
+      }
+    });
+  }
+
   function renderMap(time) {
     g.drawImage(island.bg, 0, 0);
+    drawProvinces(time);
     // príboj
     g.fillStyle = 'rgba(240,250,255,0.85)';
     for (const f of island.foam) if (Math.sin(time * 1.8 + f.ph) > 0.55) g.fillRect(f.x, f.y, 1, 1);
+    drawWarFx(time);
     // cestička: dobyté úseky svetlé, zamknuté tmavé bodky
     island.segs.forEach((pts, k) => {
       const done = k + 2 <= st.unlocked;
@@ -2305,6 +2376,10 @@
     renderMapPanel();
     focusMapNode(st.mapAnim ? st.mapAnim.seg + 2 : st.mapSel, true);
     if (!st.mapAnim) afterDeck(); // pri odomykaní hradu príde výber až po kartičkách
+    if (st.unlocked === 1 && !loadJSON('fortward.introSeen', false)) { // úplne nová hra
+      saveJSON('fortward.introSeen', true);
+      setTimeout(() => { if (st.phase === 'map') banner('Horda napadla tvoje územie!'); }, 400);
+    }
   }
 
   function renderMapPanel() {
@@ -2385,6 +2460,7 @@
 
   // animácia cestičky k novoodomknutej misii
   function mapTick(dt) {
+    if (st.provAnim && st.phase === 'map') { st.provAnim.t += dt / 1.3; if (st.provAnim.t >= 1) st.provAnim = null; }
     const a = st.mapAnim;
     if (!a || st.phase !== 'map') return;
     a.t += dt / 1.4;

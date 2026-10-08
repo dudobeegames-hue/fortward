@@ -2,6 +2,7 @@
 // Fortward – mapa ostrova: 10 misií prepojených cestičkou zdola (1) nahor (10).
 
 const MISSION_WAVES = 10;
+const HOME_PROVINCES = 5; // provincie 1–5 (juh) patria ľuďom, 6–10 (sever) horde
 const MISSIONS = [
   { name: 'Rybárska osada',  desc: 'Prvé hordy goblinov sa vylodili na pobreží. Ubráň osadu.' },
   { name: 'Mlynský potok',   desc: 'Orkovia pália mlyny pri potoku. Nedovoľ im prejsť.' },
@@ -76,9 +77,18 @@ function buildIsland(W, H, seed) {
   const icx = W / 2, icy = (L.top + L.bot) / 2, rx = W * 0.47, ry = (L.bot - L.top) / 2 + 18;
   const elev = (x, y) => fbm(x * 0.045, y * 0.045, seed + 3) + (1 - (y - L.top) / (L.bot - L.top)) * 0.28;
   const foam = [], trees = [];
+  // provincia každého kúska súše = najbližší hrad (so šumom, aby hranice neboli rovné); 255 = more
+  const prov = new Uint8Array(W * H).fill(255);
+  const provOf = (x, y) => {
+    let best = 0, bd = 1e9;
+    const jx = (fbm(x * 0.05, y * 0.05, seed + 31) - 0.5) * 18, jy = (fbm(x * 0.05, y * 0.05, seed + 37) - 0.5) * 18;
+    L.nodes.forEach((n, i) => { const d = Math.hypot(x + jx - n.x, (y + jy - n.y) * 1.15); if (d < bd) { bd = d; best = i; } });
+    return best;
+  };
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const nb = near[y * W + x];
     const dd = Math.hypot((x - icx) / rx, (y - icy) / ry) + (fbm(x * 0.035, y * 0.035, seed) - 0.5) * 0.42 - nb * 0.35;
+    if (dd <= 1) prov[y * W + x] = provOf(x, y);
     if (dd > 1) {
       const depth = dd - 1;
       let v = 0.8 - depth * 2.6 + (fbm(x * 0.06, y * 0.06, seed + 5) - 0.5) * 0.15;
@@ -124,7 +134,19 @@ function buildIsland(W, H, seed) {
     }
   }
   cx.putImageData(img, 0, 0);
-  return { bg: c, foam, segs, nodes: L.nodes, fort: makeOrcFort(), castle: makeMiniCastle(false), castleLocked: makeMiniCastle(true) };
+  // miesta ohňov v napadnutých provinciách (pár bodov okolo hradu na súši)
+  const fires = L.nodes.map((n, i) => {
+    const pts = [];
+    for (let k = 0; k < 40 && pts.length < 3; k++) {
+      const a = hash2(i, k, seed + 41) * 6.283, r = 12 + hash2(k, i, seed + 43) * 14;
+      const fx = Math.round(n.x + Math.cos(a) * r), fy = Math.round(n.y + Math.sin(a) * r * 0.8);
+      if (fx < 2 || fy < 2 || fx >= W - 2 || fy >= H - 2 || prov[fy * W + fx] !== i) continue;
+      if (Math.abs(fx - n.x) < 10 && fy > n.y - 18 && fy < n.y + 12) continue; // nie cez hrad a tabuľku
+      pts.push({ x: fx, y: fy, ph: hash2(k, k, seed + 47) * 6.28 });
+    }
+    return pts;
+  });
+  return { bg: c, foam, segs, nodes: L.nodes, prov, fires, fort: makeOrcFort(), castle: makeMiniCastle(false), castleLocked: makeMiniCastle(true) };
 }
 
 // pevnosť orkov pri misii 10
