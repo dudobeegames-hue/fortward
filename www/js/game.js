@@ -1830,7 +1830,6 @@
   }
 
   function renderBuild() {
-    $('buildWave').textContent = 'Pred vlnou ' + (st.wave + 1) + (st.tier ? ' · ' + TIERS[st.tier].name.toLowerCase() : '');
     const pal = $('palette'); pal.innerHTML = '';
     for (const kind of BUILD_ORDER) {
       const d = BUILD[kind];
@@ -1838,17 +1837,27 @@
       if (!has(kind)) { // zamknutá stavba
         const um = unlockMissionOf(kind);
         b.className = 'pcard locked';
-        b.innerHTML = '<span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost">🔒 misia ' + um + '</span>';
+        b.innerHTML = '<span class="pin"><span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost">🔒 misia ' + um + '</span></span></span>';
         b.addEventListener('click', () => { toast(d.name + ' sa odomkne v misii ' + um); AUDIO.play('deny'); });
         pal.appendChild(b);
         continue;
       }
-      b.className = 'pcard' + (st.tool === kind ? ' sel' : '') + (st.gold < costOf(kind) ? ' poor' : '');
-      b.innerHTML = '<span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost"><img class="coin" src="' + ICONS.coin + '">' + costOf(kind) + '</span>';
+      if (st.flip && st.flip !== st.tool) st.flip = null;
+      b.className = 'pcard' + (st.tool === kind ? ' sel' : '') + (st.flip === kind ? ' flipped' : '') + (st.gold < costOf(kind) ? ' poor' : '');
+      const tip = kind === 'wall' ? ' Ťahaj prstom pre celý rad.' : '';
+      b.innerHTML = '<span class="pin">' +
+        '<span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost"><img class="coin" src="' + ICONS.coin + '">' + costOf(kind) + '</span></span>' +
+        '<span class="face back"><b>' + d.name + '</b><small>' + d.desc + '.' + tip + '</small></span></span>';
       b.addEventListener('pointerdown', ev => { if (st.phase === 'build') cardPress = { kind, x: ev.clientX, y: ev.clientY }; });
       b.addEventListener('click', () => {
         if (suppressCardClick) { suppressCardClick = false; return; } // bol to ťah, nie ťuk
-        st.tool = st.tool === kind ? null : kind; st.sel = null; st.moving = null; AUDIO.play('click'); renderBuild();
+        AUDIO.play('click');
+        if (st.tool === kind) { // druhý ťuk na vybranú kartu ju otočí (vzadu je popis), ďalší ju otočí späť
+          st.flip = st.flip === kind ? null : kind;
+          b.classList.toggle('flipped', st.flip === kind);
+          return;
+        }
+        st.tool = kind; st.flip = null; st.sel = null; st.moving = null; renderBuild();
       });
       pal.appendChild(b);
     }
@@ -1860,8 +1869,7 @@
     };
     const acts = document.createElement('div'); acts.className = 'acts';
     if (st.tool) {
-      const d = BUILD[st.tool];
-      card(ICONS[st.tool], d.name, d.desc + (st.tool === 'wall' ? '. Ťukni pre jednu alebo potiahni prstom – pustením sa rad postaví. Dvojťukom na hradbu označíš celý rad.' : '. Ťukni na voľné políčko v zóne.'));
+      // bez textu nad paletou (panel neskáče) – popis stavby je na zadnej strane jej karty
     } else if (st.sel === HALL) {
       card(ICONS.hall, 'Radnica · úr. ' + st.hallLvl + ' (' + LVL_NAME[st.hallLvl] + ')', 'Kráľ ju bráni. Vylepšenie pridá zdravie, silu kráľa, rozšíri územie o 1 rad' +
         (st.hallLvl < MAX_LVL ? ' a dovolí vylepšiť stavby na úroveň ' + (st.hallLvl + 1) + ' (' + LVL_NAME[st.hallLvl + 1] + ').' : '.'));

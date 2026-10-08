@@ -94,7 +94,7 @@
   #bossbar .bar { height: 7px; margin-top: 2px; }
   #bossbar .bar i { background: linear-gradient(#ff7a5a, #a8482c); }
 
-  .pixel, #banner, #title h1, #over h2, .shopHead b { font-family: 'Pixelify Sans', 'Rubik', sans-serif; }
+  .pixel, #banner, #title h1, #over h2 { font-family: 'Pixelify Sans', 'Rubik', sans-serif; }
   #banner {
     position: absolute; left: 0; right: 0; top: 30%;
     text-align: center; font-size: 30px; font-weight: 700; color: var(--gold);
@@ -188,24 +188,31 @@
     max-height: 62%; overflow-y: auto; touch-action: pan-y;
   }
   @keyframes up { from { transform: translateY(100%); } }
-  .shopHead { display: flex; align-items: center; gap: 8px; }
-  .shopHead b { font-size: 19px; }
-  .shopHead .sub { flex: 1; color: var(--muted); font-size: 13px; }
   #palette { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; padding-bottom: 2px; scroll-snap-type: x mandatory; }
   #palette::-webkit-scrollbar { display: none; }
+  /* karta stavby: 1. ťuk = výber, 2. ťuk = otočí sa a vzadu je popis */
   .pcard {
     flex: 0 0 calc((100% - 18px) / 4); scroll-snap-align: start;
+    padding: 0; border: 0; background: none; perspective: 500px;
+  }
+  .pcard .pin { display: grid; transition: transform .35s ease; transform-style: preserve-3d; }
+  .pcard .face {
+    grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden;
     background: #1a120d; border: 2px solid var(--ink); border-radius: 8px; padding: 4px 2px 3px;
     display: flex; flex-direction: column; align-items: center; gap: 1px;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
   }
+  .pcard .back { transform: rotateY(180deg); justify-content: center; gap: 3px; padding: 4px 5px; text-align: center; }
+  .pcard .back b { font-size: 11px; color: var(--gold); line-height: 1.1; }
+  .pcard .back small { font-size: 9px; line-height: 1.2; color: var(--text); }
+  .pcard.flipped .pin { transform: rotateY(180deg); }
   .pcard .pic { height: 60px; display: flex; align-items: flex-end; }
   .pcard .pic img { max-height: 60px; max-width: 64px; }
-  .pcard b { font-size: 14px; }
+  .pcard .front b { font-size: 14px; }
   .pcard .cost { display: flex; align-items: center; gap: 3px; font-size: 14px; font-weight: 700; color: var(--gold); }
   .pcard .cost img { width: 13px; height: 13px; }
-  .pcard.sel { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold2), 0 0 10px rgba(248,208,72,.3); }
-  .pcard.poor { opacity: .5; }
+  .pcard.sel .face { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold2), 0 0 10px rgba(248,208,72,.3); }
+  .pcard.poor .front { opacity: .5; }
   .pcard.locked { opacity: .45; filter: grayscale(1); }
   .pcard.locked .cost { color: var(--muted); font-size: 10px; }
   .btn.locked { color: var(--muted); font-size: 13px; justify-content: center; }
@@ -448,7 +455,6 @@
   </div>
 
   <div id="build" hidden>
-    <div class="shopHead"><b>Budovanie</b><span class="sub" id="buildWave"></span><span class="snd"><button class="sndBtn" data-kind="music">♪</button><button class="sndBtn" data-kind="sfx">🔊</button></span></div>
     <div id="selInfo"></div>
     <div id="palette"></div>
     <div class="brow undoRow">
