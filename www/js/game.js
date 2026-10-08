@@ -24,11 +24,12 @@
     catapult: { name: 'Katapult',     short: 'Katapult', cost: 140, hp: 200, range: 150, minRange: 36, dmg: 26, cd: 3.6, proj: 'rock', speed: 120, splash: 20, block: true, desc: 'Hádže balvany ďaleko do hordy (nie na lietajúcich)' },
     mine:     { name: 'Zlatá baňa',   short: 'Baňa',   cost: 100, hp: 180, block: true, desc: 'Po každej prežitej vlne prinesie zlato' },
     chapel:   { name: 'Kaplnka',      short: 'Kaplnka', cost: 120, hp: 200, block: true, desc: 'Vyšle mnícha, ktorý chodí za rytiermi a kráľom a lieči ich' },
-    firepit:  { name: 'Ohnivá jama',  short: 'Oheň',   cost: 50,  dmg: 5, block: false, desc: 'Kto ňou prejde, niekoľko sekúnd horí' },
+    firepit:  { name: 'Ohnivá jama',  short: 'Oheň',   cost: 50,  dmg: 8, block: false, desc: 'Kto ňou prejde, niekoľko sekúnd horí' },
     beartrap: { name: 'Medvedia pasca', short: 'Pasca', cost: 40, block: false, desc: 'Chytí nepriateľa a na chvíľu ho zastaví' },
     workshop: { name: 'Dielňa remeselníka', short: 'Dielňa', cost: 90, hp: 180, block: true, desc: 'Vyšle remeselníka, ktorý chodí opravovať poškodené budovy' },
   };
   const TRAPS = { pit: 1, firepit: 1, beartrap: 1 };
+  const FIRE_BURN = 4; // ohnivá jama: horenie trvá 4 s (pri 8/s = 32 poškodenia – viac za zlato ako jama s ostňami, tá zas spomaľuje)
   const SHOOTERS = { tower: 1, mage: 1, catapult: 1 };
   // špecializácie veží (od úrovne 3)
   const SPECS = {
@@ -594,6 +595,7 @@
     // horenie a omráčenie
     if (e.burnT > 0) {
       e.burnT -= dt; e.hp -= e.burnDps * dt;
+      if (e.burnT <= 0) e.burnDps = 0; // dohorel – ďalšie zapálenie začne odznova
       if (Math.random() < 0.35) part(e.x + (Math.random() - 0.5) * e.w * 0.5, e.y - Math.random() * e.h, 0, -12 - Math.random() * 10, 0.4, Math.random() < 0.5 ? '#f89838' : '#d83818', -10);
       if (e.hp <= 0) { kill(e); return; }
     }
@@ -638,7 +640,7 @@
         spd *= 0.5;
         if (fresh) { damage(e, bDmg(here)); for (let k = 0; k < 4; k++) part(e.x, e.y - 2, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.3, '#bcc0cc', 80); if (e.dead) return; }
       } else if (here.kind === 'firepit' && fresh) {
-        e.burnT = 3; e.burnDps = bDmg(here); AUDIO.play('fire');
+        e.burnT = Math.max(e.burnT || 0, FIRE_BURN); e.burnDps = Math.max(e.burnDps || 0, bDmg(here)); AUDIO.play('fire');
       } else if (here.kind === 'beartrap' && fresh && !(here.armT > 0)) {
         e.stunT = trapStun(here) * (e.d.boss ? 0.4 : 1); here.armT = 6; here.flash = 0.1;
         AUDIO.play('clang'); for (let k = 0; k < 5; k++) part(e.x, e.y - 2, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.3, '#f4f4f8', 80);
@@ -1927,11 +1929,11 @@
       if (b.kind === 'chapel') stats = 'Mních lieči rytierov a kráľa ' + HELPERS.chapel.rate(b).toFixed(1) + '/s';
       else if (b.kind === 'mine') stats = 'Po vlne +' + Math.round(mineGold(b) * goldMul()) + ' zlata';
       else if (b.kind === 'workshop') stats = 'Remeselník opravuje budovy ' + craftRate(b).toFixed(1) + '/s';
-      else if (b.kind === 'firepit') stats = 'Horenie ' + Math.round(bDmg(b)) + '/s počas 3 s';
+      else if (b.kind === 'firepit') stats = 'Horenie ' + Math.round(bDmg(b)) + '/s počas ' + FIRE_BURN + ' s (spolu ' + Math.round(bDmg(b) * FIRE_BURN) + ')';
       else if (b.kind === 'beartrap') stats = 'Zastaví na ' + trapStun(b).toFixed(1) + ' s';
       else if (d.range) stats = 'Poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);
       else if (b.kind === 'barracks') stats = 'Rytieri ' + knightCap(b) + ' · sila ' + Math.round(knightDmg(b));
-      else if (b.kind === 'pit') stats = 'Poškodenie ' + Math.round(bDmg(b));
+      else if (b.kind === 'pit') stats = 'Poškodenie ' + Math.round(bDmg(b)) + ' · spomalí na polovicu';
       if (d.hp) stats += (stats ? ' · ' : '') + 'zdravie ' + Math.ceil(b.hp) + '/' + bMaxHp(b);
       if (b.gate) stats += ' · rytieri cez ňu prejdú';
       if (b.spikes) stats += ' · ' + (b.spikeType ? SPIKE_TYPES[b.spikeType].name.toLowerCase() : 'ostne') + ' ' + spikeDmg(b);
