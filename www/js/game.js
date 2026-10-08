@@ -23,11 +23,10 @@
     pit:      { name: 'Jama s ostňami', short: 'Jama', cost: 30,  dmg: 12, block: false, desc: 'Zraní a spomalí každého, kto ňou prejde' },
     catapult: { name: 'Katapult',     short: 'Katapult', cost: 140, hp: 200, range: 150, minRange: 36, dmg: 26, cd: 3.6, proj: 'rock', speed: 120, splash: 20, block: true, desc: 'Hádže balvany ďaleko do hordy (nie na lietajúcich)' },
     mine:     { name: 'Zlatá baňa',   short: 'Baňa',   cost: 100, hp: 180, block: true, desc: 'Po každej prežitej vlne prinesie zlato' },
-    chapel:   { name: 'Kaplnka',      short: 'Kaplnka', cost: 120, hp: 200, range: 48, block: true, support: true, desc: 'Lieči budovy, rytierov a kráľa v okolí' },
-    bell:     { name: 'Zvonica',      short: 'Zvonica', cost: 110, hp: 200, range: 44, block: true, support: true, desc: 'Veže v okolí strieľajú rýchlejšie' },
+    chapel:   { name: 'Kaplnka',      short: 'Kaplnka', cost: 120, hp: 200, block: true, desc: 'Vyšle mnícha, ktorý chodí za rytiermi a kráľom a lieči ich' },
     firepit:  { name: 'Ohnivá jama',  short: 'Oheň',   cost: 50,  dmg: 5, block: false, desc: 'Kto ňou prejde, niekoľko sekúnd horí' },
     beartrap: { name: 'Medvedia pasca', short: 'Pasca', cost: 40, block: false, desc: 'Chytí nepriateľa a na chvíľu ho zastaví' },
-    well:     { name: 'Studňa',       short: 'Studňa', cost: 90,  hp: 160, range: 56, block: true, support: true, desc: 'Počas boja opravuje poškodené budovy v okolí' },
+    workshop: { name: 'Dielňa remeselníka', short: 'Dielňa', cost: 90, hp: 180, block: true, desc: 'Vyšle remeselníka, ktorý chodí opravovať poškodené budovy' },
   };
   const TRAPS = { pit: 1, firepit: 1, beartrap: 1 };
   const SHOOTERS = { tower: 1, mage: 1, catapult: 1 };
@@ -60,9 +59,15 @@
   };
   const mineGold = b => 20 + 12 * (b.lvl - 1);
   const chapelHeal = b => 4 * (1 + 0.4 * (b.lvl - 1));
-  const bellHaste = b => 0.25 + 0.05 * (b.lvl - 1);
   const trapStun = b => 2.5 + 0.5 * (b.lvl - 1);
-  const wellRegen = b => 2 * (1 + 0.5 * (b.lvl - 1));
+  const craftRate = b => 6 * (1 + 0.5 * (b.lvl - 1)); // remeselník opraví toľko zdravia za sekundu
+  // pomocníci: z kaplnky mních (lieči rytierov a kráľa), z dielne remeselník (opravuje budovy);
+  // z každej budovy vždy len jeden – ďalší vyjde až keď ho horda zabije
+  const HELPERS = {
+    chapel:   { spr: 'monk',  hp: 30, spd: 22, rate: b => chapelHeal(b) * 2, col: '#9cd45a' },
+    workshop: { spr: 'craft', hp: 36, spd: 22, rate: b => craftRate(b),      col: '#f8d048' },
+  };
+  const HELPER_RESPAWN = 5;
   const GATE_COST = 20;
   // strelci na hradbách – vylepšujú sa zvlášť od hradby
   const WUNIT = {
@@ -73,7 +78,7 @@
   const uCd = u => WUNIT[u.type].cd * Math.pow(0.92, u.lvl - 1);
   const uRange = u => WUNIT[u.type].range + 4 * (u.lvl - 1);
   const uUpCost = u => Math.round(WUNIT[u.type].cost * 0.9 * Math.pow(1.6, u.lvl - 1));
-  const BUILD_ORDER = ['tower', 'wall', 'pit', 'mine', 'barracks', 'catapult', 'mage', 'bell', 'chapel', 'firepit', 'beartrap', 'well'];
+  const BUILD_ORDER = ['tower', 'wall', 'pit', 'mine', 'barracks', 'catapult', 'mage', 'chapel', 'firepit', 'beartrap', 'workshop'];
   const ENEMY = {
     goblin:  { spr: 'goblin',  hp: 12,  speed: 24, atk: 4,  atkCd: 0.8, gold: 3,  blood: '#62a03a' },
     orc:     { spr: 'orc',     hp: 32,  speed: 16, atk: 9,  atkCd: 1.0, gold: 6,  blood: '#62a03a' },
@@ -407,7 +412,7 @@
     st.tool = null; st.sel = null; st.moving = null; bdrag = null;
     AUDIO.play('horn'); AUDIO.music('battle');
     $('build').hidden = true; $('bottom').hidden = false;
-    for (const b of st.blds) if (b.kind === 'barracks') b.spawnT = 0.3;
+    for (const b of st.blds) if (b.kind === 'barracks' || HELPERS[b.kind]) b.spawnT = b.kind === 'barracks' ? 0.3 : 0.6;
     banner(st.wave === MISSION_WAVES ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + MISSION_WAVES);
     updateHud();
   }
@@ -647,6 +652,7 @@
     // súboj s rytierom / kráľom (beranidlo a podkopník rytierov ignorujú)
     if (e.d.ram || e.d.sapper) e.foe = null;
     if (e.foe && (e.foe.dead || e.foe.down > 0)) e.foe = null;
+    if (!e.foe && !e.d.ram && !e.d.sapper) for (const s of st.soldiers) if (s.helper && !s.dead && Math.hypot(s.x - e.x, s.y - e.y) < 9) { e.foe = s; break; }
     if (e.foe) {
       if (Math.hypot(e.foe.x - e.x, e.foe.y - e.y) < 12) { attack(() => hitUnit(e.foe, e.d.atk * 0.7 * (e.foe.ktype === 'shield' ? 0.5 : 1))); return; }
       e.foe = null;
@@ -874,13 +880,6 @@
     for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
   }
 
-  // zvonica v okolí zrýchli streľbu (násobok nabíjania)
-  function hasteMul(b) {
-    let m = 1;
-    const c = bCenter(b);
-    for (const o of st.blds) if (o.kind === 'bell' && Math.hypot(tileX(o.c) + T / 2 - c.x, tileY(o.r) + T / 2 - c.y) <= bRange(o)) m = Math.min(m, 1 - bellHaste(o));
-    return m;
-  }
   function fireCatapult(b) {
     const c = bCenter(b), rng = bRange(b), minR = BUILD.catapult.minRange;
     let best = null, bn = -1;
@@ -923,35 +922,53 @@
     return true;
   }
 
-  // studňa počas boja opravuje poškodené budovy v okolí (radnicu nie)
-  function repairAround(b, dt) {
-    const c = bCenter(b), R = bRange(b), hb = wellRegen(b) * 2 * dt;
-    let fixed = false;
-    for (const o of st.blds) {
-      if (!BUILD[o.kind].hp || o.hp >= bMaxHp(o)) continue;
-      if (Math.hypot(tileX(o.c) + T / 2 - c.x, tileY(o.r) + T / 2 - c.y) > R) continue;
-      o.hp = Math.min(bMaxHp(o), o.hp + hb); fixed = true;
-      if (Math.random() < 0.03) part(tileX(o.c) + 3 + Math.random() * 10, tileY(o.r) + 4, 0, -10, 0.5, '#88b4ff', 0);
-    }
-    if (fixed && Math.random() < 0.05) part(c.x + (Math.random() - 0.5) * 6, tileY(b.r) - 2, 0, -8, 0.6, '#88b4ff', 0);
+  // pomocník vyjde z budovy, keď žiadny jej pomocník nežije (prvý hneď na začiatku vlny)
+  function updateHelperHome(b, dt) {
+    if (st.soldiers.some(s => s.home === b && s.helper && !s.dead)) return;
+    b.spawnT -= dt;
+    if (b.spawnT > 0) return;
+    b.spawnT = HELPER_RESPAWN;
+    const h = HELPERS[b.kind], c = bCenter(b), hp = h.hp * lvlMul(b, 0.3);
+    st.soldiers.push({ home: b, helper: b.kind, x: c.x + 1, y: tileY(b.r) + T + 1, hp, max: hp, spd: h.spd, spr: h.spr, rate: h.rate(b), cd: 0, tgt: null, anim: 0, flash: 0, swing: 0, dead: false });
+    for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
   }
-
-  // kaplnka lieči budovy, rytierov a kráľa v okolí
-  function healAround(b, dt) {
-    const c = bCenter(b), R = bRange(b), hb = chapelHeal(b) * dt;
-    let healed = false;
-    for (const o of st.blds) {
-      if (!BUILD[o.kind].hp || o.hp >= bMaxHp(o)) continue;
-      if (Math.hypot(tileX(o.c) + T / 2 - c.x, tileY(o.r) + T / 2 - c.y) > R) continue;
-      o.hp = Math.min(bMaxHp(o), o.hp + hb); healed = true;
+  // mních ide za najviac zraneným rytierom/kráľom, remeselník k najviac poškodenej budove; inak sa vráti domov
+  function updateHelper(u, dt) {
+    u.flash = Math.max(0, u.flash - dt);
+    u.swing = Math.max(0, (u.swing || 0) - dt);
+    if (u.home) u.rate = HELPERS[u.helper].rate(u.home);
+    let tgt = null, tx = 0, ty = 0, best = 1;
+    if (u.helper === 'chapel') {
+      for (const o of st.soldiers.concat(st.king && !st.king.dead ? [st.king] : [])) {
+        if (o === u || o.dead || o.helper) continue;
+        const mx = o.isKing ? kingMax() : o.max, r = o.hp / mx;
+        if (r < best) { best = r; tgt = o; tx = o.x + (u.x < o.x ? -6 : 6); ty = o.y + 1; }
+      }
+    } else {
+      for (const b of st.blds) {
+        if (!BUILD[b.kind].hp) continue;
+        const r = b.hp / bMaxHp(b);
+        if (r < best) { best = r; tgt = b; tx = tileX(b.c) + T / 2; ty = tileY(b.r) + T + 3; }
+      }
     }
-    for (const u of st.soldiers.concat(st.king && !st.king.dead ? [st.king] : [])) {
-      const mx = u.isKing ? kingMax() : u.max;
-      if (u.hp >= mx || Math.hypot(u.x - c.x, u.y - c.y) > R) continue;
-      u.hp = Math.min(mx, u.hp + hb * 1.5); healed = true;
-      if (Math.random() < 0.05) part(u.x, u.y - 10, 0, -15, 0.6, '#9cd45a', 0);
+    const spd = u.spd * waterMul(u);
+    if (!tgt) { // nikto nepotrebuje pomoc – späť k budove
+      if (u.home) moveKnight(u, tileX(u.home.c) + T / 2 + 1, tileY(u.home.r) + T + 2, spd * 0.85, dt);
+      return;
     }
-    if (healed && Math.random() < 0.08) part(c.x + (Math.random() - 0.5) * 8, tileY(b.r) - 14, 0, -12, 0.7, '#9cd45a', 0);
+    if (Math.hypot(tx - u.x, ty - u.y) > 7) { moveKnight(u, tx, ty, spd, dt); return; }
+    // pri cieli: lieči / opravuje
+    if (u.helper === 'chapel') {
+      tgt.hp = Math.min(tgt.isKing ? kingMax() : tgt.max, tgt.hp + u.rate * dt);
+      if (Math.random() < 0.15) part(tgt.x + (Math.random() - 0.5) * 6, tgt.y - 6 - Math.random() * 6, 0, -12, 0.6, '#9cd45a', 0);
+    } else {
+      tgt.hp = Math.min(bMaxHp(tgt), tgt.hp + u.rate * dt);
+      u.cd -= dt;
+      if (u.cd <= 0) { // úder kladivom
+        u.cd = 0.45; u.swing = 0.15; AUDIO.play('thud');
+        for (let k = 0; k < 3; k++) part(tx + (Math.random() - 0.5) * 8, ty - 6, (Math.random() - 0.5) * 30, -10 - Math.random() * 20, 0.35, Math.random() < 0.5 ? '#f8d048' : '#c6a272', 80);
+      }
+    }
   }
 
   function ability(id) {
@@ -989,12 +1006,11 @@
     // budovy
     for (const b of st.blds) {
       b.flash = Math.max(0, b.flash - dt);
-      if (b.kind === 'tower' || b.kind === 'mage') { b.cd -= dt; if (b.cd <= 0 && fireFrom(b)) b.cd = bCd(b) * hasteMul(b); }
-      else if (b.kind === 'catapult') { b.cd -= dt; if (b.cd <= 0 && fireCatapult(b)) b.cd = bCd(b) * hasteMul(b); }
-      else if (b.unit) { b.unit.cd -= dt; if (b.unit.cd <= 0 && fireWallUnit(b)) b.unit.cd = uCd(b.unit) * hasteMul(b); }
+      if (b.kind === 'tower' || b.kind === 'mage') { b.cd -= dt; if (b.cd <= 0 && fireFrom(b)) b.cd = bCd(b); }
+      else if (b.kind === 'catapult') { b.cd -= dt; if (b.cd <= 0 && fireCatapult(b)) b.cd = bCd(b); }
+      else if (b.unit) { b.unit.cd -= dt; if (b.unit.cd <= 0 && fireWallUnit(b)) b.unit.cd = uCd(b.unit); }
       else if (b.kind === 'barracks') updateBarracks(b, dt);
-      else if (b.kind === 'chapel') healAround(b, dt);
-      else if (b.kind === 'well') repairAround(b, dt);
+      else if (HELPERS[b.kind]) updateHelperHome(b, dt);
       else if (b.kind === 'beartrap' && b.armT > 0) b.armT -= dt;
     }
     // rytieri
@@ -1002,6 +1018,7 @@
     const musterY = musterYOf();
     for (const s of st.soldiers) {
       if (s.dead) continue;
+      if (s.helper) { updateHelper(s, dt); continue; }
       const mx = G.gx0 + ((s.slot * 37) % (G.cols * T - 16)) + 8;
       updateFighter(s, dt, mx, musterY, 9999, s.dmg, false, moveKnight);
     }
@@ -1237,7 +1254,7 @@
     }
     if (b.lvl > 1 && b.kind !== 'wall') pxText(g, String(b.lvl), x0 + T - 3, y0 + T - 6, '#f8d048');
   }
-  const JOINERS = { wall: 1, tower: 1, mage: 1, barracks: 1, catapult: 1, mine: 1, chapel: 1, bell: 1, well: 1 };
+  const JOINERS = { wall: 1, tower: 1, mage: 1, barracks: 1, catapult: 1, mine: 1, chapel: 1, workshop: 1 };
   const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL || !!JOINERS[o.kind]); };
   const joinsBuilding = (c, r) => { const o = occAt(c, r); return !!o && o !== HALL && o.kind !== 'wall' && !!JOINERS[o.kind]; };
 
@@ -1686,7 +1703,7 @@
     ICONS.mage = spriteURL(BSPR.mage[0], 3);
     ICONS.wall = spriteURL(BSPR.wall[0][10], 3);
     ICONS.pit = spriteURL(BSPR.pit, 3);
-    for (const k of ['catapult', 'mine', 'chapel', 'bell', 'firepit', 'beartrap', 'well']) ICONS[k] = spriteURL(BSPR[k], 3);
+    for (const k of ['catapult', 'mine', 'chapel', 'firepit', 'beartrap', 'workshop']) ICONS[k] = spriteURL(BSPR[k], 3);
     ICONS.gate = spriteURL(BSPR.gateIcon, 3);
     ICONS.u_archer = spriteURL(SPR.archer[0], 3);
     ICONS.u_crossbow = spriteURL(SPR.knight[0], 3);
@@ -1875,10 +1892,9 @@
     } else if (st.sel) {
       const b = st.sel, d = BUILD[b.kind];
       let stats = '';
-      if (b.kind === 'chapel') stats = 'Lieči ' + chapelHeal(b).toFixed(1) + '/s v okruhu ' + bRange(b);
-      else if (b.kind === 'bell') stats = 'Veže v okruhu ' + bRange(b) + ' o ' + Math.round(bellHaste(b) * 100) + ' % rýchlejšie';
+      if (b.kind === 'chapel') stats = 'Mních lieči rytierov a kráľa ' + HELPERS.chapel.rate(b).toFixed(1) + '/s';
       else if (b.kind === 'mine') stats = 'Po vlne +' + Math.round(mineGold(b) * goldMul()) + ' zlata';
-      else if (b.kind === 'well') stats = 'Opravuje budovy v okruhu ' + bRange(b) + ' · ' + (wellRegen(b) * 2).toFixed(1) + '/s';
+      else if (b.kind === 'workshop') stats = 'Remeselník opravuje budovy ' + craftRate(b).toFixed(1) + '/s';
       else if (b.kind === 'firepit') stats = 'Horenie ' + Math.round(bDmg(b)) + '/s počas 3 s';
       else if (b.kind === 'beartrap') stats = 'Zastaví na ' + trapStun(b).toFixed(1) + ' s';
       else if (d.range) stats = 'Poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);

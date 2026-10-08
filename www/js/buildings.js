@@ -483,24 +483,6 @@ function makeChapel() {
   return p.finish();
 }
 
-// ---- Zvonica (16x34) ----
-function makeBell() {
-  const p = painter(16, 34);
-  // nohy a vzpery
-  for (const lx of [3, 12]) for (let y = 11; y <= 32; y++) p.shade(lx, y, WOOD, lx === 3 ? 0.62 : 0.38);
-  pLine(p, 4, 14, 11, 21, (x, y) => p.shade(x, y, WOOD, 0.45));
-  pLine(p, 11, 14, 4, 21, (x, y) => p.shade(x, y, WOOD, 0.4));
-  pLine(p, 4, 23, 11, 30, (x, y) => p.shade(x, y, WOOD, 0.45));
-  pLine(p, 11, 23, 4, 30, (x, y) => p.shade(x, y, WOOD, 0.4));
-  // plošina, stĺpiky a strecha
-  for (let y = 10; y <= 11; y++) for (let x = 2; x <= 13; x++) p.shade(x, y, WOOD, y === 10 ? 0.7 : 0.3);
-  for (const lx of [3, 12]) for (let y = 5; y <= 9; y++) p.shade(lx, y, WOOD, 0.5);
-  pGable(p, 7.5, 0, 5, 7, ROOF_RED);
-  // zvon
-  for (let y = 6; y <= 9; y++) { const hw = y === 6 ? 1 : y === 9 ? 3 : 2; for (let x = 8 - hw; x <= 7 + hw; x++) p.set(x, y, hexRGB(x < 7 ? '#fff070' : x < 9 ? '#f8d048' : '#b88420')); }
-  return p.finish();
-}
-
 // ---- Ohnivá jama (16x16) ----
 function makeFirepit() {
   const p = painter(16, 16);
@@ -523,17 +505,32 @@ function makeBeartrap() {
   return p.finish();
 }
 
-// ---- Studňa (16x20) ----
-function makeWell() {
-  const p = painter(16, 20);
-  pDisk(p, 7.5, 15, 6.5, 3.5, (x, y, nx, ny) => p.shade(x, y, RAMP.stone, 0.6 - nx * 0.25 + ((x + y) % 3 === 0 ? -0.15 : 0)));
-  pDisk(p, 7.5, 13.5, 5, 2, (x, y, nx, ny) => p.shade(x, y, RAMP.stone, 0.85));
-  pDisk(p, 7.5, 13.5, 3.6, 1.3, (x, y) => p.set(x, y, hexRGB('#163a7a')));
-  for (const lx of [2, 13]) for (let y = 4; y <= 13; y++) p.shade(lx, y, WOOD, lx === 2 ? 0.6 : 0.35);
-  pGable(p, 7.5, 0, 4, 7, ROOF_RED);
-  for (let x = 3; x <= 12; x++) p.shade(x, 6, WOOD, 0.55);                   // hriadeľ
-  for (let y = 7; y <= 10; y++) p.set(8, y, hexRGB('#c4b89e'));                // lano
-  for (let y = 10; y <= 12; y++) for (let x = 7; x <= 9; x++) p.shade(x, y, WOOD, 0.5);
+// ---- Dielňa remeselníka (18x24): doskové steny, otvorená brána s nákovou a výhňou, komín, vývesný štít ----
+function makeWorkshop() {
+  const p = painter(18, 24);
+  // doskové steny, svetlo zľava
+  for (let y = 11; y <= 22; y++) for (let x = 2; x <= 15; x++) {
+    let v = 0.62 - (x - 2) / 13 * 0.22 + (hash2(x, y, 181) - 0.5) * 0.1;
+    if ((x - 2) % 3 === 2) v -= 0.22;                     // škáry medzi doskami
+    if (y === 22) v -= 0.2;
+    p.shade(x, y, WOOD, v);
+  }
+  // otvorená brána: tmavé vnútro, výheň vzadu, nákova vpredu
+  for (let y = 14; y <= 22; y++) for (let x = 5; x <= 11; x++) p.set(x, y, hexRGB(y < 16 ? '#14100c' : '#1e1610'));
+  for (let x = 4; x <= 12; x++) p.shade(x, 13, WOOD, 0.75);                     // preklad
+  for (let y = 14; y <= 22; y++) { p.shade(4, y, WOOD, 0.75); p.shade(12, y, WOOD, 0.3); }
+  p.set(6, 17, GLOW2); p.set(7, 17, GLOW); p.set(6, 18, GLOW2);                   // výheň
+  for (let x = 8; x <= 10; x++) p.set(x, 19, x === 8 ? RIVET : IRON);             // nákova
+  p.set(9, 20, IRON); p.set(9, 21, IRON); p.set(8, 21, IRON); p.set(10, 21, IRON);
+  // šindľová strecha
+  pGable(p, 8.5, 2, 11, 9.5, WOOD);
+  // kamenný komín s iskrou
+  for (let y = 0; y <= 6; y++) for (let x = 12; x <= 13; x++) p.shade(x, y, RAMP.stone, x === 12 ? 0.6 : 0.35);
+  p.set(12, 0, hexRGB('#1c140e')); p.set(13, 0, hexRGB('#1c140e'));
+  // vývesný štít s kladivom
+  for (let x = 14; x <= 17; x++) p.shade(x, 12, WOOD, 0.4);
+  for (let y = 13; y <= 16; y++) for (let x = 14; x <= 17; x++) p.shade(x, y, WOOD, y === 13 ? 0.7 : 0.55);
+  p.set(15, 14, RIVET); p.set(16, 14, RIVET); p.set(15, 15, WOOD[1]);
   return p.finish();
 }
 
@@ -626,10 +623,9 @@ function initBuildingSprites() {
   BSPR.catapult = makeCatapult();
   BSPR.mine = makeMine();
   BSPR.chapel = makeChapel();
-  BSPR.bell = makeBell();
   BSPR.firepit = makeFirepit();
   BSPR.beartrap = makeBeartrap();
-  BSPR.well = makeWell();
+  BSPR.workshop = makeWorkshop();
   BSPR.mill = makeMill();
   // 8-násobná súmernosť: 45° otočenia rozdelených do snímok sa plynulo opakuje
   BSPR.millWheel = Array.from({ length: MILL_WHEEL.frames }, (_, i) => makeMillWheel(i / MILL_WHEEL.frames * Math.PI / 4));

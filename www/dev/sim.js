@@ -57,9 +57,8 @@ window.SIM = (() => {
         for (const r of [hr0, hr0 + 1]) for (const c of order) if (!acted && !F.inHall(c, r) && place('catapult', c, r)) acted = true;
         if (acted) continue;
       }
-      if (F.has('bell') && count('bell') < 1 && count('tower') >= 4) { for (const c of order) { if (c !== hc && place('bell', c, towerRow)) { acted = true; break; } } if (acted) continue; }
       if (F.has('chapel') && count('chapel') < 1) { for (const r of [hr0, hr0 + 1]) for (const c of order) if (!acted && !F.inHall(c, r) && place('chapel', c, r)) acted = true; if (acted) continue; }
-      if (F.has('well') && count('well') < 1) { for (const r of [hr0 + 2, hr0 + 1]) for (const c of order) if (!acted && !F.inHall(c, r) && place('well', c, r)) acted = true; if (acted) continue; }
+      if (F.has('workshop') && count('workshop') < 1) { for (const r of [hr0 + 2, hr0 + 1]) for (const c of order) if (!acted && !F.inHall(c, r) && place('workshop', c, r)) acted = true; if (acted) continue; }
       // pasce pred hradbami: jamy, oheň, medvedie pasce
       const trapKind = F.has('firepit') && count('firepit') < 3 ? 'firepit' : F.has('beartrap') && count('beartrap') < 2 ? 'beartrap' : F.has('pit') && count('pit') < 5 ? 'pit' : null;
       if (trapKind) for (const c of order) { if (place(trapKind, c, pitRow)) { acted = true; break; } }
@@ -70,7 +69,7 @@ window.SIM = (() => {
       if (F.has('knightTypes')) { const bk = s.blds.find(b => b.kind === 'barracks' && !b.ktype); if (bk && s.gold >= 50) { s.gold -= 50; bk.ktype = 'spear'; acted = true; continue; } }
       const ups = [];
       for (const b of s.blds) {
-        if (['tower', 'mage', 'barracks', 'catapult', 'mine', 'bell', 'chapel'].includes(b.kind) && b.lvl < F.bCap()) ups.push({ c: F.bUpCost(b), f: () => { b.spent += F.bUpCost(b); b.lvl++; b.hp = F.bMaxHp(b); } });
+        if (['tower', 'mage', 'barracks', 'catapult', 'mine', 'chapel', 'workshop'].includes(b.kind) && b.lvl < F.bCap()) ups.push({ c: F.bUpCost(b), f: () => { b.spent += F.bUpCost(b); b.lvl++; b.hp = F.bMaxHp(b); } });
         if (b.kind === 'wall' && b.lvl < Math.min(F.bCap(), 3) && s.wave >= 4) ups.push({ c: F.bUpCost(b) * 6, real: F.bUpCost(b), f: () => { b.lvl++; b.hp = F.bMaxHp(b); } });
         if (b.unit && b.unit.lvl < F.lvlCap()) ups.push({ c: F.uUpCost(b.unit), f: () => { b.unit.lvl++; } });
       }

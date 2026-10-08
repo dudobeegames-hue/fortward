@@ -104,6 +104,47 @@ const SOLDIER_LEGS = [
    '....KKK..KKK..'],
 ];
 
+// Mních z kaplnky – kapucňa, hnedá kutňa, povrazový opasok, palica s krížikom
+const MONK_BODY = [
+  '.....KK.....K.',
+  '....KlLK...KgK',
+  '...KlLLLK..KlK',
+  '...KlLLLdK.KlK',
+  '...KKdddKK.KlK',
+  '..KlLLLLLdKKlK',
+  '.KlLLLLLLLdslK',
+  '.KlLLLLLLLdKlK',
+  '.KlLeeeeeLdKlK',
+  '.KlLLLeLLLdKlK',
+  '.KlLLLLLLLdKlK',
+];
+const MONK_LEGS = [
+  ['.KdLLLLLLLdKlK',
+   '..KKK..KKK..K.'],
+  ['.KdLLLLLLLdKlK',
+   '...KKK.KKK..K.'],
+];
+// Remeselník z dielne – čiapka, plátenná košeľa, kožená zástera, kladivo na pleci
+const CRAFT_BODY = [
+  '.....KKKK..KKK',
+  '....KLlLLKKmMK',
+  '....KLLLdKKMDK',
+  '....KddddK.KlK',
+  '..KKeEEEEeKKlK',
+  '.KeELEEEELeKlK',
+  '.KeEELEELEeslK',
+  '.KeEEELLEEEKlK',
+  '.KLLLLLLLLLKlK',
+  '.KdLLLLLLLdK..',
+  '..KdLLLLLdK...',
+];
+const CRAFT_LEGS = [
+  ['...KddKKddK...',
+   '...KKK..KKK...'],
+  ['....KddKddK...',
+   '....KKK.KKK...'],
+];
+
 // Kráľ – zozadu, koruna, hermelín, červený plášť
 const KING_BODY = [
   '....K.KK.K....',
@@ -396,6 +437,8 @@ function initSprites() {
   SPR.spear = SOLDIER_LEGS.map(l => buildSprite(SPEAR_BODY.concat(l), { c: '#f08868', B: '#b83c28', n: '#6c2018' }));
   SPR.shield = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l), { c: '#d0d4dc', B: '#80869a', n: '#44485a' }));
   SPR.rider = RIDER_FRAMES.map(f => buildSprite(f));
+  SPR.monk = MONK_LEGS.map(l => buildSprite(MONK_BODY.concat(l)));
+  SPR.craft = CRAFT_LEGS.map(l => buildSprite(CRAFT_BODY.concat(l)));
   SPR.garcher = GOBLIN_LEGS.map(l => buildSprite(GARCHER_BODY.concat(l)));
   SPR.bat = BAT_FRAMES.map(f => buildSprite(f, { P: '#4a3460', p: '#7a5aa0' }));
   SPR.ram = RAM_FRAMES.map(f => buildSprite(f));
