@@ -535,6 +535,74 @@ function makeWorkshop() {
 }
 
 // ---- Strelnica (18x24): drevená prístrešok s modrou strechou, stojan s lukmi a slamený terč ----
+// stajne 20x22: drevená stodola so slamenou strechou, kôň vykúka z polovičných dvierok, balík sena
+function makeStables() {
+  const p = painter(20, 22);
+  for (let y = 10; y <= 20; y++) for (let x = 1; x <= 16; x++) {                         // doskové steny
+    let v = 0.6 - (x - 1) / 15 * 0.22 + (hash2(x, y, 211) - 0.5) * 0.1;
+    if ((x - 1) % 3 === 2) v -= 0.18;
+    if (y === 20) v -= 0.2;
+    p.shade(x, y, WOOD, v);
+  }
+  for (let y = 12; y <= 20; y++) for (let x = 5; x <= 12; x++) p.shade(x, y, WOOD, y < 16 ? 0.06 : 0.42 + (x % 2) * 0.08); // dvere: hore tma, dole polovičné dvierka
+  for (let x = 5; x <= 12; x++) p.shade(x, 16, WOOD, 0.75);                               // horná hrana dvierok
+  pLine(p, 5, 17, 12, 20, (x, y) => p.shade(x, y, WOOD, 0.25)); pLine(p, 12, 17, 5, 20, (x, y) => p.shade(x, y, WOOD, 0.25)); // krížová výstuž
+  const HORSE = ['#4a4a58', '#7a7a88', '#a8a8b6', '#d0d0dc', '#f0f0f6'].map(hexRGB); // bieloš
+  // konská hlava vykúka z dverí (pohľad spredu): uši, hriva, lysina, svetlejšia papuľa
+  for (let y = 10; y <= 15; y++) for (let x = 6; x <= 11; x++) {
+    const hw = y <= 11 ? 2.5 : y <= 13 ? 2.2 : 1.6;
+    if (Math.abs(x - 8.5) > hw) continue;
+    p.shade(x, y, HORSE, (y >= 14 ? 0.95 : 0.78) - (x - 6) * 0.1);
+  }
+  p.set(6, 9, HORSE[2]); p.set(11, 9, HORSE[1]);                                            // uši
+  for (const x of [7, 8, 9, 10]) p.set(x, 10, hexRGB('#2a160a'));                          // hriva
+  p.set(7, 12, hexRGB('#1c140e')); p.set(10, 12, hexRGB('#1c140e'));                        // oči
+  p.set(8, 15, HORSE[0]); p.set(9, 15, HORSE[0]);                                            // nozdry
+  // slamená strecha
+  for (let y = 2; y <= 10; y++) {
+    const hw = 3 + (y - 2) * 0.95;
+    for (let x = Math.floor(8.5 - hw); x <= Math.ceil(8.5 + hw); x++) {
+      if (x < 0 || x > 17) continue;
+      const nx = (x - 8.5) / hw;
+      p.shade(x, y, STRAW, (y === 10 ? 0.25 : 0.72 - nx * 0.28) + ((x + y * 2) % 5 === 0 ? -0.15 : 0));
+    }
+  }
+  for (let x = 5; x <= 12; x++) p.shade(x, 2, STRAW, 0.9);
+  // podkova nad dverami
+  p.set(7, 9, RIVET); p.set(10, 9, RIVET); p.set(7, 8, RIVET); p.set(10, 8, RIVET); p.set(8, 7, RIVET); p.set(9, 7, RIVET);
+  // balík sena vpravo
+  for (let y = 16; y <= 20; y++) for (let x = 15; x <= 19; x++) p.shade(x, y, STRAW, 0.85 - (x - 15) * 0.12 - (y - 16) * 0.05 + (y === 18 ? -0.3 : 0));
+  return p.finish();
+}
+// zbrojnica 18x26: kamenný sokel, hrázdené poschodie, modrá strecha, stojan s kopijami a štít pri dverách
+function makeArmory() {
+  const p = painter(18, 26);
+  for (let y = 18; y <= 24; y++) for (let x = 1; x <= 16; x++) {                          // kamenný sokel
+    const row = Math.floor((y - 18) / 2), mortar = (y - 18) % 2 === 1 && y !== 24 || (x + row * 3) % 5 === 0;
+    p.shade(x, y, RAMP.stone, mortar ? 0.2 : 0.62 - (x - 1) / 15 * 0.25 + (hash2(x, y, 221) - 0.5) * 0.1);
+  }
+  for (let y = 11; y <= 17; y++) for (let x = 1; x <= 16; x++) {                          // hrázdené poschodie
+    const beam = x === 1 || x === 16 || x === 8 || y === 11 || y === 17 || (y === 14 && x !== 8);
+    p.shade(x, y, beam ? WOOD : PLASTER, beam ? (x === 1 ? 0.55 : 0.3) : 0.62 - (x - 1) / 15 * 0.2);
+  }
+  for (const wx of [3, 12]) for (let y = 12; y <= 13; y++) for (let x = wx; x <= wx + 2; x++) p.set(x, y, DARKWIN); // okienka
+  for (let y = 19; y <= 24; y++) for (let x = 7; x <= 10; x++) p.shade(x, y, WOOD, y === 19 ? 0.12 : 0.3 + (x % 2) * 0.1); // dvere
+  pGable(p, 8.5, 1, 11, 9.5, ROOF_BLUE);                                                    // strecha
+  // stojan s kopijami vľavo pred budovou
+  for (const sx of [2, 4]) {
+    for (let y = 15; y <= 24; y++) p.shade(sx, y, WOOD, sx === 2 ? 0.72 : 0.5);
+    p.set(sx, 13, hexRGB('#f4f4f8')); p.set(sx, 14, hexRGB('#bcc0cc')); p.set(sx, 12, hexRGB('#80869a'));
+  }
+  for (let x = 1; x <= 5; x++) p.shade(x, 20, WOOD, 0.62 - x * 0.05);                      // priečka stojana
+  // štít so znakom pri dverách vpravo
+  for (let y = 18; y <= 23; y++) for (let x = 12; x <= 15; x++) {
+    if (y === 23 && (x === 12 || x === 15)) continue;
+    p.shade(x, y, ROOF_BLUE, 0.7 - (x - 12) * 0.12);
+  }
+  for (let y = 19; y <= 22; y++) p.set(13, y, hexRGB('#f8d048'));
+  p.set(12, 20, hexRGB('#f8d048')); p.set(14, 20, hexRGB('#f8d048'));
+  return p.finish();
+}
 function makeRange() {
   const p = painter(18, 24);
   // zadná doskova stena prístrešku
@@ -870,6 +938,8 @@ function initBuildingSprites() {
   BSPR.beartrap = makeBeartrap();
   BSPR.workshop = makeWorkshop();
   BSPR.range = makeRange();
+  BSPR.stables = makeStables();
+  BSPR.armory = makeArmory();
   BSPR.orcKeep = makeOrcKeep();
   BSPR.orcTower = makeOrcTower();
   BSPR.palisade = makePalisade(false);

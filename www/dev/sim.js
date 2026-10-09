@@ -89,7 +89,6 @@ window.SIM = (() => {
       // ostne, špecializácia, druh rytierov
       if (F.has('spikes')) { const w = s.blds.find(b => b.kind === 'wall' && !b.spikes); if (w && s.gold >= 25) { s.gold -= 25; w.spikes = true; acted = true; continue; } }
       if (F.has('spec')) { const t = s.blds.find(b => b.kind === 'tower' && b.lvl >= 3 && !b.spec); if (t && s.gold >= 80) { s.gold -= 80; t.spec = 'rapid'; acted = true; continue; } }
-      if (F.has('knightTypes')) { const bk = s.blds.find(b => b.kind === 'barracks' && !b.ktype); if (bk && s.gold >= 50) { s.gold -= 50; bk.ktype = 'spear'; acted = true; continue; } }
       const ups = [];
       for (const b of s.blds) {
         if (['tower', 'mage', 'barracks', 'range', 'catapult', 'mine', 'chapel', 'workshop'].includes(b.kind) && b.lvl < F.bCap()) ups.push({ c: F.bUpCost(b), f: () => { b.spent += F.bUpCost(b); b.lvl++; b.hp = F.bMaxHp(b); } });
