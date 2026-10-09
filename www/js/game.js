@@ -355,7 +355,6 @@
   const FORT = { keepHp: 1500, towerHp: 320, palHp: 220, stakeHp: 90, keepBot: 84, palY: 100, stakeY: 116 }; // y spodku hradu, palisády a kolov (herné px) – pod horným panelom
   // obrana hradu rastie s misiou: 6 palisáda + 2 veže, 7 + koly, 8 kamenný múr + 4 veže, 9 hrad hádže balvany, 10 hádže častejšie
   const fortLayout = a => ({ stone: a >= 2, stakes: a >= 1, towers: a >= 2 ? [-60, -40, 40, 60] : [-40, 40], rock: a >= 4 ? 3.2 : a >= 3 ? 4.5 : 0 });
-  const FORT_NEWS = ['', 'Pred hradbami sú zahrotené koly – zraňujú a spomaľujú vojakov', 'Horda postavila kamenné hradby a ďalšie veže', 'Hrad hádže balvany na zhluky vojakov', 'Hlavný hrad hordy – balvany padajú častejšie'];
   function makeFort() {
     const x = scene.fortX, tr = TIERS[st.tier || 0].hp, a = st.mission - HOME_PROVINCES - 1, mm = 1 + 0.2 * a, L = fortLayout(a);
     const keepBot = FORT.keepBot, py = FORT.palY, ph = FORT.palHp * tr * mm * (L.stone ? 1.7 : 1);
@@ -372,13 +371,12 @@
   function repairFort() {
     const F = st.fort;
     if (!F || F.dead) return;
-    let fixed = false, rebuilt = 0;
+    let rebuilt = 0;
     for (const o of F.towers.concat(F.pal)) {
-      if (o.hp > 0 && o.hp < o.max) { o.hp = Math.min(o.max, o.hp + o.max * 0.3); fixed = true; }
-      else if (o.hp <= 0 && F.pal.includes(o) && rebuilt < 2) { o.hp = o.max * 0.35; rebuilt++; fixed = true; }
+      if (o.hp > 0 && o.hp < o.max) o.hp = Math.min(o.max, o.hp + o.max * 0.3);
+      else if (o.hp <= 0 && F.pal.includes(o) && rebuilt < 2) { o.hp = o.max * 0.35; rebuilt++; }
     }
-    for (const q of F.stakes) if (q.hp < q.max) { q.hp = q.max; fixed = true; }
-    if (fixed) setTimeout(() => { if (st.phase === 'build') toast(rebuilt ? 'Orkovia opravili hradby – ' + (rebuilt > 1 ? 'zbúrané úseky stoja znova' : 'zbúraný úsek stojí znova') : 'Orkovia opravili opevnenie'); }, 400);
+    for (const q of F.stakes) q.hp = q.max;
   }
   // koly: kto po nich ide, je zranený a spomalený; vojaci ich pritom pošliapu
   function stakeAt(u) {
@@ -665,9 +663,7 @@
     if (kingMeta.pending) setTimeout(() => { if (st.phase === 'build') showTalentPick(); }, 600);
     st.viewUp = 0;
     if (isAttack() && st.wave === 0) {
-      const news = FORT_NEWS[st.mission - HOME_PROVINCES - 1];
       st.introPan = { t: 0 }; // úvodný prelet kamery na orkský hrad a späť k radnici
-      if (news) setTimeout(() => { if (st.phase === 'build' && st.introPan) toast(news); }, 2000);
     } else if (isAttack() && st.siegeHold) {
       st.siegeT = SIEGE_BUILD; // obliehanie: na budovanie je len chvíľa, potom útok pokračuje sám
       setTimeout(() => { if (st.phase === 'build') toast('Hrad je obliehaný – orkovia ho neopravia. Útok pokračuje o ' + SIEGE_BUILD + ' s'); }, 400);
