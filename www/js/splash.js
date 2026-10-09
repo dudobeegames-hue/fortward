@@ -2,15 +2,18 @@
 // Fortward – úvod: najprv logo štúdia (DBee games) na čiernom pozadí 2,5 s, potom obrázok hry
 // (img/splash.jpg aj s názvom) počas načítania; keď je hra pripravená, plynulo prejde do menu.
 const SPLASH = (() => {
-  const LOGO_MS = 2500, FADE_MS = 500, ART_MIN_MS = 2600;
+  const LOGO_MS = 2500, LOGO_FADE_MS = 900, BLACK_MS = 250, FADE_MS = 700, ART_MIN_MS = 2600;
   let artFrom = Infinity; // kedy sa začal ukazovať obrázok hry
   const logo = document.getElementById('logoIntro'), img = logo && logo.querySelector('img');
   function startLogo() {
     logo.classList.add('in');
     setTimeout(() => {
-      logo.classList.add('out');
-      artFrom = performance.now();
-      setTimeout(() => logo.remove(), FADE_MS + 50);
+      logo.classList.add('fade');                       // logo sa vytratí do čiernej
+      setTimeout(() => {
+        logo.classList.add('out');                      // až potom sa z čiernej vynorí obrázok hry
+        artFrom = performance.now();
+        setTimeout(() => logo.remove(), FADE_MS + 50);
+      }, LOGO_FADE_MS + BLACK_MS);
     }, LOGO_MS);
   }
   if (logo) {

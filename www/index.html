@@ -291,9 +291,10 @@
   #splash { position: fixed; inset: 0; z-index: 100; background: #07061a; transition: opacity .8s ease; }
   #splash.out { opacity: 0; pointer-events: none; }
   /* logo štúdia pred obrázkom hry: čierne pozadie, logo naskočí, 2,5 s a zmizne */
-  #logoIntro { position: fixed; inset: 0; z-index: 101; background: #000; display: flex; align-items: center; justify-content: center; transition: opacity .5s ease; }
+  #logoIntro { position: fixed; inset: 0; z-index: 101; background: #000; display: flex; align-items: center; justify-content: center; transition: opacity .7s ease; }
   #logoIntro img { width: min(80vw, 56vh); height: auto; opacity: 0; transform: scale(.94); transition: opacity .45s ease, transform .6s ease; }
   #logoIntro.in img { opacity: 1; transform: scale(1); }
+  #logoIntro.fade img { opacity: 0; transition: opacity .9s ease; }
   #logoIntro.out { opacity: 0; pointer-events: none; }
   #splash img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
   /* veľmi úzke displeje: celý obrázok (názov sa neoreže), okraje vyplní rozmazaná kópia */
