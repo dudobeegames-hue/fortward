@@ -2769,7 +2769,7 @@
       acts.appendChild(btn('Oživiť kráľa', c, st.gold >= c, reviveKing, 'up wide'));
       info.appendChild(acts);
     }
-    $('nextWave').textContent = !isAttack() ? 'Do boja ▶' : st.wave >= MISSION_WAVES ? 'Zaútočiť ▶' : 'Do útoku ▶';
+    $('nextWave').textContent = !isAttack() ? 'Do boja' : st.wave >= MISSION_WAVES ? 'Zaútočiť' : 'Do útoku';
     const rc = repairCost();
     $('undoBtn').disabled = !undoStack.length;
     const rb = $('repairBtn');
@@ -3112,7 +3112,7 @@
       });
       tb.appendChild(b);
     });
-    $('mapPlay').textContent = starsOf(m, st.mapTier) ? 'Hrať znova ▶' : 'Hrať ▶';
+    $('mapPlay').textContent = starsOf(m, st.mapTier) ? 'Hrať znova' : 'Hrať';
     $('mStars').innerHTML = '';
     $('hallBtnTxt').textContent = starsFree();
   }
@@ -3348,7 +3348,7 @@
       c.className = 'slot' + (info ? '' : ' empty');
       c.innerHTML = '<span class="slotNum">' + n + '</span><div class="slotInfo">' + (info
         ? '<b>' + info.race + '</b><small><span class="st">★ ' + info.stars + '</span><span class="kg"><img src="' + ICONS.king + '" alt="">úr. ' + info.king + '</span></small>'
-        : '<b>Nová hra</b><small>Prázdna pozícia</small>') + '</div>' + (info ? '<button class="slotDel" title="Vymazať"><img src="' + TRASH + '" alt="Vymazať"></button>' : '<span class="slotGo">▶</span>');
+        : '<b>Nová hra</b><small>Prázdna pozícia</small>') + '</div>' + (info ? '<button class="slotDel" title="Vymazať"><img src="' + TRASH + '" alt="Vymazať"></button>' : '<span class="slotGo"><img src="' + UI_ICONS.plus + '" alt="Nová hra"></span>');
       c.addEventListener('click', () => { // rozohraná pozícia rovno na ostrov, nová na výber rasy
         AUDIO.play('build'); loadSlot(n);
         if (info) { $('slots').hidden = true; showMap(); } else showTitle();
@@ -3388,7 +3388,7 @@
     if (st.phase !== 'build' || !(st.siegeT > 0) || kingMeta.pending) return;
     st.siegeT -= dt;
     if (st.siegeT <= 0) { startWave(); return; }
-    $('nextWave').textContent = (st.wave >= MISSION_WAVES ? 'Zaútočiť ▶ ' : 'Do útoku ▶ ') + Math.ceil(st.siegeT);
+    $('nextWave').textContent = (st.wave >= MISSION_WAVES ? 'Zaútočiť ' : 'Do útoku ') + Math.ceil(st.siegeT);
   }
 
   // ---------------- Slučka ----------------

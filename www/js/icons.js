@@ -48,6 +48,21 @@ const UI_ICONS = (() => {
     '.....K......',
   ], PAL);
 
+  // zelené plus na prázdnej pozícii (nová hra)
+  const plus = fromMap([
+    '...KKKKK...',
+    '...KLLGK...',
+    '...KLGGK...',
+    'KKKKLGGKKKK',
+    'KLLLLGGGGGK',
+    'KLGGGGGGGDK',
+    'KGGGGGGGDDK',
+    'KKKKGGDKKKK',
+    '...KGDDK...',
+    '...KDDDK...',
+    '...KKKKK...',
+  ], { K: '#1c140e', L: '#b8f890', G: '#5ccf3c', D: '#2c8a2c' });
+
   // ---- vlajky 18×12 bodov ----
   const FW = 18, FH = 12;
   const stripesH = cols => (x, y) => cols[Math.floor(y * cols.length / FH)];
@@ -127,5 +142,5 @@ const UI_ICONS = (() => {
     { id: 'zh', name: '中文' },
   ];
 
-  return { pix, music, sound, flags, langs };
+  return { pix, music, sound, plus, flags, langs };
 })();

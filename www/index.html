@@ -371,7 +371,8 @@
   .slotInfo .st { color: var(--gold); }
   .slotInfo .kg { display: inline-flex; align-items: center; gap: 3px; color: #e8dccb; }
   .slotInfo .kg img { height: 16px; }
-  .slotGo { color: #7ee05e; font-size: 20px; padding-right: 4px; }
+  .slotGo { flex: 0 0 auto; width: 42px; height: 42px; display: grid; place-items: center; }
+  .slotGo img { width: 27px; height: 27px; image-rendering: pixelated; }
   .slotDel { flex: 0 0 auto; width: 42px; height: 42px; display: grid; place-items: center; padding: 0; background: var(--panel2); border: 2px solid var(--ink); border-radius: 9px;
     box-shadow: inset 0 -3px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.1); }
   .slotDel img { width: 21px; height: 24px; image-rendering: pixelated; }
@@ -387,7 +388,7 @@
   .askCard .row { display: flex; gap: 10px; width: 100%; }
   .askCard .row button { flex: 1; justify-content: center; font-size: 17px; }
   #askOk { background: #c8382a; color: #fff; box-shadow: inset 0 -3px 0 #7c1810, inset 0 2px 0 rgba(255,255,255,.25); text-shadow: 1px 1px 0 var(--ink); }
-  #raceBack, #slotsBack { margin-top: 4px; }
+  #raceBack, #slotsBack { margin-top: 4px; justify-content: center; min-width: 110px; }
 
   /* ---- Titulná obrazovka ---- */
   .screenOverlay {
@@ -540,7 +541,7 @@
 </style>
 </head>
 <body>
-<div id="splash"><img src="img/splash.jpg" alt="Fortward"><div id="splashBtns"><button id="splashPlay" class="greenBtn" aria-label="Hrať"><span class="pxH"></span>rať</button><button id="splashSet" class="grayBtn">Nastavenia</button></div><div id="setPanel" hidden><h2 id="setHead">Nastavenia</h2><div id="setMain" class="setIcons"><button class="setIc snd" data-kind="music"><span class="ico"><img id="icoMusic" alt=""></span><b>Hudba</b></button><button class="setIc snd" data-kind="sfx"><span class="ico"><img id="icoSound" alt=""></span><b>Zvuky</b></button><button class="setIc" id="langBtn"><span class="ico"><img id="icoLang" class="flag" alt=""></span><b>Jazyk</b></button></div><div id="langList" hidden></div><button id="setBack" class="btn">◀ Späť</button></div></div>
+<div id="splash"><img src="img/splash.jpg" alt="Fortward"><div id="splashBtns"><button id="splashPlay" class="greenBtn" aria-label="Hrať"><span class="pxH"></span>rať</button><button id="splashSet" class="grayBtn">Nastavenia</button></div><div id="setPanel" hidden><h2 id="setHead">Nastavenia</h2><div id="setMain" class="setIcons"><button class="setIc snd" data-kind="music"><span class="ico"><img id="icoMusic" alt=""></span><b>Hudba</b></button><button class="setIc snd" data-kind="sfx"><span class="ico"><img id="icoSound" alt=""></span><b>Zvuky</b></button><button class="setIc" id="langBtn"><span class="ico"><img id="icoLang" class="flag" alt=""></span><b>Jazyk</b></button></div><div id="langList" hidden></div><button id="setBack" class="btn">Späť</button></div></div>
 <div id="logoIntro"><img src="img/logo.jpg" alt="DBee games"></div>
 <script src="js/splash.js"></script>
 <div id="game">
@@ -577,8 +578,8 @@
     <div id="palette"></div>
     <div class="brow undoRow">
       <button id="repairBtn" class="btn"></button>
-      <button id="undoBtn" class="btn undo" disabled>↶ Späť</button>
-      <button id="nextWave" class="primary">Do boja ▶</button>
+      <button id="undoBtn" class="btn undo" disabled>Späť</button>
+      <button id="nextWave" class="primary">Do boja</button>
     </div>
   </div>
 
@@ -586,7 +587,7 @@
     <div class="menuSpace"></div>
     <h2 class="menuHead">Vyber pozíciu</h2>
     <div id="slotList"></div>
-    <button id="slotsBack" class="btn">◀ Späť</button>
+    <button id="slotsBack" class="btn">Späť</button>
   </div>
 
   <div id="title" class="screenOverlay menuBg" hidden>
@@ -594,7 +595,7 @@
     <div class="menuSpace"></div>
     <h2 class="menuHead">Vyber si rasu</h2>
     <div id="races"></div>
-    <button id="raceBack" class="btn">◀ Späť</button>
+    <button id="raceBack" class="btn">Späť</button>
   </div>
 
   <div id="map" hidden>
@@ -612,7 +613,7 @@
       <div class="brow three">
         <button id="mapBack" class="btn">Menu</button>
         <button id="hallBtn" class="btn hallBtn"><span>Sieň</span><span class="cost">★ <span id="hallBtnTxt">0</span></span></button>
-        <button id="mapPlay" class="primary">Hrať ▶</button>
+        <button id="mapPlay" class="primary">Hrať</button>
       </div>
     </div>
   </div>
@@ -649,8 +650,8 @@
 
   <div id="pauseBox" class="screenOverlay" hidden>
     <div class="askCard"><h2>Pauza</h2>
-      <button id="pauseGo" class="primary">▶ Pokračovať</button>
-      <button id="pauseRestart" class="btn">↻ Reštart</button>
+      <button id="pauseGo" class="primary">Pokračovať</button>
+      <button id="pauseRestart" class="btn">Reštart</button>
       <button id="pauseQuit" class="btn">Ukončiť</button></div>
   </div>
   <div id="askBox" class="screenOverlay" hidden>
