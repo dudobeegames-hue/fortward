@@ -1787,7 +1787,7 @@
     if (b.kind === 'wall') {
       const edgeL = b.c === 0 && G.gx0 > 0 && !scene.theme.sea, // pri mori hradba končí na pláži
         edgeR = b.c === G.cols - 1 && W - (x0 + T) > 0;
-      const m = (joins(b.c, b.r - 1) ? 1 : 0) | (joins(b.c + 1, b.r) || edgeR ? 2 : 0) | (joins(b.c, b.r + 1) ? 4 : 0) | (joins(b.c - 1, b.r) || edgeL ? 8 : 0);
+      const m = (joinsV(b.c, b.r - 1) ? 1 : 0) | (joins(b.c + 1, b.r) || edgeR ? 2 : 0) | (joinsV(b.c, b.r + 1) ? 4 : 0) | (joins(b.c - 1, b.r) || edgeL ? 8 : 0);
       const wl = Math.max(1, Math.min(5, b.lvl)) - 1;
       spr = BSPR.wall[wl][m];
       g.drawImage(b.flash > 0 ? spr.f : spr.c, x0, y0 - 6);
@@ -1837,6 +1837,7 @@
   }
   const JOINERS = { wall: 1, tower: 1, mage: 1 }; // hradby sa napájajú len na hradby a veže (strážna, mága) – na ostatné budovy nie
   const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL || !!JOINERS[o.kind]); };
+  const joinsV = (c, r) => occAt(c, r) !== HALL && joins(c, r); // na radnicu sa hradby napájajú len z bokov, nie zhora
   const joinsBuilding = (c, r) => { const o = occAt(c, r); return !!o && o !== HALL && o.kind !== 'wall' && !!JOINERS[o.kind]; };
 
   function drawHall(time) {
@@ -1940,11 +1941,11 @@
     }
     if (drag) { // náhľad radu hradieb pred pustením prsta
       const key = (c, r) => c + ',' + r, inPath = new Set(drag.path.map(q => key(q.c, q.r))), ok = wallsAfford();
-      const j = (c, r) => inPath.has(key(c, r)) || joins(c, r);
+      const j = (c, r) => inPath.has(key(c, r)) || joins(c, r), jv = (c, r) => inPath.has(key(c, r)) || joinsV(c, r);
       g.globalAlpha = 0.65;
       drag.path.forEach((q, i) => {
         const x = tileX(q.c), y = tileY(q.r);
-        const m = (j(q.c, q.r - 1) ? 1 : 0) | (j(q.c + 1, q.r) ? 2 : 0) | (j(q.c, q.r + 1) ? 4 : 0) | (j(q.c - 1, q.r) ? 8 : 0);
+        const m = (jv(q.c, q.r - 1) ? 1 : 0) | (j(q.c + 1, q.r) ? 2 : 0) | (jv(q.c, q.r + 1) ? 4 : 0) | (j(q.c - 1, q.r) ? 8 : 0);
         g.drawImage(BSPR.wall[0][m].c, x, y - 6);
         if (i >= ok) { g.fillStyle = 'rgba(232,72,56,0.55)'; g.fillRect(x, y - 6, T, T + 6); }
       });
