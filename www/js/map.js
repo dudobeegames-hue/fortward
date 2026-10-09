@@ -193,6 +193,7 @@ const ENEMY_INTRO = {
   6: { id: 'shaman', name: 'Šaman', desc: 'lieči ostatných – zabi ho ako prvého' },
   7: { id: 'bear', name: 'Medvedí jazdec', desc: 'nápor zrazí rytiera aj jazdca – zastavia ho len kopijníci' },
   8: { id: 'sapper', name: 'Podkopník', desc: 'beží k hradbám a vyhodí ich do vzduchu – zastreľ ho skôr' },
+  9: { id: 'wolf', name: 'Vlčí jazdci', desc: 'prebehnú cez rytierov a idú po lukostrelcoch – zastavia ich kopijníci' },
   10: { id: 'orcKing', name: 'Orkský veľkráľ', desc: 'vyjde z hradu pod polovicou zdravia – dupnutím omračuje a privoláva goblinov' },
 };
 function techFor(m) {

@@ -881,6 +881,29 @@ function makeBearRider(step) {
   return p.finish();
 }
 
+// ---- Vlčí jazdec (goblin na sivom vlkovi s dýkou) 16x17, pohľad spredu; step = krok labiek ----
+function makeWolfRider(step) {
+  const p = painter(16, 17);
+  const WOLF = ['#1e1e26', '#34343e', '#4e4e5a', '#6e6e7c', '#9090a0', '#b8b8c6'].map(hexRGB);
+  const SKIN = ['#305c22', '#3e7a2a', '#62a03a', '#7cb848', '#9cd45a'].map(hexRGB);
+  for (const [lx, up] of [[3, step], [10, 1 - step]]) for (let y = 12; y <= 16 - up; y++) for (let x = lx; x <= lx + 1; x++) // labky
+    p.shade(x, y, WOLF, y === 16 - up ? 0.15 : 0.6 - (x - lx) * 0.2);
+  pDisk(p, 7.5, 11, 6.5, 3.5, (x, y, nx, ny) => p.shade(x, y, WOLF, 0.6 - nx * 0.25 - ny * 0.15 + (hash2(x, y, 311) - 0.5) * 0.15)); // trup
+  // hlava vlka: špicaté uši, úzky ňufák
+  pDisk(p, 7.5, 12.2, 3.4, 2.6, (x, y, nx, ny, q) => p.shade(x, y, WOLF, q > 0.75 ? 0.12 : 0.9 - nx * 0.3)); // hlava s tmavým lemom
+  for (const [ex, v] of [[4, 0.8], [11, 0.45]]) { p.shade(ex, 8, WOLF, v); p.shade(ex, 9, WOLF, v); p.shade(ex + (ex === 4 ? 1 : -1), 9, WOLF, v - 0.1); p.shade(ex, 7, WOLF, v + 0.1); } // špicaté uši
+  for (let y = 13; y <= 15; y++) { p.shade(7, y, WOLF, 0.98); p.shade(8, y, WOLF, 0.8); }   // ňufák
+  p.set(7, 16, hexRGB('#1c140e')); p.set(8, 16, hexRGB('#1c140e'));                              // nos
+  p.set(6, 11, hexRGB('#f8d048')); p.set(9, 11, hexRGB('#f8d048'));                              // žlté oči
+  // goblin v sedle: zelená hlava so špicatými ušami, kožená vesta, dýka
+  for (let y = 4; y <= 8; y++) for (let x = 6; x <= 9; x++) p.shade(x, y, y <= 5 ? SKIN : WOOD, (y <= 5 ? 0.8 : 0.4) - (x - 6) * 0.08);
+  for (let y = 1; y <= 3; y++) for (let x = 6; x <= 9; x++) p.shade(x, y, SKIN, 0.85 - (x - 6) * 0.1);
+  p.set(5, 2, SKIN[3]); p.set(10, 2, SKIN[1]);                                                    // uši
+  p.set(7, 2, hexRGB('#e84838')); p.set(8, 2, hexRGB('#e84838'));                                 // oči
+  p.set(11, 6, hexRGB('#62a03a')); p.set(12, 5, hexRGB('#bcc0cc')); p.set(13, 4, hexRGB('#f4f4f8')); // ruka s dýkou
+  return p.finish();
+}
+
 // ---- Vodný mlyn (32x32): kamenné prízemie, hrázdené poschodie, slamená strecha, koleso s lopatkami a žľab ----
 const STRAW = ['#2e200c', '#4a3614', '#6a4e1e', '#8a6a2a', '#a8843a', '#c49e4e', '#dcba68', '#ecd28a'].map(hexRGB);
 // koleso mlyna: stred v sprite mlyna (vodorovne), polomer s lopatkami ~8,4 px
@@ -987,6 +1010,7 @@ function initBuildingSprites() {
   SPR.siegeCat = [makeSiegeCat(true), makeSiegeCat(false)];
   SPR.orcKing = [makeOrcKing(0), makeOrcKing(1)];
   SPR.bear = [makeBearRider(0), makeBearRider(1)];
+  SPR.wolf = [makeWolfRider(0), makeWolfRider(1)];
   BSPR.mill = makeMill();
   // 8-násobná súmernosť: 45° otočenia rozdelených do snímok sa plynulo opakuje
   BSPR.millWheel = Array.from({ length: MILL_WHEEL.frames }, (_, i) => makeMillWheel(i / MILL_WHEEL.frames * Math.PI / 4));

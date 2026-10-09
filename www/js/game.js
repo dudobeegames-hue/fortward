@@ -97,6 +97,7 @@
     bat:     { spr: 'bat',     hp: 9,   speed: 30, atk: 4,  atkCd: 1.0, gold: 4,  blood: '#4a3460', fly: true },
     ram:     { spr: 'ram',     hp: 170, speed: 9,  atk: 48, atkCd: 1.6, gold: 22, blood: '#6e4422', ram: true },
     shaman:  { spr: 'shaman',  hp: 45,  speed: 12, atk: 5,  atkCd: 1.2, gold: 15, blood: '#62a03a', heals: true },
+    wolf:    { spr: 'wolf',    hp: 30,  speed: 40, atk: 9,  atkCd: 0.7, gold: 7,  blood: '#62a03a', cav: true, flank: true },
     bear:    { spr: 'bear',    hp: 150, speed: 22, atk: 24, atkCd: 1.2, gold: 20, blood: '#62a03a', cav: true, charge: true },
     sapper:  { spr: 'sapper',  hp: 16,  speed: 22, atk: 90, atkCd: 0.5, gold: 8,  blood: '#62a03a', sapper: true },
   };
@@ -607,7 +608,7 @@
     typeShift: 0.8, bruteFrom: 5, bruteRate: 0.03,         // ako rýchlo pribúdajú orkovia a surovci
     startGold: 210, startGoldMission: 80, goldMission: 0.15, // ekonomika (každá misia začína od nuly)
     bossBase: 0.6, bossMission: 0.33, bossLast: 1.0,       // sila vojvodcu v 5. a 10. vlne
-    pBear: 0.07,
+    pBear: 0.07, pWolf: 0.1,
     pArcher: 0.12, pBat: 0.12, pRam: 0.05, pShaman: 0.04, pSapper: 0.06, // podiel nových nepriateľov
   };
   const goldMul = () => 1 + DIFF.goldMission * (st.mission - 1);
@@ -630,8 +631,9 @@
       const pSap = m >= 8 && w >= 2 ? DIFF.pSapper : 0;
       if (r2 >= 1 - pSap) type = 'sapper';
       const pSh = m >= 6 && w >= 2 ? DIFF.pShaman : 0, pRam = m >= 5 && w >= 3 ? DIFF.pRam : 0, pBat = m >= 4 ? DIFF.pBat : 0, pArc = m >= 3 ? DIFF.pArcher : 0;
-      const pBear = m >= 7 && w >= 3 ? DIFF.pBear : 0;
+      const pBear = m >= 7 && w >= 3 ? DIFF.pBear : 0, pWolf = m >= 9 && w >= 2 ? DIFF.pWolf : 0;
       if (r2 >= 1 - pSap - pBear && r2 < 1 - pSap) type = 'bear';
+      else if (r2 >= 1 - pSap - pBear - pWolf && r2 < 1 - pSap - pBear) type = 'wolf';
       else if (r2 < pSh) type = 'shaman';
       else if (r2 < pSh + pRam) type = 'ram';
       else if (r2 < pSh + pRam + pBat) type = 'bat';
@@ -987,6 +989,20 @@
       e.atk -= dt * slow;
       if (e.atk <= 0) { e.atk = e.d.atkCd; e.lunge = 0.15; fn(); }
     };
+    // vlčí jazdec: prebehne cez líniu (zastavia ho len kopijníci) a ide po lukostrelcoch mimo hradieb
+    if (e.d.flank) {
+      if (e.foe && e.foe.ktype !== 'spear' && !e.foe.archer) e.foe = null;
+      if (!e.foe) {
+        const zoneY = tileY(zoneTopRow());
+        let tg = null, td = 1e9;
+        for (const u of st.soldiers) if (u.archer && !u.dead && u.y < zoneY) { const d = Math.hypot(u.x - e.x, u.y - e.y); if (d < td) { td = d; tg = u; } }
+        if (tg) {
+          if (td < 9) { attackFn(() => hitUnit(tg, e.d.atk * e.pow)); return; }
+          moveTo(e, tg.x, tg.y, e.spd * slow * waterMul(e), dt);
+          return;
+        }
+      }
+    }
     // šaman lieči okolie
     if (e.d.heals) {
       e.healT = (e.healT || 2) - dt;
@@ -1240,6 +1256,7 @@
     if (u.tgt && (u.tgt.dead || Math.hypot(u.tgt.x - homeX, u.tgt.y - homeY) > aggro + 16)) u.tgt = null;
     // jazdec si vyberá strelcov, šamanov a podkopníkov; ostatní najbližšieho
     if (!u.tgt && u.ktype === 'rider') u.tgt = priorityEnemy(homeX, homeY, aggro, RIDER_PRIO);
+    if (u.ktype === 'spear' && !(u.tgt && u.tgt.d.cav)) { const c = priorityEnemy(u.x, u.y, 90, e => e.d.cav); if (c) u.tgt = c; } // kopijník vyráža proti jazde
     if (!u.tgt) u.tgt = nearestEnemy(homeX, homeY, aggro, true);
     const t = u.tgt;
     const cry = st.cryT > 0 ? 1 : 0, spd = (u.spd || 26) * (1 + 0.4 * cry) * waterMul(u);
@@ -2359,7 +2376,7 @@
     ICONS.u_siegeRam = spriteURL(SPR.siegeRam[0], 2); ICONS.u_siegeCat = spriteURL(SPR.siegeCat[0], 2);
     $('buyRam').querySelector('img').src = ICONS.u_siegeRam; $('buyCat').querySelector('img').src = ICONS.u_siegeCat;
     $('kingIcon').src = ICONS.king;
-    for (const k of ['garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' ? 2 : 3);
+    for (const k of ['garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' ? 2 : 3);
     ICONS.coin = spriteURL(SPR.coin[0], 4);
     ICONS.gem = spriteURL(SPR.gem[0], 4);
     document.querySelectorAll('img.coin').forEach(i => { i.src = ICONS.coin; });
