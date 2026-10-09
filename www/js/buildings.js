@@ -904,6 +904,43 @@ function makeWolfRider(step) {
   return p.finish();
 }
 
+// ---- Sokol hráča 13x9 (pohľad zhora-spredu): hnedé krídla s pruhmi, svetlá hruď, modrá páska; up = krídla hore ----
+const FALCON = ['#2a1a0e', '#4a2e18', '#6e4826', '#8e6436', '#b08850', '#d8c0a0'].map(hexRGB);
+function makeFalcon(up) {
+  const p = painter(13, 9);
+  for (let x = 0; x <= 12; x++) {                                        // krídla
+    const dx = Math.abs(x - 6); if (dx < 1) continue;
+    const yw = up ? 4 - Math.round(dx * 0.6) : 3 + Math.round(dx * 0.35);
+    for (let y = yw; y <= yw + (dx > 4 ? 0 : 1); y++) p.shade(x, y, FALCON, (x < 6 ? 0.75 : 0.45) - (dx % 2 ? 0.15 : 0));
+  }
+  for (let y = 2; y <= 7; y++) for (let x = 5; x <= 7; x++) p.shade(x, y, FALCON, y <= 3 ? 0.55 : 0.92 - (x - 5) * 0.1); // telo, svetlá hruď
+  p.set(6, 1, FALCON[3]); p.set(6, 2, hexRGB('#f8d048'));                                     // hlava, zobák
+  p.set(5, 2, hexRGB('#1c140e')); p.set(7, 2, hexRGB('#1c140e'));                             // oči
+  p.set(5, 5, hexRGB('#3c64c8')); p.set(6, 5, hexRGB('#5a86e8')); p.set(7, 5, hexRGB('#3c64c8')); // modrá páska (sokol kráľa)
+  for (const x of [5, 7]) p.set(x, 8, FALCON[1]);                                              // chvost
+  return p.finish();
+}
+// sokoliareň 16x28: drevená vežička s bidlami, sokol na vrchole, modrá strieška
+function makeFalconry() {
+  const p = painter(16, 28);
+  for (let y = 12; y <= 26; y++) for (let x = 3; x <= 12; x++) {                              // drevené telo
+    let v = 0.6 - (x - 3) / 9 * 0.25 + (hash2(x, y, 321) - 0.5) * 0.1;
+    if ((x - 3) % 3 === 2) v -= 0.18;
+    if (y === 26) v -= 0.2;
+    p.shade(x, y, WOOD, v);
+  }
+  for (let y = 19; y <= 26; y++) for (let x = 6; x <= 9; x++) p.shade(x, y, WOOD, y === 19 ? 0.1 : 0.3 + (x % 2) * 0.08); // dvere
+  for (const wy of [14]) for (let x = 7; x <= 8; x++) for (let y = wy; y <= wy + 1; y++) p.set(x, y, DARKWIN);
+  pGable(p, 7.5, 5, 11, 6.5, ROOF_BLUE);                                                        // strieška
+  for (const [bx, by] of [[0, 16], [13, 20]]) for (let x = bx; x <= bx + 2; x++) p.shade(x, by, WOOD, 0.7);   // bidlá
+  // sokol na vrchole strechy
+  for (let y = 1; y <= 4; y++) for (let x = 6; x <= 9; x++) p.shade(x, y, FALCON, y === 1 ? 0.6 : 0.9 - (x - 6) * 0.15);
+  p.set(8, 1, hexRGB('#f8d048')); p.set(7, 1, hexRGB('#1c140e')); p.set(5, 3, FALCON[2]); p.set(10, 3, FALCON[1]);
+  // rukavica sokoliara na bidle vpravo
+  p.set(14, 19, hexRGB('#a86c38')); p.set(14, 18, FALCON[3]);
+  return p.finish();
+}
+
 // ---- Vodný mlyn (32x32): kamenné prízemie, hrázdené poschodie, slamená strecha, koleso s lopatkami a žľab ----
 const STRAW = ['#2e200c', '#4a3614', '#6a4e1e', '#8a6a2a', '#a8843a', '#c49e4e', '#dcba68', '#ecd28a'].map(hexRGB);
 // koleso mlyna: stred v sprite mlyna (vodorovne), polomer s lopatkami ~8,4 px
@@ -1011,6 +1048,8 @@ function initBuildingSprites() {
   SPR.orcKing = [makeOrcKing(0), makeOrcKing(1)];
   SPR.bear = [makeBearRider(0), makeBearRider(1)];
   SPR.wolf = [makeWolfRider(0), makeWolfRider(1)];
+  SPR.falcon = [makeFalcon(true), makeFalcon(false)];
+  BSPR.falconry = makeFalconry();
   BSPR.mill = makeMill();
   // 8-násobná súmernosť: 45° otočenia rozdelených do snímok sa plynulo opakuje
   BSPR.millWheel = Array.from({ length: MILL_WHEEL.frames }, (_, i) => makeMillWheel(i / MILL_WHEEL.frames * Math.PI / 4));

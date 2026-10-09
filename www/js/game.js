@@ -22,6 +22,7 @@
     barracks: { name: 'Kasárne',      short: 'Kasárne', cost: 90, hp: 220, block: true, desc: 'Posiela rytierov proti horde' },
     range:    { name: 'Strelnica',    short: 'Strelnica', cost: 100, hp: 200, block: true, desc: 'Vysiela lukostrelcov, ktorí sa držia za rytiermi a strieľajú z diaľky' },
     stables:  { name: 'Stajne',       short: 'Stajne',  cost: 110, hp: 200, block: true, desc: 'Vysiela jazdcov – rýchlo obídu líniu a idú po strelcoch, šamanoch a podkopníkoch' },
+    falconry: { name: 'Sokoliareň',   short: 'Sokoly',  cost: 120, hp: 180, block: true, desc: 'Vypúšťa sokoly – letia ponad hradby a lovia netopiere, šamanov a podkopníkov; strelci ich ľahko zostrelia' },
     armory:   { name: 'Zbrojnica',    short: 'Zbrojnica', cost: 100, hp: 240, block: true, desc: 'Vysiela kopijníkov – útočia spoza rytierov a sú silní proti jazde' },
     mage:     { name: 'Veža mága',    short: 'Mág',    cost: 150, hp: 240, range: 70, dmg: 14, cd: 2.2, proj: 'fire', speed: 115, splash: 16, block: true, desc: 'Ohnivá guľa zasiahne celú skupinu' },
     wall:     { name: 'Hradby',       short: 'Hradby', cost: 12,  hp: 240, block: true, desc: 'Zatarasí cestu – horda ich musí rozbiť alebo obísť' },
@@ -86,7 +87,7 @@
   const uCd = u => WUNIT[u.type].cd * Math.pow(0.92, u.lvl - 1);
   const uRange = u => WUNIT[u.type].range + 4 * (u.lvl - 1);
   const uUpCost = u => Math.round(WUNIT[u.type].cost * 0.9 * Math.pow(1.6, u.lvl - 1));
-  const BUILD_ORDER = ['tower', 'wall', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'catapult', 'mage', 'chapel', 'firepit', 'beartrap', 'workshop'];
+  const BUILD_ORDER = ['tower', 'wall', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'catapult', 'mage', 'chapel', 'firepit', 'beartrap', 'workshop'];
   const ENEMY = {
     goblin:  { spr: 'goblin',  hp: 12,  speed: 24, atk: 4,  atkCd: 0.8, gold: 3,  blood: '#62a03a' },
     orc:     { spr: 'orc',     hp: 32,  speed: 16, atk: 9,  atkCd: 1.0, gold: 6,  blood: '#62a03a' },
@@ -390,7 +391,7 @@
   function throwRock(F) {
     let best = null, bn = 0;
     for (const u of st.soldiers) {
-      if (u.dead || u.helper || Math.hypot(u.x - F.x, u.y - F.y) > 150) continue;
+      if (u.dead || u.helper || u.fly || Math.hypot(u.x - F.x, u.y - F.y) > 150) continue;
       let n = 0; for (const v of st.soldiers) if (!v.dead && Math.hypot(v.x - u.x, v.y - u.y) < 14) n++;
       if (n > bn) { bn = n; best = u; }
     }
@@ -408,7 +409,7 @@
       if (r.t < 1) continue;
       r.done = true;
       const dmg = 16 * (1 + 0.2 * (st.mission - HOME_PROVINCES - 1)) * Math.sqrt(TIERS[st.tier || 0].hp);
-      for (const u of st.soldiers) if (!u.dead && Math.hypot(u.x - r.tx, u.y - r.ty) < 13) hitUnit(u, dmg);
+      for (const u of st.soldiers) if (!u.dead && !u.fly && Math.hypot(u.x - r.tx, u.y - r.ty) < 13) hitUnit(u, dmg);
       st.shake = Math.max(st.shake, 0.12);
       for (let k = 0; k < 12; k++) part(r.tx, r.ty - 2, (Math.random() - 0.5) * 50, -Math.random() * 35, 0.5, ['#3c3846', '#625a6c', '#967048'][k % 3], 100);
     }
@@ -557,7 +558,7 @@
     }
     for (const q of F.pal) q.flash = Math.max(0, q.flash - dt);
     for (const u of st.soldiers) { // koly zraňujú a vojaci ich pritom pošliapu
-      const q = !u.dead && !u.helper && stakeAt(u);
+      const q = !u.dead && !u.helper && !u.fly && stakeAt(u);
       if (!q) continue;
       hitUnit(u, 4 * dt); u.flash = 0;
       q.hp -= 12 * dt;
@@ -576,7 +577,7 @@
       for (const u of st.soldiers) { if (u.dead) continue; const d = Math.hypot(u.x - t.x, u.y - (t.y - 24)); if (d < td) { td = d; tg = u; } }
       if (!tg) { t.cd = 0.3; continue; }
       t.cd = 1.5;
-      st.eproj.push({ x: t.x, y: t.y - 28, tx: tg.x, ty: tg.y - 6, tgt: tg, dmg: 5 * (1 + 0.2 * (st.mission - HOME_PROVINCES - 1)) * Math.sqrt(TIERS[st.tier || 0].hp) });
+      st.eproj.push({ x: t.x, y: t.y - 28, tx: tg.x, ty: tg.y - (tg.fly ? 16 : 6), tgt: tg, dmg: 5 * (1 + 0.2 * (st.mission - HOME_PROVINCES - 1)) * Math.sqrt(TIERS[st.tier || 0].hp) });
       fortContact();
     }
   }
@@ -686,7 +687,7 @@
     updateHud();
   }
   // sú vojaci pri pevnosti? (pri palisáde alebo za ňou)
-  const sieging = () => !!st.fort && !st.fort.dead && st.soldiers.some(u => !u.dead && !u.helper && u.y < FORT.palY + 40);
+  const sieging = () => !!st.fort && !st.fort.dead && st.soldiers.some(u => !u.dead && !u.helper && !u.fly && u.y < FORT.palY + 40);
   const fortContact = () => { if (st.fort && st.phase === 'battle' && !st.orcWaveOn && st.pendingWave) triggerOrcWave(); };
 
   function startWave() {
@@ -707,7 +708,7 @@
     AUDIO.play('horn'); AUDIO.music('battle');
     st.viewUp = Math.max(0, (st.viewUp || 0) - panelLow()); // rovnaký pohľad aj bez panela
     $('build').hidden = true; $('bottom').hidden = false;
-    for (const b of st.blds) if (UNIT_HOME[b.kind] || b.kind === 'range' || HELPERS[b.kind]) b.spawnT = HELPERS[b.kind] ? 0.6 : 0.3;
+    for (const b of st.blds) if (UNIT_HOME[b.kind] || b.kind === 'range' || b.kind === 'falconry' || HELPERS[b.kind]) b.spawnT = HELPERS[b.kind] ? 0.6 : 0.3;
     if (isAttack()) {
       banner(st.pendingWave ? 'Do útoku!' : 'Zaútoč na hrad hordy!');
       if (st.pendingWave && !canMarch()) triggerOrcWave(); // nemá kto vyraziť – orkovia útočia hneď
@@ -929,14 +930,14 @@
       AUDIO.play('horn');
     }
     let tg = null, td = 90;
-    for (const u of st.soldiers) { if (u.dead || u.helper) continue; const d = Math.hypot(u.x - e.x, u.y - e.y); if (d < td) { td = d; tg = u; } }
+    for (const u of st.soldiers) { if (u.dead || u.helper || u.fly) continue; const d = Math.hypot(u.x - e.x, u.y - e.y); if (d < td) { td = d; tg = u; } }
     if (!tg) return false;
     // dupnutie: zraní a omráči všetkých vojakov okolo
     if (e.stompT <= 0 && td < KING_STOMP.r) {
       e.stompT = KING_STOMP.cd; e.lunge = 0.3;
       AUDIO.play('boom'); st.shake = Math.max(st.shake, 0.35);
       for (let k = 0; k < 28; k++) { const a = k / 28 * 6.28; part(e.x + Math.cos(a) * 6, e.y + Math.sin(a) * 3, Math.cos(a) * 60, Math.sin(a) * 30, 0.45, k % 2 ? '#967048' : '#c6a272', 0); }
-      for (const u of st.soldiers) if (!u.dead && !u.helper && Math.hypot(u.x - e.x, u.y - e.y) < KING_STOMP.r) { hitUnit(u, e.d.atk * 0.5 * e.pow); u.stunT = KING_STOMP.stun; }
+      for (const u of st.soldiers) if (!u.dead && !u.helper && !u.fly && Math.hypot(u.x - e.x, u.y - e.y) < KING_STOMP.r) { hitUnit(u, e.d.atk * 0.5 * e.pow); u.stunT = KING_STOMP.stun; }
       return true;
     }
     e.attacking = false;
@@ -951,7 +952,7 @@
   function bearCharge(e, dt) {
     if (e.charged) { if (!e.foe && !e.attacking) { e.rechargeT = (e.rechargeT || 0) + dt; if (e.rechargeT > 3) e.charged = false; } else e.rechargeT = 0; return; }
     for (const u of st.soldiers) {
-      if (u.dead || u.helper || u.siege || u.stunT > 0 || Math.hypot(u.x - e.x, u.y - e.y) > 11) continue;
+      if (u.dead || u.helper || u.siege || u.fly || u.stunT > 0 || Math.hypot(u.x - e.x, u.y - e.y) > 11) continue;
       e.charged = true; e.rechargeT = 0;
       if (st.soldiers.some(s => !s.dead && s.ktype === 'spear' && Math.hypot(s.x - e.x, s.y - e.y) < 22)) { // les kopijí
         e.stunT = 0.9; AUDIO.play('clang');
@@ -1050,7 +1051,7 @@
     // súboj s rytierom / kráľom (beranidlo a podkopník rytierov ignorujú)
     if (e.d.ram || e.d.sapper) e.foe = null;
     if (e.foe && (e.foe.dead || e.foe.down > 0)) e.foe = null;
-    if (!e.foe && !e.d.ram && !e.d.sapper) for (const s of st.soldiers) if ((s.helper || s.archer) && !s.dead && Math.hypot(s.x - e.x, s.y - e.y) < 9) { e.foe = s; break; }
+    if (!e.foe && !e.d.ram && !e.d.sapper) for (const s of st.soldiers) if ((s.helper || s.archer) && !s.fly && !s.dead && Math.hypot(s.x - e.x, s.y - e.y) < 9) { e.foe = s; break; }
     if (e.foe) {
       if (Math.hypot(e.foe.x - e.x, e.foe.y - e.y) < 12) { attack(() => hitUnit(e.foe, e.d.atk * 0.7 * 1)); return; }
       e.foe = null;
@@ -1067,13 +1068,13 @@
       const hrr = hallRect();
       const dh = Math.hypot(Math.max(hrr.x0 - e.x, 0, e.x - hrr.x1), Math.max(hrr.y0 - e.y, 0, e.y - hrr.y1));
       if (dh < td) { td = dh; tgt = HALL; }
-      for (const u of st.soldiers) { const d = Math.hypot(u.x - e.x, u.y - e.y); if (d < td * 0.8) { td = d; tgt = u; } }
+      for (const u of st.soldiers) { const d = Math.hypot(u.x - e.x, u.y - e.y); if (d < (u.fly ? R : td * 0.8)) { td = u.fly ? 0 : d; tgt = u; } } // sokoly zostrelí prednostne
       if (tgt) {
         attackFn(() => {
           let tx, ty;
           if (tgt === HALL) { tx = Math.max(hrr.x0 + 2, Math.min(hrr.x1 - 2, e.x)); ty = hrr.y0 + 4; }
           else if (tgt.kind) { tx = tileX(tgt.c) + T / 2; ty = tileY(tgt.r) + 4; }
-          else { tx = tgt.x; ty = tgt.y - 6; }
+          else { tx = tgt.x; ty = tgt.y - (tgt.fly ? 16 : 6); }
           st.eproj.push({ x: e.x, y: e.y - 8, tx, ty, tgt, dmg: e.d.atk });
         });
         return;
@@ -1343,6 +1344,52 @@
     return true;
   }
 
+  // ---- sokoly: lietajú ponad všetko, lovia letcov, šamanov a podkopníkov; pechota na ne nedosiahne ----
+  const FALCON_PRIO = e => e.d.fly || e.d.heals || e.d.sapper;
+  const falconCap = b => 1 + b.lvl;
+  const falconHp = b => 22 * lvlMul(b, 0.3) * (1 + 0.2 * perk('drill'));
+  const falconDmg = b => 5 * lvlMul(b, 0.35) * (1 + 0.2 * perk('drill'));
+  function updateFalconry(b, dt) {
+    b.spawnT -= dt;
+    if (b.spawnT > 0) return;
+    if (st.soldiers.filter(s => s.home === b).length >= falconCap(b)) { b.spawnT = 0.5; return; }
+    b.spawnT = Math.max(4, 8 - 0.8 * (b.lvl - 1));
+    const c = bCenter(b), hp = falconHp(b);
+    st.soldiers.push({ home: b, fly: true, x: c.x, y: tileY(b.r) + 4, hp, max: hp, dmg: falconDmg(b), spd: 52, cd: 0.3, tgt: null, anim: Math.random() * 2, flash: 0, dead: false, slot: st.soldierN++ });
+    for (let k = 0; k < 5; k++) part(c.x, tileY(b.r), (Math.random() - 0.5) * 20, -Math.random() * 20, 0.4, '#d8c0a0', 20);
+  }
+  function updateFalcon(u, dt) {
+    u.flash = Math.max(0, u.flash - dt); u.cd = Math.max(0, u.cd - dt); u.swing = Math.max(0, (u.swing || 0) - dt);
+    u.anim += dt * 9;
+    if (u.tgt && (u.tgt.dead || (!FALCON_PRIO(u.tgt) && u.retarget-- <= 0))) u.tgt = null;
+    if (!u.tgt || !FALCON_PRIO(u.tgt)) { // prednostný cieľ kdekoľvek na bojisku, inak najbližší nepriateľ
+      let best = null, bd = 1e9, bestP = false;
+      for (const e of st.enemies) {
+        if (e.dead || e.y < 4) continue;
+        const p = !!FALCON_PRIO(e), d = Math.hypot(e.x - u.x, e.y - u.y);
+        if ((p && !bestP) || (p === bestP && d < bd)) { best = e; bd = d; bestP = p; }
+      }
+      if (best) { u.tgt = best; u.retarget = 30; }
+    }
+    const t = u.tgt;
+    if (t) {
+      const ty = t.y - (t.d.fly ? 0 : 4);
+      if (Math.hypot(t.x - u.x, ty - u.y) > 5) { moveTo(u, t.x, ty, u.spd, dt); return; }
+      if (u.cd <= 0) { u.cd = 0.8; u.swing = 0.15; AUDIO.play('hit'); damage(t, u.dmg * (t.d.fly ? 2 : 1)); } // netopiere roztrhá
+      return;
+    }
+    // nič na love: krúži nad svojou sokoliarňou (v útoku nad vojskom)
+    const lead = st.fort ? st.soldiers.filter(s => !s.dead && !s.fly && !s.helper).sort((a, b) => a.y - b.y)[0] : null;
+    const c = lead || (u.home && st.blds.includes(u.home) ? bCenter(u.home) : { x: G.hallCx, y: G.hallTop });
+    const a = performance.now() / 700 + u.slot;
+    moveTo(u, c.x + Math.cos(a) * 12, c.y - 10 + Math.sin(a) * 5, u.spd * 0.6, dt);
+  }
+  function drawFalcon(u, time) {
+    const fr = SPR.falcon[Math.floor(u.anim) % 2], bob = Math.sin(time * 5 + u.slot) * 1.5;
+    shadow(u.x, u.y + 2, 3);
+    g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), Math.round(u.y - 14 + bob - (u.swing > 0 ? -3 : 0)));
+  }
+
   // strelnica v intervaloch vyšle lukostrelca (najviac archerCap naraz)
   function updateRange(b, dt) {
     b.spawnT -= dt;
@@ -1495,6 +1542,7 @@
       else if (b.unit) { b.unit.cd -= dt; if (b.unit.cd <= 0 && fireWallUnit(b)) b.unit.cd = uCd(b.unit); }
       else if (UNIT_HOME[b.kind]) updateBarracks(b, dt);
       else if (b.kind === 'range') updateRange(b, dt);
+      else if (b.kind === 'falconry') updateFalconry(b, dt);
       else if (HELPERS[b.kind]) updateHelperHome(b, dt);
       else if (b.kind === 'beartrap' && b.armT > 0) b.armT -= dt;
     }
@@ -1505,6 +1553,7 @@
       if (s.dead) continue;
       if (s.stunT > 0) { s.stunT -= dt; s.flash = Math.max(0, s.flash - dt); continue; } // omráčený dupnutím veľkráľa
       if (s.helper) { updateHelper(s, dt); continue; }
+      if (s.fly) { updateFalcon(s, dt); continue; }
       if (s.archer) { updateArcher(s, dt, G.gx0 + ((s.slot * 37 + 18) % (G.cols * T - 16)) + 8, musterY + 16); continue; }
       if (st.fort) { updateAssault(s, dt); continue; }
       const mx = G.gx0 + ((s.slot * 37) % (G.cols * T - 16)) + 8;
@@ -2248,7 +2297,7 @@
     if (playing) {
       objs.push({ y: G.hallBot, f: () => drawHall(time) });
       for (const b of st.blds) if (!TRAPS[b.kind]) objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), f: () => drawBuilding(b, time) });
-      for (const s of st.soldiers) objs.push({ y: s.y, f: () => drawFighter(s, s.spr || 'soldier') });
+      for (const s of st.soldiers) objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: s.y, f: () => drawFighter(s, s.spr || 'soldier') });
       if (st.king && !st.king.dead) objs.push({ y: st.king.y, f: () => drawFighter(st.king, 'king') });
       else if (st.king && st.king.deadT < KING_GONE) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
     }
@@ -2365,7 +2414,7 @@
     ICONS.mage = spriteURL(BSPR.mage[0], 3);
     ICONS.wall = spriteURL(BSPR.wall[0][10], 3);
     ICONS.pit = spriteURL(BSPR.pit, 3);
-    for (const k of ['catapult', 'mine', 'chapel', 'firepit', 'beartrap', 'workshop', 'range', 'stables', 'armory']) ICONS[k] = spriteURL(BSPR[k], 3);
+    for (const k of ['catapult', 'mine', 'chapel', 'firepit', 'beartrap', 'workshop', 'range', 'stables', 'armory', 'falconry']) ICONS[k] = spriteURL(BSPR[k], 3);
     ICONS.gate = spriteURL(BSPR.gateIcon, 3);
     ICONS.u_archer = spriteURL(SPR.archer[0], 3);
     ICONS.u_crossbow = spriteURL(SPR.knight[0], 3);
