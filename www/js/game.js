@@ -2297,7 +2297,7 @@
     const objs = [];
     if (playing) {
       objs.push({ y: G.hallBot, f: () => drawHall(time) });
-      for (const b of st.blds) if (!TRAPS[b.kind]) objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), f: () => drawBuilding(b, time) });
+      for (const b of st.blds) if (!TRAPS[b.kind]) objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), x: b.c, f: () => drawBuilding(b, time) });
       for (const s of st.soldiers) objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: s.y, f: () => drawFighter(s, s.spr || 'soldier') });
       if (st.king && !st.king.dead) objs.push({ y: st.king.y, f: () => drawFighter(st.king, 'king') });
       else if (st.king && st.king.deadT < KING_GONE) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
@@ -2311,7 +2311,7 @@
       for (const q of F.stakes) if (q.hp > 0) objs.push({ y: q.y, f: () => g.drawImage(BSPR.stakes.c, q.x - 8, q.y - BSPR.stakes.h) });
       for (const r of F.rocks.concat(F.prock)) objs.push({ y: 9999, f: () => drawRock(r) });
     }
-    objs.sort((a, b) => a.y - b.y);
+    objs.sort((a, b) => a.y - b.y || (b.x || 0) - (a.x || 0)); // v rovnakom rade je ľavejšia budova vpredu
     for (const o of objs) o.f();
     if (st.phase === 'build') drawPlaceGhost(time);
     // ukazovatele zdravia

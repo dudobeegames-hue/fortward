@@ -169,8 +169,8 @@ function makeHall(lvl) {
     const dx = x - 24.5, top = 40 + (Math.abs(dx) > 4 ? 2 : Math.abs(dx) > 2 ? 1 : 0);
     if (y < top) continue;
     if (Math.abs(dx) > 5 || y === top) { p.set(x, y, M.gold && y === top ? GOLD : hexRGB('#1c140e')); continue; }
-    let v = 0.5 - dx * 0.04 + (x % 3 === 0 ? -0.25 : 0);
-    if (y === 46 || y === 50) { if (lvl >= 3) { p.set(x, y, IRON); continue; } v = 0.15; }
+    let v = (M.wood ? 0.32 : 0.5) - dx * 0.04 + (x % 3 === 0 ? -0.2 : 0); // drevená radnica: vráta tmavšie ako steny
+    if (y === 46 || y === 50) { if (lvl >= 3) { p.set(x, y, IRON); continue; } v = 0.08; }
     p.shade(x, y, WOOD, v);
   }
   p.set(27, 48, GOLD);
