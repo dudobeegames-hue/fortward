@@ -114,6 +114,9 @@
   const archerHp = b => 28 * lvlMul(b, 0.3) * (1 + 0.2 * perk('drill')) * (1 + 0.1 * tal('command'));
   const archerDmg = b => 5 * lvlMul(b, 0.4) * (1 + 0.1 * perk('fletching')) * (1 + 0.1 * tal('command'));
   const ARCHER_RANGE = 64, ARCHER_CD = 1.1;
+  const ARCHER_PRIO = e => e.d.fly || e.d.heals || e.d.sapper;            // lukostrelci: najprv letci, šamani a podkopníci
+  const RIDER_PRIO = e => e.d.ranged || e.d.heals || e.d.sapper;          // jazdci: strelci, šamani, podkopníci
+  const SPEAR_REACH = 15, SPEAR_VS_CAV = 3, RIDER_CHARGE = 2, CHARGE_RUN = 30;
   const knightHp = b => 40 * lvlMul(b, 0.3) * (1 + 0.2 * perk('drill')) * (1 + 0.1 * tal('command'));
   const knightDmg = b => 6 * lvlMul(b, 0.35) * (1 + 0.2 * perk('drill')) * (1 + 0.1 * tal('command'));
   const hallMax = () => Math.round((400 + 200 * (st.hallLvl - 1)) * (1 + 0.15 * perk('foundations')));
@@ -1115,6 +1118,15 @@
     }
   }
 
+  function priorityEnemy(x, y, rad, prio) {
+    let best = null, bd = 1e9;
+    for (const e of st.enemies) {
+      if (e.dead || e.d.fly || !prio(e)) continue;
+      const d = Math.hypot(e.x - x, e.y - y);
+      if (d <= rad && d < bd) { bd = d; best = e; }
+    }
+    return best;
+  }
   function nearestEnemy(x, y, rad, preferFree) {
     let best = null, bd = 1e9;
     for (const e of st.enemies) {
@@ -1200,23 +1212,33 @@
     u.flash = Math.max(0, u.flash - dt);
     u.cd = Math.max(0, u.cd - dt);
     if (u.tgt && (u.tgt.dead || Math.hypot(u.tgt.x - homeX, u.tgt.y - homeY) > aggro + 16)) u.tgt = null;
+    // jazdec si vyberá strelcov, šamanov a podkopníkov; ostatní najbližšieho
+    if (!u.tgt && u.ktype === 'rider') u.tgt = priorityEnemy(homeX, homeY, aggro, RIDER_PRIO);
     if (!u.tgt) u.tgt = nearestEnemy(homeX, homeY, aggro, true);
     const t = u.tgt;
     const cry = st.cryT > 0 ? 1 : 0, spd = (u.spd || 26) * (1 + 0.4 * cry) * waterMul(u);
     if (cry) dmg *= 1.6;
     if (t) {
       const d = Math.hypot(t.x - u.x, t.y - u.y);
-      if (d > 8) go(u, t.x + (u.x < t.x ? -5 : 5), t.y + 1, spd, dt);
+      const spear = u.ktype === 'spear', reach = spear ? SPEAR_REACH : 8, off = spear ? 12 : 5; // kopijník bodá spoza rytiera
+      if (d > reach) { go(u, t.x + (u.x < t.x ? -off : off), t.y + 1, spd, dt); u.run = (u.run || 0) + spd * dt; }
       else {
         if (!t.foe) t.foe = u;
         if (u.cd <= 0) {
           u.cd = u.isKing ? 0.8 * (1 - 0.12 * tal('swift')) : 0.8; u.swing = 0.15;
           AUDIO.play(u.isKing ? 'kingHit' : 'clang');
+          let mul = 1;
+          if (spear && t.d.cav) mul *= SPEAR_VS_CAV;                                   // kopija proti jazde
+          if (u.ktype === 'rider' && (u.run || 0) >= CHARGE_RUN) {                      // úder po rozbehu
+            mul *= RIDER_CHARGE;
+            for (let k = 0; k < 6; k++) part(t.x, t.y - 6, (Math.random() - 0.5) * 40, -Math.random() * 30, 0.35, k % 2 ? '#f8d048' : '#ffffff', 60);
+          }
+          u.run = 0;
           if (cleave) { for (const e of st.enemies) if (!e.dead && Math.hypot(e.x - t.x, e.y - t.y) < 10) damage(e, dmg); }
-          else damage(t, dmg);
+          else damage(t, dmg * mul);
         }
       }
-    } else go(u, homeX, homeY, spd * 0.85, dt);
+    } else { go(u, homeX, homeY, spd * 0.85, dt); u.run = (u.run || 0) + spd * dt * 0.85; }
     u.swing = Math.max(0, (u.swing || 0) - dt);
   }
 
@@ -1261,13 +1283,13 @@
     const u = b.unit, d = WUNIT[u.type], c = bCenter(b);
     return shoot(c.x, c.y, c.x, tileY(b.r) - 6, uRange(u), d.proj, d.speed, uDmg(u), 0);
   }
-  function shoot(cx, cy, ox, oy, rng, proj, speed, dmg, splash) {
+  function shoot(cx, cy, ox, oy, rng, proj, speed, dmg, splash, prio) {
     const c = { x: cx, y: cy };
     let best = null, bd = 1e9;
     for (const e of st.enemies) {
       if (e.dead || e.y < 4) continue;
       if (Math.hypot(e.x - c.x, e.y - c.y) > rng) continue;
-      const t = tileAt(e.x, e.y), v = st.dist[t.r * G.cols + t.c];
+      const t = tileAt(e.x, e.y), v = (st.dist[t.r * G.cols + t.c] || 0) - (prio && prio(e) ? 1e6 : 0); // prednostné ciele
       if (v < bd) { bd = v; best = e; }
     }
     if (!best) return false;
@@ -1298,7 +1320,7 @@
     let near = false;
     for (const e of st.enemies) if (!e.dead && e.y > 4 && Math.hypot(e.x - u.x, e.y - u.y) <= ARCHER_RANGE) { near = true; break; }
     if (near) {
-      if (u.cd <= 0 && shoot(u.x, u.y, u.x, u.y - 9, ARCHER_RANGE, 'arrow', 180, u.dmg, 0)) { u.cd = ARCHER_CD; u.swing = 0.1; }
+      if (u.cd <= 0 && shoot(u.x, u.y, u.x, u.y - 9, ARCHER_RANGE, 'arrow', 180, u.dmg, 0, ARCHER_PRIO)) { u.cd = ARCHER_CD; u.swing = 0.1; }
       u.swing = Math.max(0, (u.swing || 0) - dt);
       return;
     }
