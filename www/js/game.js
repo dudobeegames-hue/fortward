@@ -212,6 +212,15 @@
   const lockBtn = (label, id, wide) => btn('🔒 ' + label + ' · misia ' + unlockMissionOf(id), null, false, () => { }, 'locked' + (wide ? ' wide' : ''));
   try { st.unlocked = Math.max(1, Math.min(11, parseInt(localStorage.getItem('fortward.unlocked') || '1', 10) || 1)); } catch (e) { /* bez úložiska */ }
   const saveProgress = () => { try { localStorage.setItem('fortward.unlocked', String(st.unlocked)); } catch (e) { } };
+  // prejdené misie bez záznamu hviezd (vyhrané pred zavedením hviezd) dostanú 1 bronzovú – víťazstvo dáva vždy aspoň 1
+  {
+    let fixed = false;
+    for (let m = 1; m < st.unlocked && m <= MISSIONS.length; m++) {
+      const a = meta.stars[m - 1];
+      if (!a || !a.some(v => v > 0)) { meta.stars[m - 1] = [1, 0, 0]; fixed = true; }
+    }
+    if (fixed) saveJSON('fortward.stars', meta.stars);
+  }
   let island = null;
 
   // ---------------- Mriežka ----------------
