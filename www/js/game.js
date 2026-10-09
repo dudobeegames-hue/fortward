@@ -97,6 +97,7 @@
     bat:     { spr: 'bat',     hp: 9,   speed: 30, atk: 4,  atkCd: 1.0, gold: 4,  blood: '#4a3460', fly: true },
     ram:     { spr: 'ram',     hp: 170, speed: 9,  atk: 48, atkCd: 1.6, gold: 22, blood: '#6e4422', ram: true },
     shaman:  { spr: 'shaman',  hp: 45,  speed: 12, atk: 5,  atkCd: 1.2, gold: 15, blood: '#62a03a', heals: true },
+    bear:    { spr: 'bear',    hp: 150, speed: 22, atk: 24, atkCd: 1.2, gold: 20, blood: '#62a03a', cav: true, charge: true },
     sapper:  { spr: 'sapper',  hp: 16,  speed: 22, atk: 90, atkCd: 0.5, gold: 8,  blood: '#62a03a', sapper: true },
   };
 
@@ -606,6 +607,7 @@
     typeShift: 0.8, bruteFrom: 5, bruteRate: 0.03,         // ako rýchlo pribúdajú orkovia a surovci
     startGold: 210, startGoldMission: 80, goldMission: 0.15, // ekonomika (každá misia začína od nuly)
     bossBase: 0.6, bossMission: 0.33, bossLast: 1.0,       // sila vojvodcu v 5. a 10. vlne
+    pBear: 0.07,
     pArcher: 0.12, pBat: 0.12, pRam: 0.05, pShaman: 0.04, pSapper: 0.06, // podiel nových nepriateľov
   };
   const goldMul = () => 1 + DIFF.goldMission * (st.mission - 1);
@@ -628,7 +630,9 @@
       const pSap = m >= 8 && w >= 2 ? DIFF.pSapper : 0;
       if (r2 >= 1 - pSap) type = 'sapper';
       const pSh = m >= 6 && w >= 2 ? DIFF.pShaman : 0, pRam = m >= 5 && w >= 3 ? DIFF.pRam : 0, pBat = m >= 4 ? DIFF.pBat : 0, pArc = m >= 3 ? DIFF.pArcher : 0;
-      if (r2 < pSh) type = 'shaman';
+      const pBear = m >= 7 && w >= 3 ? DIFF.pBear : 0;
+      if (r2 >= 1 - pSap - pBear && r2 < 1 - pSap) type = 'bear';
+      else if (r2 < pSh) type = 'shaman';
       else if (r2 < pSh + pRam) type = 'ram';
       else if (r2 < pSh + pRam + pBat) type = 'bat';
       else if (r2 < pSh + pRam + pBat + pArc) type = 'garcher';
@@ -941,6 +945,27 @@
     return true;
   }
 
+  // medvedí jazdec: nápor do prvého vojaka (odhodí ho a omráči); kopijníci nablízku nápor zastavia
+  function bearCharge(e, dt) {
+    if (e.charged) { if (!e.foe && !e.attacking) { e.rechargeT = (e.rechargeT || 0) + dt; if (e.rechargeT > 3) e.charged = false; } else e.rechargeT = 0; return; }
+    for (const u of st.soldiers) {
+      if (u.dead || u.helper || u.siege || u.stunT > 0 || Math.hypot(u.x - e.x, u.y - e.y) > 11) continue;
+      e.charged = true; e.rechargeT = 0;
+      if (st.soldiers.some(s => !s.dead && s.ktype === 'spear' && Math.hypot(s.x - e.x, s.y - e.y) < 22)) { // les kopijí
+        e.stunT = 0.9; AUDIO.play('clang');
+        st.texts.push({ x: e.x, y: e.y - e.h - 2, s: '!', life: 0.8, max: 0.8 });
+        for (let k = 0; k < 6; k++) part(e.x, e.y - 8, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.3, '#f4f4f8', 60);
+        return;
+      }
+      hitUnit(u, e.d.atk * 0.9 * e.pow); // zraní, ale nezabije čerstvého rytiera
+      const d = Math.hypot(u.x - e.x, u.y - e.y) || 1;
+      u.x += (u.x - e.x) / d * 12; u.y += (u.y - e.y) / d * 12 + 4; u.stunT = 1.2; // odhodený a omráčený
+      AUDIO.play('boom'); st.shake = Math.max(st.shake, 0.15);
+      for (let k = 0; k < 10; k++) part(u.x, u.y - 4, (Math.random() - 0.5) * 40, -Math.random() * 30, 0.4, k % 2 ? '#c6a272' : '#967048', 80);
+      return;
+    }
+  }
+
   function updateEnemy(e, dt) {
     e.flash = Math.max(0, e.flash - dt);
     e.lunge = Math.max(0, e.lunge - dt);
@@ -954,6 +979,7 @@
     }
     if (e.stunT > 0) { e.stunT -= dt; return; }
     if (e.d.king && updateOrcKing(e, dt)) return;
+    if (e.d.charge) bearCharge(e, dt);
     if (e.chillT > 0) { e.chillT -= dt; if (Math.random() < 0.2) part(e.x + (Math.random() - 0.5) * e.w * 0.5, e.y - Math.random() * e.h, 0, -6, 0.4, '#e0f4ff', 0); }
     const slow = (st.freezeT > 0 ? 0.35 : 1) * (e.chillT > 0 ? 0.5 : 1);
     const attackFn = (fn) => {
@@ -2333,7 +2359,7 @@
     ICONS.u_siegeRam = spriteURL(SPR.siegeRam[0], 2); ICONS.u_siegeCat = spriteURL(SPR.siegeCat[0], 2);
     $('buyRam').querySelector('img').src = ICONS.u_siegeRam; $('buyCat').querySelector('img').src = ICONS.u_siegeCat;
     $('kingIcon').src = ICONS.king;
-    for (const k of ['garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' ? 2 : 3);
+    for (const k of ['garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' ? 2 : 3);
     ICONS.coin = spriteURL(SPR.coin[0], 4);
     ICONS.gem = spriteURL(SPR.gem[0], 4);
     document.querySelectorAll('img.coin').forEach(i => { i.src = ICONS.coin; });

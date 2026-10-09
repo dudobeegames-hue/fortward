@@ -191,6 +191,7 @@ const ENEMY_INTRO = {
   4: { id: 'bat', name: 'Netopiere', desc: 'preletia ponad hradby priamo k radnici' },
   5: { id: 'ram', name: 'Beranidlo', desc: 'rozbíja hradby a rytierov ignoruje' },
   6: { id: 'shaman', name: 'Šaman', desc: 'lieči ostatných – zabi ho ako prvého' },
+  7: { id: 'bear', name: 'Medvedí jazdec', desc: 'nápor zrazí rytiera aj jazdca – zastavia ho len kopijníci' },
   8: { id: 'sapper', name: 'Podkopník', desc: 'beží k hradbám a vyhodí ich do vzduchu – zastreľ ho skôr' },
   10: { id: 'orcKing', name: 'Orkský veľkráľ', desc: 'vyjde z hradu pod polovicou zdravia – dupnutím omračuje a privoláva goblinov' },
 };
