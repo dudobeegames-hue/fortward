@@ -160,6 +160,40 @@
     }
   } catch (e) { }
   const meta = { stars: [], perks: {} };
+  // ---- trofeje: počítadlá za celú pozíciu a míľniky; získaná trofej sa na mape vyfarbí ----
+  const stats = { kills: 0, builds: 0, bosses: 0, orcKings: 0, perfect: 0, maxGold: 0 };
+  const ach = {};
+  const ACH = [
+    { id: 'blood',    name: 'Prvá krv',          desc: 'Poraz prvého nepriateľa',            icon: 'e_orc',      ok: () => stats.kills >= 1 },
+    { id: 'win1',     name: 'Prvé víťazstvo',    desc: 'Dobyj prvý hrad',                    icon: 'hall',       ok: () => st.unlocked >= 2 },
+    { id: 'kills100', name: 'Bojovník',          desc: 'Poraz 100 nepriateľov',              icon: 'u_knight',   ok: () => stats.kills >= 100 },
+    { id: 'builds50', name: 'Staviteľ',          desc: 'Postav 50 stavieb',                  icon: 'tower',      ok: () => stats.builds >= 50 },
+    { id: 'rich',     name: 'Boháč',             desc: 'Maj naraz 1000 zlata',               icon: 'coin',       ok: () => stats.maxGold >= 1000 },
+    { id: 'perfect',  name: 'Nedobytná radnica', desc: 'Vyhraj misiu s nepoškodenou radnicou', icon: 'wall',     ok: () => stats.perfect >= 1 },
+    { id: 'boss',     name: 'Lovec vojvodcov',   desc: 'Poraz Vojvodcu orkov',               icon: 'e_shaman',   ok: () => stats.bosses >= 1 },
+    { id: 'king5',    name: 'Skúsený panovník',  desc: 'Kráľ na úrovni 5',                   icon: 'king',       ok: () => kingMeta.lvl >= 5 },
+    { id: 'stars10',  name: 'Zberateľ hviezd',   desc: 'Získaj 10 hviezd',                   icon: 'star',       ok: () => starsTotal() >= 10 },
+    { id: 'half',     name: 'Polovica ostrova',  desc: 'Oslobodi 5 provincií',               icon: 'barracks',   ok: () => st.unlocked >= 6 },
+    { id: 'fort',     name: 'Dobyvateľ',         desc: 'Zbúraj prvú orkskú pevnosť',         icon: 'u_siegeRam', ok: () => st.unlocked >= 7 },
+    { id: 'gold3',    name: 'Zlatá koruna',      desc: 'Získaj 3 hviezdy na zlatej úrovni',  icon: 'gem',        ok: () => meta.stars.some(a => a && a[2] >= 3) },
+    { id: 'kills1k',  name: 'Postrach hordy',    desc: 'Poraz 1000 nepriateľov',             icon: 'e_bear',     ok: () => stats.kills >= 1000 },
+    { id: 'stars30',  name: 'Hviezdny pán',      desc: 'Získaj 30 hviezd',                   icon: 'star',       ok: () => starsTotal() >= 30 },
+    { id: 'king10',   name: 'Legendárny kráľ',   desc: 'Kráľ na úrovni 10',                  icon: 'king',       ok: () => kingMeta.lvl >= 10 },
+    { id: 'orcKing',  name: 'Kráľobijca',        desc: 'Poraz orkského veľkráľa',            icon: 'e_orcKing',  ok: () => stats.orcKings >= 1 },
+    { id: 'island',   name: 'Pán ostrova',       desc: 'Oslobodi celý ostrov',               icon: 'gate',       ok: () => st.unlocked >= 11 },
+  ];
+  const achIcon = a => a.icon === 'star' ? UI_ICONS.star : ICONS[a.icon];
+  const saveStats = () => saveJSON(sk('stats'), stats);
+  // skontroluje míľniky; nové trofeje uloží a oznámi
+  function checkAch() {
+    const fresh = ACH.filter(a => !ach[a.id] && a.ok());
+    if (!fresh.length) return;
+    for (const a of fresh) ach[a.id] = Date.now();
+    saveJSON(sk('ach'), ach); saveStats();
+    toast('Nová trofej: ' + fresh.map(a => a.name).join(', '));
+    AUDIO.play('unlock');
+    if (!$('map').hidden) renderMapBar();
+  }
   const perk = id => meta.perks[id] || 0;
 
   // ---- Levelovanie kráľa: XP za prežité vlny, na každej novej úrovni výber z 3 vylepšení (natrvalo) ----
@@ -232,6 +266,9 @@
     if (meta.perks.armor) { delete meta.perks.armor; saveJSON(sk('perks'), meta.perks); } // zrušený bonus – hviezdy sa vrátia
     for (const k in kingMeta) delete kingMeta[k];
     Object.assign(kingMeta, { lvl: 1, xp: 0, pending: 0, tal: {} }, loadJSON(sk('king'), {}));
+    Object.assign(stats, { kills: 0, builds: 0, bosses: 0, orcKings: 0, perfect: 0, maxGold: 0 }, loadJSON(sk('stats'), {}));
+    for (const k in ach) delete ach[k];
+    Object.assign(ach, loadJSON(sk('ach'), {}));
     st.unlocked = Math.max(1, Math.min(11, parseInt(localStorage.getItem(sk('unlocked')) || '1', 10) || 1));
     // prejdené misie bez záznamu hviezd (vyhrané pred zavedením hviezd) dostanú 1 bronzovú – víťazstvo dáva vždy aspoň 1
     let fixed = false;
@@ -251,7 +288,7 @@
     const king = JSON.parse(get('king') || '{}') || {};
     return { race: race ? JSON.parse(race) : 'Ľudia', won: Math.min(MISSIONS.length, Math.max(0, (parseInt(unl || '1', 10) || 1) - 1)), stars, king: king.lvl || 1 };
   }
-  function clearSlot(n) { for (const k of ['stars', 'perks', 'king', 'unlocked', 'introSeen', 'race']) try { localStorage.removeItem(slotKey(n, k)); } catch (e) { } }
+  function clearSlot(n) { for (const k of ['stars', 'perks', 'king', 'unlocked', 'introSeen', 'race', 'stats', 'ach']) try { localStorage.removeItem(slotKey(n, k)); } catch (e) { } }
   let island = null;
 
   // ---------------- Mriežka ----------------
@@ -760,6 +797,7 @@
   }
 
   function endWave() {
+    stats.maxGold = Math.max(stats.maxGold, st.gold); saveStats();
     const bonus = Math.round((10 + st.wave * 4) * goldMul()) + 6 * tal('tax');
     st.gold += bonus;
     const lvl0 = kingMeta.lvl;
@@ -806,6 +844,7 @@
 
   function missionWon() {
     const m = st.mission;
+    if (st.hallHp >= hallMax()) stats.perfect++;
     st.phase = 'won';
     const t = st.tier || 0, stars = starsFor(st.hallHp / hallMax()), prevStars = starsOf(m, t);
     const nextWasOpen = t < 2 && tierOpen(m, t + 1);
@@ -828,11 +867,13 @@
       (stars > prevStars ? '<br><span class="newTech">+' + (stars - prevStars) + ' ★ do Kráľovskej siene</span>' : '') + tierNote;
     const xpLine = st.lastXp ? '<br><span class="newTech">Kráľ +' + st.lastXp + ' XP' + (kingMeta.pending ? ' · nová úroveň ' + kingMeta.lvl + '!' : '') + '</span>' : '';
     later(() => showOver(m === MISSIONS.length ? 'Víťazstvo!' : 'Misia splnená!', starLine + '<br>' + text + xpLine, true), 1200);
+    saveStats(); later(checkAch, 2200);
     updateHud();
   }
 
   function gameOver() {
     st.phase = 'over';
+    saveStats();
     st.hallHp = 0;
     const survived = st.wave - 1;
     $('bossbar').hidden = true; $('bottom').hidden = true;
@@ -885,6 +926,9 @@
         (Math.random() - 0.5) * 60, -20 - Math.random() * 50, 0.5 + Math.random() * 0.4, cols[k % cols.length], 140);
     }
     if (e.d.boss) { if (st.boss === e) st.boss = null; st.shake = e.d.king ? 0.8 : 0.4; banner(e.d.king ? 'Orkský veľkráľ padol!' : 'Vojvodca padol!'); }
+    stats.kills++; if (e.d.boss) { if (e.d.king) stats.orcKings++; else stats.bosses++; }
+    stats.maxGold = Math.max(stats.maxGold, st.gold);
+    checkAch();
     updateHud();
   }
 
@@ -2261,7 +2305,7 @@
   const MAP_HEAD = 26; // hlavička mapy (v herných px)
   function mapCamMax() {
     if (!island) return 0;
-    const panelLow = $('mapPanel').offsetHeight * DPR / S;
+    const panelLow = $('mapBar').offsetHeight * DPR / S;
     const lowest = Math.max(...island.nodes.map(n => n.y)) + 22; // hrad + tabuľka s hviezdami
     return Math.max(0, lowest - (H - panelLow) + 4);
   }
@@ -2269,7 +2313,7 @@
   function focusMapNode(num, instant) {
     const n = island && island.nodes[num - 1];
     if (!n) return;
-    const panelLow = $('mapPanel').offsetHeight * DPR / S;
+    const panelLow = $('mapBar').offsetHeight * DPR / S;
     const mid = MAP_HEAD + (H - panelLow - MAP_HEAD) / 2;
     mapCamTarget = clampMap(n.y - 6 - mid);
     if (instant) mapCam = mapCamTarget;
@@ -2480,7 +2524,8 @@
     ICONS.u_siegeRam = spriteURL(SPR.siegeRam[0], 2); ICONS.u_siegeCat = spriteURL(SPR.siegeCat[0], 2);
     $('buyRam').querySelector('img').src = ICONS.u_siegeRam; $('buyCat').querySelector('img').src = ICONS.u_siegeCat;
     $('kingIcon').src = ICONS.king;
-    for (const k of ['garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' ? 2 : 3);
+    $('icoHall').src = ICONS.hall; $('icoHero').src = ICONS.king;
+    for (const k of ['orc', 'garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' ? 2 : 3);
     ICONS.coin = spriteURL(SPR.coin[0], 4);
     ICONS.gem = spriteURL(SPR.gem[0], 4);
     document.querySelectorAll('img.coin').forEach(i => { i.src = ICONS.coin; });
@@ -2787,7 +2832,7 @@
     if (st.gold < dc) { toast('Nedostatok zlata'); AUDIO.play('deny'); return false; }
     snapshot();
     st.gold -= dc;
-    addBuilding(kind, c, r);
+    addBuilding(kind, c, r); stats.builds++;
     AUDIO.play('build');
     const cx = tileX(c) + T / 2, cy = tileY(r) + T / 2;
     for (let k = 0; k < 8; k++) part(cx + (Math.random() - 0.5) * 12, cy + 4, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.4, '#c6a272', 60);
@@ -2820,7 +2865,7 @@
   const wallsAfford = () => Math.floor(st.gold / costOf('wall'));
   function placeWall(c, r) {
     st.gold -= costOf('wall');
-    addBuilding('wall', c, r);
+    addBuilding('wall', c, r); stats.builds++;
     for (let k = 0; k < 5; k++) part(tileX(c) + 8 + (Math.random() - 0.5) * 12, tileY(r) + 12, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.4, '#c6a272', 60);
   }
   // ---- presúvanie stavieb (ťahaním alebo tlačidlom „Presunúť“) ----
@@ -3074,8 +3119,10 @@
     $('title').hidden = true;
     $('map').hidden = false;
     if (!st.mapAnim) st.mapSel = Math.min(st.unlocked, MISSIONS.length);
-    renderMapPanel();
+    $('missionBox').hidden = true;
+    renderMapPanel(); renderMapBar();
     focusMapNode(st.mapAnim ? st.mapAnim.seg + 2 : st.mapSel, true);
+    saveStats(); checkAch();
     if (!st.mapAnim) afterDeck(); // pri odomykaní hradu príde výber až po kartičkách
     if (st.unlocked === 1 && !loadJSON(sk('introSeen'), false)) { // úplne nová hra
       saveJSON(sk('introSeen'), true);
@@ -3114,8 +3161,18 @@
     });
     $('mapPlay').textContent = starsOf(m, st.mapTier) ? 'Hrať znova' : 'Hrať';
     $('mStars').innerHTML = '';
-    $('hallBtnTxt').textContent = starsFree();
   }
+  // spodné ikonky mapy: na Sieni počet voľných hviezd, na Trofejach počet získaných
+  function renderMapBar() {
+    const free = starsFree(), got = ACH.filter(a => ach[a.id]).length;
+    $('hallBtnTxt').textContent = '★' + free; $('hallBtnTxt').hidden = !free;
+    $('trophyTxt').textContent = got; $('trophyTxt').hidden = !got;
+  }
+  $('icoHome').src = UI_ICONS.home; $('icoTrophy').src = UI_ICONS.trophy;
+  const openMission = () => { renderMapPanel(); $('missionBox').hidden = false; };
+  const closeMission = () => { $('missionBox').hidden = true; };
+  $('mapClose').addEventListener('click', () => { AUDIO.play('click'); closeMission(); });
+  $('missionBox').addEventListener('click', ev => { if (ev.target === $('missionBox')) closeMission(); });
 
   function kingSummary() {
     const xp = kingMeta.lvl >= KING_MAX_LVL ? 'najvyššia úroveň' : 'XP ' + kingMeta.xp + ' / ' + kingXpNeed(kingMeta.lvl);
@@ -3125,10 +3182,6 @@
   function renderPerks() {
     $('perkStars').textContent = starsFree() + ' / ' + starsTotal();
     const list = $('perkList'); list.innerHTML = '';
-    const kr = document.createElement('div'); kr.className = 'perk kingRow';
-    const need = kingXpNeed(kingMeta.lvl), pct = kingMeta.lvl >= KING_MAX_LVL ? 100 : Math.round(kingMeta.xp / need * 100);
-    kr.innerHTML = '<img src="' + ICONS.king + '"><div class="info"><b>Kráľ · úroveň ' + kingMeta.lvl + '</b><span class="xpBar"><i style="width:' + pct + '%"></i></span><small>' + kingSummary() + '</small></div>';
-    list.appendChild(kr);
     for (const pk of PERKS) {
       const lvl = perk(pk.id), cost = lvl + 1;
       const row = document.createElement('div'); row.className = 'perk';
@@ -3147,7 +3200,37 @@
     }
   }
   $('hallBtn').addEventListener('click', () => { AUDIO.play('click'); $('perks').hidden = false; renderPerks(); });
-  $('perkBack').addEventListener('click', () => { AUDIO.play('click'); $('perks').hidden = true; renderMapPanel(); });
+  $('perkBack').addEventListener('click', () => { AUDIO.play('click'); $('perks').hidden = true; renderMapBar(); });
+
+  // ---- Hrdinovia: zatiaľ len kráľ, ďalší hrdinovia prídu neskôr ----
+  function renderHeroes() {
+    const list = $('heroList'); list.innerHTML = '';
+    const need = kingXpNeed(kingMeta.lvl), pct = kingMeta.lvl >= KING_MAX_LVL ? 100 : Math.round(kingMeta.xp / need * 100);
+    const k = document.createElement('div'); k.className = 'hero big';
+    k.innerHTML = '<img src="' + ICONS.king + '" alt=""><div class="info"><span class="tag">Vybraný hrdina</span><b>Kráľ · úroveň ' + kingMeta.lvl + '</b>' +
+      '<span class="xpBar"><i style="width:' + pct + '%"></i></span><small>' + kingSummary() + '</small></div>';
+    list.appendChild(k);
+    for (let i = 0; i < 2; i++) {
+      const h = document.createElement('div'); h.className = 'hero locked';
+      h.innerHTML = '<img src="' + ICONS.king + '" alt=""><b>Nový hrdina</b><small>čoskoro</small>';
+      list.appendChild(h);
+    }
+  }
+  $('heroBtn').addEventListener('click', () => { AUDIO.play('click'); renderHeroes(); $('heroes').hidden = false; });
+  $('heroBack').addEventListener('click', () => { AUDIO.play('click'); $('heroes').hidden = true; });
+
+  // ---- Trofeje ----
+  function renderTrophies() {
+    const list = $('trophyList'); list.innerHTML = '';
+    for (const a of ACH) {
+      const c = document.createElement('div'); c.className = 'trophy' + (ach[a.id] ? ' got' : '');
+      c.innerHTML = '<span class="pic"><img src="' + achIcon(a) + '" alt=""></span><b>' + a.name + '</b><small>' + a.desc + '</small>';
+      list.appendChild(c);
+    }
+    $('trophyCount').textContent = ACH.filter(a => ach[a.id]).length + ' / ' + ACH.length;
+  }
+  $('trophyBtn').addEventListener('click', () => { AUDIO.play('click'); checkAch(); renderTrophies(); $('trophies').hidden = false; });
+  $('trophyBack').addEventListener('click', () => { AUDIO.play('click'); $('trophies').hidden = true; });
 
   function tapMap(x, y) {
     if (st.mapAnim) return;
@@ -3155,7 +3238,7 @@
       if (Math.hypot(n.x - x, n.y - 5 - y) > 14) return;
       const num = i + 1;
       if (num > st.unlocked) { toast('Najprv dobi misiu ' + (num - 1)); AUDIO.play('deny'); return; }
-      st.mapSel = num; AUDIO.play('click'); renderMapPanel();
+      st.mapSel = num; AUDIO.play('click'); openMission();
     });
   }
 
@@ -3271,7 +3354,7 @@
     $('map').hidden = true; $('slots').hidden = true; $('title').hidden = true;
     SPLASH.show(); AUDIO.play('click');
   }
-  $('mapBack').addEventListener('click', showMenu);
+  $('mapHome').addEventListener('click', showMenu);
   $('slotsBack').addEventListener('click', showMenu);
   $('raceBack').addEventListener('click', showSlots);
   // Nastavenia na úvodnom obrázku: jediné miesto pre hudbu, zvuky a jazyk

@@ -63,6 +63,49 @@ const UI_ICONS = (() => {
     '...KKKKK...',
   ], { K: '#1c140e', L: '#b8f890', G: '#5ccf3c', D: '#2c8a2c' });
 
+  // ikonky mapy: domček (menu), pohár (trofeje), hviezda
+  const home = fromMap([
+    '.....KK.....',
+    '....KRRK....',
+    '...KRRRRK...',
+    '..KRRRRRRK..',
+    '.KRRRRRRRRK.',
+    'KKKKKKKKKKKK',
+    '.KWWWWWWWWK.',
+    '.KWBBWWKKWK.',
+    '.KWBBWWKOOK.',
+    '.KWWWWWKOOK.',
+    '.KWWWWWKOOK.',
+    '.KKKKKKKKKK.',
+  ], { K: '#1c140e', R: '#d8402c', W: '#ecdcb4', B: '#6a96f0', O: '#8a5a2a' });
+  const trophy = fromMap([
+    '..KKKKKKKK..',
+    'KKKYYYYWYKKK',
+    'KYKYYYYWYKYK',
+    'KYKYYYYYYKYK',
+    '.KKYYYYYYKK.',
+    '..KOYYYYOK..',
+    '...KOYYOK...',
+    '....KYYK....',
+    '....KOOK....',
+    '...KYYYYK...',
+    '..KYYYYYYK..',
+    '..KKKKKKKK..',
+  ], { K: '#1c140e', Y: '#f8d048', O: '#b88420', W: '#fff7c8' });
+  const star = fromMap([
+    '.....K.....',
+    '....KYK....',
+    '....KYK....',
+    'KKKKYYYKKKK',
+    'KYYYYYYYYYK',
+    '.KYYYYYYYK.',
+    '..KYYYYYK..',
+    '..KYYKYYK..',
+    '.KYYK.KYYK.',
+    '.KYK...KYK.',
+    '.KK.....KK.',
+  ], PAL);
+
   // ---- vlajky 18×12 bodov ----
   const FW = 18, FH = 12;
   const stripesH = cols => (x, y) => cols[Math.floor(y * cols.length / FH)];
@@ -142,5 +185,5 @@ const UI_ICONS = (() => {
     { id: 'zh', name: '中文' },
   ];
 
-  return { pix, music, sound, plus, flags, langs };
+  return { pix, music, sound, plus, home, trophy, star, flags, langs };
 })();

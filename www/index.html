@@ -256,7 +256,7 @@
   .mStars { position: absolute; right: 0; top: 0; color: var(--gold); font-size: 18px; letter-spacing: 1px; }
   .mStars i, .bigStars i { color: #4a3a2c; font-style: normal; }
   .bigStars { font-size: 34px; color: var(--gold); letter-spacing: 4px; text-shadow: 2px 2px 0 var(--ink); }
-  #perks.perksScreen { justify-content: flex-start; background: linear-gradient(#1e1611, #120c09); gap: 10px; overflow-y: auto; z-index: 8; touch-action: pan-y; }
+  .screenOverlay.perksScreen { justify-content: flex-start; background: linear-gradient(#1e1611, #120c09); gap: 10px; overflow-y: auto; z-index: 8; touch-action: pan-y; }
   .perkHead { display: flex; justify-content: space-between; align-items: center; width: 100%; }
   .perkHead b { font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 24px; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
   .perkNote { margin: 0; font-size: 13px; color: var(--muted); }
@@ -270,7 +270,7 @@
   .perk .btn { justify-content: center; padding: 8px 4px; }
   .perksScreen .row { display: flex; gap: 8px; width: 100%; margin-top: auto; }
   .perksScreen .row .btn { flex: 1; justify-content: center; }
-  .mapHead .pill { margin-left: auto; font-size: 13px; padding: 4px 7px; }
+  .mapHead .pill { font-size: 13px; padding: 4px 7px; }
   #selInfo { display: flex; flex-direction: column; gap: 6px; }
   .brow { display: grid; grid-template-columns: 1fr 1.3fr; gap: 6px; }
   .brow .primary { font-size: 17px; padding: 9px 10px; }
@@ -427,14 +427,52 @@
     background: linear-gradient(rgba(8,14,30,.85), rgba(8,14,30,0));
   }
   .mapHead b { white-space: nowrap; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 20px; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
+  /* okno misie po ťuknutí na hrad */
+  #missionBox { z-index: 6; background: rgba(8,6,4,.55); }
+  #missionBox[hidden] { display: none; }
   #mapPanel {
-    position: absolute; left: 0; right: 0; bottom: 0;
+    width: 100%; max-width: 380px; box-sizing: border-box;
     background: linear-gradient(var(--panel), #1e1611);
-    border-top: 3px solid var(--ink); border-radius: 14px 14px 0 0;
-    box-shadow: 0 -2px 0 var(--edge) inset, 0 -8px 24px rgba(0,0,0,.5);
-    padding: 10px 12px calc(env(safe-area-inset-bottom) + 12px);
-    display: flex; flex-direction: column; gap: 10px;
+    border: 3px solid var(--ink); border-radius: 14px;
+    box-shadow: 0 0 0 2px var(--edge) inset, 0 10px 30px rgba(0,0,0,.6);
+    padding: 12px; display: flex; flex-direction: column; gap: 10px;
   }
+  #mapPanel .brow .btn { justify-content: center; }
+  /* ikonky na mape: domček vľavo hore, dole Sieň, Hrdinovia, Trofeje */
+  .mapIc { width: 46px; height: 46px; padding: 0; display: grid; place-items: center; border-radius: 10px; border: 3px solid var(--ink);
+    background: linear-gradient(#5a4836, #3a2c22); box-shadow: inset 0 -4px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.15); }
+  .mapIc img { width: 30px; height: 30px; image-rendering: pixelated; }
+  .mapIc:active { transform: translateY(2px); }
+  #mapBar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 22px;
+    padding: 18px 12px calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(rgba(8,14,30,0), rgba(8,14,30,.75)); }
+  #mapBar .setIc { flex: 0 0 auto; width: 76px; }
+  #mapBar .ico img { width: 40px; height: 40px; object-fit: contain; }
+  .setIc .badge { position: absolute; top: -9px; right: -11px; min-width: 22px; height: 22px; padding: 0 5px; box-sizing: border-box; border-radius: 11px; border: 2px solid var(--ink);
+    background: var(--gold); color: var(--ink); font-style: normal; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 13px; line-height: 18px; text-align: center; text-shadow: none; }
+  .setIc .badge[hidden] { display: none; }
+  /* hrdinovia */
+  #heroList { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  .hero { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 8px; border-radius: 10px; border: 2px solid var(--ink); background: rgba(0,0,0,.28); text-align: center; color: #fff; }
+  .hero.big { grid-column: 1 / -1; flex-direction: row; text-align: left; gap: 12px; border-color: var(--gold); background: rgba(248,208,72,.08); box-shadow: 0 0 0 1px var(--gold); }
+  .hero img { width: 44px; height: 44px; object-fit: contain; image-rendering: pixelated; }
+  .hero.big img { width: 56px; height: 56px; }
+  .hero .info { flex: 1; display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+  .hero b { font-size: 17px; }
+  .hero small { color: var(--muted); font-size: 12px; }
+  .hero .tag { color: var(--gold); font-size: 12px; font-weight: 700; }
+  .hero.locked img { filter: brightness(0); opacity: .45; }
+  .hero.locked b { color: var(--muted); }
+  /* trofeje: sivé, kým ich hráč nezíska */
+  #trophyList { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  .trophy { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px 8px; border-radius: 10px; border: 2px solid var(--ink); background: rgba(0,0,0,.28); text-align: center; }
+  .trophy .pic { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 50%; border: 2px solid var(--ink); background: radial-gradient(circle at 40% 35%, #fff2a0, #f8d048 45%, #b88420); }
+  .trophy .pic img { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated; }
+  .trophy b { font-size: 14px; line-height: 1.15; }
+  .trophy small { color: var(--muted); font-size: 11.5px; line-height: 1.25; }
+  .trophy.got { border-color: var(--gold); background: rgba(248,208,72,.1); }
+  .trophy:not(.got) .pic { background: #3a3230; }
+  .trophy:not(.got) .pic img { filter: grayscale(1) brightness(.7); opacity: .6; }
+  .trophy:not(.got) b { color: var(--muted); }
   .mCard { display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: start; }
   .mnum {
     width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
@@ -600,20 +638,28 @@
 
   <div id="map" hidden>
     <div class="mapHead">
+      <button id="mapHome" class="mapIc" title="Menu" aria-label="Menu"><img id="icoHome" alt=""></button>
       <span class="pill">Dobyté <span id="mapProg">0 / 10</span></span>
     </div>
-    <div id="mapPanel">
-      <div class="mCard">
-        <span id="mNum" class="mnum">1</span>
-        <div class="mInfo"><b id="mName"></b><small id="mMeta"></small></div>
-        <span id="mStars" class="mStars"></span>
-      </div>
-      <div id="mTiers" class="mTiers"></div>
-      <div id="mNew" class="mNew"></div>
-      <div class="brow three">
-        <button id="mapBack" class="btn">Menu</button>
-        <button id="hallBtn" class="btn hallBtn"><span>Sieň</span><span class="cost">★ <span id="hallBtnTxt">0</span></span></button>
-        <button id="mapPlay" class="primary">Hrať</button>
+    <div id="mapBar">
+      <button id="hallBtn" class="setIc"><span class="ico"><img id="icoHall" alt=""><em id="hallBtnTxt" class="badge" hidden>0</em></span><b>Sieň</b></button>
+      <button id="heroBtn" class="setIc"><span class="ico"><img id="icoHero" alt=""></span><b>Hrdinovia</b></button>
+      <button id="trophyBtn" class="setIc"><span class="ico"><img id="icoTrophy" alt=""><em id="trophyTxt" class="badge" hidden>0</em></span><b>Trofeje</b></button>
+    </div>
+    <!-- okno misie: zjaví sa až po ťuknutí na hrad -->
+    <div id="missionBox" class="screenOverlay" hidden>
+      <div id="mapPanel">
+        <div class="mCard">
+          <span id="mNum" class="mnum">1</span>
+          <div class="mInfo"><b id="mName"></b><small id="mMeta"></small></div>
+          <span id="mStars" class="mStars"></span>
+        </div>
+        <div id="mTiers" class="mTiers"></div>
+        <div id="mNew" class="mNew"></div>
+        <div class="brow">
+          <button id="mapClose" class="btn">Späť</button>
+          <button id="mapPlay" class="primary">Hrať</button>
+        </div>
       </div>
     </div>
   </div>
@@ -635,8 +681,21 @@
     <p class="perkNote">Každý hrad môžeš dobyť na medenej, striebornej a zlatej úrovni – za každú 1 až 3 hviezdy podľa zdravia radnice na konci. Hviezdami kúpiš trvalé bonusy – nákup je natrvalo, vyber si rozumne.</p>
     <div id="perkList"></div>
     <div class="row">
-      <button id="perkBack" class="btn up">Späť na mapu</button>
+      <button id="perkBack" class="btn up">Späť</button>
     </div>
+  </div>
+
+  <div id="heroes" class="screenOverlay perksScreen" hidden>
+    <div class="perkHead"><b>Hrdinovia</b></div>
+    <p class="perkNote">Vyber hrdinu, ktorý pôjde s tvojím vojskom do boja. Hrdina získava skúsenosti za každú prežitú vlnu.</p>
+    <div id="heroList"></div>
+    <div class="row"><button id="heroBack" class="btn">Späť</button></div>
+  </div>
+
+  <div id="trophies" class="screenOverlay perksScreen" hidden>
+    <div class="perkHead"><b>Trofeje</b><span class="pill"><span id="trophyCount">0</span></span></div>
+    <div id="trophyList"></div>
+    <div class="row"><button id="trophyBack" class="btn">Späť</button></div>
   </div>
 
   <div id="over" class="screenOverlay" hidden>
