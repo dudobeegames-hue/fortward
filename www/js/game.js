@@ -3248,18 +3248,23 @@
   $('mapPlay').addEventListener('click', () => { if (!st.mapAnim && tierOpen(st.mapSel, st.mapTier || 0)) startMission(st.mapSel, st.mapTier || 0); });
   $('mapBack').addEventListener('click', () => { st.phase = 'title'; $('map').hidden = true; showSlots(); });
   $('raceBack').addEventListener('click', showSlots);
+  // hudba a zvuky sa nastavujú len v Nastaveniach na úvodnom obrázku
   function syncSound() {
-    document.querySelectorAll('.sndBtn').forEach(b => {
+    document.querySelectorAll('.tgl').forEach(b => {
       const on = AUDIO.prefs[b.dataset.kind];
-      b.classList.toggle('off', !on);
-      b.title = (b.dataset.kind === 'music' ? 'Hudba' : 'Zvuky') + (on ? ' zapnuté' : ' vypnuté');
+      b.classList.toggle('on', on); b.textContent = on ? 'Zap' : 'Vyp';
     });
   }
-  document.querySelectorAll('.sndBtn').forEach(b => b.addEventListener('click', ev => {
-    ev.stopPropagation();
+  document.querySelectorAll('.tgl').forEach(b => b.addEventListener('click', () => {
     AUDIO.setPref(b.dataset.kind, !AUDIO.prefs[b.dataset.kind]);
     syncSound(); AUDIO.play('click');
   }));
+  const showSettings = open => {
+    $('setPanel').hidden = !open; $('splashBtns').classList.toggle('hide', open);
+    AUDIO.play('click');
+  };
+  $('splashSet').addEventListener('click', () => showSettings(true));
+  $('setBack').addEventListener('click', () => showSettings(false));
   syncSound();
   $('gemBox').addEventListener('click', () => toast('Obchod s gemami pripravujeme'));
 

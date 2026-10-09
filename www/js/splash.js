@@ -22,15 +22,15 @@ const SPLASH = (() => {
     if (img.complete) go(); else { img.addEventListener('load', go); img.addEventListener('error', go); setTimeout(go, 1200); }
   } else artFrom = performance.now();
 
-  // hra je načítaná: na obrázku sa (najskôr chvíľu po zmiznutí loga) zjaví zelené tlačidlo Hrať
+  // hra je načítaná: na obrázku sa (najskôr chvíľu po zmiznutí loga) zjaví zelené Hrať a sivé Nastavenia
   const api = { onPlay: null, done };
   function done() {
-    const el = document.getElementById('splash'), btn = document.getElementById('splashPlay');
+    const el = document.getElementById('splash'), btns = document.getElementById('splashBtns'), btn = document.getElementById('splashPlay');
     if (!el || !btn) return;
     const tick = () => {
       const left = artFrom + ART_MIN_MS - performance.now();
       if (left > 0) { setTimeout(tick, Math.min(left, 300)); return; }
-      btn.classList.add('show');
+      btns.classList.add('show');
     };
     tick();
     btn.addEventListener('click', () => {

@@ -260,17 +260,7 @@
   .perk .btn { justify-content: center; padding: 8px 4px; }
   .perksScreen .row { display: flex; gap: 8px; width: 100%; margin-top: auto; }
   .perksScreen .row .btn { flex: 1; justify-content: center; }
-  .snd { display: inline-flex; gap: 6px; }
-  .sndBtn {
-    width: 34px; height: 34px; border-radius: 8px; border: 2px solid var(--ink);
-    background: var(--panel2); font-size: 16px; line-height: 1; padding: 0;
-    box-shadow: inset 0 -3px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.1);
-  }
-  .sndBtn.off { opacity: .45; position: relative; }
-  .sndBtn.off::after { content: ''; position: absolute; left: 6px; right: 6px; top: 50%; height: 2px; background: var(--red); transform: rotate(-35deg); }
-  .mapHead .snd { margin-left: auto; margin-right: 6px; }
-  .mapHead .sndBtn { width: 30px; height: 30px; font-size: 14px; }
-  .mapHead .pill { font-size: 13px; padding: 4px 7px; }
+  .mapHead .pill { margin-left: auto; font-size: 13px; padding: 4px 7px; }
   #selInfo { display: flex; flex-direction: column; gap: 6px; }
   .brow { display: grid; grid-template-columns: 1fr 1.3fr; gap: 6px; }
   .brow .primary { font-size: 17px; padding: 9px 10px; }
@@ -301,18 +291,39 @@
   #splash::before { content: ''; position: absolute; inset: -20px; background: url(img/splash.jpg) center / cover; filter: blur(14px) brightness(.55); }
   @media (max-aspect-ratio: 9/20) { #splash img { object-fit: contain; object-position: center; } }
 
-  /* zelené tlačidlo Hrať na úvodnom obrázku */
-  .greenBtn {
-    position: absolute; left: 50%; top: 56%; transform: translate(-50%, -50%) scale(.9); opacity: 0; pointer-events: none;
+  /* tlačidlá na úvodnom obrázku: zelené Hrať (stred na 56 % výšky) a pod ním sivé Nastavenia */
+  #splashBtns { position: absolute; left: 50%; top: 56%; transform: translate(-50%, -35px) scale(.9); opacity: 0; pointer-events: none;
+    display: flex; flex-direction: column; align-items: center; gap: 14px; transition: opacity .5s ease, transform .5s ease; }
+  #splashBtns.show { opacity: 1; pointer-events: auto; transform: translate(-50%, -35px) scale(1); }
+  #splashBtns.hide { opacity: 0; pointer-events: none; }
+  .greenBtn, .grayBtn {
+    width: 270px; box-sizing: border-box; padding: 8px 0 14px; border: 3px solid var(--ink); border-radius: 14px;
     font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 34px; font-weight: 700; letter-spacing: 2px; color: #fff;
-    padding: 14px 58px; border: 3px solid var(--ink); border-radius: 14px;
     background: linear-gradient(#7ee05e, #3fae3a 55%, #2c8a2c);
-    box-shadow: inset 0 -5px 0 #1f6420, inset 0 3px 0 rgba(255,255,255,.35), 0 6px 18px rgba(0,0,0,.55);
-    text-shadow: 2px 2px 0 #1f5a1c; transition: opacity .5s ease, transform .5s ease;
+    box-shadow: inset 0 -10px 0 #1f6420, inset 0 3px 0 rgba(255,255,255,.35), 0 6px 18px rgba(0,0,0,.55);
+    text-shadow: 2px 2px 0 #1f5a1c;
   }
-  .greenBtn.show { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); animation: greenPulse 1.8s ease-in-out .6s infinite; }
-  .greenBtn:active { transform: translate(-50%, -48%) scale(.98); box-shadow: inset 0 -2px 0 #1f6420; }
-  @keyframes greenPulse { 50% { transform: translate(-50%, -50%) scale(1.05); } }
+  .greenBtn { animation: greenPulse 1.8s ease-in-out .6s infinite; }
+  .grayBtn { font-size: 28px; padding: 11px 0 17px; letter-spacing: 1px;
+    background: linear-gradient(#b4b0b8, #87838c 55%, #6c6872); box-shadow: inset 0 -10px 0 #4c4952, inset 0 3px 0 rgba(255,255,255,.35), 0 6px 18px rgba(0,0,0,.55);
+    text-shadow: 2px 2px 0 #3c3a42; }
+  .greenBtn:active, .grayBtn:active { transform: translateY(2px) scale(.98); animation: none; }
+  @keyframes greenPulse { 50% { transform: scale(1.05); } }
+  /* jednoduché H bez hrbolčeka na priečke (písmo Pixelify ho má) */
+  .pxH { display: inline-block; width: .56em; height: .7em; box-sizing: border-box; margin-right: .06em;
+    border-left: .14em solid; border-right: .14em solid; background: linear-gradient(currentColor, currentColor) 0 50% / 100% .14em no-repeat;
+    filter: drop-shadow(2px 2px 0 #1f5a1c); }
+  /* nastavenia na úvodnom obrázku: jediné miesto, kde sa zapína hudba a zvuky */
+  #setPanel { position: absolute; left: 50%; top: 56%; transform: translate(-50%, -50%); width: 280px; box-sizing: border-box;
+    display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 14px; border: 3px solid var(--ink);
+    background: rgba(42,31,24,.94); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), 0 8px 24px rgba(0,0,0,.6); }
+  #setPanel[hidden] { display: none; }
+  #setPanel h2 { margin: 0 0 2px; text-align: center; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 26px; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
+  .setRow { display: flex; align-items: center; justify-content: space-between; font-size: 19px; font-weight: 600; }
+  .tgl { width: 78px; padding: 6px 0; border-radius: 10px; border: 2px solid var(--ink); font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 17px; font-weight: 700; color: #fff;
+    background: #5a4c40; box-shadow: inset 0 -4px 0 rgba(0,0,0,.35); text-shadow: 1px 1px 0 var(--ink); }
+  .tgl.on { background: #3fae3a; box-shadow: inset 0 -4px 0 #1f6420; }
+  #setBack { margin-top: 4px; justify-content: center; }
   /* menu (pozície, výber rasy): pozadím stmavený úvodný obrázok, názov hry z obrázka ostane hore vidieť */
   .screenOverlay.menuBg { justify-content: flex-start; gap: 10px; background: linear-gradient(rgba(8,6,12,.15), rgba(8,6,12,.15) 20%, rgba(14,10,8,.72) 34%, rgba(14,10,8,.9)), #07061a url(img/splash.jpg) center top / cover no-repeat; }
   .menuSpace { flex: 0 0 26%; }
@@ -482,7 +493,7 @@
 </style>
 </head>
 <body>
-<div id="splash"><img src="img/splash.jpg" alt="Fortward"><button id="splashPlay" class="greenBtn">Hrať</button></div>
+<div id="splash"><img src="img/splash.jpg" alt="Fortward"><div id="splashBtns"><button id="splashPlay" class="greenBtn" aria-label="Hrať"><span class="pxH"></span>rať</button><button id="splashSet" class="grayBtn">Nastavenia</button></div><div id="setPanel" hidden><h2>Nastavenia</h2><div class="setRow">Hudba<button class="tgl" data-kind="music"></button></div><div class="setRow">Zvuky<button class="tgl" data-kind="sfx"></button></div><button id="setBack" class="btn">◀ Späť</button></div></div>
 <div id="logoIntro"><img src="img/logo.jpg" alt="DBee games"></div>
 <script src="js/splash.js"></script>
 <div id="game">
@@ -527,7 +538,6 @@
     <div class="menuSpace"></div>
     <h2 class="menuHead">Vyber pozíciu</h2>
     <div id="slotList"></div>
-    <span class="snd"><button class="sndBtn" data-kind="music">♪</button><button class="sndBtn" data-kind="sfx">🔊</button></span>
   </div>
 
   <div id="title" class="screenOverlay menuBg" hidden>
@@ -540,7 +550,6 @@
 
   <div id="map" hidden>
     <div class="mapHead">
-      <span class="snd"><button class="sndBtn" data-kind="music">♪</button><button class="sndBtn" data-kind="sfx">🔊</button></span>
       <span class="pill">Dobyté <span id="mapProg">0 / 10</span></span>
     </div>
     <div id="mapPanel">
