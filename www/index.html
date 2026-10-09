@@ -301,6 +301,36 @@
   #splash::before { content: ''; position: absolute; inset: -20px; background: url(img/splash.jpg) center / cover; filter: blur(14px) brightness(.55); }
   @media (max-aspect-ratio: 9/20) { #splash img { object-fit: contain; object-position: center; } }
 
+  /* zelené tlačidlo Hrať na úvodnom obrázku */
+  .greenBtn {
+    position: absolute; left: 50%; top: 56%; transform: translate(-50%, -50%) scale(.9); opacity: 0; pointer-events: none;
+    font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 34px; font-weight: 700; letter-spacing: 2px; color: #fff;
+    padding: 14px 58px; border: 3px solid var(--ink); border-radius: 14px;
+    background: linear-gradient(#7ee05e, #3fae3a 55%, #2c8a2c);
+    box-shadow: inset 0 -5px 0 #1f6420, inset 0 3px 0 rgba(255,255,255,.35), 0 6px 18px rgba(0,0,0,.55);
+    text-shadow: 2px 2px 0 #1f5a1c; transition: opacity .5s ease, transform .5s ease;
+  }
+  .greenBtn.show { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); animation: greenPulse 1.8s ease-in-out .6s infinite; }
+  .greenBtn:active { transform: translate(-50%, -48%) scale(.98); box-shadow: inset 0 -2px 0 #1f6420; }
+  @keyframes greenPulse { 50% { transform: translate(-50%, -50%) scale(1.05); } }
+  /* menu (pozície, výber rasy): pozadím stmavený úvodný obrázok, názov hry z obrázka ostane hore vidieť */
+  .screenOverlay.menuBg { justify-content: flex-start; gap: 10px; background: linear-gradient(rgba(8,6,12,.15), rgba(8,6,12,.15) 20%, rgba(14,10,8,.72) 34%, rgba(14,10,8,.9)), #07061a url(img/splash.jpg) center top / cover no-repeat; }
+  .menuSpace { flex: 0 0 26%; }
+  .menuHead { margin: 0; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 26px; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
+  #slotList { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .slot { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--ink); background: rgba(42,31,24,.92); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); cursor: pointer; }
+  .slot:active { transform: translateY(1px); }
+  .slot.empty { background: rgba(28,22,18,.85); border-style: dashed; border-color: #6e5a46; }
+  .slotNum { flex: 0 0 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 20px; font-weight: 700; background: var(--blue); color: #fff; border: 2px solid var(--ink); }
+  .slot.empty .slotNum { background: #4a3c30; color: #c8b8a4; }
+  .slotInfo { flex: 1; display: flex; flex-direction: column; line-height: 1.25; }
+  .slotInfo b { font-size: 17px; }
+  .slotInfo small { color: var(--muted); font-size: 12.5px; }
+  .slotInfo .st { color: var(--gold); }
+  .slotGo { color: #7ee05e; font-size: 20px; }
+  .slotDel { flex: 0 0 auto; background: #4a2a22; color: #f0c0b0; border: 2px solid var(--ink); border-radius: 8px; padding: 4px 9px; font-size: 14px; }
+  #raceBack { margin-top: 4px; }
+
   /* ---- Titulná obrazovka ---- */
   .screenOverlay {
     position: absolute; inset: 0;
@@ -308,19 +338,6 @@
     padding: calc(env(safe-area-inset-top) + 16px) 18px calc(env(safe-area-inset-bottom) + 20px);
     background: radial-gradient(ellipse at 50% 40%, rgba(14,10,8,.35), rgba(14,10,8,.88));
   }
-  #title { justify-content: flex-start; background: linear-gradient(rgba(10,8,18,.55), rgba(10,8,18,0) 22%, rgba(10,8,18,0) 52%, rgba(14,10,8,.78) 64%, rgba(14,10,8,.92)); }
-  #title .titleArt { flex: 1; min-height: 40px; } /* voľné miesto pre ilustráciu hrdinov */
-  #title { gap: 8px; background: linear-gradient(rgba(10,8,18,.55), rgba(10,8,18,0) 20%, rgba(10,8,18,0) 58%, rgba(14,10,8,.82) 66%, rgba(14,10,8,.94)); }
-  #title #races { gap: 6px; }
-  #title .race { padding: 4px 4px 4px; gap: 1px; }
-  #title .race > img { width: 30px; height: 34px; }
-  #title .race b { font-size: 13px; }
-  #title #playBtn { margin-top: 4px; }
-  #title h1 {
-    margin: 0; font-size: 46px; letter-spacing: 3px; color: var(--gold);
-    text-shadow: 3px 3px 0 var(--ink), -2px 0 0 var(--ink), 0 -2px 0 var(--ink), 3px 0 0 var(--ink), 0 6px 0 var(--gold2), 3px 8px 0 var(--ink);
-  }
-  #title .sub { margin: -4px 0 6px; color: var(--muted); font-size: 16px; }
   #gemBox { position: absolute; top: calc(env(safe-area-inset-top) + 10px); right: 12px; pointer-events: auto; }
   #races { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
   .race {
@@ -335,8 +352,6 @@
   .race.sel { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold2), 0 0 14px rgba(248,208,72,.25); }
   .race.sel .tag { color: var(--gold); }
   .race.gem .tag { color: #88b4ff; }
-  #playBtn { margin-top: 8px; }
-  #bestTxt { color: var(--muted); font-size: 14px; margin: 0; min-height: 1em; }
   .note { font-size: 11px; color: #7c6c5a; text-align: center; margin: 0; }
 
   #over h2 { margin: 0; font-size: 34px; color: var(--red); text-shadow: 3px 3px 0 var(--ink); }
@@ -467,7 +482,7 @@
 </style>
 </head>
 <body>
-<div id="splash"><img src="img/splash.jpg" alt="Fortward"></div>
+<div id="splash"><img src="img/splash.jpg" alt="Fortward"><button id="splashPlay" class="greenBtn">Hrať</button></div>
 <div id="logoIntro"><img src="img/logo.jpg" alt="DBee games"></div>
 <script src="js/splash.js"></script>
 <div id="game">
@@ -508,16 +523,19 @@
     </div>
   </div>
 
-  <div id="title" class="screenOverlay">
-    <div id="gemBox" class="pill"><img class="gem" alt=""><span>0</span></div>
-    <h1>FORTWARD</h1>
-    <p class="sub">Ubráň pevnosť pred hordami</p>
-    <div class="titleArt"></div>
-    <div id="races"></div>
-    <button id="playBtn" class="primary">Hrať</button>
-    <p id="bestTxt"></p>
+  <div id="slots" class="screenOverlay menuBg" hidden>
+    <div class="menuSpace"></div>
+    <h2 class="menuHead">Vyber pozíciu</h2>
+    <div id="slotList"></div>
     <span class="snd"><button class="sndBtn" data-kind="music">♪</button><button class="sndBtn" data-kind="sfx">🔊</button></span>
-    <p class="note">Prototyp · bez reklám</p>
+  </div>
+
+  <div id="title" class="screenOverlay menuBg" hidden>
+    <div id="gemBox" class="pill"><img class="gem" alt=""><span>0</span></div>
+    <div class="menuSpace"></div>
+    <h2 class="menuHead">Vyber si rasu</h2>
+    <div id="races"></div>
+    <button id="raceBack" class="btn">◀ Späť</button>
   </div>
 
   <div id="map" hidden>
@@ -577,7 +595,7 @@
 <script>
   // hra sa načíta až po vykreslení úvodnej obrazovky (inak by ťažké skripty zdržali jej prvé zobrazenie)
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    const list = ['audio', 'sprites', 'scene', 'buildings', 'map', 'title', 'game'];
+    const list = ['audio', 'sprites', 'scene', 'buildings', 'map', 'game'];
     list.forEach((n, i) => {
       const s = document.createElement('script'); s.src = 'js/' + n + '.js'; s.async = false;
       if (i === list.length - 1) s.onload = () => SPLASH.done();

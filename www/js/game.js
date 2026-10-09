@@ -144,7 +144,22 @@
   const PERK_MAX = 3;
   const loadJSON = (k, def) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? def : v; } catch (e) { return def; } };
   const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } };
-  const meta = { stars: loadJSON('fortward.stars', []), perks: loadJSON('fortward.perks', {}) };
+  // ---- 4 pozície na uloženie: postup každej je pod vlastnou predponou (zvuk je spoločný) ----
+  const SLOTS = 4;
+  let SLOT = 1;
+  const slotKey = (n, k) => 'fortward.s' + n + '.' + k;
+  const sk = k => slotKey(SLOT, k);
+  // jednorazový presun starého postupu (bez pozícií) do pozície 1
+  try {
+    if (!localStorage.getItem('fortward.slotsReady')) {
+      if (!localStorage.getItem(slotKey(1, 'unlocked')) && localStorage.getItem('fortward.unlocked')) {
+        for (const k of ['stars', 'perks', 'king', 'unlocked', 'introSeen']) { const v = localStorage.getItem('fortward.' + k); if (v != null) localStorage.setItem(slotKey(1, k), v); }
+        localStorage.setItem(slotKey(1, 'race'), JSON.stringify('Ľudia'));
+      }
+      localStorage.setItem('fortward.slotsReady', '1');
+    }
+  } catch (e) { }
+  const meta = { stars: [], perks: {} };
   const perk = id => meta.perks[id] || 0;
 
   // ---- Levelovanie kráľa: XP za prežité vlny, na každej novej úrovni výber z 3 vylepšení (natrvalo) ----
@@ -162,10 +177,10 @@
     { id: 'roar',    name: 'Hromový hlas',    desc: 'Pokrik trvá o 2 s dlhšie',                         icon: 'king', need: 'warcry' },
     { id: 'frost',   name: 'Ľadový dych',     desc: 'Mráz trvá o 1,5 s dlhšie',                         icon: 'king', need: 'freeze' },
   ];
-  const kingMeta = Object.assign({ lvl: 1, xp: 0, pending: 0, tal: {} }, loadJSON('fortward.king', {}));
+  const kingMeta = { lvl: 1, xp: 0, pending: 0, tal: {} };
   const tal = id => kingMeta.tal[id] || 0;
   const kingXpNeed = l => 60 + 40 * (l - 1);
-  const saveKing = () => saveJSON('fortward.king', kingMeta);
+  const saveKing = () => saveJSON(sk('king'), kingMeta);
   function gainKingXp(n) {
     if (kingMeta.lvl >= KING_MAX_LVL) return 0;
     kingMeta.xp += n;
@@ -180,9 +195,6 @@
     { name: 'Strieborná', col: '#c8ccd8', hi: '#ffffff', hp: 1.3,  extra: 2, xp: 1.4 },
     { name: 'Zlatá',      col: '#f8d048', hi: '#fff070', hp: 1.65, extra: 4, xp: 1.8 },
   ];
-  // staré uloženie (jedno číslo na misiu) = medená úroveň
-  meta.stars = meta.stars.map(v => Array.isArray(v) ? v : [v || 0, 0, 0]);
-  if (meta.perks.armor) { delete meta.perks.armor; saveJSON('fortward.perks', meta.perks); } // zrušený bonus – hviezdy sa vrátia
   const starsOf = (m, t) => (meta.stars[m - 1] || [])[t] || 0;
   const tierOpen = (m, t) => t === 0 ? m <= st.unlocked : starsOf(m, t - 1) >= 3;
   const starSpan = (n, t) => '<span style="color:' + TIERS[t].col + '">' + '★'.repeat(n) + '</span><i>' + '★'.repeat(3 - n) + '</i>';
@@ -210,17 +222,36 @@
   const bCap = () => Math.min(lvlCap(), st.hallLvl);
   const LVL_NAME = ['', 'drevo', 'kameň', 'kameň s kovaním', 'tmavé opevnenie', 'kráľovský kameň'];
   const lockBtn = (label, id, wide) => btn('🔒 ' + label + ' · misia ' + unlockMissionOf(id), null, false, () => { }, 'locked' + (wide ? ' wide' : ''));
-  try { st.unlocked = Math.max(1, Math.min(11, parseInt(localStorage.getItem('fortward.unlocked') || '1', 10) || 1)); } catch (e) { /* bez úložiska */ }
-  const saveProgress = () => { try { localStorage.setItem('fortward.unlocked', String(st.unlocked)); } catch (e) { } };
-  // prejdené misie bez záznamu hviezd (vyhrané pred zavedením hviezd) dostanú 1 bronzovú – víťazstvo dáva vždy aspoň 1
-  {
+  const saveProgress = () => { try { localStorage.setItem(sk('unlocked'), String(st.unlocked)); } catch (e) { } };
+  // načíta postup zvolenej pozície do hry
+  function loadSlot(n) {
+    SLOT = n;
+    meta.stars = loadJSON(sk('stars'), []).map(v => Array.isArray(v) ? v : [v || 0, 0, 0]); // staré uloženie (číslo) = medená úroveň
+    for (const k in meta.perks) delete meta.perks[k];
+    Object.assign(meta.perks, loadJSON(sk('perks'), {}));
+    if (meta.perks.armor) { delete meta.perks.armor; saveJSON(sk('perks'), meta.perks); } // zrušený bonus – hviezdy sa vrátia
+    for (const k in kingMeta) delete kingMeta[k];
+    Object.assign(kingMeta, { lvl: 1, xp: 0, pending: 0, tal: {} }, loadJSON(sk('king'), {}));
+    st.unlocked = Math.max(1, Math.min(11, parseInt(localStorage.getItem(sk('unlocked')) || '1', 10) || 1));
+    // prejdené misie bez záznamu hviezd (vyhrané pred zavedením hviezd) dostanú 1 bronzovú – víťazstvo dáva vždy aspoň 1
     let fixed = false;
     for (let m = 1; m < st.unlocked && m <= MISSIONS.length; m++) {
       const a = meta.stars[m - 1];
       if (!a || !a.some(v => v > 0)) { meta.stars[m - 1] = [1, 0, 0]; fixed = true; }
     }
-    if (fixed) saveJSON('fortward.stars', meta.stars);
+    if (fixed) saveJSON(sk('stars'), meta.stars);
+    st.mapSel = null; st.mapTierFor = null; st.mapAnim = null; st.provAnim = null;
   }
+  // súhrn pozície pre menu (bez prepnutia)
+  function slotInfo(n) {
+    const get = k => { try { return localStorage.getItem(slotKey(n, k)); } catch (e) { return null; } };
+    const race = get('race'), unl = get('unlocked');
+    if (!race && !unl) return null;
+    const stars = (JSON.parse(get('stars') || '[]') || []).reduce((a, v) => a + (Array.isArray(v) ? v.reduce((x, y) => x + (y || 0), 0) : (v || 0)), 0);
+    const king = JSON.parse(get('king') || '{}') || {};
+    return { race: race ? JSON.parse(race) : 'Ľudia', won: Math.min(MISSIONS.length, Math.max(0, (parseInt(unl || '1', 10) || 1) - 1)), stars, king: king.lvl || 1 };
+  }
+  function clearSlot(n) { for (const k of ['stars', 'perks', 'king', 'unlocked', 'introSeen', 'race']) try { localStorage.removeItem(slotKey(n, k)); } catch (e) { } }
   let island = null;
 
   // ---------------- Mriežka ----------------
@@ -771,7 +802,7 @@
     st.phase = 'won';
     const t = st.tier || 0, stars = starsFor(st.hallHp / hallMax()), prevStars = starsOf(m, t);
     const nextWasOpen = t < 2 && tierOpen(m, t + 1);
-    if (stars > prevStars) { const a = (meta.stars[m - 1] || [0, 0, 0]).slice(); a[t] = stars; meta.stars[m - 1] = a; saveJSON('fortward.stars', meta.stars); }
+    if (stars > prevStars) { const a = (meta.stars[m - 1] || [0, 0, 0]).slice(); a[t] = stars; meta.stars[m - 1] = a; saveJSON(sk('stars'), meta.stars); }
     const tierNote = t >= 2 ? '' : !nextWasOpen && tierOpen(m, t + 1) ? '<br><span class="newTech">Odomkla sa ' + TIERS[t + 1].name.toLowerCase() + ' úroveň!</span>'
       : !tierOpen(m, t + 1) ? '<br><small class="dim">Za 3 hviezdy (radnica nad 80 % zdravia) sa odomkne ' + TIERS[t + 1].name.toLowerCase() + ' úroveň.</small>' : '';
     $('bossbar').hidden = true; $('bottom').hidden = true;
@@ -2302,7 +2333,7 @@
 
   function render(time) {
     if (st.phase === 'map') { renderMap(time); present(); return; }
-    if (st.phase === 'title') { TITLE.draw(g, W, H, time); present(); return; } // titulná ilustrácia
+    if (st.phase === 'title') return; // menu má za pozadím úvodný obrázok, plátno sa nekreslí
     g.drawImage(scene.bg, 0, 0);
     drawSceneFx(time);
     const playing = st.phase !== 'title';
@@ -3027,8 +3058,8 @@
     renderMapPanel();
     focusMapNode(st.mapAnim ? st.mapAnim.seg + 2 : st.mapSel, true);
     if (!st.mapAnim) afterDeck(); // pri odomykaní hradu príde výber až po kartičkách
-    if (st.unlocked === 1 && !loadJSON('fortward.introSeen', false)) { // úplne nová hra
-      saveJSON('fortward.introSeen', true);
+    if (st.unlocked === 1 && !loadJSON(sk('introSeen'), false)) { // úplne nová hra
+      saveJSON(sk('introSeen'), true);
       setTimeout(() => { if (st.phase === 'map') banner('Horda napadla tvoje územie!'); }, 400);
     }
   }
@@ -3090,7 +3121,7 @@
       b.disabled = lvl >= PERK_MAX || starsFree() < cost;
       b.addEventListener('click', () => {
         if (starsFree() < cost || lvl >= PERK_MAX) return;
-        meta.perks[pk.id] = lvl + 1; saveJSON('fortward.perks', meta.perks);
+        meta.perks[pk.id] = lvl + 1; saveJSON(sk('perks'), meta.perks);
         AUDIO.play('upgrade'); renderPerks();
       });
       row.appendChild(b); list.appendChild(row);
@@ -3212,11 +3243,11 @@
     AUDIO.play('unlock');
   }
 
-  $('playBtn').addEventListener('click', showMap);
   $('overMap').addEventListener('click', showMap);
   $('overRetry').addEventListener('click', () => startMission(st.mission, st.tier));
   $('mapPlay').addEventListener('click', () => { if (!st.mapAnim && tierOpen(st.mapSel, st.mapTier || 0)) startMission(st.mapSel, st.mapTier || 0); });
-  $('mapBack').addEventListener('click', () => { st.phase = 'title'; $('map').hidden = true; showTitle(); });
+  $('mapBack').addEventListener('click', () => { st.phase = 'title'; $('map').hidden = true; showSlots(); });
+  $('raceBack').addEventListener('click', showSlots);
   function syncSound() {
     document.querySelectorAll('.sndBtn').forEach(b => {
       const on = AUDIO.prefs[b.dataset.kind];
@@ -3240,10 +3271,34 @@
     { name: 'Zombie', spr: 'goblin', state: 'gem', price: 500 },
     { name: 'Hmyzáci', spr: 'goblin', state: 'gem', price: 800 },
   ];
+  // ---- menu: 4 pozície na uloženie ----
+  function showSlots() {
+    st.phase = 'title';
+    $('title').hidden = true; $('map').hidden = true;
+    $('slots').hidden = false;
+    AUDIO.music('map');
+    const box = $('slotList'); box.innerHTML = '';
+    for (let n = 1; n <= SLOTS; n++) {
+      const info = slotInfo(n), c = document.createElement('div');
+      c.className = 'slot' + (info ? '' : ' empty');
+      c.innerHTML = '<span class="slotNum">' + n + '</span><div class="slotInfo">' + (info
+        ? '<b>' + info.race + '</b><small>Dobyté ' + info.won + ' / ' + MISSIONS.length + ' · <span class="st">★ ' + info.stars + '</span> · kráľ úr. ' + info.king + '</small>'
+        : '<b>Nová hra</b><small>Prázdna pozícia</small>') + '</div>' + (info ? '<button class="slotDel" title="Vymazať">✕</button>' : '<span class="slotGo">▶</span>');
+      c.addEventListener('click', () => { AUDIO.play('build'); loadSlot(n); showTitle(); });
+      const del = c.querySelector('.slotDel');
+      if (del) del.addEventListener('click', ev => {
+        ev.stopPropagation();
+        if (!confirm('Vymazať pozíciu ' + n + '? Postup sa stratí.')) return;
+        clearSlot(n); showSlots();
+      });
+      box.appendChild(c);
+    }
+  }
+  // ---- menu: výber rasy (po výbere sa otvorí mapa) ----
   function showTitle() {
+    $('slots').hidden = true;
     $('title').hidden = false;
     AUDIO.music('map');
-    $('bestTxt').textContent = st.unlocked > MISSIONS.length ? 'Ostrov je oslobodený!' : st.unlocked > 1 ? 'Postup: misia ' + st.unlocked + ' z ' + MISSIONS.length : '';
     const box = $('races'); box.innerHTML = '';
     for (const r of RACES) {
       const c = document.createElement('button');
@@ -3254,6 +3309,7 @@
       c.addEventListener('click', () => {
         if (r.state === 'soon') toast(r.name + ' prídu v ďalšej verzii');
         else if (r.state === 'gem') toast('Odomykanie za gemy pripravujeme');
+        else { saveJSON(sk('race'), r.name); saveProgress(); showMap(); }
       });
       box.appendChild(c);
     }
@@ -3291,9 +3347,9 @@
   initIcons();
   resize();
   window.addEventListener('resize', resize);
-  showTitle();
   updateHud();
   requestAnimationFrame(frame);
+  SPLASH.onPlay = showSlots; // zelené tlačidlo Hrať na úvodnom obrázku otvorí pozície
 
   // ---------------- Ladenie ----------------
   function postPNG(canvas, name) {

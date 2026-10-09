@@ -158,8 +158,8 @@ window.SIM = (() => {
 
   // celá kampaň od misie 1 (postup hráča v prehliadači sa po skončení obnoví)
   function campaign(opts) {
-    const saved = localStorage.getItem('fortward.unlocked');
-    const savedStars = localStorage.getItem('fortward.stars'), metaStars = F.meta.stars.slice();
+    const saved = localStorage.getItem('fortward.s1.unlocked');
+    const savedStars = localStorage.getItem('fortward.s1.stars'), metaStars = F.meta.stars.slice();
     s.unlocked = 1;
     const out = [];
     for (let m = 1; m <= 10; m++) {
@@ -171,8 +171,8 @@ window.SIM = (() => {
       out.push(r);
       if (!r.won) break;
     }
-    if (saved === null) localStorage.removeItem('fortward.unlocked'); else localStorage.setItem('fortward.unlocked', saved);
-    if (savedStars === null) localStorage.removeItem('fortward.stars'); else localStorage.setItem('fortward.stars', savedStars);
+    if (saved === null) localStorage.removeItem('fortward.s1.unlocked'); else localStorage.setItem('fortward.s1.unlocked', saved);
+    if (savedStars === null) localStorage.removeItem('fortward.s1.stars'); else localStorage.setItem('fortward.s1.stars', savedStars);
     F.meta.stars.length = 0; metaStars.forEach((v, i) => { F.meta.stars[i] = v; });
     s.unlocked = Math.max(1, parseInt(saved || '1', 10) || 1);
     return out;
