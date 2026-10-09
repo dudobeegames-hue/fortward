@@ -555,6 +555,8 @@
       if (q.hp <= 0) { AUDIO.play('crumble'); for (let k = 0; k < 10; k++) part(q.x + (Math.random() - 0.5) * 14, q.y - 4, (Math.random() - 0.5) * 40, -Math.random() * 30, 0.6, '#4a2e1a', 100); }
     }
     updateRocks(F, dt); updatePlayerRocks(F, dt); maybeOrcKing(F);
+    // horda vyrazí z hradu, keď vojsko hráča prejde polovicu bojiska (alebo pri prvom kontakte s obranou)
+    if (st.pendingWave && st.soldiers.some(u => !u.dead && !u.helper && u.y < (FORT.palY + G.hallTop) / 2)) fortContact(); // polovica cesty medzi hradmi
     if (F.rockCd && st.phase === 'battle') { F.rockT -= dt; if (F.rockT <= 0) F.rockT = throwRock(F) ? F.rockCd : 0.5; }
     for (const t of F.towers) {
       t.flash = Math.max(0, t.flash - dt);
@@ -1306,6 +1308,14 @@
       }
       const sp = (u.spd || 24) * waterMul(u);
       if (u.y < FORT.palY + 40) moveTo(u, ox, oy + ARCHER_RANGE - 8, sp, dt); else moveKnight(u, ox, oy + ARCHER_RANGE - 8, sp, dt);
+      return;
+    }
+    // obrana: nikto v dosahu – priblíž sa k najbližšej horde na dostrel, inak sa vráť na svoje miesto
+    let tg = null, td = 1e9;
+    for (const e of st.enemies) { if (e.dead || e.y <= 4) continue; const d = Math.hypot(e.x - u.x, e.y - u.y); if (d < td) { td = d; tg = e; } }
+    if (tg) {
+      const k = (ARCHER_RANGE - 10) / td;
+      moveKnight(u, tg.x + (u.x - tg.x) * k, tg.y + (u.y - tg.y) * k, (u.spd || 24) * waterMul(u), dt);
       return;
     }
     moveKnight(u, hx, hy, (u.spd || 24) * waterMul(u), dt);

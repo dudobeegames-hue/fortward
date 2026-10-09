@@ -379,7 +379,7 @@ function makeGatehouse(lvl) {
     }
     for (let y = 5; y <= 28; y++) for (let x = 5; x <= 10; x++) {
       if (y <= 7) { p.shade(x, y, WOOD, y === 5 ? 0.8 : 0.5); continue; }
-      p.shade(x, y, WOOD, (x % 2 ? 0.55 : 0.4) - (y === 14 || y === 22 ? 0.3 : 0));
+      p.shade(x, y, WOOD, (x % 2 ? 0.36 : 0.25) - (y === 14 || y === 22 ? 0.2 : 0)); // vráta tmavšie ako stĺpy
     }
     return p.finish();
   }
