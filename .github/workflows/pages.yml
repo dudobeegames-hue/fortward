@@ -29,3 +29,11 @@ jobs:
           path: www
       - id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true
+      # GitHub občas hneď po nahratí nenájde balík stránky – po krátkej pauze sa nasadenie zopakuje
+      - name: Počkať pred druhým pokusom
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+      - id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4
