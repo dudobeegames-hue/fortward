@@ -645,31 +645,52 @@ function makeRange() {
 const ORC_STONE = ['#100f14', '#18171e', '#22202a', '#2e2a36', '#3c3846', '#4e4858', '#625a6c'].map(hexRGB);
 const ORC_WOOD = ['#140c08', '#24160e', '#382214', '#4a2e1a', '#5e3c22', '#74502e'].map(hexRGB);
 const BONE = hexRGB('#eee6cc'), BONE2 = hexRGB('#a8a088'), BLOOD = hexRGB('#8c2018'), BLOOD2 = hexRGB('#e84838'), EMBER = hexRGB('#f89838');
-// hrad hordy 56x50: hradby s cimburím a kostenými hrotmi, stredná veža, brána s mrežou, lebka, zástavy
+// hrad hordy 56x50 (drevený)
 function makeOrcKeep() {
+  // drevená pevnosť hordy 56x50: zrubová veža z vodorovných brvien, bočné opevnenie z kolov s kostenými hrotmi,
+  // okovaná brána s lebkou, červené zástavy a žeravé strieľne
   const p = painter(56, 50);
-  const stone = (x, y, base) => {                       // kvádre so škárami, svetlo zľava
-    const row = Math.floor(y / 3), mortar = y % 3 === 2 || (x + row * 3) % 7 === 0;
-    p.shade(x, y, ORC_STONE, mortar ? 0.12 : base + (hash2(x, y, 201) - 0.5) * 0.12);
-  };
-  for (let y = 18; y <= 49; y++) for (let x = 1; x <= 54; x++) stone(x, y, 0.62 - (x - 1) / 53 * 0.3);     // hradby
-  for (let x = 1; x <= 54; x++) for (let y = 15; y <= 17; y++) if ((x - 1) % 5 < 3) stone(x, y, 0.75);    // cimburie
-  for (let y = 3; y <= 49; y++) for (let x = 18; x <= 37; x++) stone(x, y, 0.7 - (x - 18) / 19 * 0.32);   // stredná veža
-  for (let x = 17; x <= 38; x++) for (let y = 0; y <= 2; y++) if ((x - 17) % 4 < 2) stone(x, y, 0.82);    // cimburie veže
-  for (let x = 2; x <= 53; x += 5) { p.set(x + 1, 13, BONE); p.set(x + 1, 14, BONE2); }                   // kostené hroty
-  for (const [wx, wy] of [[23, 8], [31, 8], [23, 18], [31, 18]]) for (let y = wy; y <= wy + 3; y++) p.set(wx + (y === wy ? 0 : 0), y, y === wy ? EMBER : hexRGB('#d83818')); // žiariace strieľne
-  // brána s mrežou a oblúkom
+  const W = ORC_WOOD;
+  // bočné opevnenie z hrubých zvislých kolov (s hrotmi navrchu)
+  for (let x = 1; x <= 54; x++) {
+    const lx = (x - 1) % 3, top = 16 + ((Math.floor((x - 1) / 3) * 5) % 2), tip = lx === 1 ? top - 2 : top;
+    for (let y = tip; y <= 49; y++) {
+      let v = [0.8, 0.6, 0.32][lx] - (y - top) * 0.004;
+      if (y === tip) v += 0.12;
+      if (y === 26 || y === 40) v = 0.12;                                   // previazanie lanom
+      p.shade(x, y, W, v);
+    }
+    if (lx === 1) p.set(x, tip - 1, BONE);
+  }
+  // zrubová veža uprostred: vodorovné brvná s tienistými škárami
+  for (let y = 4; y <= 49; y++) for (let x = 17; x <= 38; x++) {
+    const course = (y - 4) % 4;
+    let v = [0.82, 0.68, 0.52, 0.2][course] - (x - 17) / 21 * 0.32;
+    if ((x === 17 || x === 38) && course !== 3) v += 0.12;                // konce brvien na rohoch
+    p.shade(x, y, W, v + (hash2(x >> 2, y, 241) - 0.5) * 0.06);
+  }
+  // vrch veže: plošina so zahrotenými kolmi a kosťami
+  for (let x = 16; x <= 39; x++) { const lx = (x - 16) % 3; for (let y = lx === 1 ? 0 : 1; y <= 3; y++) p.shade(x, y, W, [0.85, 0.65, 0.35][lx]); if (lx === 1) p.set(x, 0, BONE); }
+  // žeravé strieľne (ohne vnútri)
+  for (const [wx, wy] of [[22, 9], [32, 9], [22, 19], [32, 19]]) for (let y = wy; y <= wy + 3; y++) for (let x = wx; x <= wx + 1; x++) p.set(x, y, y === wy ? EMBER : hexRGB('#d83818'));
+  // okovaná brána s klenbou z brvien
   for (let y = 33; y <= 49; y++) for (let x = 22; x <= 33; x++) {
     const arch = y < 36 && Math.hypot(x - 27.5, (36 - y) * 1.6) > 6.2;
     if (arch) continue;
-    p.set(x, y, (x - 22) % 3 === 1 || (y - 33) % 4 === 0 ? hexRGB('#3a3a44') : hexRGB('#0a0806'));
+    const edge = y < 37 && Math.hypot(x - 27.5, (36 - y) * 1.6) > 5;
+    if (edge) { p.shade(x, y, W, 0.9); continue; }
+    let v = (x - 22) % 3 === 2 ? 0.18 : 0.46 - (x - 22) * 0.015;
+    if (y === 39 || y === 45) { p.set(x, y, (x % 3 === 0) ? RIVET : IRON); continue; } // železné pásy s nitmi
+    p.shade(x, y, W, v);
   }
+  for (let y = 37; y <= 49; y++) p.set(27, y, hexRGB('#140c08'));         // stred vrát
   // lebka nad bránou
   for (let y = 27; y <= 31; y++) for (let x = 25; x <= 30; x++) {
     if ((y === 27 || y === 31) && (x === 25 || x === 30)) continue;
     p.set(x, y, (y === 29 && (x === 26 || x === 29)) || (y === 31 && x % 2) ? hexRGB('#1c140e') : x < 28 ? BONE : BONE2);
   }
-  // červené zástavy na hradbách
+  for (const [hx, hy] of [[24, 26], [31, 26]]) { p.set(hx, hy, BONE); p.set(hx + (hx < 28 ? -1 : 1), hy - 1, BONE2); } // rohy lebky
+  // červené zástavy na bočnom opevnení
   for (const bx of [5, 45]) for (let y = 21; y <= 31; y++) for (let x = bx; x <= bx + 5; x++) {
     if (y === 31 && (x - bx) % 2 === 1) continue;
     p.set(x, y, x === bx ? BLOOD2 : (y === 25 && x > bx + 1 && x < bx + 4) ? hexRGB('#1c140e') : BLOOD);
@@ -715,22 +736,29 @@ function makePalisade(gate) {
   }
   return p.finish();
 }
-// kamenný múr hordy 16x21 (misie 8+): kvádre, cimburie s kostenými hrotmi; brána: vráta s mrežou a lebkou
+// zosilnené hradby hordy (misie 8+)
 function makeOrcWall(gate) {
+  // zosilnené drevené hradby hordy 16x21 (misie 8+): dvojitý rad hrubých kolov, železné pásy s nitmi, kostené hroty;
+  // brána: okované vráta s lebkou
   const p = painter(16, 21);
-  for (let y = 4; y <= 20; y++) for (let x = 0; x <= 15; x++) {
-    const row = Math.floor((y - 4) / 3), mortar = (y - 4) % 3 === 2 || (x + row * 4) % 8 === 0;
-    p.shade(x, y, ORC_STONE, mortar ? 0.14 : 0.7 - x / 15 * 0.3 + ((y - 4) % 3 === 0 ? 0.06 : 0) + (hash2(x, y, 233) - 0.5) * 0.12);
-  }
-  for (let x = 0; x <= 15; x++) if (x % 6 < 4) for (let y = 1; y <= 3; y++) p.shade(x, y, ORC_STONE, y === 1 ? 0.9 : 0.72 - x / 15 * 0.25); // cimburie
-  for (const bx of [1, 7, 13]) { p.set(bx + 1, 0, BONE); }                                                        // kostené hroty
-  if (gate) {
-    for (let y = 8; y <= 20; y++) for (let x = 3; x <= 12; x++) {
-      if (y < 11 && Math.hypot(x - 7.5, (11 - y) * 1.4) > 4.8) continue;
-      p.set(x, y, (x - 3) % 3 === 1 || (y - 8) % 4 === 0 ? hexRGB('#3a3a44') : hexRGB('#0a0806'));
+  const W = ORC_WOOD;
+  for (let x = 0; x <= 15; x++) {
+    const lx = x % 4, tip = lx === 1 || lx === 2 ? 0 : 1;
+    for (let y = tip; y <= 20; y++) {
+      if (lx === 3 && y < 3) continue;
+      let v = [0.66, 0.82, 0.55, 0.22][lx] - y * 0.008;
+      if (y === tip) v = 0.92;
+      p.shade(x, y, W, v);
     }
-    for (let y = 4; y <= 7; y++) for (let x = 6; x <= 9; x++) if (!((y === 4 || y === 7) && (x === 6 || x === 9))) p.set(x, y, (y === 6 && (x === 6 || x === 9)) ? hexRGB('#1c140e') : x < 8 ? BONE : BONE2);
-  } else for (let y = 9; y <= 11; y++) p.set(7, y, y === 9 ? EMBER : hexRGB('#d83818'));                           // žiariaca strieľňa
+    if (lx === 1) p.set(x, 0, BONE);
+  }
+  for (const by of [6, 14]) for (let x = 0; x <= 15; x++) { p.set(x, by, IRON); p.set(x, by + 1, x % 4 === 2 ? RIVET : hexRGB('#26262e')); } // železné pásy
+  if (gate) {
+    for (let y = 8; y <= 20; y++) for (let x = 4; x <= 11; x++) p.shade(x, y, W, (x - 4) % 2 ? 0.25 : 0.4);
+    for (let y = 8; y <= 20; y++) p.set(8, y, hexRGB('#140c08'));
+    for (const by of [11, 17]) for (let x = 4; x <= 11; x++) p.set(x, by, x % 2 ? RIVET : IRON);
+    for (let y = 3; y <= 6; y++) for (let x = 6; x <= 9; x++) if (!((y === 3 || y === 6) && (x === 6 || x === 9))) p.set(x, y, (y === 5 && (x === 6 || x === 9)) ? hexRGB('#1c140e') : x < 8 ? BONE : BONE2);
+  }
   return p.finish();
 }
 // zahrotené koly 16x9 pred hradbami (misie 7+): dva prekrížené rady kolov s kostenými hrotmi
