@@ -587,7 +587,7 @@
     Object.assign(st, {
       wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.15 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, tool: null, sel: null, hallFlash: 0, shake: 0, soldierN: 0,
       blds: [], enemies: [], soldiers: [], proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
-      cryT: 0, cryCd: 0, freezeT: 0, freezeCd: 0, siegeHold: false, siegeT: 0,
+      cryT: 0, cryCd: 0, freezeT: 0, freezeCd: 0, siegeHold: false, siegeT: 0, introPan: null,
     });
     rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
     st.fort = isAttack() ? makeFort() : null;
@@ -666,8 +666,8 @@
     st.viewUp = 0;
     if (isAttack() && st.wave === 0) {
       const news = FORT_NEWS[st.mission - HOME_PROVINCES - 1];
-      setTimeout(() => { if (st.phase === 'build') toast('Potiahni mapu nadol – uvidíš orkskú pevnosť'); }, 1500);
-      if (news) setTimeout(() => { if (st.phase === 'build') toast(news); }, 3700);
+      st.introPan = { t: 0 }; // úvodný prelet kamery na orkský hrad a späť k radnici
+      if (news) setTimeout(() => { if (st.phase === 'build' && st.introPan) toast(news); }, 2000);
     } else if (isAttack() && st.siegeHold) {
       st.siegeT = SIEGE_BUILD; // obliehanie: na budovanie je len chvíľa, potom útok pokračuje sám
       setTimeout(() => { if (st.phase === 'build') toast('Hrad je obliehaný – orkovia ho neopravia. Útok pokračuje o ' + SIEGE_BUILD + ' s'); }, 400);
@@ -2233,6 +2233,7 @@
   }
 
   const panelLow = () => $('build').offsetHeight * DPR / S;
+  const INTRO_PAN = [0.5, 1.4, 1.6, 1.2]; // s: čakanie, prelet hore, pohľad na hrad, návrat
   function camTick(dt) {
     if (st.phase === 'map') {
       if (!mapDrag) mapCam += (mapCamTarget - mapCam) * Math.min(1, dt * 8);
@@ -2244,6 +2245,14 @@
     const full = st.phase === 'build' && !$('build').hidden ? panelLow() : 0;
     st.viewUp = Math.max(0, Math.min(full + camBase(), st.viewUp || 0));
     let target = camBase() + full - st.viewUp;
+    if (st.introPan && (vscroll || st.phase !== 'build')) st.introPan = null; // ťuk/ťah prelet preruší
+    if (st.introPan) { // čakanie, prelet hore, pohľad na hrad, návrat
+      const P = INTRO_PAN, t = (st.introPan.t += dt), ease = x => x * x * (3 - 2 * x);
+      const k = t < P[0] ? 0 : t < P[0] + P[1] ? ease((t - P[0]) / P[1]) : t < P[0] + P[1] + P[2] ? 1 : ease(Math.max(0, 1 - (t - P[0] - P[1] - P[2]) / P[3]));
+      camY = target * (1 - k);
+      if (t >= P[0] + P[1] + P[2] + P[3]) st.introPan = null;
+      return;
+    }
     if (vscroll) camY = target;
     target = Math.min(target, Math.max(0, FH - 60));
     camY += (target - camY) * Math.min(1, dt * 10);
