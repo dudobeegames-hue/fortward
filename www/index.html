@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0e0a08">
 <title>Fortward</title>
+<link rel="preload" as="image" href="img/logo.jpg">
 <link rel="preload" as="image" href="img/splash.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&family=Rubik:wght@500;600;700&display=swap" rel="stylesheet">
@@ -289,6 +290,11 @@
   /* ---- Úvodná obrazovka počas načítania ---- */
   #splash { position: fixed; inset: 0; z-index: 100; background: #07061a; transition: opacity .8s ease; }
   #splash.out { opacity: 0; pointer-events: none; }
+  /* logo štúdia pred obrázkom hry: čierne pozadie, logo naskočí, 2,5 s a zmizne */
+  #logoIntro { position: fixed; inset: 0; z-index: 101; background: #000; display: flex; align-items: center; justify-content: center; transition: opacity .5s ease; }
+  #logoIntro img { width: min(80vw, 56vh); height: auto; opacity: 0; transform: scale(.94); transition: opacity .45s ease, transform .6s ease; }
+  #logoIntro.in img { opacity: 1; transform: scale(1); }
+  #logoIntro.out { opacity: 0; pointer-events: none; }
   #splash img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
   /* veľmi úzke displeje: celý obrázok (názov sa neoreže), okraje vyplní rozmazaná kópia */
   #splash::before { content: ''; position: absolute; inset: -20px; background: url(img/splash.jpg) center / cover; filter: blur(14px) brightness(.55); }
@@ -461,6 +467,7 @@
 </head>
 <body>
 <div id="splash"><img src="img/splash.jpg" alt="Fortward"></div>
+<div id="logoIntro"><img src="img/logo.jpg" alt="DBee games"></div>
 <script src="js/splash.js"></script>
 <div id="game">
   <canvas id="screen"></canvas>
