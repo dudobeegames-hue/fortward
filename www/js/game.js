@@ -3284,6 +3284,25 @@
     { name: 'Hmyzáci', spr: 'goblin', state: 'gem', price: 800 },
   ];
   // ---- menu: 4 pozície na uloženie ----
+  // červený pixelový kôš na vymazanie pozície (14×16 bodov)
+  const TRASH = (() => {
+    const R = (x, y, w, h, c) => '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="' + c + '"/>';
+    const K = '#2a0a06', svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 16" shape-rendering="crispEdges">' +
+      R(4, 0, 6, 1, K) + R(4, 1, 1, 1, K) + R(9, 1, 1, 1, K) + R(5, 1, 4, 1, '#e84838') +
+      R(0, 2, 14, 4, K) + R(1, 3, 12, 1, '#ff9a80') + R(1, 4, 12, 1, '#e84838') +
+      R(1, 6, 12, 10, K) + R(2, 6, 10, 9, '#d8402c') + R(2, 6, 1, 8, '#ff7a60') + R(11, 6, 1, 9, '#a8261c') + R(2, 14, 10, 1, '#a8261c') +
+      R(4, 8, 1, 5, '#7c1810') + R(7, 8, 1, 5, '#7c1810') + R(9, 8, 1, 5, '#7c1810') + '</svg>';
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  })();
+  // vlastné potvrdenie v štýle hry (okno prehliadača confirm() nevyzerá dobre)
+  function ask(title, text, onOk) {
+    $('askImg').src = TRASH; $('askTitle').textContent = title; $('askText').textContent = text;
+    const box = $('askBox'), close = () => { box.hidden = true; };
+    box.hidden = false;
+    $('askNo').onclick = () => { AUDIO.play('click'); close(); };
+    $('askOk').onclick = () => { close(); AUDIO.play('sell'); onOk(); };
+    box.onclick = ev => { if (ev.target === box) close(); };
+  }
   function showSlots() {
     st.phase = 'title';
     $('title').hidden = true; $('map').hidden = true;
@@ -3294,8 +3313,8 @@
       const info = slotInfo(n), c = document.createElement('div');
       c.className = 'slot' + (info ? '' : ' empty');
       c.innerHTML = '<span class="slotNum">' + n + '</span><div class="slotInfo">' + (info
-        ? '<b>' + info.race + '</b><small>Dobyté ' + info.won + ' / ' + MISSIONS.length + ' · <span class="st">★ ' + info.stars + '</span> · kráľ úr. ' + info.king + '</small>'
-        : '<b>Nová hra</b><small>Prázdna pozícia</small>') + '</div>' + (info ? '<button class="slotDel" title="Vymazať">✕</button>' : '<span class="slotGo">▶</span>');
+        ? '<b>' + info.race + '</b><small><span class="st">★ ' + info.stars + '</span><span class="kg"><img src="' + ICONS.king + '" alt="">úr. ' + info.king + '</span></small>'
+        : '<b>Nová hra</b><small>Prázdna pozícia</small>') + '</div>' + (info ? '<button class="slotDel" title="Vymazať"><img src="' + TRASH + '" alt="Vymazať"></button>' : '<span class="slotGo">▶</span>');
       c.addEventListener('click', () => { // rozohraná pozícia rovno na ostrov, nová na výber rasy
         AUDIO.play('build'); loadSlot(n);
         if (info) { $('slots').hidden = true; showMap(); } else showTitle();
@@ -3303,8 +3322,8 @@
       const del = c.querySelector('.slotDel');
       if (del) del.addEventListener('click', ev => {
         ev.stopPropagation();
-        if (!confirm('Vymazať pozíciu ' + n + '? Postup sa stratí.')) return;
-        clearSlot(n); showSlots();
+        AUDIO.play('click');
+        ask('Vymazať pozíciu ' + n + '?', 'Postup sa stratí natrvalo.', () => { clearSlot(n); showSlots(); });
       });
       box.appendChild(c);
     }
