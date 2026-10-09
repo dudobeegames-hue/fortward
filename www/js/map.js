@@ -228,37 +228,44 @@ function unlockMissionOf(id) {
 
 // ---- Malý hradík pre bod misie na mape (19x18) ----
 function makeMiniCastle(locked) {
+  // biela citadela (19x18): svetlý kameň, vysoká stredná veža so zlatým hrotom, nižšie krídla so zlatými lemami;
+  // zamknutá je stmavená, bez zlata a svetla
   const p = painter(19, 18);
+  const b = locked ? -0.45 : 0, st = STONE_WHITE;
   const roof = locked ? ['#14141a', '#1e1e28', '#2c2c38', '#3e3e4c', '#525262'].map(hexRGB) : ROOF_BLUE;
-  const bias = locked ? -0.28 : 0;
-  // hlavná budova
-  for (let y = 8; y <= 16; y++) for (let x = 5; x <= 13; x++) {
-    let v = 0.62 + bias - (x - 5) * 0.03 + ((y - 8) % 3 === 2 ? -0.22 : 0);
-    if (y === 16) v -= 0.15;
-    p.shade(x, y, RAMP.stone, v);
-  }
-  for (let y = 3; y <= 9; y++) {
-    const hw = (y - 2) / 7 * 5.5;
-    for (let x = Math.floor(9 - hw); x <= Math.ceil(9 + hw); x++) {
-      const nx = (x - 9) / Math.max(1, hw);
-      if (Math.abs(nx) > 1.05) continue;
-      p.shade(x, y, roof, 0.6 - nx * 0.3 + (y === 9 ? -0.3 : 0));
+  const wall = (x0, x1, y0, y1, seed) => {
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      let v = 0.66 + b - (x - x0) / Math.max(1, x1 - x0) * 0.3 + ((y - y0) % 3 === 2 ? -0.2 : 0) + (hash2(x, y, seed) - 0.5) * 0.1;
+      if ((y - y0) % 3 !== 2 && (x + Math.floor((y - y0) / 3) * 2) % 4 === 0) v -= 0.12;
+      p.shade(x, y, st, v);
     }
-  }
-  // veže
-  for (const tx of [1, 14]) {
-    for (let y = 7; y <= 16; y++) for (let x = tx; x <= tx + 3; x++) p.shade(x, y, RAMP.stone, 0.68 + bias - (x - tx) * 0.1 + ((y - 7) % 3 === 2 ? -0.2 : 0));
-    for (let y = 1; y <= 7; y++) {
-      const hw = (y) / 7 * 2.6;
-      for (let x = Math.floor(tx + 1.5 - hw); x <= Math.ceil(tx + 1.5 + hw); x++) {
-        if (Math.abs(x - (tx + 1.5)) > hw + 0.3) continue;
-        p.shade(x, y, roof, 0.62 - (x - tx - 1.5) / 3 * 0.35);
+  };
+  const cone = (cx, yTop, yBot, hw) => {
+    for (let y = yTop; y <= yBot; y++) {
+      const w = (y - yTop + 1) / (yBot - yTop + 1) * hw;
+      for (let x = Math.floor(cx - w); x <= Math.ceil(cx + w); x++) {
+        const nx = (x - cx) / Math.max(0.6, w);
+        if (Math.abs(nx) > 1.15) continue;
+        p.shade(x, y, roof, 0.62 - nx * 0.32 + (y === yBot ? -0.25 : 0));
       }
     }
+  };
+  const win = (x, y) => p.set(x, y, locked ? hexRGB('#1e1e28') : GLOW);
+  // nižšie bočné krídla s kužeľovými strechami
+  for (const [x0, x1] of [[1, 6], [12, 17]]) { wall(x0, x1, 9, 17, 5); cone((x0 + x1) / 2, 4, 9, 3.6); win(Math.round((x0 + x1) / 2), 12); }
+  // vysoká stredná veža so zlatým hrotom
+  wall(7, 11, 5, 17, 7);
+  cone(9, 0, 6, 3.2);
+  if (!locked) {
+    p.set(9, 0, GOLD);
+    for (let x = 7; x <= 11; x++) p.set(x, 7, x % 2 ? GOLD : GOLD2);
+    for (const x0 of [1, 12]) for (let x = x0; x <= x0 + 5; x++) p.set(x, 10, x % 2 ? GOLD : GOLD2);
   }
-  // brána a okná
-  for (let y = 12; y <= 16; y++) for (let x = 8; x <= 10; x++) if (!(y === 12 && x !== 9)) p.set(x, y, locked ? hexRGB('#14100c') : WOOD[2]);
-  const win = locked ? hexRGB('#1e1e28') : GLOW;
-  p.set(6, 11, win); p.set(12, 11, win); p.set(2, 10, win); p.set(16, 10, win);
+  win(9, 9); win(9, 12);
+  // brána
+  for (let y = 14; y <= 17; y++) for (let x = 8; x <= 10; x++) {
+    if (y === 14 && (x === 8 || x === 10)) continue;
+    p.set(x, y, locked ? hexRGB('#14100c') : (x === 8 || x === 10 ? WOOD[1] : WOOD[3]));
+  }
   return p.finish();
 }
