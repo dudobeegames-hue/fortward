@@ -380,7 +380,14 @@
     return b;
   }
 
+  // časovač viazaný na misiu: po reštarte či odchode na mapu sa nespustí a počas pauzy počká
+  function later(fn, ms) {
+    const run = st.run;
+    const go = () => { if (st.run !== run) return; if (st.paused) { setTimeout(go, 200); return; } fn(); };
+    setTimeout(go, ms);
+  }
   function startMission(m, tier) {
+    st.run = (st.run || 0) + 1;
     st.mission = m;
     st.tier = tier || 0;
     st.tech = techFor(Math.max(m, st.unlocked)); // platí všetko, čo hráč už odomkol
@@ -475,7 +482,7 @@
       st.lastXp = gainKingXp(Math.round(40 * TIERS[st.tier || 0].xp));
       st.enemies = []; st.spawnQ = [];
       st.orcWaveOn = false; // pád hradu nie je koniec vlny – žiadne budovanie, len víťazstvo
-      setTimeout(() => { if (st.phase === 'battle' || st.phase === 'pause' || st.phase === 'build') missionWon(); }, 1200);
+      later(() => { if (st.phase === 'battle' || st.phase === 'pause' || st.phase === 'build') missionWon(); }, 1200);
     }
   }
   // cieľ útočiaceho vojaka: najprv palisáda (kým nie je prelomená), potom veže, nakoniec hrad
@@ -700,13 +707,13 @@
     $('build').hidden = false;
     renderBuild();
     updateHud();
-    if (kingMeta.pending) setTimeout(() => { if (st.phase === 'build') showTalentPick(); }, 600);
+    if (kingMeta.pending) later(() => { if (st.phase === 'build') showTalentPick(); }, 600);
     st.viewUp = 0;
     if (isAttack() && st.wave === 0) {
       st.introPan = { t: 0 }; // úvodný prelet kamery na orkský hrad a späť k radnici
     } else if (isAttack() && st.siegeHold) {
       st.siegeT = SIEGE_BUILD; // obliehanie: na budovanie je len chvíľa, potom útok pokračuje sám
-      setTimeout(() => { if (st.phase === 'build') toast('Hrad je obliehaný – orkovia ho neopravia. Útok pokračuje o ' + SIEGE_BUILD + ' s'); }, 400);
+      later(() => { if (st.phase === 'build') toast('Hrad je obliehaný – orkovia ho neopravia. Útok pokračuje o ' + SIEGE_BUILD + ' s'); }, 400);
     } else if (isAttack()) repairFort();
   }
 
@@ -778,13 +785,13 @@
     if (st.wave >= MISSION_WAVES && !isAttack()) { missionWon(); return; }
     if (st.wave >= MISSION_WAVES) { // útočná misia: horde došli vlny, teraz treba dobyť hrad
       banner('Horde došli sily – zaútoč na hrad!'); AUDIO.play('cleared');
-      setTimeout(() => { if (st.phase === 'pause') enterBuild(); }, 1400);
+      later(() => { if (st.phase === 'pause') enterBuild(); }, 1400);
       updateHud();
       return;
     }
     banner(hold ? 'Vlna odrazená! +' + bonus + ' zlata · obliehanie trvá' : 'Vlna prežitá! +' + bonus + ' zlata' + (st.lastXp ? ' · kráľ +' + st.lastXp + ' XP' : ''));
     AUDIO.play('cleared');
-    setTimeout(() => { if (st.phase === 'pause') enterBuild(); }, 1000);
+    later(() => { if (st.phase === 'pause') enterBuild(); }, 1000);
     updateHud();
   }
 
@@ -820,7 +827,7 @@
     const starLine = '<span class="bigStars">' + starSpan(stars, t) + '</span>' +
       (stars > prevStars ? '<br><span class="newTech">+' + (stars - prevStars) + ' ★ do Kráľovskej siene</span>' : '') + tierNote;
     const xpLine = st.lastXp ? '<br><span class="newTech">Kráľ +' + st.lastXp + ' XP' + (kingMeta.pending ? ' · nová úroveň ' + kingMeta.lvl + '!' : '') + '</span>' : '';
-    setTimeout(() => showOver(m === MISSIONS.length ? 'Víťazstvo!' : 'Misia splnená!', starLine + '<br>' + text + xpLine, true), 1200);
+    later(() => showOver(m === MISSIONS.length ? 'Víťazstvo!' : 'Misia splnená!', starLine + '<br>' + text + xpLine, true), 1200);
     updateHud();
   }
 
@@ -835,7 +842,7 @@
     }
     st.shake = 0.6;
     AUDIO.music(null); AUDIO.play('crumble'); setTimeout(() => AUDIO.play('lose'), 500);
-    setTimeout(() => showOver('Radnica padla!', 'Misia ' + st.mission + ' · ' + MISSIONS[st.mission - 1].name + (st.tier ? ' · ' + TIERS[st.tier].name.toLowerCase() + ' úroveň' : '') + '<br>Prežité vlny: <b>' + survived + ' / ' + MISSION_WAVES + '</b>', false), 1200);
+    later(() => showOver('Radnica padla!', 'Misia ' + st.mission + ' · ' + MISSIONS[st.mission - 1].name + (st.tier ? ' · ' + TIERS[st.tier].name.toLowerCase() + ' úroveň' : '') + '<br>Prežité vlny: <b>' + survived + ' / ' + MISSION_WAVES + '</b>', false), 1200);
     updateHud();
   }
 
@@ -949,7 +956,7 @@
     e.stompT = 3; e.summonT = 4; F.kingE = e;
     st.shake = 0.5;
     for (let k = 0; k < 30; k++) part(F.gateX + (Math.random() - 0.5) * 20, F.gateY - Math.random() * 10, (Math.random() - 0.5) * 50, -Math.random() * 40, 0.8, ['#3c3846', '#625a6c', '#f89838'][k % 3], 90);
-    setTimeout(() => { if (st.phase === 'battle' && !e.dead) toast('Kým žije veľkráľ, hrad nepadne!'); }, 1800);
+    later(() => { if (st.phase === 'battle' && !e.dead) toast('Kým žije veľkráľ, hrad nepadne!'); }, 1800);
   }
   // vráti true, ak veľkráľ tento krok vybavil sám (dupnutie, súboj s vojakom); inak ide ako ostatní k radnici
   function updateOrcKing(e, dt) {
@@ -3043,12 +3050,24 @@
     st.speed = st.speed >= 3 ? 1 : st.speed + 1;
     $('speedBtn').textContent = 'x' + st.speed;
   });
+  // ---- pauza: hra stojí, ponuka Pokračovať / Reštart (misia od 1. vlny) / Ukončiť (späť na mapu) ----
+  const canPause = () => !st.paused && !$('hud').hidden && (st.phase === 'battle' || st.phase === 'build' || st.phase === 'pause');
+  function setPaused(on) {
+    st.paused = on; $('pauseBox').hidden = !on;
+  }
+  $('pauseBtn').addEventListener('click', ev => { ev.stopPropagation(); if (canPause()) { AUDIO.play('click'); setPaused(true); } });
+  $('pauseGo').addEventListener('click', () => { AUDIO.play('click'); setPaused(false); });
+  $('pauseRestart').addEventListener('click', () => { AUDIO.play('click'); setPaused(false); startMission(st.mission, st.tier); });
+  $('pauseQuit').addEventListener('click', () => { AUDIO.play('click'); setPaused(false); showMap(); });
+  // keď hráč odíde z aplikácie (iné okno, zamknutý mobil), hra sa sama pozastaví
+  document.addEventListener('visibilitychange', () => { if (document.hidden && canPause()) setPaused(true); });
   function clearBattle() {
     st.enemies = []; st.proj = []; st.eproj = []; st.drops = []; st.soldiers = []; st.parts = []; st.texts = []; st.marks = []; st.spawnQ = [];
     $('over').hidden = true; $('hud').hidden = true; $('bottom').hidden = true; $('build').hidden = true; $('bossbar').hidden = true;
   }
 
   function showMap() {
+    st.run = (st.run || 0) + 1; // časovače rozohranej misie sa zrušia
     clearBattle();
     st.phase = 'map';
     AUDIO.music('map');
@@ -3378,6 +3397,7 @@
   function frame(now) {
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
     if (!scene) { resize(); requestAnimationFrame(frame); return; }
+    if (st.paused) { acc = 0; render(now / 1000); requestAnimationFrame(frame); return; } // pauza: všetko stojí, len sa kreslí
     if (st.phase === 'battle') {
       // spomalenie na tretinu, posledných 0,3 s sa plynulo vráti na plnú rýchlosť
       const slow = slowmoT <= 0 ? 1 : slowmoT > 0.3 ? 0.33 : 0.33 + 0.67 * (1 - slowmoT / 0.3);

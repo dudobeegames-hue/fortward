@@ -44,7 +44,7 @@
   #hud {
     position: absolute; left: 0; right: 0; top: 0;
     padding: calc(env(safe-area-inset-top) + 8px) 10px 0;
-    display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: 'wave wall gold' 'king . .';
+    display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: 'wave wall gold' 'king . pause';
     gap: 6px 8px; align-items: center;
     pointer-events: none; z-index: 5;
   }
@@ -52,6 +52,16 @@
   #hud-wave { grid-area: wave; justify-content: center; }
   #hud-wall { grid-area: wall; }
   #hud-gold { grid-area: gold; }
+  /* pauza pod zlatkami */
+  #pauseBtn { grid-area: pause; justify-self: end; align-self: start; pointer-events: auto; width: 38px; height: 38px; padding: 0; display: grid; place-items: center;
+    background: rgba(28, 20, 14, .82); border: 2px solid var(--ink); border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 -3px 0 rgba(0,0,0,.35); }
+  #pauseBtn i { display: block; width: 14px; height: 16px; border-left: 5px solid #fff2d0; border-right: 5px solid #fff2d0; box-sizing: border-box; filter: drop-shadow(1px 1px 0 var(--ink)); }
+  #pauseBtn:active { transform: translateY(1px); }
+  /* ponuka pauzy */
+  #pauseBox { z-index: 40; background: rgba(8,6,4,.7); }
+  #pauseBox .askCard { gap: 10px; }
+  #pauseBox .askCard button { width: 100%; justify-content: center; font-size: 19px; padding: 11px; }
+  #pauseBox h2 { margin-bottom: 4px; }
   #hud-king {
     grid-area: king; position: relative; flex-direction: column; align-items: stretch; gap: 3px;
     padding: 4px 8px 6px;
@@ -540,6 +550,7 @@
     <div class="pill" id="hud-wave"><span id="waveTxt">Vlna 1</span></div>
     <div class="pill" id="hud-wall"><div class="bar"><i id="hallFill"></i></div><span id="hallTxt"></span></div>
     <div class="pill" id="hud-gold"><img class="coin" alt=""><span id="goldTxt">0</span></div>
+    <button id="pauseBtn" title="Pauza" aria-label="Pauza"><i></i></button>
     <div class="pill" id="hud-king" title="Kráľ"><div class="kTop"><img id="kingIcon" alt=""><span class="kLvl" title="Úroveň kráľa"><small>úr.</small><b id="kingLvl">1</b></span></div><div class="kRow"><b>HP</b><div class="bar hp" title="Zdravie kráľa"><i id="kingFill"></i></div></div><div class="kRow"><b>XP</b><div class="bar xp" title="Skúsenosti kráľa"><i id="xpFill"></i></div></div></div>
   </div>
   <div id="bossbar" hidden><span id="bossName">Vojvodca orkov</span><div class="bar"><i id="bossFill"></i></div></div>
@@ -636,6 +647,12 @@
     </div>
   </div>
 
+  <div id="pauseBox" class="screenOverlay" hidden>
+    <div class="askCard"><h2>Pauza</h2>
+      <button id="pauseGo" class="primary">▶ Pokračovať</button>
+      <button id="pauseRestart" class="btn">↻ Reštart</button>
+      <button id="pauseQuit" class="btn">Ukončiť</button></div>
+  </div>
   <div id="askBox" class="screenOverlay" hidden>
     <div class="askCard"><img id="askImg" alt=""><h2 id="askTitle"></h2><p id="askText"></p>
       <div class="row"><button id="askNo" class="btn">Zrušiť</button><button id="askOk" class="btn">Vymazať</button></div></div>
