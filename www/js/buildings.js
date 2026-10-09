@@ -8,13 +8,14 @@ const WOOD = ['#1e120a', '#3e2614', '#5a3a1e', '#6e4422', '#8a5a2e', '#a86c38', 
 const PLASTER = ['#6a6050', '#8a7e68', '#a89c84', '#c4b89e', '#ddd2b8', '#eee6cc'].map(hexRGB);
 const GLOW = hexRGB('#fff070'), GLOW2 = hexRGB('#f89838'), DARKWIN = hexRGB('#2a1e14');
 const STONE_DARK = ['#100f14', '#18181f', '#22222c', '#2e2e3a', '#3e3e4c', '#525262', '#686876', '#80808e'].map(hexRGB);
+const STONE_WARM = ['#221c18', '#342b24', '#4a3e34', '#625244', '#7c6a58', '#988470', '#b49e88', '#d0bca4'].map(hexRGB); // pieskovec (úroveň 3)
 const STONE_WHITE = ['#3e3e4c', '#5e5e6e', '#80808e', '#a0a0ac', '#bebec8', '#d8d8de', '#ececf0', '#ffffff'].map(hexRGB);
 const IRON = hexRGB('#3a3a44'), RIVET = hexRGB('#a0a0aa'), GOLD = hexRGB('#f8d048'), GOLD2 = hexRGB('#b88420');
 // úroveň 1 drevo, 2 kameň, 3 kameň s kovaním, 4 tmavý opevnený, 5 kráľovský biely so zlatom
 const LVL_MAT = [null,
   { body: null, wood: true, roof: ROOF_RED, banner: null },
   { body: null, roof: ROOF_RED, banner: null },
-  { body: null, roof: ROOF_BLUE, banner: '#e84838', iron: true },
+  { body: STONE_WARM, roof: ROOF_BLUE, banner: '#e84838', iron: true, band: true, portcullis: true },
   { body: STONE_DARK, roof: ROOF_BLUE, banner: '#3c64c8', iron: true, studs: true },
   { body: STONE_WHITE, roof: ROOF_BLUE, banner: '#3c64c8', gold: true },
 ];
@@ -358,6 +359,7 @@ function makeWall(mask, lvl) {
       let v = 0.5 + (hash2(Math.floor((x + off) / cw), course, 111) - 0.5) * 0.2;
       if (ry % ch === ch - 1 || (x + off) % cw === cw - 1) v = 0.18;
       if (y === faceEnd) v = 0.12;
+      if (M.band && !S && (ry === 2 || ry === 3)) { p.set(x, y, ry === 2 ? hexRGB('#26262e') : (x % 3 === 1 ? RIVET : IRON)); continue; } // železný pás
       if (M.iron && !S && ry === 3) { p.set(x, y, (x % 3 === 1) ? RIVET : IRON); continue; }
       if (M.studs && !S && ry % ch === 1 && (x + off) % cw === 2) { p.set(x, y, RIVET); continue; }
       if (M.gold && !S && ry === 0) { p.set(x, y, hexRGB('#3c64c8')); continue; }
@@ -402,10 +404,20 @@ function makeGatehouse(lvl) {
     if (y <= 10) { p.shade(x, y, body, y === 10 ? 0.2 : 0.55 - (x - 5) * 0.04 + (hash2(x, y, 141) - 0.5) * 0.1); continue; }
     const arch = (y === 11 && (x <= 6 || x >= 9)) || (y === 12 && (x === 5 || x === 10));
     if (arch) { p.shade(x, y, body, 0.45); continue; }
+    if (M.portcullis) { // spustená železná mreža, za ňou tma
+      const bar = (x - 5) % 2 === 0, rail = (y - 12) % 4 === 0;
+      p.set(x, y, bar || rail ? (bar && rail ? RIVET : IRON) : hexRGB('#120c08'));
+      continue;
+    }
     if (y === 16 || y === 23) { p.set(x, y, IRON); continue; }
     p.shade(x, y, WOOD, (x % 2 ? 0.58 : 0.42) - (y > 26 ? 0.12 : 0));
   }
-  p.set(9, 20, GOLD);
+  if (M.portcullis) { // červené zástavy na pilieroch
+    for (const bx of [1, 12]) for (let y = 13; y <= 20; y++) for (let x = bx; x <= bx + 2; x++) {
+      if (y === 20 && x === bx + 1) continue;
+      p.set(x, y, x === bx ? hexRGB('#e84838') : y === 15 && x === bx + 1 ? GOLD : hexRGB('#8c2018'));
+    }
+  } else p.set(9, 20, GOLD);
   return p.finish();
 }
 
