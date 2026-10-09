@@ -1972,25 +1972,40 @@
     if (island.layers) return island.layers;
     const mk = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; };
     const P = island.prov, n = island.nodes.length;
-    const L = { blue: [], red: [], border: mk() };
+    const L = { blue: [], red: [] };
     for (let i = 0; i < n; i++) for (const key of ['blue', 'red']) {
       const c = mk(), x = c.getContext('2d'), id = x.createImageData(W, H), [r, gg, b, a] = PROV_COL[key];
       for (let k = 0; k < P.length; k++) if (P[k] === i) { id.data[k * 4] = r; id.data[k * 4 + 1] = gg; id.data[k * 4 + 2] = b; id.data[k * 4 + 3] = a * 255; }
       x.putImageData(id, 0, 0); L[key][i] = c;
     }
-    const bx = L.border.getContext('2d'), bd = bx.createImageData(W, H);
+    island.layers = L;
+    return L;
+  }
+  // kto drží provinciu: ľudia (juh a dobyté) alebo horda; počas animácie dobytia ešte pôvodný vlastník
+  const provOwner = i => {
+    const pa = st.provAnim;
+    if (pa && pa.i === i) return pa.from === 'horde' ? 1 : 0;
+    return provState(i) === 'horde' ? 1 : 0;
+  };
+  // hranice: tenké prerušované medzi provinciami, hrubá červená na fronte ľudia × horda (prepočíta sa, keď sa front posunie)
+  function borderLayer() {
+    const n = island.nodes.length, key = Array.from({ length: n }, (_, i) => provOwner(i)).join('');
+    if (island.borderKey === key) return island.border;
+    const P = island.prov, own = v => key.charCodeAt(v) - 48;
+    const c = island.border || document.createElement('canvas'); c.width = W; c.height = H;
+    const bx = c.getContext('2d'), bd = bx.createImageData(W, H);
     for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
       const v = P[y * W + x]; if (v === 255) continue;
       const nbs = [P[y * W + x + 1], P[(y + 1) * W + x]];
       if (!nbs.some(q => q !== 255 && q !== v)) continue;
-      const front = nbs.some(q => q !== 255 && (q < HOME_PROVINCES) !== (v < HOME_PROVINCES)); // hranica ľudia × horda
+      const front = nbs.some(q => q !== 255 && own(q) !== own(v)); // hranica ľudia × horda
       const k = (y * W + x) * 4;
       if (front) { bd.data[k] = 120; bd.data[k + 1] = 20; bd.data[k + 2] = 16; bd.data[k + 3] = 220; }
       else if ((x + y) % 3) { bd.data[k] = 28; bd.data[k + 1] = 20; bd.data[k + 2] = 14; bd.data[k + 3] = 120; } // prerušovaná
     }
     bx.putImageData(bd, 0, 0);
-    island.layers = L;
-    return L;
+    island.border = c; island.borderKey = key;
+    return c;
   }
   function drawProvince(i, state, time) {
     const L = provLayers();
@@ -2007,7 +2022,7 @@
         g.save(); g.beginPath(); g.arc(nd.x, nd.y, r, 0, 6.283); g.clip(); drawProvince(i, 'ours', time); g.restore();
       } else drawProvince(i, provState(i), time);
     }
-    g.drawImage(provLayers().border, 0, 0);
+    g.drawImage(borderLayer(), 0, 0);
   }
   // ohne, dym a šípky útoku v napadnutých provinciách
   function drawWarFx(time) {
