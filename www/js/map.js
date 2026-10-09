@@ -151,44 +151,44 @@ function buildIsland(W, H, seed) {
 
 // pevnosť orkov pri misii 10
 function makeOrcFort() {
-  // orkská drevená pevnosť: hrubé zahrotené koly s kostenými hrotmi, strážna veža so zástavou,
+  // orkská drevená pevnosť (20x18): zahrotené koly s kostenými hrotmi, strážna veža so zástavou,
   // chatrč za palisádou, lebka nad bránou a fakle po stranách
-  const p = painter(24, 22);
+  const p = painter(20, 18);
   const W = ORC_WOOD, HIDE = ['#2a1c12', '#4a3020', '#6a4a30', '#8a6a48'].map(hexRGB);
   // chatrč zo zvieracích koží (vľavo za palisádou)
-  for (let y = 5; y <= 11; y++) { const hw = (y - 4) * 0.95; for (let x = Math.floor(7 - hw); x <= Math.ceil(7 + hw); x++) p.shade(x, y, HIDE, 0.75 - (x - 7 + hw) / (2 * hw + 1) * 0.5 + (y % 2 ? 0 : -0.1)); }
-  p.set(7, 4, BONE); p.set(6, 3, BONE2); p.set(8, 3, BONE2);                                  // rohy na vrchole
+  for (let y = 4; y <= 9; y++) { const hw = (y - 3) * 0.95; for (let x = Math.floor(5 - hw); x <= Math.ceil(5 + hw); x++) p.shade(x, y, HIDE, 0.75 - (x - 5 + hw) / (2 * hw + 1) * 0.5 + (y % 2 ? 0 : -0.1)); }
+  p.set(5, 3, BONE); p.set(4, 2, BONE2); p.set(6, 2, BONE2);                                  // rohy na vrchole
   // strážna veža (vpravo): nohy, plošina s hrotmi, zástava
-  for (const lx of [14, 18]) for (let y = 5; y <= 14; y++) p.shade(lx, y, W, lx === 14 ? 0.85 : 0.5);
-  pLine(p, 14, 7, 18, 11, (x, y) => p.shade(x, y, W, 0.45)); pLine(p, 18, 7, 14, 11, (x, y) => p.shade(x, y, W, 0.4));
-  for (let y = 3; y <= 5; y++) for (let x = 13; x <= 19; x++) p.shade(x, y, W, (y === 3 ? 0.98 : 0.65) - (x - 13) * 0.05);
-  for (const sx of [13, 16, 19]) p.set(sx, 2, BONE);
-  for (let y = 0; y <= 3; y++) p.set(19, y - 0, W[1]);                                           // žrď
-  for (let y = 0; y <= 2; y++) for (let x = 20; x <= 23; x++) if (!(y === 2 && x === 23)) p.set(x, y, x === 20 ? BLOOD2 : BLOOD);
-  // palisáda vpredu: hrubé koly rôznej výšky so špicami a previazaním
-  for (let x = 0; x <= 23; x++) {
-    const log = Math.floor(x / 3), lx = x % 3, top = 9 + (log * 7 % 3), tip = lx === 1 ? top - 1 : top;
-    for (let y = tip; y <= 21; y++) {
-      let v = [0.88, 0.66, 0.36][lx] - (y - top) * 0.012;
+  for (const lx of [12, 15]) for (let y = 4; y <= 11; y++) p.shade(lx, y, W, lx === 12 ? 0.85 : 0.5);
+  pLine(p, 12, 6, 15, 9, (x, y) => p.shade(x, y, W, 0.45));
+  for (let y = 2; y <= 4; y++) for (let x = 11; x <= 16; x++) p.shade(x, y, W, (y === 2 ? 0.98 : 0.65) - (x - 11) * 0.05);
+  for (const sx of [11, 14, 16]) p.set(sx, 1, BONE);
+  for (let y = 0; y <= 2; y++) p.set(16, y, W[1]);                                              // žrď
+  for (let y = 0; y <= 1; y++) for (let x = 17; x <= 19; x++) if (!(y === 1 && x === 19)) p.set(x, y, x === 17 ? BLOOD2 : BLOOD);
+  // palisáda vpredu: koly rôznej výšky so špicami a previazaním
+  for (let x = 0; x <= 19; x++) {
+    const log = Math.floor(x / 2), lx = x % 2, top = 8 + (log * 7 % 2), tip = lx ? top - 1 : top;
+    for (let y = tip; y <= 17; y++) {
+      let v = [0.88, 0.5][lx] - (y - top) * 0.014;
       if (y === tip) v += 0.12;
-      if (y === 16) v = 0.12;                                                                    // previazanie
+      if (y === 13) v = 0.12;                                                                    // previazanie
       p.shade(x, y, W, v);
     }
-    if (lx === 1) p.set(x, tip - 1, BONE);                                                       // kostený hrot
+    if (lx) p.set(x, tip - 1, BONE);                                                             // kostený hrot
   }
-  // brána: tmavý otvor s hrubými vrátami, lebka nad ňou
-  for (let y = 14; y <= 21; y++) for (let x = 9; x <= 14; x++) p.set(x, y, hexRGB('#0a0604'));          // tmavý priechod
-  for (const x of [9, 14]) for (let y = 13; y <= 21; y++) p.shade(x, y, W, x === 9 ? 0.95 : 0.55);        // stĺpy brány
-  for (let x = 9; x <= 14; x++) p.shade(x, 13, W, 0.9);                                                   // preklad
-  for (let y = 15; y <= 21; y++) { p.shade(10, y, W, 0.55); p.shade(13, y, W, 0.4); }                     // pootvorené vráta
-  // veľká lebka nad bránou
-  for (let y = 9; y <= 12; y++) for (let x = 9; x <= 14; x++) {
-    if ((y === 9 || y === 12) && (x === 9 || x === 14)) continue;
-    const eye = y === 10 && (x === 10 || x === 13), teeth = y === 12 && x % 2 === 0;
-    p.set(x, y, eye || teeth ? hexRGB('#1c140e') : x < 12 ? BONE : BONE2);
+  // brána: tmavý priechod, stĺpy, preklad, pootvorené vráta
+  for (let y = 12; y <= 17; y++) for (let x = 8; x <= 11; x++) p.set(x, y, hexRGB('#0a0604'));
+  for (const x of [7, 12]) for (let y = 11; y <= 17; y++) p.shade(x, y, W, x === 7 ? 0.95 : 0.55);
+  for (let x = 7; x <= 12; x++) p.shade(x, 11, W, 0.9);
+  for (let y = 13; y <= 17; y++) { p.shade(8, y, W, 0.55); p.shade(11, y, W, 0.4); }
+  // lebka nad bránou
+  for (let y = 7; y <= 10; y++) for (let x = 8; x <= 11; x++) {
+    if ((y === 7 || y === 10) && (x === 8 || x === 11)) continue;
+    const eye = y === 8 && (x === 8 || x === 11), teeth = y === 10 && x % 2 === 0;
+    p.set(x, y, eye || teeth ? hexRGB('#1c140e') : x < 10 ? BONE : BONE2);
   }
   // fakle po stranách brány
-  for (const tx of [7, 16]) { p.set(tx, 13, W[2]); p.set(tx, 12, EMBER); p.set(tx, 11, hexRGB('#fff070')); }
+  for (const tx of [5, 14]) { p.set(tx, 11, W[2]); p.set(tx, 10, EMBER); p.set(tx, 9, hexRGB('#fff070')); }
   return p.finish();
 }
 

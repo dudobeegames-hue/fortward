@@ -2056,8 +2056,8 @@
     let top;
     if (num > HOME_PROVINCES && !done) { // hrad hordy = orkská pevnosť, kým ho hráč nedobyje
       const f = island.fort;
-      g.drawImage(f.c, n.x - 12, n.y - 20);
-      top = n.y - 20;
+      g.drawImage(f.c, n.x - Math.floor(f.w / 2), n.y - f.h + 2);
+      top = n.y - f.h + 2;
     } else {
       const c = status === 'locked' ? island.castleLocked : island.castle;
       g.drawImage(c.c, n.x - 9, n.y - 16);
