@@ -3284,7 +3284,10 @@
       c.innerHTML = '<span class="slotNum">' + n + '</span><div class="slotInfo">' + (info
         ? '<b>' + info.race + '</b><small>Dobyté ' + info.won + ' / ' + MISSIONS.length + ' · <span class="st">★ ' + info.stars + '</span> · kráľ úr. ' + info.king + '</small>'
         : '<b>Nová hra</b><small>Prázdna pozícia</small>') + '</div>' + (info ? '<button class="slotDel" title="Vymazať">✕</button>' : '<span class="slotGo">▶</span>');
-      c.addEventListener('click', () => { AUDIO.play('build'); loadSlot(n); showTitle(); });
+      c.addEventListener('click', () => { // rozohraná pozícia rovno na ostrov, nová na výber rasy
+        AUDIO.play('build'); loadSlot(n);
+        if (info) { $('slots').hidden = true; showMap(); } else showTitle();
+      });
       const del = c.querySelector('.slotDel');
       if (del) del.addEventListener('click', ev => {
         ev.stopPropagation();
