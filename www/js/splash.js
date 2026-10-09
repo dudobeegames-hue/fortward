@@ -23,7 +23,9 @@ const SPLASH = (() => {
   } else artFrom = performance.now();
 
   // hra je načítaná: na obrázku sa (najskôr chvíľu po zmiznutí loga) zjaví zelené Hrať a sivé Nastavenia
-  const api = { onPlay: null, done };
+  // Menu (mapa) a Späť (pozície) sa sem vracajú cez SPLASH.show(), lebo len tu sú Nastavenia
+  const api = { onPlay: null, done, show };
+  let leaving = false, hideT = 0;
   function done() {
     const el = document.getElementById('splash'), btns = document.getElementById('splashBtns'), btn = document.getElementById('splashPlay');
     if (!el || !btn) return;
@@ -34,9 +36,17 @@ const SPLASH = (() => {
     };
     tick();
     btn.addEventListener('click', () => {
+      if (leaving) return;
+      leaving = true;
       if (api.onPlay) api.onPlay();                    // menu sa pripraví pod obrázkom
-      el.classList.add('out'); setTimeout(() => el.remove(), 900);
-    }, { once: true });
+      el.classList.add('out'); hideT = setTimeout(() => { el.hidden = true; leaving = false; }, 900);
+    });
+  }
+  function show() {
+    const el = document.getElementById('splash');
+    clearTimeout(hideT); leaving = false;
+    el.hidden = false; void el.offsetWidth;            // aby sa obrázok plynulo zjavil
+    el.classList.remove('out');
   }
   return api;
 })();

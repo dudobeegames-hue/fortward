@@ -280,6 +280,7 @@
   /* ---- Úvodná obrazovka počas načítania ---- */
   #splash { position: fixed; inset: 0; z-index: 100; background: #07061a; transition: opacity .8s ease; }
   #splash.out { opacity: 0; pointer-events: none; }
+  #splash[hidden] { display: none; }
   /* logo štúdia pred obrázkom hry: čierne pozadie, logo naskočí, 2,5 s a zmizne */
   #logoIntro { position: fixed; inset: 0; z-index: 101; background: #000; display: flex; align-items: center; justify-content: center; transition: opacity .7s ease; }
   #logoIntro img { image-rendering: auto; width: min(80vw, 56vh); height: auto; opacity: 0; transform: scale(.94); transition: opacity .45s ease, transform .6s ease; }
@@ -340,7 +341,7 @@
   .slotInfo .st { color: var(--gold); }
   .slotGo { color: #7ee05e; font-size: 20px; }
   .slotDel { flex: 0 0 auto; background: #4a2a22; color: #f0c0b0; border: 2px solid var(--ink); border-radius: 8px; padding: 4px 9px; font-size: 14px; }
-  #raceBack { margin-top: 4px; }
+  #raceBack, #slotsBack { margin-top: 4px; }
 
   /* ---- Titulná obrazovka ---- */
   .screenOverlay {
@@ -538,6 +539,7 @@
     <div class="menuSpace"></div>
     <h2 class="menuHead">Vyber pozíciu</h2>
     <div id="slotList"></div>
+    <button id="slotsBack" class="btn">◀ Späť</button>
   </div>
 
   <div id="title" class="screenOverlay menuBg" hidden>

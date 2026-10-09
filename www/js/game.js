@@ -3246,7 +3246,14 @@
   $('overMap').addEventListener('click', showMap);
   $('overRetry').addEventListener('click', () => startMission(st.mission, st.tier));
   $('mapPlay').addEventListener('click', () => { if (!st.mapAnim && tierOpen(st.mapSel, st.mapTier || 0)) startMission(st.mapSel, st.mapTier || 0); });
-  $('mapBack').addEventListener('click', () => { st.phase = 'title'; $('map').hidden = true; showSlots(); });
+  // Menu na mape aj Späť z pozícií vedú na úvodný obrázok (Hrať / Nastavenia)
+  function showMenu() {
+    st.phase = 'title';
+    $('map').hidden = true; $('slots').hidden = true; $('title').hidden = true;
+    SPLASH.show(); AUDIO.play('click');
+  }
+  $('mapBack').addEventListener('click', showMenu);
+  $('slotsBack').addEventListener('click', showMenu);
   $('raceBack').addEventListener('click', showSlots);
   // hudba a zvuky sa nastavujú len v Nastaveniach na úvodnom obrázku
   function syncSound() {
