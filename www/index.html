@@ -292,6 +292,14 @@
     padding: calc(env(safe-area-inset-top) + 16px) 18px calc(env(safe-area-inset-bottom) + 20px);
     background: radial-gradient(ellipse at 50% 40%, rgba(14,10,8,.35), rgba(14,10,8,.88));
   }
+  #title { justify-content: flex-start; background: linear-gradient(rgba(10,8,18,.55), rgba(10,8,18,0) 22%, rgba(10,8,18,0) 52%, rgba(14,10,8,.78) 64%, rgba(14,10,8,.92)); }
+  #title .titleArt { flex: 1; min-height: 40px; } /* voľné miesto pre ilustráciu hrdinov */
+  #title { gap: 8px; background: linear-gradient(rgba(10,8,18,.55), rgba(10,8,18,0) 20%, rgba(10,8,18,0) 58%, rgba(14,10,8,.82) 66%, rgba(14,10,8,.94)); }
+  #title #races { gap: 6px; }
+  #title .race { padding: 4px 4px 4px; gap: 1px; }
+  #title .race > img { width: 30px; height: 34px; }
+  #title .race b { font-size: 13px; }
+  #title #playBtn { margin-top: 4px; }
   #title h1 {
     margin: 0; font-size: 46px; letter-spacing: 3px; color: var(--gold);
     text-shadow: 3px 3px 0 var(--ink), -2px 0 0 var(--ink), 0 -2px 0 var(--ink), 3px 0 0 var(--ink), 0 6px 0 var(--gold2), 3px 8px 0 var(--ink);
@@ -485,6 +493,7 @@
     <div id="gemBox" class="pill"><img class="gem" alt=""><span>0</span></div>
     <h1>FORTWARD</h1>
     <p class="sub">Ubráň pevnosť pred hordami</p>
+    <div class="titleArt"></div>
     <div id="races"></div>
     <button id="playBtn" class="primary">Hrať</button>
     <p id="bestTxt"></p>
@@ -551,6 +560,7 @@
 <script src="js/scene.js"></script>
 <script src="js/buildings.js"></script>
 <script src="js/map.js"></script>
+<script src="js/title.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>

@@ -2231,6 +2231,7 @@
   const panelLow = () => $('build').offsetHeight * DPR / S;
   const INTRO_PAN = [0.5, 1.4, 1.6, 1.2]; // s: čakanie, prelet hore, pohľad na hrad, návrat
   function camTick(dt) {
+    if (st.phase === 'title') { camY = 0; return; }
     if (st.phase === 'map') {
       if (!mapDrag) mapCam += (mapCamTarget - mapCam) * Math.min(1, dt * 8);
       camY = mapCam;
@@ -2292,6 +2293,7 @@
 
   function render(time) {
     if (st.phase === 'map') { renderMap(time); present(); return; }
+    if (st.phase === 'title') { TITLE.draw(g, W, H, time); present(); return; } // titulná ilustrácia
     g.drawImage(scene.bg, 0, 0);
     drawSceneFx(time);
     const playing = st.phase !== 'title';
