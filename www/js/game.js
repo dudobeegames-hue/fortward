@@ -3255,23 +3255,38 @@
   $('mapBack').addEventListener('click', showMenu);
   $('slotsBack').addEventListener('click', showMenu);
   $('raceBack').addEventListener('click', showSlots);
-  // hudba a zvuky sa nastavujú len v Nastaveniach na úvodnom obrázku
+  // Nastavenia na úvodnom obrázku: jediné miesto pre hudbu, zvuky a jazyk
   function syncSound() {
-    document.querySelectorAll('.tgl').forEach(b => {
+    document.querySelectorAll('.setIc.snd').forEach(b => {
       const on = AUDIO.prefs[b.dataset.kind];
-      b.classList.toggle('on', on); b.textContent = on ? 'Zap' : 'Vyp';
+      b.classList.toggle('off', !on);
+      b.title = (b.dataset.kind === 'music' ? 'Hudba' : 'Zvuky') + (on ? ' zapnuté' : ' vypnuté');
     });
   }
-  document.querySelectorAll('.tgl').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.setIc.snd').forEach(b => b.addEventListener('click', () => {
     AUDIO.setPref(b.dataset.kind, !AUDIO.prefs[b.dataset.kind]);
     syncSound(); AUDIO.play('click');
   }));
-  const showSettings = open => {
-    $('setPanel').hidden = !open; $('splashBtns').classList.toggle('hide', open);
+  $('icoMusic').src = UI_ICONS.music; $('icoSound').src = UI_ICONS.sound; $('icoLang').src = UI_ICONS.flags.sk;
+  // jazyky: zatiaľ len slovenčina, ostatné sú pripravené miesta s vlajkou (preklad príde, keď budú texty hotové)
+  UI_ICONS.langs.forEach(l => {
+    const b = document.createElement('button');
+    b.className = 'lang' + (l.ready ? ' cur' : ' soon');
+    b.innerHTML = '<img src="' + UI_ICONS.flags[l.id] + '" alt=""><span>' + l.name + (l.ready ? '' : '<small>čoskoro</small>') + '</span>';
+    b.addEventListener('click', () => { if (l.ready) AUDIO.play('click'); else AUDIO.play('deny'); });
+    $('langList').appendChild(b);
+  });
+  let setView = 'closed';
+  function setSettings(v) {
+    setView = v;
+    $('setPanel').hidden = v === 'closed'; $('splashBtns').classList.toggle('hide', v !== 'closed');
+    $('setMain').hidden = v !== 'main'; $('langList').hidden = v !== 'lang';
+    $('setHead').textContent = v === 'lang' ? 'Jazyk' : 'Nastavenia';
     AUDIO.play('click');
-  };
-  $('splashSet').addEventListener('click', () => showSettings(true));
-  $('setBack').addEventListener('click', () => showSettings(false));
+  }
+  $('splashSet').addEventListener('click', () => setSettings('main'));
+  $('langBtn').addEventListener('click', () => setSettings('lang'));
+  $('setBack').addEventListener('click', () => setSettings(setView === 'lang' ? 'main' : 'closed'));
   syncSound();
   $('gemBox').addEventListener('click', () => toast('Obchod s gemami pripravujeme'));
 
