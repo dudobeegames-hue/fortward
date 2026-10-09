@@ -603,7 +603,7 @@
   // zdravie rastie v rámci misie (hpWave) aj s misiou (hpMission), zloženie hordy sa posúva o typeShift vĺn na misiu
   const DIFF = {
     // sila nepriateľov podľa misie (násobok zdravia v 1. vlne) – misia 1 je úvodná a ľahká, misia 10 skúška
-    missionHp: [0.95, 1.5, 2.3, 2.55, 2.55, 2.5, 2.6, 2.35, 2.9, 3.05],
+    missionHp: [0.95, 1.5, 2.3, 2.55, 2.55, 2.7, 2.9, 3.4, 3.2, 4.0], // 6–10 silnejšie: hráč má stajne, zbrojnicu a sokoly
     hpWave: 1.10, hpWaveMission: 0.006, hpMission: 0.25,   // rast zdravia počas misie (neskoršie misie rastú rýchlejšie)
     countWave: 2, countMission: 1,                         // počet nepriateľov vo vlne
     typeShift: 0.8, bruteFrom: 5, bruteRate: 0.03,         // ako rýchlo pribúdajú orkovia a surovci

@@ -62,6 +62,11 @@ window.SIM = (() => {
         for (const r of [hr0, hr0 + 1]) for (const c of [G.hc0 + 3, G.hc0 - 1, G.hc0 - 2, G.hc0 + 4]) if (!acted && place('range', c, r)) acted = true;
         if (acted) continue;
       }
+      // nové jednotky: stajne, zbrojnica (proti jazde), sokoliareň (proti letcom)
+      const rows = [hr0 + 1, hr0, hr0 + 2, hr0 - 1];
+      if (F.has('armory') && count('armory') < (s.mission >= 7 ? 1 + (wave >= 5 ? 1 : 0) : 0) && count('barracks') >= 1) { if (placeAny('armory', rows, order)) { acted = true; continue; } }
+      if (F.has('stables') && count('stables') < (wave >= 3 ? 1 : 0) && count('barracks') >= 1) { if (placeAny('stables', rows, order)) { acted = true; continue; } }
+      if (F.has('falconry') && count('falconry') < (wave >= 2 ? 1 : 0)) { if (placeAny('falconry', rows, order)) { acted = true; continue; } }
       if (F.has('mage') && count('mage') < (wave >= 6 ? 3 : 2)) {
         for (const r of [hr0, hr0 + 1, hr0 + 2]) for (const c of order) if (!acted && !F.inHall(c, r) && place('mage', c, r)) acted = true;
         if (acted) continue;
@@ -91,7 +96,7 @@ window.SIM = (() => {
       if (F.has('spec')) { const t = s.blds.find(b => b.kind === 'tower' && b.lvl >= 3 && !b.spec); if (t && s.gold >= 80) { s.gold -= 80; t.spec = 'rapid'; acted = true; continue; } }
       const ups = [];
       for (const b of s.blds) {
-        if (['tower', 'mage', 'barracks', 'range', 'catapult', 'mine', 'chapel', 'workshop'].includes(b.kind) && b.lvl < F.bCap()) ups.push({ c: F.bUpCost(b), f: () => { b.spent += F.bUpCost(b); b.lvl++; b.hp = F.bMaxHp(b); } });
+        if (['tower', 'mage', 'barracks', 'range', 'stables', 'armory', 'falconry', 'catapult', 'mine', 'chapel', 'workshop'].includes(b.kind) && b.lvl < F.bCap()) ups.push({ c: F.bUpCost(b), f: () => { b.spent += F.bUpCost(b); b.lvl++; b.hp = F.bMaxHp(b); } });
         if (b.kind === 'wall' && b.lvl < Math.min(F.bCap(), 3) && s.wave >= 4) ups.push({ c: F.bUpCost(b) * 6, real: F.bUpCost(b), f: () => { b.lvl++; b.hp = F.bMaxHp(b); } });
         if (b.unit && b.unit.lvl < F.lvlCap()) ups.push({ c: F.uUpCost(b.unit), f: () => { b.unit.lvl++; } });
       }
