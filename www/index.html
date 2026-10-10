@@ -514,6 +514,7 @@
   .skillOpt span { display: flex; flex-direction: column; line-height: 1.25; }
   .skillOpt b { font-size: 15px; }
   .skillOpt small { color: var(--muted); font-size: 12px; }
+  .skillOpt:disabled { opacity: .4; }
   .skillOpt.cur { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold), inset 0 -4px 0 rgba(0,0,0,.35); }
   /* trofeje: sivé, kým ich hráč nezíska */
   #trophyList { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
@@ -776,7 +777,7 @@
   </div>
   <!-- výber schopnosti do slotu hrdinu -->
   <div id="skillPick" class="screenOverlay" hidden>
-    <div class="askCard"><h2 id="skillPickHead">Schopnosť</h2><div id="skillOpts"></div>
+    <div class="askCard"><h2 id="skillPickHead">Schopnosť</h2><p>Výber je natrvalo – vyber rozumne.</p><div id="skillOpts"></div>
       <button id="skillBack" class="btn backBtn">Späť</button></div>
   </div>
   <div id="askBox" class="screenOverlay" hidden>

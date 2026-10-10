@@ -227,6 +227,7 @@
     freeze:    { name: 'Mráz',         desc: 'Nepriatelia v okolí na pár sekúnd takmer zamrznú.',     icon: 'sp_frost' },
     lightning: { name: 'Blesk',        desc: 'Silný úder do nepriateľa, preskočí na dvoch ďalších.',  icon: 'sp_bolt' },
     fireball:  { name: 'Ohnivá guľa',  desc: 'Výbuch zraní hordu v okolí a podpáli ju.',              icon: 'sp_fire' },
+    warcry:    { name: 'Pokrik',       desc: 'Na chvíľu posilní a zrýchli hrdinu aj rytierov.',        icon: 'king' }, // v zálohe pre iného hrdinu
   };
   const slotOpen = i => kingMeta.lvl >= KING_SLOT_LVL[i];
   const spellOn = id => kingMeta.slots.some((s, i) => s === id && slotOpen(i));
@@ -3325,7 +3326,7 @@
       const b = document.createElement('button');
       if (!slotOpen(i)) { b.className = 'skill lock'; b.innerHTML = '<span>úroveň ' + KING_SLOT_LVL[i] + '</span>'; b.addEventListener('click', () => AUDIO.play('deny')); }
       else if (!id) { b.className = 'skill empty'; b.innerHTML = '<img src="' + UI_ICONS.plus + '" alt=""><span>Vybrať</span>'; b.addEventListener('click', () => openSkillPick(i)); }
-      else { b.className = 'skill'; b.innerHTML = '<img src="' + ICONS[POWER_INFO[id].icon] + '" alt=""><span>' + POWER_INFO[id].name + '</span>'; b.addEventListener('click', () => openSkillPick(i)); }
+      else { b.className = 'skill'; b.innerHTML = '<img src="' + ICONS[POWER_INFO[id].icon] + '" alt=""><span>' + POWER_INFO[id].name + '</span>'; } // výber je natrvalo
       row.appendChild(b);
     });
     list.appendChild(row);
@@ -3339,15 +3340,16 @@
   // výber schopnosti do slotu (schopnosť z iného slotu sa vymení)
   function openSkillPick(i) {
     AUDIO.play('click');
+    if (kingMeta.slots[i]) return;
     $('skillPickHead').textContent = 'Schopnosť ' + (i + 1);
     const box = $('skillOpts'); box.innerHTML = '';
     for (const id of KING_POWERS) {
-      const inf = POWER_INFO[id], where = kingMeta.slots.indexOf(id);
+      const inf = POWER_INFO[id], taken = kingMeta.slots.includes(id);
       const b = document.createElement('button');
-      b.className = 'skillOpt' + (where === i ? ' cur' : '');
-      b.innerHTML = '<img src="' + ICONS[inf.icon] + '" alt=""><span><b>' + inf.name + '</b><small>' + inf.desc + (where >= 0 && where !== i ? ' (teraz v slote ' + (where + 1) + ')' : '') + '</small></span>';
+      b.className = 'skillOpt'; b.disabled = taken;
+      b.innerHTML = '<img src="' + ICONS[inf.icon] + '" alt=""><span><b>' + inf.name + '</b><small>' + (taken ? 'Hrdina ju už má' : inf.desc) + '</small></span>';
       b.addEventListener('click', () => {
-        if (where >= 0 && where !== i) kingMeta.slots[where] = kingMeta.slots[i]; // výmena slotov
+        if (taken || kingMeta.slots[i]) return;
         kingMeta.slots[i] = id; saveKing();
         AUDIO.play('upgrade'); $('skillPick').hidden = true; renderHeroes(); renderMapBar();
       });
