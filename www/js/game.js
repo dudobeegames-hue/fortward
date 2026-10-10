@@ -922,7 +922,7 @@
       w: spr.w, h: spr.h, dead: false, foe: null, trap: null, attacking: false, pow: Math.sqrt(item.hpMul),
     };
     st.enemies.push(e);
-    if (d.boss && !(st.boss && st.boss.d.king && !st.boss.dead)) { st.boss = e; $('bossName').textContent = d.name || 'Vojvodca orkov'; banner(d.king ? 'Orkský veľkráľ vychádza z hradu!' : 'Prichádza Vojvodca!'); AUDIO.play('boss'); }
+    if (d.boss && !(st.boss && st.boss.d.king && !st.boss.dead)) { st.boss = e; $('bossName').textContent = d.name || 'Vojvodca orkov'; if (d.king) banner('Orkský veľkráľ vychádza z hradu!'); AUDIO.play('boss'); }
     return e;
   }
 
@@ -947,7 +947,7 @@
       part(e.x + (Math.random() - 0.5) * e.w * 0.6, e.y - Math.random() * e.h,
         (Math.random() - 0.5) * 60, -20 - Math.random() * 50, 0.5 + Math.random() * 0.4, cols[k % cols.length], 140);
     }
-    if (e.d.boss) { if (st.boss === e) st.boss = null; st.shake = e.d.king ? 0.8 : 0.4; banner(e.d.king ? 'Orkský veľkráľ padol!' : 'Vojvodca padol!'); }
+    if (e.d.boss) { if (st.boss === e) st.boss = null; st.shake = e.d.king ? 0.8 : 0.4; if (e.d.king) banner('Orkský veľkráľ padol!'); }
     stats.kills++; if (e.d.boss) { if (e.d.king) stats.orcKings++; else stats.bosses++; }
     stats.maxGold = Math.max(stats.maxGold, st.gold);
     checkAch();
