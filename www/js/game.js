@@ -3169,7 +3169,7 @@
     $('hallBtnTxt').textContent = '★' + free; $('hallBtnTxt').hidden = !free;
     $('trophyTxt').textContent = fresh; $('trophyTxt').hidden = !fresh;
   }
-  $('icoHome').src = UI_ICONS.home; $('icoTrophy').src = UI_ICONS.trophy; $('icoSwords').src = UI_ICONS.swords;
+  $('icoHome').src = UI_ICONS.home; $('icoTrophy').src = UI_ICONS.trophy; $('icoSwords').src = UI_ICONS.swords; $('icoShop').src = UI_ICONS.chest;
   const openMission = () => { renderMapPanel(); $('missionBox').hidden = false; };
   const closeMission = () => { $('missionBox').hidden = true; };
   $('mapClose').addEventListener('click', () => { AUDIO.play('click'); closeMission(); });
@@ -3232,7 +3232,8 @@
   function setTab(t, quiet) {
     mapTab = t;
     document.querySelectorAll('.tabCard').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
-    $('perks').hidden = t !== 'hall'; $('heroes').hidden = t !== 'heroes'; $('trophies').hidden = t !== 'trophies';
+    $('perks').hidden = t !== 'hall'; $('heroes').hidden = t !== 'heroes'; $('trophies').hidden = t !== 'trophies'; $('shop').hidden = t !== 'shop';
+    if (t === 'shop') renderShop();
     if (t === 'hall') renderPerks();
     if (t === 'heroes') renderHeroes();
     if (t === 'trophies') {
@@ -3241,6 +3242,26 @@
     }
     closeMission(); renderMapBar();
     if (!quiet) AUDIO.play('click');
+  }
+  // ---- Nákupy: odomknutie rás, hrdinov alebo všetkého naraz (platby cez obchod aplikácií prídu neskôr) ----
+  function renderShop() {
+    const list = $('shopList'); list.innerHTML = '';
+    const sec = t => { const h = document.createElement('div'); h.className = 'shopSec'; h.textContent = t; list.appendChild(h); };
+    const item = (cls, img, name, desc, price) => {
+      const r = document.createElement('div'); r.className = 'shopItem' + (cls ? ' ' + cls : '');
+      r.innerHTML = img + '<div class="info"><b>' + name + '</b><small>' + desc + '</small></div>';
+      const b = document.createElement('button'); b.className = 'btn up';
+      b.innerHTML = price;
+      b.addEventListener('click', () => { AUDIO.play('deny'); toast('Nákupy pripravujeme'); });
+      r.appendChild(b); list.appendChild(r);
+    };
+    const gem = n => '<img src="' + ICONS.gem + '" alt="">' + n;
+    item('bundle', '<img src="' + UI_ICONS.chest + '" alt="">', 'Kompletný balík', 'Odomkne všetky rasy aj hrdinov naraz', gem(2000));
+    sec('Rasy');
+    for (const r of RACES.filter(x => x.state !== 'open'))
+      item('', '<img src="' + spriteURL(SPR[r.spr][0], 4) + '" alt="">', r.name, r.state === 'gem' ? 'Nová rasa so svojimi stavbami a jednotkami' : 'Pripravujeme', r.price ? gem(r.price) : 'Čoskoro');
+    sec('Hrdinovia');
+    for (let i = 0; i < 2; i++) item('', '<img class="sil" src="' + ICONS.king + '" alt="">', 'Nový hrdina', 'Pripravujeme', 'Čoskoro');
   }
   document.querySelectorAll('.tabCard').forEach(b => b.addEventListener('click', () => { if (b.dataset.tab !== mapTab) setTab(b.dataset.tab); }));
 

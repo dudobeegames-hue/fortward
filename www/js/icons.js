@@ -149,6 +149,24 @@ const UI_ICONS = (() => {
     return pix(N, N, (x, y) => out[y][x]);
   })();
 
+  // truhlica s pokladom (karta Nákupy)
+  const chest = fromMap([
+    '..KKKKKKKKKK..',
+    '.KBBBBKKBBBBK.',
+    'KBBBBKYYKBBBBK',
+    'KbbbbKYYKbbbbK',
+    'KKKKKKKKKKKKKK',
+    'KYYYYYYYYYYYYK',
+    'KBBBBKYYKBBBBK',
+    'KBBBKYWYYKBBBK',
+    'KBBBKYKKYKBBBK',
+    'KBBBBKYYKBBBBK',
+    'KbbbbbKKbbbbbK',
+    'KYYYYYYYYYYYYK',
+    'KbbbbbbbbbbbbK',
+    'KKKKKKKKKKKKKK',
+  ], { K: '#1c140e', B: '#9a6430', b: '#6a4220', Y: '#f8d048', W: '#fff7c8' });
+
   // ---- vlajky 18×12 bodov ----
   const FW = 18, FH = 12;
   const stripesH = cols => (x, y) => cols[Math.floor(y * cols.length / FH)];
@@ -228,5 +246,5 @@ const UI_ICONS = (() => {
     { id: 'zh', name: '中文' },
   ];
 
-  return { pix, music, sound, plus, home, hall, trophy, star, swords, flags, langs };
+  return { pix, music, sound, plus, home, hall, trophy, star, swords, chest, flags, langs };
 })();
