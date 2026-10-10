@@ -874,7 +874,7 @@
     if (stars > prevStars) { const a = (meta.stars[m - 1] || [0, 0, 0]).slice(); a[t] = stars; meta.stars[m - 1] = a; saveJSON(sk('stars'), meta.stars); }
     const tierNote = t >= 2 ? '' : !nextWasOpen && tierOpen(m, t + 1) ? '<br><span class="newTech">Odomkla sa ' + TIERS[t + 1].name.toLowerCase() + ' úroveň!</span>'
       : !tierOpen(m, t + 1) ? '<br><small class="dim">Za 3 hviezdy (radnica nad 80 % zdravia) sa odomkne ' + TIERS[t + 1].name.toLowerCase() + ' úroveň.</small>' : '';
-    $('bossbar').hidden = true; $('bottom').hidden = true;
+    $('hud-boss').hidden = true; $('bottom').hidden = true;
     const first = t === 0 && m >= st.unlocked;
     if (first) {
       st.provAnim = { i: m - 1, t: 0, from: m <= HOME_PROVINCES ? 'attacked' : 'horde' }; // provincia sa na mape prefarbí na modro
@@ -899,7 +899,7 @@
     saveStats();
     st.hallHp = 0;
     const survived = st.wave - 1;
-    $('bossbar').hidden = true; $('bottom').hidden = true;
+    $('hud-boss').hidden = true; $('bottom').hidden = true;
     const hr = hallRect();
     for (let k = 0; k < 60; k++) {
       part(hr.x0 + Math.random() * (hr.x1 - hr.x0), hr.y0 - 10 + Math.random() * 40, (Math.random() - 0.5) * 50, -Math.random() * 50, 1.3, ['#6a6a78', '#3e3e4c', '#f89838', '#d83818'][k % 4], 60);
@@ -923,7 +923,7 @@
       w: spr.w, h: spr.h, dead: false, foe: null, trap: null, attacking: false, pow: Math.sqrt(item.hpMul),
     };
     st.enemies.push(e);
-    if (d.boss && !(st.boss && st.boss.d.king && !st.boss.dead)) { st.boss = e; $('bossName').textContent = d.name || 'Vojvodca orkov'; if (d.king) banner('Orkský veľkráľ vychádza z hradu!'); AUDIO.play('boss'); }
+    if (d.boss && !(st.boss && st.boss.d.king && !st.boss.dead)) { st.boss = e; if (d.king) banner('Orkský veľkráľ vychádza z hradu!'); AUDIO.play('boss'); }
     return e;
   }
 
@@ -2702,10 +2702,11 @@
       b.classList.toggle('ready', p >= 1 && st.spellSel !== id);
       b.classList.toggle('sel', st.spellSel === id);
     }
-    const bb = $('bossbar');
-    if (st.boss && !st.boss.dead && st.phase === 'battle') {
+    const bb = $('hud-boss'), B = st.boss;
+    if (B && !B.dead && st.phase === 'battle') {
       bb.hidden = false;
-      $('bossFill').style.width = (Math.max(0, st.boss.hp / st.boss.max) * 100) + '%';
+      $('bossFill').style.width = (Math.max(0, B.hp / B.max) * 100) + '%';
+      $('bossTxt').textContent = (B.d.king ? 'Veľkráľ' : 'Vojvodca') + ' ' + Math.max(0, Math.ceil(B.hp)) + ' / ' + Math.ceil(B.max);
     } else bb.hidden = true;
   }
 
@@ -3315,7 +3316,7 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden && canPause()) setPaused(true); });
   function clearBattle() {
     st.enemies = []; st.proj = []; st.eproj = []; st.drops = []; st.soldiers = []; st.parts = []; st.texts = []; st.marks = []; st.spawnQ = [];
-    $('over').hidden = true; $('hud').hidden = true; $('bottom').hidden = true; $('build').hidden = true; $('bossbar').hidden = true;
+    $('over').hidden = true; $('hud').hidden = true; $('bottom').hidden = true; $('build').hidden = true; $('hud-boss').hidden = true;
   }
 
   function showMap() {

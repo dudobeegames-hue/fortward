@@ -45,13 +45,18 @@
   #hud {
     position: absolute; left: 0; right: 0; top: 0;
     padding: calc(env(safe-area-inset-top) + 8px) 10px 0;
-    display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: 'wave wall gold' 'king . pause';
+    display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: 'wave wall gold' 'king boss pause';
     gap: 6px 8px; align-items: center;
     pointer-events: none; z-index: 5;
   }
   /* kráľ v hornom paneli: pod vlnou, rovnako široký; dole zdravie a XP. Pri nízkom zdraví bliká, padnutý je sivý a prečiarknutý */
   #hud-wave { grid-area: wave; justify-content: center; }
   #hud-wall { grid-area: wall; }
+  /* zdravie bossa: rovnaký panel ako radnica, hneď pod ním a rovnako široký */
+  #hud-boss { grid-area: boss; align-self: start; flex-direction: column; align-items: stretch; gap: 2px; padding: 4px 8px; }
+  #hud-boss[hidden] { display: none; }
+  #hud-boss .bar i { background: linear-gradient(#ff7a5a, #c83020); }
+  #bossTxt { font-size: 11px; color: #ffb090; text-align: center; line-height: 1; }
   #hud-gold { grid-area: gold; }
   /* pauza pod zlatkami */
   #pauseBtn { grid-area: pause; justify-self: end; align-self: start; pointer-events: auto; width: 38px; height: 38px; padding: 0; display: grid; place-items: center;
@@ -101,13 +106,6 @@
   img.coin, img.gem { width: 16px; height: 16px; }
   #goldTxt { color: var(--gold); }
 
-  #bossbar {
-    position: absolute; left: 34%; right: 6%; top: calc(env(safe-area-inset-top) + 52px);
-    text-align: center; font-size: 13px; font-weight: 700; color: #ffb090; text-shadow: 1px 1px 0 var(--ink);
-    pointer-events: none;
-  }
-  #bossbar .bar { height: 7px; margin-top: 2px; }
-  #bossbar .bar i { background: linear-gradient(#ff7a5a, #a8482c); }
 
   .pixel, #banner, #title h1, #over h2 { font-family: 'Pixelify Sans', 'Rubik', sans-serif; }
   #banner {
@@ -671,10 +669,10 @@
     <div class="pill" id="hud-wave"><span id="waveTxt">Vlna 1</span></div>
     <div class="pill" id="hud-wall"><div class="bar"><i id="hallFill"></i></div><span id="hallTxt"></span></div>
     <div class="pill" id="hud-gold"><img class="coin" alt=""><span id="goldTxt">0</span></div>
+    <div class="pill" id="hud-boss" hidden><div class="bar"><i id="bossFill"></i></div><span id="bossTxt"></span></div>
     <button id="pauseBtn" title="Pauza" aria-label="Pauza"><i></i></button>
     <div class="pill" id="hud-king" title="Kráľ"><div class="kTop"><img id="kingIcon" alt=""><span class="kLvl" title="Úroveň kráľa"><small>úr.</small><b id="kingLvl">1</b></span></div><div class="kRow"><b>HP</b><div class="bar hp" title="Zdravie kráľa"><i id="kingFill"></i></div></div><div class="kRow"><b>XP</b><div class="bar xp" title="Skúsenosti kráľa"><i id="xpFill"></i></div></div></div>
   </div>
-  <div id="bossbar" hidden><span id="bossName">Vojvodca orkov</span><div class="bar"><i id="bossFill"></i></div></div>
   <div id="banner"></div>
   <div id="hint" hidden></div>
 
