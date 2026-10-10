@@ -2111,7 +2111,21 @@
         g.globalAlpha = 1;
       } else corners(ox, oy, ox + T - 1, oy + T - 1, blink ? '#9cd45a' : '#ffffff');
     }
-    if (drag) { // náhľad radu hradieb pred pustením prsta
+    if (drag && drag.kind === 'paving') { // náhľad dlažby pred pustením prsta
+      const ok = dragAfford();
+      g.globalAlpha = 0.75;
+      drag.path.forEach((q, i) => {
+        const x = tileX(q.c), y = tileY(q.r);
+        g.drawImage(paveAt(x, y), x, y);
+        if (i >= ok) { g.fillStyle = 'rgba(232,72,56,0.55)'; g.fillRect(x, y, T, T); }
+      });
+      g.globalAlpha = 1;
+      if (drag.path.length) {
+        const q = drag.path[drag.path.length - 1], n = Math.min(drag.path.length, ok);
+        const s = String(n * costOf('paving')), tx = Math.max(2, Math.min(W - s.length * 4 - 2, tileX(q.c) + T / 2 - s.length * 2)), ty = tileY(q.r) - 8;
+        pxText(g, s, tx, ty, n < drag.path.length ? '#e84838' : '#f8d048');
+      }
+    } else if (drag) { // náhľad radu hradieb pred pustením prsta
       const key = (c, r) => c + ',' + r, inPath = new Set(drag.path.map(q => key(q.c, q.r))), ok = wallsAfford();
       const j = (c, r) => inPath.has(key(c, r)) || joins(c, r), jv = (c, r) => inPath.has(key(c, r)) || joinsV(c, r);
       g.globalAlpha = 0.65;
@@ -2818,7 +2832,7 @@
       }
       if (st.flip && st.flip !== st.tool) st.flip = null;
       b.className = 'pcard' + (st.tool === kind ? ' sel' : '') + (st.flip === kind ? ' flipped' : '') + (st.gold < costOf(kind) ? ' poor' : '');
-      const tip = kind === 'wall' ? ' Ťahaj prstom pre celý rad.' : '';
+      const tip = kind === 'wall' ? ' Ťahaj prstom pre celý rad.' : kind === 'paving' ? ' Ťahaj prstom pre celú plochu.' : '';
       b.innerHTML = '<span class="pin">' +
         '<span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost"><img class="coin" src="' + ICONS.coin + '">' + costOf(kind) + '</span></span>' +
         '<span class="face back"><b>' + d.name + '</b><small>' + d.desc + '.' + tip + '</small></span></span>';
@@ -3107,6 +3121,9 @@
   // hradby: ťuk = jedna, ťahanie = náhľad radu s cenou, pustením prsta sa postaví (kým stačí zlato)
   let drag = null;                        // {path: [{c, r}], last}
   const wallFree = (c, r) => inZone(c, r) && !inHall(c, r) && !occAt(c, r);
+  const paveFree = (c, r) => inZone(c, r) && !inHall(c, r) && !st.paving[c + ',' + r]; // dlažba ide aj pod budovy
+  const dragFree = (c, r) => (drag && drag.kind === 'paving' ? paveFree : wallFree)(c, r);
+  const dragAfford = () => Math.floor(st.gold / costOf(drag && drag.kind === 'paving' ? 'paving' : 'wall'));
   const wallsAfford = () => Math.floor(st.gold / costOf('wall'));
   function placeWall(c, r) {
     st.gold -= costOf('wall');
@@ -3168,6 +3185,11 @@
       moveBuilding(b, t.c, t.r);
       return;
     }
+    if (st.tool === 'paving' && inZone(t.c, t.r) && !inHall(t.c, t.r)) { // dlažba: ťuk = jedna (alebo zobrať), ťah = celá plocha
+      drag = { kind: 'paving', path: paveFree(t.c, t.r) ? [t] : [], last: t, start: t, moved: false };
+      try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
+      return;
+    }
     const o = occAt(t.c, t.r);
     if (o && o !== HALL) { // chytenie stavby: ťuk = výber, ťahanie = presun
       bdrag = { b: o, start: t, hover: t, moved: false };
@@ -3175,7 +3197,7 @@
       return;
     }
     if (st.tool === 'wall' && wallFree(t.c, t.r)) {
-      drag = { path: [t], last: t };
+      drag = { kind: 'wall', path: [t], last: t };
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
       return;
     }
@@ -3244,6 +3266,7 @@
     if (!drag || st.phase !== 'build') return;
     const t = evTile(evPos(ev));
     if (t.c === drag.last.c && t.r === drag.last.r) return;
+    drag.moved = true;
     // prejdi všetky políčka medzi poslednou a aktuálnou pozíciou (aby rýchly ťah nič nepreskočil)
     let { c, r } = drag.last;
     while (c !== t.c || r !== t.r) {
@@ -3251,7 +3274,7 @@
       if (Math.abs(dc) >= Math.abs(dr)) c += Math.sign(dc); else r += Math.sign(dr);
       const back = drag.path.findIndex(q => q.c === c && q.r === r);
       if (back >= 0) drag.path.length = back + 1;          // návrat prstom späť skráti rad
-      else if (wallFree(c, r)) drag.path.push({ c, r });
+      else if (dragFree(c, r)) drag.path.push({ c, r });
     }
     drag.last = t;
   });
@@ -3280,16 +3303,19 @@
       return;
     }
     if (drag) {
-      const path = drag.path; drag = null;
+      const dr = drag, path = dr.path, n = Math.min(path.length, dragAfford()); drag = null;
       if (st.phase !== 'build') return;
-      const n = Math.min(path.length, wallsAfford());
+      if (dr.kind === 'paving' && !dr.moved && !path.length) { placePaving(dr.start.c, dr.start.r); return; } // ťuk na dlažbu ju zoberie
       if (n < path.length) { toast('Nedostatok zlata'); AUDIO.play('deny'); }
       if (n > 0) {
         snapshot();
-        for (const q of path.slice(0, n)) placeWall(q.c, q.r);
+        for (const q of path.slice(0, n)) {
+          if (dr.kind === 'paving') { st.paving[q.c + ',' + q.r] = 1; st.gold -= costOf('paving'); }
+          else placeWall(q.c, q.r);
+        }
         AUDIO.play('build');
       }
-      if (st.gold < costOf('wall')) st.tool = null;
+      if (st.gold < costOf(dr.kind)) st.tool = null;
       renderBuild();
     }
   };
