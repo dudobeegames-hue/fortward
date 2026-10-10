@@ -259,7 +259,23 @@
   .perkHead { display: flex; justify-content: space-between; align-items: center; width: 100%; }
   .perkHead b { font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 24px; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
   .perkNote { margin: 0; font-size: 13px; color: var(--muted); }
-  #perkList { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+  #perkList { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  /* bonus v Sieni: rámik s ikonou, názvom, popisom a 3 hviezdami (vyplnené = kúpené úrovne) */
+  .perkCard { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px 8px; border-radius: 10px; border: 2px solid var(--ink);
+    background: rgba(0,0,0,.28); color: #fff; text-align: center; box-shadow: inset 0 -4px 0 rgba(0,0,0,.25); }
+  .perkCard .pic { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; }
+  .perkCard b { font-size: 14px; line-height: 1.15; }
+  .perkCard small { color: var(--muted); font-size: 11.5px; line-height: 1.25; flex: 1; }
+  .perkCard .pstars { display: flex; gap: 4px; margin-top: 2px; }
+  .perkCard .pstars img { width: 22px; height: 22px; image-rendering: pixelated; }
+  .perkCard .pstars img.off { filter: grayscale(1) brightness(.45); opacity: .7; }
+  .perkCard .price { position: absolute; top: 5px; right: 6px; font-size: 11px; font-weight: 700; color: var(--muted); }
+  .perkCard.can { border-color: #b88420; box-shadow: inset 0 0 0 1px rgba(248,208,72,.5), inset 0 -4px 0 rgba(0,0,0,.25); }
+  .perkCard.can .price { color: var(--gold); }
+  .perkCard.max { border-color: var(--gold); background: rgba(248,208,72,.1); }
+  .perkCard:active { transform: translateY(1px); }
+  .perkCard.shake { animation: perkShake .3s; }
+  @keyframes perkShake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
   .perk { display: grid; grid-template-columns: 36px 1fr 64px; gap: 8px; align-items: center; background: rgba(0,0,0,.28); border-radius: 8px; padding: 6px 8px; }
   .perk img { width: 34px; max-height: 38px; object-fit: contain; }
   .perk .info { display: flex; flex-direction: column; line-height: 1.2; }
@@ -781,7 +797,7 @@
 
   <div id="perks" class="screenOverlay perksScreen tabScreen" hidden>
     <div class="perkHead"><b>Kráľovská sieň</b><span class="pill">★ <span id="perkStars">0</span></span></div>
-    <p class="perkNote">Každý hrad môžeš dobyť na medenej, striebornej a zlatej úrovni – za každú 1 až 3 hviezdy podľa zdravia radnice na konci. Hviezdami kúpiš trvalé bonusy – nákup je natrvalo, vyber si rozumne.</p>
+    <p class="perkNote">Hviezdy získavaš za dobyté hrady (1 až 3 podľa zdravia radnice). Ťukni na bonus a za hviezdy sa mu vyplní ďalšia hviezda – nákup je natrvalo, vyber si rozumne.</p>
     <div id="perkList"></div>
   </div>
 

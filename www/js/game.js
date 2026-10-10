@@ -2054,11 +2054,11 @@
     const { c, r } = pdrag.t, hx = tileX(c), hy = tileY(r), kind = pdrag.kind;
     const ok = (kind === 'paving' ? inZone(c, r) && !inHall(c, r) : canPlace(c, r)) && st.gold >= costOf(kind); // zelená = dá sa postaviť, červená = posuň prst ďalej
     g.fillStyle = ok ? 'rgba(156,212,90,0.35)' : 'rgba(232,72,56,0.5)'; g.fillRect(hx, hy, T, T);
-    const spr = kind === 'wall' ? BSPR.wall[0][10] : TRAPS[kind] ? BSPR[kind] : kind === 'paving' ? { c: PAVE } : bsprOf(kind, 1);
+    const spr = kind === 'wall' ? BSPR.wall[0][10] : TRAPS[kind] ? BSPR[kind] : kind === 'paving' ? { c: paveAt(hx, hy) } : bsprOf(kind, 1);
     g.globalAlpha = ok ? 0.75 : 0.45;
     if (kind === 'wall') g.drawImage(spr.c, hx, hy - 6);
     else if (TRAPS[kind]) g.drawImage(spr.c, hx, hy);
-    else if (kind === 'paving') g.drawImage(PAVE, hx, hy);
+    else if (kind === 'paving') g.drawImage(paveAt(hx, hy), hx, hy);
     else g.drawImage(spr.c, hx + T / 2 - Math.floor(spr.w / 2), hy + T + 1 - spr.h);
     g.globalAlpha = 1;
     corners(hx, hy, hx + T - 1, hy + T - 1, ok ? '#9cd45a' : (blink ? '#e84838' : '#ff9a80'));
@@ -2588,7 +2588,7 @@
     g.drawImage(scene.bg, 0, 0);
     drawSceneFx(time);
     const playing = st.phase !== 'title';
-    if (playing) for (const key in st.paving) { const [pc, pr] = key.split(','); g.drawImage(PAVE, tileX(+pc), tileY(+pr)); } // dlažba pod všetkým
+    if (playing) for (const key in st.paving) { const [pc, pr] = key.split(','), px = tileX(+pc), py = tileY(+pr); g.drawImage(paveAt(px, py), px, py); } // dlažba pod všetkým
     if (playing) for (const b of st.blds) if (TRAPS[b.kind]) drawPit(b, time);
     if (st.phase === 'build') drawBuildOverlay(time);
     for (const m of st.marks) drawMark(m);
@@ -2733,7 +2733,7 @@
     $('icoHall').src = UI_ICONS.hall; $('icoHero').src = ICONS.king;
     for (const k of ['orc', 'garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' ? 2 : 3);
     ICONS.coin = spriteURL(SPR.coin[0], 4);
-    ICONS.paving = spriteURL({ c: PAVE, w: T, h: T }, 3);
+    ICONS.paving = spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3);
     Object.assign(ICONS, { sp_volley: UI_ICONS.spellVolley, sp_fire: UI_ICONS.spellFire, sp_frost: UI_ICONS.spellFrost, sp_bolt: UI_ICONS.spellBolt });
     const SPI = { volley: 'sp_volley', fireball: 'sp_fire', freeze: 'sp_frost', lightning: 'sp_bolt' };
     document.querySelectorAll('.spell').forEach(b => { b.querySelector('img').src = ICONS[SPI[b.dataset.spell]]; });
@@ -3037,23 +3037,26 @@
 
   // dá sa na políčko postaviť? (na farbu náhľadu a pri pustení prsta)
   const canPlace = (c, r) => inZone(c, r) && !inHall(c, r) && !occAt(c, r);
-  // dlažba: kamenné dlaždice v posunutých radoch (svetlá horná hrana, tieň vpravo, tmavá škára)
-  const PAVE = (() => {
+  // dlažba: presne ako nádvorie pod radnicou (scene.js) – rovnaké tehlové rady 6×5, škáry a farby RAMP.walk;
+  // počíta sa z polohy na bojisku, takže susedné dlaždice aj nádvorie na seba plynule nadväzujú
+  const paveCache = {};
+  function paveAt(px, py) {
+    const key = px + ',' + py;
+    if (paveCache[key]) return paveCache[key];
     const c = document.createElement('canvas'); c.width = T; c.height = T;
-    const x2 = c.getContext('2d'), R = RAMP.stone;
+    const x2 = c.getContext('2d'), id = x2.createImageData(T, T);
     for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) {
-      const course = y >> 2, ry = y & 3, off = (course & 1) * 4, bx = (x + off) & 7, bi = (x + off) >> 3;
-      let lv;
-      if (ry === 3 || bx === 7) lv = 1;                                   // škára
-      else {
-        lv = ry === 0 ? 6 : bx === 6 || ry === 2 ? 4 : 5;                 // svetlo zhora, tieň vpravo dole
-        if (hash2(bi, course, 77) < 0.35) lv -= 1;                        // každá dlaždica trochu iný odtieň
-        if (hash2(x, y, 78) < 0.06) lv -= 1;                              // zrnká
-      }
-      const col = R[Math.max(0, lv)]; x2.fillStyle = Array.isArray(col) ? 'rgb(' + col.join(',') + ')' : col; x2.fillRect(x, y, 1, 1);
+      const X = px + x, Y = py + y;
+      const row = Math.floor(Y / 5), off = (row % 2) * 3, col = Math.floor((X + off) / 6);
+      let v = 0.5 + (hash2(col, row, 21) - 0.5) * 0.3 + (hash2(X, Y, 22) - 0.5) * 0.1;
+      if (Y % 5 === 0 || (X + off) % 6 === 0) v = 0.15;
+      else if (Y % 5 === 1 || (X + off) % 6 === 1) v += 0.12;
+      const rgb = pickRamp(RAMP.walk, v, X, Y), k = (y * T + x) * 4;
+      id.data[k] = rgb[0]; id.data[k + 1] = rgb[1]; id.data[k + 2] = rgb[2]; id.data[k + 3] = 255;
     }
-    return c;
-  })();
+    x2.putImageData(id, 0, 0);
+    return (paveCache[key] = c);
+  }
   function placePaving(c, r) {
     if (!inZone(c, r)) { toast('Stavať sa dá len v zóne pri radnici'); AUDIO.play('deny'); return false; }
     if (inHall(c, r)) { AUDIO.play('deny'); return false; }
@@ -3425,20 +3428,19 @@
     $('perkStars').textContent = starsFree() + ' / ' + starsTotal();
     const list = $('perkList'); list.innerHTML = '';
     for (const pk of PERKS) {
-      const lvl = perk(pk.id), cost = lvl + 1;
-      const row = document.createElement('div'); row.className = 'perk';
-      const pips = '<span class="pips">' + '●'.repeat(lvl) + '<i>' + '●'.repeat(PERK_MAX - lvl) + '</i></span>';
-      row.innerHTML = '<img src="' + ICONS[pk.icon] + '"><div class="info"><b>' + pk.name + ' ' + pips + '</b><small>' + pk.desc + (lvl ? ' (teraz ' + lvl + '×)' : '') + '</small></div>';
+      const lvl = perk(pk.id), cost = lvl + 1, max = lvl >= PERK_MAX, can = !max && starsFree() >= cost;
       const b = document.createElement('button');
-      b.className = 'btn ' + (lvl >= PERK_MAX ? '' : 'up');
-      b.innerHTML = lvl >= PERK_MAX ? 'Max' : '★ ' + cost;
-      b.disabled = lvl >= PERK_MAX || starsFree() < cost;
+      b.className = 'perkCard' + (max ? ' max' : can ? ' can' : '');
+      let stars = '';
+      for (let k = 0; k < PERK_MAX; k++) stars += '<img class="' + (k < lvl ? 'on' : 'off') + '" src="' + UI_ICONS.star + '" alt="">';
+      b.innerHTML = (max ? '' : '<span class="price">★ ' + cost + '</span>') + '<img class="pic" src="' + ICONS[pk.icon] + '" alt=""><b>' + pk.name + '</b><small>' + pk.desc + '</small><span class="pstars">' + stars + '</span>';
       b.addEventListener('click', () => {
-        if (starsFree() < cost || lvl >= PERK_MAX) return;
+        if (max) return;
+        if (!can) { AUDIO.play('deny'); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); return; }
         meta.perks[pk.id] = lvl + 1; saveJSON(sk('perks'), meta.perks);
         AUDIO.play('upgrade'); renderPerks(); renderMapBar();
       });
-      row.appendChild(b); list.appendChild(row);
+      list.appendChild(b);
     }
   }
 
