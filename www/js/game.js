@@ -747,8 +747,9 @@
     }
     if (w % 5 === 0) { // boss v 5. a 10. vlne, v posledných misiách dvaja
       const bossMul = (w === MISSION_WAVES ? DIFF.bossLast : 1) * (DIFF.bossBase + DIFF.bossMission * (m - 1)) * tr.hp;
-      q.push({ type: 'warlord', gap: 2.5, hpMul: bossMul });
-      if (w === MISSION_WAVES && m >= 8) q.push({ type: 'warlord', gap: 3, hpMul: bossMul });
+      // vojvodca je pomalý – vyrazí už po prvej pätine hordy, aby dorazil spolu s ňou (nie dlho po nej)
+      q.splice(Math.floor(q.length * 0.2), 0, { type: 'warlord', gap: 1.2, hpMul: bossMul });
+      if (w === MISSION_WAVES && m >= 8) q.splice(Math.floor(q.length * 0.45), 0, { type: 'warlord', gap: 1.2, hpMul: bossMul });
     }
     return q;
   }

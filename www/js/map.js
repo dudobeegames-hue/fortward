@@ -206,9 +206,9 @@ function makeOrcFort() {
 
 // ---- Odomykanie: čo prináša každá misia (misia 1 = základná výbava) ----
 const UNLOCKS = [
-  [{ id: 'tower', name: 'Strážna veža', icon: 'tower' }, { id: 'wall', name: 'Hradby', icon: 'wall' }, { id: 'pit', name: 'Jama s ostňami', icon: 'pit' }],
+  [{ id: 'tower', name: 'Strážna veža', icon: 'tower' }, { id: 'wall', name: 'Hradby', icon: 'wall' }, { id: 'pit', name: 'Jama s ostňami', icon: 'pit' }, { id: 'gate', name: 'Brána', icon: 'gate', desc: 'Prerob hradbu na bránu – tvoji rytieri cez ňu prejdú, horda nie.' }],
   [{ id: 'mine', name: 'Zlatá baňa', icon: 'mine' }, { id: 'mage', name: 'Veža mága', icon: 'mage' }],
-  [{ id: 'gate', name: 'Brána', icon: 'gate', desc: 'Prerob hradbu na bránu – tvoji rytieri cez ňu prejdú, horda nie.' }, { id: 'wallArcher', name: 'Lukostrelec na hradbách', icon: 'u_archer', desc: 'Postav lukostrelca priamo na hradbu – strieľa rýchle šípy na hordu.' }],
+  [{ id: 'wallArcher', name: 'Lukostrelec na hradbách', icon: 'u_archer', desc: 'Postav lukostrelca priamo na hradbu – strieľa rýchle šípy na hordu.' }],
   [{ id: 'barracks', name: 'Kasárne a rytieri', icon: 'barracks' }],
   [{ id: 'range', name: 'Strelnica a lukostrelci', icon: 'range' }, { id: 'catapult', name: 'Katapult', icon: 'catapult' }],
   [{ id: 'stables', name: 'Stajne a jazdci', icon: 'stables', desc: 'Jazdci rýchlo obídu líniu a idú po strelcoch, šamanoch a podkopníkoch.' }, { id: 'siegeRam', name: 'Baranidlo', icon: 'u_siegeRam', desc: 'V útoku na hrad ho kúpiš počas boja. Pomaly sa dovalí k bráne a rozbíja ju – orkov si nevšíma.' }],
