@@ -1268,7 +1268,6 @@
       for (let k = 0; k < 10; k++) part(u.x, u.y - 6, (Math.random() - 0.5) * 40, -Math.random() * 40, 0.6, '#f8d048', 80);
       AUDIO.play('crumble');
       slowmoT = SLOWMO_DUR;
-      toast('Kráľ padol! Po vlne ho môžeš oživiť.');
     } else {
       u.dead = true;
       for (let k = 0; k < 8; k++) part(u.x, u.y - 6, (Math.random() - 0.5) * 40, -Math.random() * 40, 0.5, ['#3c64c8', '#bcc0cc', '#e84838'][k % 3], 120);
