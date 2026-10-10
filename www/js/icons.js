@@ -65,19 +65,22 @@ const UI_ICONS = (() => {
 
   // ikonky mapy: domček (menu), pohár (trofeje), hviezda
   const home = fromMap([
-    '.....KK.....',
-    '....KRRK....',
-    '...KRRRRK...',
-    '..KRRRRRRK..',
-    '.KRRRRRRRRK.',
-    'KKKKKKKKKKKK',
-    '.KWWWWWWWWK.',
-    '.KWBBWWKKWK.',
-    '.KWBBWWKOOK.',
-    '.KWWWWWKOOK.',
-    '.KWWWWWKOOK.',
-    '.KKKKKKKKKK.',
-  ], { K: '#1c140e', R: '#d8402c', W: '#ecdcb4', B: '#6a96f0', O: '#8a5a2a' });
+    '.......KK.......',
+    '......KLLK.KKK..',
+    '.....KLLLLKKDK..',
+    '....KLLKKLLKDK..',
+    '...KLLKMMKLLKK..',
+    '..KLLKMMMMKLLK..',
+    '.KLLKMMKKMMKLLK.',
+    'KLLKMMMKKMMMKLLK',
+    'KKKKMMMMMMMMKKKK',
+    '..KMMMMMMMMMMK..',
+    '..KMMMMKKMMMMK..',
+    '..KMMMKDDKMMMK..',
+    '..KMMMKDDKMMMK..',
+    '..KMMMKDDKMMMK..',
+    '..KKKKKKKKKKKK..',
+  ], { K: '#1c140e', L: '#f4e6c4', M: '#b8a27a', D: '#6a5636' });
   const trophy = fromMap([
     '..KKKKKKKK..',
     'KKKYYYYWYKKK',

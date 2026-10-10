@@ -273,6 +273,14 @@
   .mapHead .pill { font-size: 13px; padding: 4px 7px; }
   #selInfo { display: flex; flex-direction: column; gap: 6px; }
   .brow { display: grid; grid-template-columns: 1fr 1.3fr; gap: 6px; }
+  /* tlačidlo Späť: všade rovnako veľké a rovnakej farby */
+  .btn.backBtn { flex: 0 0 auto; width: 140px; height: 46px; padding: 0; margin: 4px auto 0; justify-content: center; align-self: center;
+    font-size: 17px; font-weight: 700; color: #fff; text-shadow: 1px 1px 0 var(--ink); }
+  .perksScreen .row.back { justify-content: center; }
+  .perksScreen .row.back .btn { flex: 0 0 auto; }
+  .brow.backRow { display: flex; gap: 8px; align-items: center; }
+  .brow.backRow .backBtn { margin: 0; }
+  .brow.backRow .primary { flex: 1; height: 46px; padding: 0; }
   .brow .primary { font-size: 17px; padding: 9px 10px; }
   .unitCard {
     display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center;
@@ -353,7 +361,6 @@
   .lang small { color: var(--muted); font-size: 10.5px; font-weight: 500; }
   .lang.cur { border-color: var(--gold); box-shadow: inset 0 -3px 0 rgba(0,0,0,.35), 0 0 0 1px var(--gold); }
   .lang.soon { opacity: .55; }
-  #setBack { margin-top: 4px; justify-content: center; }
   /* menu (pozície, výber rasy): pozadím stmavený úvodný obrázok, názov hry z obrázka ostane hore vidieť */
   .screenOverlay.menuBg { justify-content: flex-start; gap: 10px; background: linear-gradient(rgba(8,6,12,.15), rgba(8,6,12,.15) 20%, rgba(14,10,8,.72) 34%, rgba(14,10,8,.9)), #07061a url(img/splash.jpg) center top / cover no-repeat; }
   .menuSpace { flex: 0 0 26%; }
@@ -388,7 +395,6 @@
   .askCard .row { display: flex; gap: 10px; width: 100%; }
   .askCard .row button { flex: 1; justify-content: center; font-size: 17px; }
   #askOk { background: #c8382a; color: #fff; box-shadow: inset 0 -3px 0 #7c1810, inset 0 2px 0 rgba(255,255,255,.25); text-shadow: 1px 1px 0 var(--ink); }
-  #raceBack, #slotsBack { margin-top: 4px; justify-content: center; min-width: 110px; }
 
   /* ---- Titulná obrazovka ---- */
   .screenOverlay {
@@ -441,7 +447,7 @@
   /* ikonky na mape: domček vľavo hore, dole Sieň, Hrdinovia, Trofeje */
   .mapIc { width: 46px; height: 46px; padding: 0; display: grid; place-items: center; border-radius: 10px; border: 3px solid var(--ink);
     background: linear-gradient(#5a4836, #3a2c22); box-shadow: inset 0 -4px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.15); }
-  .mapIc img { width: 30px; height: 30px; image-rendering: pixelated; }
+  .mapIc img { width: 32px; height: 30px; image-rendering: pixelated; }
   .mapIc:active { transform: translateY(2px); }
   #mapBar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 22px;
     padding: 18px 12px calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(rgba(8,14,30,0), rgba(8,14,30,.75)); }
@@ -470,6 +476,8 @@
   .trophy b { font-size: 14px; line-height: 1.15; }
   .trophy small { color: var(--muted); font-size: 11.5px; line-height: 1.25; }
   .trophy.got { border-color: var(--gold); background: rgba(248,208,72,.1); }
+  .trophy { position: relative; }
+  .trophy .newTag { position: absolute; top: 6px; right: 6px; padding: 1px 6px; border-radius: 6px; border: 2px solid var(--ink); background: var(--red); color: #fff; font-style: normal; font-size: 11px; font-weight: 700; }
   .trophy:not(.got) .pic { background: #3a3230; }
   .trophy:not(.got) .pic img { filter: grayscale(1) brightness(.7); opacity: .6; }
   .trophy:not(.got) b { color: var(--muted); }
@@ -579,7 +587,7 @@
 </style>
 </head>
 <body>
-<div id="splash"><img src="img/splash.jpg" alt="Fortward"><div id="splashBtns"><button id="splashPlay" class="greenBtn" aria-label="Hrať"><span class="pxH"></span>rať</button><button id="splashSet" class="grayBtn">Nastavenia</button></div><div id="setPanel" hidden><h2 id="setHead">Nastavenia</h2><div id="setMain" class="setIcons"><button class="setIc snd" data-kind="music"><span class="ico"><img id="icoMusic" alt=""></span><b>Hudba</b></button><button class="setIc snd" data-kind="sfx"><span class="ico"><img id="icoSound" alt=""></span><b>Zvuky</b></button><button class="setIc" id="langBtn"><span class="ico"><img id="icoLang" class="flag" alt=""></span><b>Jazyk</b></button></div><div id="langList" hidden></div><button id="setBack" class="btn">Späť</button></div></div>
+<div id="splash"><img src="img/splash.jpg" alt="Fortward"><div id="splashBtns"><button id="splashPlay" class="greenBtn" aria-label="Hrať"><span class="pxH"></span>rať</button><button id="splashSet" class="grayBtn">Nastavenia</button></div><div id="setPanel" hidden><h2 id="setHead">Nastavenia</h2><div id="setMain" class="setIcons"><button class="setIc snd" data-kind="music"><span class="ico"><img id="icoMusic" alt=""></span><b>Hudba</b></button><button class="setIc snd" data-kind="sfx"><span class="ico"><img id="icoSound" alt=""></span><b>Zvuky</b></button><button class="setIc" id="langBtn"><span class="ico"><img id="icoLang" class="flag" alt=""></span><b>Jazyk</b></button></div><div id="langList" hidden></div><button id="setBack" class="btn backBtn">Späť</button></div></div>
 <div id="logoIntro"><img src="img/logo.jpg" alt="DBee games"></div>
 <script src="js/splash.js"></script>
 <div id="game">
@@ -625,7 +633,7 @@
     <div class="menuSpace"></div>
     <h2 class="menuHead">Vyber pozíciu</h2>
     <div id="slotList"></div>
-    <button id="slotsBack" class="btn">Späť</button>
+    <button id="slotsBack" class="btn backBtn">Späť</button>
   </div>
 
   <div id="title" class="screenOverlay menuBg" hidden>
@@ -633,7 +641,7 @@
     <div class="menuSpace"></div>
     <h2 class="menuHead">Vyber si rasu</h2>
     <div id="races"></div>
-    <button id="raceBack" class="btn">Späť</button>
+    <button id="raceBack" class="btn backBtn">Späť</button>
   </div>
 
   <div id="map" hidden>
@@ -656,8 +664,8 @@
         </div>
         <div id="mTiers" class="mTiers"></div>
         <div id="mNew" class="mNew"></div>
-        <div class="brow">
-          <button id="mapClose" class="btn">Späť</button>
+        <div class="brow backRow">
+          <button id="mapClose" class="btn backBtn">Späť</button>
           <button id="mapPlay" class="primary">Hrať</button>
         </div>
       </div>
@@ -680,8 +688,8 @@
     <div class="perkHead"><b>Kráľovská sieň</b><span class="pill">★ <span id="perkStars">0</span></span></div>
     <p class="perkNote">Každý hrad môžeš dobyť na medenej, striebornej a zlatej úrovni – za každú 1 až 3 hviezdy podľa zdravia radnice na konci. Hviezdami kúpiš trvalé bonusy – nákup je natrvalo, vyber si rozumne.</p>
     <div id="perkList"></div>
-    <div class="row">
-      <button id="perkBack" class="btn up">Späť</button>
+    <div class="row back">
+      <button id="perkBack" class="btn backBtn">Späť</button>
     </div>
   </div>
 
@@ -689,13 +697,13 @@
     <div class="perkHead"><b>Hrdinovia</b></div>
     <p class="perkNote">Vyber hrdinu, ktorý pôjde s tvojím vojskom do boja. Hrdina získava skúsenosti za každú prežitú vlnu.</p>
     <div id="heroList"></div>
-    <div class="row"><button id="heroBack" class="btn">Späť</button></div>
+    <div class="row back"><button id="heroBack" class="btn backBtn">Späť</button></div>
   </div>
 
   <div id="trophies" class="screenOverlay perksScreen" hidden>
     <div class="perkHead"><b>Trofeje</b><span class="pill"><span id="trophyCount">0</span></span></div>
     <div id="trophyList"></div>
-    <div class="row"><button id="trophyBack" class="btn">Späť</button></div>
+    <div class="row back"><button id="trophyBack" class="btn backBtn">Späť</button></div>
   </div>
 
   <div id="over" class="screenOverlay" hidden>

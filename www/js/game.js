@@ -163,6 +163,7 @@
   // ---- trofeje: počítadlá za celú pozíciu a míľniky; získaná trofej sa na mape vyfarbí ----
   const stats = { kills: 0, builds: 0, bosses: 0, orcKings: 0, perfect: 0, maxGold: 0 };
   const ach = {};
+  let achSeen = 0; // čas poslednej prezrenej trofeje – novšie sú „neprečítané“
   const ACH = [
     { id: 'blood',    name: 'Prvá krv',          desc: 'Poraz prvého nepriateľa',            icon: 'e_orc',      ok: () => stats.kills >= 1 },
     { id: 'win1',     name: 'Prvé víťazstvo',    desc: 'Dobyj prvý hrad',                    icon: 'hall',       ok: () => st.unlocked >= 2 },
@@ -269,6 +270,7 @@
     Object.assign(stats, { kills: 0, builds: 0, bosses: 0, orcKings: 0, perfect: 0, maxGold: 0 }, loadJSON(sk('stats'), {}));
     for (const k in ach) delete ach[k];
     Object.assign(ach, loadJSON(sk('ach'), {}));
+    achSeen = loadJSON(sk('achSeen'), 0);
     st.unlocked = Math.max(1, Math.min(11, parseInt(localStorage.getItem(sk('unlocked')) || '1', 10) || 1));
     // prejdené misie bez záznamu hviezd (vyhrané pred zavedením hviezd) dostanú 1 bronzovú – víťazstvo dáva vždy aspoň 1
     let fixed = false;
@@ -288,7 +290,7 @@
     const king = JSON.parse(get('king') || '{}') || {};
     return { race: race ? JSON.parse(race) : 'Ľudia', won: Math.min(MISSIONS.length, Math.max(0, (parseInt(unl || '1', 10) || 1) - 1)), stars, king: king.lvl || 1 };
   }
-  function clearSlot(n) { for (const k of ['stars', 'perks', 'king', 'unlocked', 'introSeen', 'race', 'stats', 'ach']) try { localStorage.removeItem(slotKey(n, k)); } catch (e) { } }
+  function clearSlot(n) { for (const k of ['stars', 'perks', 'king', 'unlocked', 'introSeen', 'race', 'stats', 'ach', 'achSeen']) try { localStorage.removeItem(slotKey(n, k)); } catch (e) { } }
   let island = null;
 
   // ---------------- Mriežka ----------------
@@ -3164,9 +3166,9 @@
   }
   // spodné ikonky mapy: na Sieni počet voľných hviezd, na Trofejach počet získaných
   function renderMapBar() {
-    const free = starsFree(), got = ACH.filter(a => ach[a.id]).length;
+    const free = starsFree(), fresh = ACH.filter(a => ach[a.id] > achSeen).length;
     $('hallBtnTxt').textContent = '★' + free; $('hallBtnTxt').hidden = !free;
-    $('trophyTxt').textContent = got; $('trophyTxt').hidden = !got;
+    $('trophyTxt').textContent = fresh; $('trophyTxt').hidden = !fresh;
   }
   $('icoHome').src = UI_ICONS.home; $('icoTrophy').src = UI_ICONS.trophy;
   const openMission = () => { renderMapPanel(); $('missionBox').hidden = false; };
@@ -3223,14 +3225,17 @@
   function renderTrophies() {
     const list = $('trophyList'); list.innerHTML = '';
     for (const a of ACH) {
-      const c = document.createElement('div'); c.className = 'trophy' + (ach[a.id] ? ' got' : '');
-      c.innerHTML = '<span class="pic"><img src="' + achIcon(a) + '" alt=""></span><b>' + a.name + '</b><small>' + a.desc + '</small>';
+      const c = document.createElement('div'); c.className = 'trophy' + (ach[a.id] ? ' got' : '') + (ach[a.id] > achSeen ? ' fresh' : '');
+      c.innerHTML = '<span class="pic"><img src="' + achIcon(a) + '" alt=""></span><b>' + a.name + '</b><small>' + a.desc + '</small>' + (ach[a.id] > achSeen ? '<em class="newTag">Nové</em>' : '');
       list.appendChild(c);
     }
     $('trophyCount').textContent = ACH.filter(a => ach[a.id]).length + ' / ' + ACH.length;
   }
-  $('trophyBtn').addEventListener('click', () => { AUDIO.play('click'); checkAch(); renderTrophies(); $('trophies').hidden = false; });
-  $('trophyBack').addEventListener('click', () => { AUDIO.play('click'); $('trophies').hidden = true; });
+  $('trophyBtn').addEventListener('click', () => {
+    AUDIO.play('click'); checkAch(); renderTrophies(); $('trophies').hidden = false;
+    achSeen = Math.max(achSeen, ...ACH.map(a => ach[a.id] || 0)); saveJSON(sk('achSeen'), achSeen); // po prezretí odznak zmizne
+  });
+  $('trophyBack').addEventListener('click', () => { AUDIO.play('click'); $('trophies').hidden = true; renderMapBar(); });
 
   function tapMap(x, y) {
     if (st.mapAnim) return;
