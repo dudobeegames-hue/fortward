@@ -708,7 +708,7 @@
   const DIFF = {
     // sila nepriateľov podľa misie (násobok zdravia v 1. vlne) – misia 1 je úvodná a ľahká, misia 10 skúška
     missionHp: [0.95, 1.5, 2.3, 2.55, 2.55, 2.7, 2.9, 3.4, 3.2, 4.0], // 6–10 silnejšie: hráč má stajne, zbrojnicu a sokoly
-    copperHp:  [1, 1, 1, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15],     // medená úroveň od misie 4 tuhšia (hrdina má už schopnosti); strieborná a zlatá bez zmeny
+    copperHp:  [1, 1, 1, 1.15, 1.15, 1.45, 1.15, 1.15, 1.15, 1.15], // medená od misie 4 tuhšia (hrdina má schopnosti); misia 6 (prvý útok) ešte viac
     hpWave: 1.10, hpWaveMission: 0.006, hpMission: 0.25,   // rast zdravia počas misie (neskoršie misie rastú rýchlejšie)
     countWave: 2, countMission: 1,                         // počet nepriateľov vo vlne
     typeShift: 0.8, bruteFrom: 5, bruteRate: 0.03,         // ako rýchlo pribúdajú orkovia a surovci
