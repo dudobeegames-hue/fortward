@@ -2331,7 +2331,7 @@
     const L = provLayers();
     if (state === 'horde') { g.drawImage(L.red[i], 0, 0); return; }
     g.drawImage(L.blue[i], 0, 0);
-    if (state === 'attacked') { g.globalAlpha = 0.35 + 0.3 * Math.sin(time * 3 + i); g.drawImage(L.red[i], 0, 0); g.globalAlpha = 1; } // pulzuje do červena
+    if (state === 'attacked') { g.globalAlpha = i + 1 === st.unlocked ? 0.35 + 0.3 * Math.sin(time * 3) : 0.35; g.drawImage(L.red[i], 0, 0); g.globalAlpha = 1; } // pulzuje len najbližšia misia
   }
   function drawProvinces(time) {
     const n = island.nodes.length, pa = st.provAnim;
@@ -3535,7 +3535,7 @@
   }
   $('mapHome').addEventListener('click', showMenu);
   $('slotsBack').addEventListener('click', showMenu);
-  $('raceBack').addEventListener('click', showSlots);
+  $('raceBack').addEventListener('click', () => showSlots());
   // Nastavenia na úvodnom obrázku: jediné miesto pre hudbu, zvuky a jazyk
   function syncSound() {
     document.querySelectorAll('.setIc.snd').forEach(b => {
@@ -3599,7 +3599,18 @@
     $('askOk').onclick = () => { close(); AUDIO.play('sell'); onOk(); };
     box.onclick = ev => { if (ev.target === box) close(); };
   }
-  function showSlots() {
+  // rozvinutie zvitku s pozíciami (výška pergamenu z 0 na plnú, spodná tyč ide s ním)
+  function unrollScroll(anim) {
+    const p = $('scrollPaper');
+    p.ontransitionend = null; p.style.transition = 'none'; p.style.height = anim ? '0px' : 'auto';
+    if (!anim) return;
+    void p.offsetHeight;
+    const h = p.scrollHeight;
+    p.style.transition = 'height .9s cubic-bezier(.3,.7,.3,1) .3s';
+    p.style.height = h + 'px';
+    p.ontransitionend = () => { p.style.height = 'auto'; };
+  }
+  function showSlots(opts) {
     st.phase = 'title';
     $('title').hidden = true; $('map').hidden = true;
     $('slots').hidden = false;
@@ -3619,10 +3630,11 @@
       if (del) del.addEventListener('click', ev => {
         ev.stopPropagation();
         AUDIO.play('click');
-        ask('Vymazať pozíciu ' + n + '?', 'Postup sa stratí natrvalo.', () => { clearSlot(n); showSlots(); });
+        ask('Vymazať pozíciu ' + n + '?', 'Postup sa stratí natrvalo.', () => { clearSlot(n); showSlots({ still: true }); });
       });
       box.appendChild(c);
     }
+    unrollScroll(!(opts && opts.still));
   }
   // ---- menu: výber rasy (po výbere sa otvorí mapa) ----
   function showTitle() {
@@ -3680,7 +3692,7 @@
   window.addEventListener('resize', resize);
   updateHud();
   requestAnimationFrame(frame);
-  SPLASH.onPlay = showSlots; // zelené tlačidlo Hrať na úvodnom obrázku otvorí pozície
+  SPLASH.onPlay = () => showSlots(); // zelené tlačidlo Hrať na úvodnom obrázku otvorí pozície
 
   // ---------------- Ladenie ----------------
   function postPNG(canvas, name) {
