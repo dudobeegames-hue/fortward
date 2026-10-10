@@ -167,6 +167,59 @@ const UI_ICONS = (() => {
     'KKKKKKKKKKKKKK',
   ], { K: '#1c140e', B: '#9a6430', b: '#6a4220', Y: '#f8d048', W: '#fff7c8' });
 
+  // obrázok z bodov s automatickým tmavým obrysom okolo
+  function outlined(N, M, paint) {
+    const g = [...Array(M)].map(() => Array(N).fill(null));
+    paint((x, y, c) => { if (x >= 0 && y >= 0 && x < N && y < M) g[y][x] = c; });
+    const out = g.map(r => r.slice());
+    for (let y = 0; y < M; y++) for (let x = 0; x < N; x++) {
+      if (g[y][x]) continue;
+      if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => g[y + dy] && g[y + dy][x + dx])) out[y][x] = '#1c140e';
+    }
+    return pix(N, M, (x, y) => out[y][x]);
+  }
+  // kúzla: šípová salva (3 šípy vedľa seba), ohnivá guľa, mráz (vločka), blesk
+  const spellVolley = outlined(14, 14, put => {
+    for (const cx of [3, 7, 11]) {
+      for (const y of [1, 2]) { put(cx - 1, y, '#e84838'); put(cx + 1, y, '#e84838'); }
+      for (let y = 1; y <= 9; y++) put(cx, y, '#c8a272');
+      put(cx - 1, 10, '#e8eef8'); put(cx, 10, '#ffffff'); put(cx + 1, 10, '#9aa4b8'); put(cx, 11, '#e8eef8');
+    }
+  });
+  const spellFire = outlined(14, 14, put => {
+    for (let k = 0; k < 6; k++) { put(9 + k * 0.7 | 0, 5 - k * 0.8 | 0, k < 3 ? '#f89838' : '#d83818'); put(10 + k * 0.7 | 0, 6 - k * 0.8 | 0, '#d83818'); }
+    for (let y = 0; y < 14; y++) for (let x = 0; x < 14; x++) {
+      const d = Math.hypot(x - 6, y - 8);
+      if (d < 4.6) put(x, y, d < 1.8 ? '#fff7c8' : d < 3.2 ? '#f8d048' : '#f89838');
+    }
+  });
+  const spellFrost = outlined(13, 13, put => {
+    const c = 6;
+    for (let k = -5; k <= 5; k++) { put(c + k, c, '#e8f4ff'); put(c, c + k, '#e8f4ff'); }
+    for (let k = -4; k <= 4; k++) { put(c + k, c + k, '#88c8ff'); put(c + k, c - k, '#88c8ff'); }
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { // malé vetvičky na koncoch ramien
+      const ex = c + dx * 4, ey = c + dy * 4;
+      put(ex + dy, ey + dx, '#e8f4ff'); put(ex - dy, ey - dx, '#e8f4ff');
+    }
+    put(c, c, '#ffffff');
+  });
+  const spellBolt = fromMap([
+    '.......KKKKK..',
+    '......KWYYYK..',
+    '.....KWYYYK...',
+    '....KWYYYK....',
+    '...KWYYYKKKK..',
+    '..KWYYYYYYYK..',
+    '..KKKKYYYYK...',
+    '.....KYYYK....',
+    '....KYYYK.....',
+    '...KYYK.......',
+    '..KYYK........',
+    '.KYK..........',
+    '.KK...........',
+    '..............',
+  ], { K: '#1c140e', Y: '#f8e048', W: '#ffffff' });
+
   // ---- vlajky 18×12 bodov ----
   const FW = 18, FH = 12;
   const stripesH = cols => (x, y) => cols[Math.floor(y * cols.length / FH)];
@@ -246,5 +299,5 @@ const UI_ICONS = (() => {
     { id: 'zh', name: '中文' },
   ];
 
-  return { pix, music, sound, plus, home, hall, trophy, star, swords, chest, flags, langs };
+  return { pix, music, sound, plus, home, hall, trophy, star, swords, chest, spellVolley, spellFire, spellFrost, spellBolt, flags, langs };
 })();

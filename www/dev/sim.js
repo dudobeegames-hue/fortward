@@ -134,9 +134,17 @@ window.SIM = (() => {
       let n = 0; for (const e of s.enemies) if (e.foe) n++;
       if (n >= 3) F.ability('warcry');
     }
+    // kúzla do najväčšej skupiny: ohnivá guľa, mráz pri radnici, blesk na najbližšieho k radnici
+    const crowd = R => { let best = null, bn = 0; for (const e of s.enemies) { let n = 0; for (const o of s.enemies) if (Math.hypot(o.x - e.x, o.y - e.y) < R) n++; if (n > bn) { bn = n; best = e; } } return [best, bn]; };
+    if (F.has('fireball') && s.fireCd <= 0) { const [b, n] = crowd(16); if (b && n >= 3) F.castSpell('fireball', b.x, b.y); }
     if (F.has('freeze') && s.freezeCd <= 0) {
       let n = 0; for (const e of s.enemies) if (Math.hypot(e.x - G.hallCx, e.y - G.hallTop) < 70) n++;
-      if (n >= 6) F.ability('freeze');
+      const [b] = crowd(24);
+      if (n >= 6 && b) F.castSpell('freeze', b.x, b.y);
+    }
+    if (F.has('lightning') && s.boltCd <= 0 && s.enemies.length) {
+      const e = s.enemies.reduce((a, o) => (o.y > a.y ? o : a));
+      F.castSpell('lightning', e.x, e.y);
     }
   }
 

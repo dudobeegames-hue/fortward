@@ -64,8 +64,16 @@
   // kráľove schopnosti
   const ABIL = {
     warcry: { name: 'Pokrik', dur: 6, cd: 30 },
-    freeze: { name: 'Mráz',   dur: 4, cd: 40 },
   };
+  // kúzla: hráč ťukne na kúzlo a potom na miesto na bojisku (salva má vlastné nabíjanie volleyCd)
+  const SPELLS = {
+    volley:    { name: 'Šípová salva', tech: 'volley',    cdKey: 'volleyT' },
+    fireball:  { name: 'Ohnivá guľa',  tech: 'fireball',  cdKey: 'fireCd', cd: 22, R: 18 },
+    freeze:    { name: 'Mráz',         tech: 'freeze',    cdKey: 'freezeCd', cd: 30, R: 26, dur: 3 },
+    lightning: { name: 'Blesk',        tech: 'lightning', cdKey: 'boltCd', cd: 18, reach: 34 },
+  };
+  const spellMax = id => id === 'volley' ? volleyCd() : SPELLS[id].cd;
+  const spellPow = () => 1 + 0.15 * (st.mission - 1); // kúzla silnejú s misiou, aby stačili na tuhšiu hordu
   const mineGold = b => 20 + 12 * (b.lvl - 1);
   const chapelHeal = b => 4 * (1 + 0.4 * (b.lvl - 1));
   const trapStun = b => 2.5 + 0.5 * (b.lvl - 1);
@@ -191,9 +199,7 @@
     if (!fresh.length) return;
     for (const a of fresh) ach[a.id] = Date.now();
     saveJSON(sk('ach'), ach); saveStats();
-    toast('Nová trofej: ' + fresh.map(a => a.name).join(', '));
-    AUDIO.play('unlock');
-    if (!$('map').hidden) renderMapBar();
+    if (!$('map').hidden) renderMapBar(); // upozornenie je len odznak na karte Trofeje
   }
   const perk = id => meta.perks[id] || 0;
 
@@ -671,7 +677,7 @@
     Object.assign(st, {
       wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.15 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, tool: null, sel: null, hallFlash: 0, shake: 0, soldierN: 0,
       blds: [], enemies: [], soldiers: [], proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
-      cryT: 0, cryCd: 0, freezeT: 0, freezeCd: 0, siegeHold: false, siegeT: 0, introPan: null,
+      cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, spellSel: null, fallFx: [], bolts: [], siegeHold: false, siegeT: 0, introPan: null,
     });
     rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
     st.fort = isAttack() ? makeFort() : null;
@@ -1030,7 +1036,7 @@
       return true;
     }
     e.attacking = false;
-    if (td > 11) { moveTo(e, tg.x, tg.y + 2, e.spd * (st.freezeT > 0 ? 0.35 : 1), dt); return true; }
+    if (td > 11) { moveTo(e, tg.x, tg.y + 2, e.spd, dt); return true; }
     e.attacking = true;
     e.atk -= dt;
     if (e.atk <= 0) { e.atk = e.d.atkCd; e.lunge = 0.15; AUDIO.play('clang'); hitUnit(tg, e.d.atk * e.pow); }
@@ -1070,10 +1076,14 @@
       if (e.hp <= 0) { kill(e); return; }
     }
     if (e.stunT > 0) { e.stunT -= dt; return; }
+    if (e.frostT > 0) { // zasiahnutý mrazom: takmer stojí aj neútočí
+      e.frostT -= dt; dt *= 0.12;
+      if (Math.random() < 0.3) part(e.x + (Math.random() - 0.5) * e.w * 0.6, e.y - Math.random() * e.h, 0, -4, 0.5, Math.random() < 0.5 ? '#e0f4ff' : '#88c8ff', 0);
+    }
     if (e.d.king && updateOrcKing(e, dt)) return;
     if (e.d.charge) bearCharge(e, dt);
     if (e.chillT > 0) { e.chillT -= dt; if (Math.random() < 0.2) part(e.x + (Math.random() - 0.5) * e.w * 0.5, e.y - Math.random() * e.h, 0, -6, 0.4, '#e0f4ff', 0); }
-    const slow = (st.freezeT > 0 ? 0.35 : 1) * (e.chillT > 0 ? 0.5 : 1);
+    const slow = e.chillT > 0 ? 0.5 : 1;
     const attackFn = (fn) => {
       e.attacking = true;
       e.atk -= dt * slow;
@@ -1596,10 +1606,60 @@
     if (id === 'warcry') {
       if (st.cryCd > 0) { AUDIO.play('deny'); return; }
       st.cryT = a.dur + 2 * tal('roar'); st.cryCd = a.cd; AUDIO.play('horn'); banner('Za kráľa!');
-    } else {
-      if (st.freezeCd > 0) { AUDIO.play('deny'); return; }
-      st.freezeT = a.dur + 1.5 * tal('frost'); st.freezeCd = a.cd; AUDIO.play('unlock'); banner('Mráz!');
     }
+  }
+
+  // ---- kúzla ----
+  function selectSpell(id) {
+    if (st.phase !== 'battle' || !has(SPELLS[id].tech)) return;
+    if (st.spellSel === id) { st.spellSel = null; AUDIO.play('click'); return; }
+    if (st[SPELLS[id].cdKey] > 0) { AUDIO.play('deny'); return; }
+    st.spellSel = id; AUDIO.play('click');
+    if (!st.spellHint) { st.spellHint = true; hint('Ťukni na bojisko, kam má kúzlo dopadnúť'); }
+  }
+  // ťuk na bojisko počas boja: zvolené kúzlo sa zošle na to miesto
+  function tapBattle(x, y) {
+    const id = st.spellSel;
+    if (!id) return;
+    if (castSpell(id, x, y)) st.spellSel = null;
+  }
+  function castSpell(id, x, y) {
+    if (st.phase !== 'battle' || !has(SPELLS[id].tech) || st[SPELLS[id].cdKey] > 0) { AUDIO.play('deny'); return false; }
+    if (id === 'volley') { volley(x, y); return true; }
+    const sp = SPELLS[id], pow = spellPow();
+    if (id === 'fireball') { // guľa padá z neba a vybuchne
+      st.fallFx.push({ x, y, t: 0.35, max: 0.35 });
+      AUDIO.play('fire');
+    } else if (id === 'freeze') {
+      const dur = sp.dur + 1.5 * tal('frost');
+      for (const e of st.enemies) if (!e.dead && Math.hypot(e.x - x, (e.y - y) / 0.7) < sp.R) e.frostT = Math.max(e.frostT || 0, dur);
+      for (let k = 0; k < 40; k++) { const a = Math.random() * 6.28, r = Math.random() * sp.R; part(x + Math.cos(a) * r, y + Math.sin(a) * r * 0.7, (Math.random() - 0.5) * 10, -6 - Math.random() * 10, 0.9, ['#ffffff', '#e0f4ff', '#88c8ff'][k % 3], 0); }
+      st.marks.push({ x, y, life: 0.6, max: 0.6, ice: true });
+      AUDIO.play('unlock'); banner('Mráz!');
+    } else if (id === 'lightning') { // zasiahne najbližšieho nepriateľa a preskočí na ďalších dvoch
+      const near = (px, py, skip) => { let b = null, bd = sp.reach; for (const e of st.enemies) { if (e.dead || skip.includes(e)) continue; const d = Math.hypot(e.x - px, e.y - py); if (d < bd) { bd = d; b = e; } } return b; };
+      const hit = [];
+      let cur = near(x, y, hit);
+      if (!cur) { hint('Blesk treba zoslať na nepriateľa'); AUDIO.play('deny'); return false; }
+      const pts = [{ x: cur.x + 6, y: Math.max(0, cur.y - 120) }];
+      for (let n = 0; n < 3 && cur; n++) { hit.push(cur); pts.push({ x: cur.x, y: cur.y - cur.h * 0.5 }); cur = near(cur.x, cur.y, hit); }
+      hit.forEach((e, n) => { damage(e, (n ? 27 : 45) * pow); e.stunT = Math.max(e.stunT || 0, 0.4); });
+      st.bolts.push({ pts, life: 0.3, max: 0.3 });
+      AUDIO.play('bolt'); AUDIO.play('boom'); st.shake = Math.max(st.shake, 0.15);
+    }
+    st[sp.cdKey] = sp.cd;
+    return true;
+  }
+  // výbuch ohnivej gule
+  function fireballBlast(x, y) {
+    const sp = SPELLS.fireball, pow = spellPow();
+    for (const e of st.enemies) {
+      if (e.dead || Math.hypot(e.x - x, (e.y - y) / 0.7) > sp.R) continue;
+      e.burnT = 3; e.burnDps = Math.max(e.burnDps || 0, 4 * pow);
+      damage(e, 20 * pow);
+    }
+    for (let k = 0; k < 46; k++) { const a = Math.random() * 6.28, v = 20 + Math.random() * 60; part(x, y - 3, Math.cos(a) * v, Math.sin(a) * v * 0.6 - 25, 0.35 + Math.random() * 0.4, ['#fff7c8', '#f8d048', '#f89838', '#d83818', '#3e2614'][k % 5], 60); }
+    AUDIO.play('boom'); st.shake = Math.max(st.shake, 0.3);
   }
 
   function volley(x, y) {
@@ -1702,8 +1762,16 @@
     st.enemies = st.enemies.filter(e => !e.dead);
     st.volleyT = Math.max(0, st.volleyT - dt);
     st.cryT = Math.max(0, st.cryT - dt); st.cryCd = Math.max(0, st.cryCd - dt);
-    st.freezeT = Math.max(0, st.freezeT - dt); st.freezeCd = Math.max(0, st.freezeCd - dt);
-    if (st.freezeT > 0 && Math.random() < 0.6) part(Math.random() * W, Math.random() * G.hallTop, (Math.random() - 0.5) * 6, 12, 1.2, Math.random() < 0.5 ? '#ffffff' : '#88b4ff', 0);
+    st.freezeCd = Math.max(0, st.freezeCd - dt); st.fireCd = Math.max(0, st.fireCd - dt); st.boltCd = Math.max(0, st.boltCd - dt);
+    for (const f of st.fallFx) { // padajúca ohnivá guľa s chvostom iskier
+      f.t -= dt;
+      const fy = f.y - 90 * Math.max(0, f.t / f.max), fx = f.x + 30 * Math.max(0, f.t / f.max);
+      for (let k = 0; k < 4; k++) part(fx + (Math.random() - 0.5) * 3, fy + (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 8, -6, 0.3, ['#fff7c8', '#f8d048', '#f89838'][k % 3], 0);
+      if (f.t <= 0) { f.done = true; fireballBlast(f.x, f.y); }
+    }
+    st.fallFx = st.fallFx.filter(f => !f.done);
+    for (const b of st.bolts) b.life -= dt;
+    st.bolts = st.bolts.filter(b => b.life > 0);
     updateFx(dt);
     if (st.phase === 'battle' && !st.spawnQ.length && !st.enemies.length && (!st.fort || (st.orcWaveOn && !st.fort.dead))) endWave();
   }
@@ -2094,10 +2162,30 @@
     for (let k = 0; k < 6; k++) { g.fillStyle = cols[k]; g.fillRect(x, y - 5 + k, 1, 1); }
   }
 
+  // blesk: lomená čiara z neba cez zasiahnutých nepriateľov (biele jadro, žltý okraj)
+  function drawBolt(b) {
+    g.globalAlpha = Math.min(1, b.life / b.max * 1.6);
+    for (let i = 1; i < b.pts.length; i++) {
+      const a = b.pts[i - 1], c = b.pts[i], n = Math.max(2, Math.round(Math.hypot(c.x - a.x, c.y - a.y) / 3));
+      let px = a.x, py = a.y;
+      for (let k = 1; k <= n; k++) {
+        const t = k / n, j = k < n ? (Math.random() - 0.5) * 6 : 0;
+        const nx = a.x + (c.x - a.x) * t + j, ny = a.y + (c.y - a.y) * t;
+        const steps = Math.max(1, Math.round(Math.hypot(nx - px, ny - py)));
+        for (let s = 0; s <= steps; s++) {
+          const x = Math.round(px + (nx - px) * s / steps), y = Math.round(py + (ny - py) * s / steps);
+          g.fillStyle = '#f8e048'; g.fillRect(x - 1, y, 3, 1);
+          g.fillStyle = '#ffffff'; g.fillRect(x, y, 1, 1);
+        }
+        px = nx; py = ny;
+      }
+    }
+    g.globalAlpha = 1;
+  }
   function drawMark(m) {
     const t = 1 - m.life / m.max;
-    const r = m.no ? 4 : 6 + t * 10;
-    g.fillStyle = m.no ? 'rgba(232,72,56,0.8)' : 'rgba(255,240,112,' + (0.9 * (1 - t)) + ')';
+    const r = m.no ? 4 : m.ice ? 8 + t * 18 : 6 + t * 10;
+    g.fillStyle = m.no ? 'rgba(232,72,56,0.8)' : m.ice ? 'rgba(200,232,255,' + (0.9 * (1 - t)) + ')' : 'rgba(255,240,112,' + (0.9 * (1 - t)) + ')';
     const n = Math.max(8, Math.round(r * 4));
     for (let k = 0; k < n; k++) {
       const a = k / n * 6.283;
@@ -2433,7 +2521,7 @@
     }
     for (const dr of st.drops) drawDrop(dr);
     drawFog(time);
-    if (st.freezeT > 0) { g.fillStyle = 'rgba(140,190,255,0.12)'; g.fillRect(0, 0, W, FH); }
+    for (const b of st.bolts) drawBolt(b);
     for (const q of st.parts) {
       g.globalAlpha = Math.min(1, q.life / q.max * 2);
       g.fillStyle = q.col; g.fillRect(Math.round(q.x), Math.round(q.y), 1, 1);
@@ -2490,17 +2578,21 @@
       kp.classList.toggle('dead', !!k.dead);
       kp.classList.toggle('hurt', !k.dead && r < 0.35 && st.phase === 'battle');
     }
-    for (const [id, cd, max] of [['warcry', st.cryCd, ABIL.warcry.cd], ['freeze', st.freezeCd, ABIL.freeze.cd]]) {
+    for (const [id, cd, max] of [['warcry', st.cryCd, ABIL.warcry.cd]]) {
       const el = $(id + 'Btn');
       el.hidden = !has(id);
       const pp = cd > 0 ? 1 - cd / max : 1;
       el.style.setProperty('--p', (pp * 100) + '%');
       el.classList.toggle('ready', pp >= 1);
     }
-    const vb = $('volley');
-    const p = st.volleyT > 0 ? 1 - st.volleyT / volleyCd() : 1;
-    vb.style.setProperty('--p', (p * 100) + '%');
-    vb.classList.toggle('ready', p >= 1);
+    for (const b of document.querySelectorAll('.spell')) {
+      const id = b.dataset.spell, sp = SPELLS[id], cd = st[sp.cdKey] || 0;
+      b.hidden = !has(sp.tech);
+      const p = cd > 0 ? 1 - cd / spellMax(id) : 1;
+      b.style.setProperty('--p', (p * 100) + '%');
+      b.classList.toggle('ready', p >= 1 && st.spellSel !== id);
+      b.classList.toggle('sel', st.spellSel === id);
+    }
     const bb = $('bossbar');
     if (st.boss && !st.boss.dead && st.phase === 'battle') {
       bb.hidden = false;
@@ -2529,6 +2621,9 @@
     $('icoHall').src = UI_ICONS.hall; $('icoHero').src = ICONS.king;
     for (const k of ['orc', 'garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' ? 2 : 3);
     ICONS.coin = spriteURL(SPR.coin[0], 4);
+    Object.assign(ICONS, { sp_volley: UI_ICONS.spellVolley, sp_fire: UI_ICONS.spellFire, sp_frost: UI_ICONS.spellFrost, sp_bolt: UI_ICONS.spellBolt });
+    const SPI = { volley: 'sp_volley', fireball: 'sp_fire', freeze: 'sp_frost', lightning: 'sp_bolt' };
+    document.querySelectorAll('.spell').forEach(b => { b.querySelector('img').src = ICONS[SPI[b.dataset.spell]]; });
     ICONS.gem = spriteURL(SPR.gem[0], 4);
     document.querySelectorAll('img.coin').forEach(i => { i.src = ICONS.coin; });
     document.querySelectorAll('img.gem').forEach(i => { i.src = ICONS.gem; });
@@ -2911,7 +3006,7 @@
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
       return;
     }
-    if (st.phase === 'battle' && p.y > 4) { volley(p.x, p.y); return; }
+    if (st.phase === 'battle' && p.y > 4) { tapBattle(p.x, p.y); return; }
     if (st.phase === 'map') {
       mapDrag = { y0: ev.clientY, cam0: mapCam, moved: false, p };
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
@@ -3016,7 +3111,7 @@
     if (vscroll) {
       const v = vscroll; vscroll = null;
       if (!v.moved && st.phase === 'build') tapBuild(v.p.x, v.p.y);
-      if (!v.moved && st.phase === 'battle' && ev && ev.type === 'pointerup') volley(v.p.x, v.p.y);
+      if (!v.moved && st.phase === 'battle' && ev && ev.type === 'pointerup') tapBattle(v.p.x, v.p.y);
       return;
     }
     if (mapDrag) { // krátky ťuk bez posunu = výber misie
@@ -3056,7 +3151,7 @@
   $('nextWave').addEventListener('click', startWave);
   $('undoBtn').addEventListener('click', doUndo);
   $('warcryBtn').addEventListener('click', () => ability('warcry'));
-  $('freezeBtn').addEventListener('click', () => ability('freeze'));
+  document.querySelectorAll('.spell').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); selectSpell(b.dataset.spell); }));
   $('repairBtn').addEventListener('click', () => {
     const rc = repairCost();
     if (!rc || st.gold < rc) return;
@@ -3299,7 +3394,7 @@
   function unlockItems(m) {
     const items = (UNLOCKS[m - 1] || []).map(u => ({
       icon: ICONS[u.icon], name: u.name,
-      tag: BUILD[u.id] ? 'Nová stavba' : ABIL[u.id] ? 'Kráľova schopnosť' : 'Nové vylepšenie',
+      tag: BUILD[u.id] ? 'Nová stavba' : ABIL[u.id] ? 'Kráľova schopnosť' : /^(volley|fireball|freeze|lightning)$/.test(u.id) ? 'Kúzlo' : 'Nové vylepšenie',
       desc: u.desc || (BUILD[u.id] ? BUILD[u.id].desc + '.' : ''),
     }));
     const foe = ENEMY_INTRO[m];
@@ -3561,6 +3656,6 @@
     for (const s of list) { x.drawImage(s.c, px * scale, (h - 3 - s.h) * scale, s.w * scale, s.h * scale); px += s.w + 3; }
     return postPNG(c, name);
   }
-  window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon,
+  window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS,
     enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, buyUnit, knightsBlocked, get isAttack() { return isAttack(); } };
 })();
