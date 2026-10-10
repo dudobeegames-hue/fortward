@@ -132,6 +132,11 @@ const AUDIO = (() => {
     cleared: () => { [659, 784, 988].forEach((f, k) => tone({ type: 'square', f, t: 0.14, vol: 0.05, at: k * 0.1, lp: 3000 })); },
     win: () => { [523, 659, 784, 1047, 784, 1047].forEach((f, k) => tone({ type: 'square', f, t: k === 5 ? 0.6 : 0.16, vol: 0.06, at: k * 0.14, lp: 3200 })); [262, 330, 392].forEach(f => tone({ type: 'triangle', f, t: 1.4, vol: 0.06, at: 0.7 })); },
     lose: () => { [440, 415, 392, 349].forEach((f, k) => tone({ type: 'triangle', f, t: k === 3 ? 0.9 : 0.3, vol: 0.09, at: k * 0.3 })); tone({ type: 'sine', f: 87, t: 1.6, vol: 0.12, at: 0.9 }); },
+    // šuchot rozvíjaného zvitku: krátke praskania papiera a tichý šum pod nimi
+    paper: () => {
+      for (let k = 0; k < 10; k++) noise({ filter: 'bandpass', freq: rnd(1800, 4500), q: 0.9, t: rnd(0.04, 0.11), vol: rnd(0.04, 0.08), at: k * 0.085 + Math.random() * 0.03, attack: 0.008 });
+      noise({ filter: 'lowpass', freq: 1200, f2: 600, t: 0.85, vol: 0.035, attack: 0.15 });
+    },
     unlock: () => { [784, 988, 1175, 1568].forEach((f, k) => tone({ type: 'triangle', f, t: 0.2, vol: 0.06, at: k * 0.08 })); },
   };
   const MIN_GAP = { arrow: 0.05, bolt: 0.06, hit: 0.035, die: 0.05, coin: 0.05, thud: 0.07, hallHit: 0.12, clang: 0.08, kingHit: 0.1, fire: 0.1, boom: 0.06 };

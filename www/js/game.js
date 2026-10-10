@@ -3609,6 +3609,7 @@
     p.style.transition = 'height .9s cubic-bezier(.3,.7,.3,1) .3s';
     p.style.height = h + 'px';
     p.ontransitionend = () => { p.style.height = 'auto'; };
+    setTimeout(() => AUDIO.play('paper'), 300); // zvuk spolu s rozvíjaním
   }
   function showSlots(opts) {
     st.phase = 'title';
