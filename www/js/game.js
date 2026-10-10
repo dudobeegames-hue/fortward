@@ -218,7 +218,19 @@
     { id: 'roar',    name: 'Hromový hlas',    desc: 'Pokrik trvá o 2 s dlhšie',                         icon: 'king', need: 'warcry' },
     { id: 'frost',   name: 'Ľadový dych',     desc: 'Mráz trvá o 1,5 s dlhšie',                         icon: 'king', need: 'freeze' },
   ];
-  const kingMeta = { lvl: 1, xp: 0, pending: 0, tal: {} };
+  const kingMeta = { lvl: 1, xp: 0, pending: 0, tal: {}, slots: [null, null, null] };
+  // schopnosti hrdinu: 3 sloty, odomknú sa na úrovni 2, 5 a 9; hráč si do slotu vyberie jednu z ponuky
+  const KING_SLOT_LVL = [2, 5, 9];
+  const KING_POWERS = ['volley', 'freeze', 'lightning'];
+  const POWER_INFO = {
+    volley:    { name: 'Šípová salva', desc: 'Dážď šípov na zvolené miesto. Vylepšuje sa v radnici.', icon: 'sp_volley' },
+    freeze:    { name: 'Mráz',         desc: 'Nepriatelia v okolí na pár sekúnd takmer zamrznú.',     icon: 'sp_frost' },
+    lightning: { name: 'Blesk',        desc: 'Silný úder do nepriateľa, preskočí na dvoch ďalších.',  icon: 'sp_bolt' },
+    fireball:  { name: 'Ohnivá guľa',  desc: 'Výbuch zraní hordu v okolí a podpáli ju.',              icon: 'sp_fire' },
+  };
+  const slotOpen = i => kingMeta.lvl >= KING_SLOT_LVL[i];
+  const spellOn = id => kingMeta.slots.some((s, i) => s === id && slotOpen(i));
+  const emptySlots = () => kingMeta.slots.filter((s, i) => !s && slotOpen(i)).length;
   const tal = id => kingMeta.tal[id] || 0;
   const kingXpNeed = l => 60 + 40 * (l - 1);
   const saveKing = () => saveJSON(sk('king'), kingMeta);
@@ -272,7 +284,8 @@
     Object.assign(meta.perks, loadJSON(sk('perks'), {}));
     if (meta.perks.armor) { delete meta.perks.armor; saveJSON(sk('perks'), meta.perks); } // zrušený bonus – hviezdy sa vrátia
     for (const k in kingMeta) delete kingMeta[k];
-    Object.assign(kingMeta, { lvl: 1, xp: 0, pending: 0, tal: {} }, loadJSON(sk('king'), {}));
+    Object.assign(kingMeta, { lvl: 1, xp: 0, pending: 0, tal: {}, slots: [null, null, null] }, loadJSON(sk('king'), {}));
+    if (!Array.isArray(kingMeta.slots) || kingMeta.slots.length !== 3) kingMeta.slots = [null, null, null];
     Object.assign(stats, { kills: 0, builds: 0, bosses: 0, orcKings: 0, perfect: 0, maxGold: 0 }, loadJSON(sk('stats'), {}));
     for (const k in ach) delete ach[k];
     Object.assign(ach, loadJSON(sk('ach'), {}));
@@ -1611,7 +1624,7 @@
 
   // ---- kúzla ----
   function selectSpell(id) {
-    if (st.phase !== 'battle' || !has(SPELLS[id].tech)) return;
+    if (st.phase !== 'battle' || !spellOn(id)) return;
     if (st.spellSel === id) { st.spellSel = null; AUDIO.play('click'); return; }
     if (st[SPELLS[id].cdKey] > 0) { AUDIO.play('deny'); return; }
     st.spellSel = id; AUDIO.play('click');
@@ -1624,7 +1637,7 @@
     if (castSpell(id, x, y)) st.spellSel = null;
   }
   function castSpell(id, x, y) {
-    if (st.phase !== 'battle' || !has(SPELLS[id].tech) || st[SPELLS[id].cdKey] > 0) { AUDIO.play('deny'); return false; }
+    if (st.phase !== 'battle' || !spellOn(id) || st[SPELLS[id].cdKey] > 0) { AUDIO.play('deny'); return false; }
     if (id === 'volley') { volley(x, y); return true; }
     const sp = SPELLS[id], pow = spellPow();
     if (id === 'fireball') { // guľa padá z neba a vybuchne
@@ -2587,7 +2600,7 @@
     }
     for (const b of document.querySelectorAll('.spell')) {
       const id = b.dataset.spell, sp = SPELLS[id], cd = st[sp.cdKey] || 0;
-      b.hidden = !has(sp.tech);
+      b.hidden = !spellOn(id);
       const p = cd > 0 ? 1 - cd / spellMax(id) : 1;
       b.style.setProperty('--p', (p * 100) + '%');
       b.classList.toggle('ready', p >= 1 && st.spellSel !== id);
@@ -2740,10 +2753,10 @@
         }, 'up'));
       } else if (st.hallLvl < MAX_LVL) acts.appendChild(lockBtn('Radnica úr. ' + (st.hallLvl + 1), 'lvl5'));
       else acts.appendChild(btn('Max. úroveň', null, false, () => { }));
-      if (has('volleyUp')) {
+      if (has('volleyUp') && spellOn('volley')) { // salvu má kráľ len ak ju dal do slotu
         const vc = volleyUpCost();
         acts.appendChild(btn('Salva úr. ' + (st.volleyLvl + 1), vc, st.gold >= vc, () => { st.gold -= vc; st.volleyLvl++; }));
-      } else acts.appendChild(lockBtn('Salva', 'volleyUp'));
+      } else if (!has('volleyUp')) acts.appendChild(lockBtn('Salva', 'volleyUp'));
       info.appendChild(acts);
       card(ICONS.king, 'Kráľ · úr. ' + kingMeta.lvl + (st.king && st.king.dead ? ' · padol' : ''), kingSummary());
       if (st.king && st.king.dead) {
@@ -3263,6 +3276,7 @@
     const free = starsFree(), fresh = ACH.filter(a => ach[a.id] > achSeen).length;
     $('hallBtnTxt').textContent = '★' + free; $('hallBtnTxt').hidden = !free;
     $('trophyTxt').textContent = fresh; $('trophyTxt').hidden = !fresh;
+    const es = emptySlots(); $('heroTxt').textContent = es; $('heroTxt').hidden = !es; // voľný slot na schopnosť
   }
   $('icoHome').src = UI_ICONS.home; $('icoTrophy').src = UI_ICONS.trophy; $('icoSwords').src = UI_ICONS.swords; $('icoShop').src = UI_ICONS.chest;
   const openMission = () => { renderMapPanel(); $('missionBox').hidden = false; };
@@ -3304,12 +3318,45 @@
     k.innerHTML = '<span class="tag">Vybraný</span><img src="' + ICONS.king + '" alt=""><b>Kráľ · úroveň ' + kingMeta.lvl + '</b>' +
       '<span class="xpBar"><i style="width:' + pct + '%"></i></span><small>' + kingSummary() + '</small>';
     list.appendChild(k);
+    // tri sloty schopností pod kráľom
+    const sh = document.createElement('div'); sh.className = 'skillsHead'; sh.textContent = 'Schopnosti'; list.appendChild(sh);
+    const row = document.createElement('div'); row.className = 'skills';
+    kingMeta.slots.forEach((id, i) => {
+      const b = document.createElement('button');
+      if (!slotOpen(i)) { b.className = 'skill lock'; b.innerHTML = '<span>úroveň ' + KING_SLOT_LVL[i] + '</span>'; b.addEventListener('click', () => AUDIO.play('deny')); }
+      else if (!id) { b.className = 'skill empty'; b.innerHTML = '<img src="' + UI_ICONS.plus + '" alt=""><span>Vybrať</span>'; b.addEventListener('click', () => openSkillPick(i)); }
+      else { b.className = 'skill'; b.innerHTML = '<img src="' + ICONS[POWER_INFO[id].icon] + '" alt=""><span>' + POWER_INFO[id].name + '</span>'; b.addEventListener('click', () => openSkillPick(i)); }
+      row.appendChild(b);
+    });
+    list.appendChild(row);
     for (let i = 0; i < 2; i++) {
       const h = document.createElement('div'); h.className = 'hero locked';
       h.innerHTML = '<img src="' + ICONS.king + '" alt=""><b>Nový hrdina</b><small>čoskoro</small>';
       list.appendChild(h);
     }
   }
+
+  // výber schopnosti do slotu (schopnosť z iného slotu sa vymení)
+  function openSkillPick(i) {
+    AUDIO.play('click');
+    $('skillPickHead').textContent = 'Schopnosť ' + (i + 1);
+    const box = $('skillOpts'); box.innerHTML = '';
+    for (const id of KING_POWERS) {
+      const inf = POWER_INFO[id], where = kingMeta.slots.indexOf(id);
+      const b = document.createElement('button');
+      b.className = 'skillOpt' + (where === i ? ' cur' : '');
+      b.innerHTML = '<img src="' + ICONS[inf.icon] + '" alt=""><span><b>' + inf.name + '</b><small>' + inf.desc + (where >= 0 && where !== i ? ' (teraz v slote ' + (where + 1) + ')' : '') + '</small></span>';
+      b.addEventListener('click', () => {
+        if (where >= 0 && where !== i) kingMeta.slots[where] = kingMeta.slots[i]; // výmena slotov
+        kingMeta.slots[i] = id; saveKing();
+        AUDIO.play('upgrade'); $('skillPick').hidden = true; renderHeroes(); renderMapBar();
+      });
+      box.appendChild(b);
+    }
+    $('skillPick').hidden = false;
+  }
+  $('skillBack').addEventListener('click', () => { AUDIO.play('click'); $('skillPick').hidden = true; });
+  $('skillPick').addEventListener('click', ev => { if (ev.target === $('skillPick')) $('skillPick').hidden = true; });
 
   // ---- Trofeje ----
   function renderTrophies() {
@@ -3442,7 +3489,7 @@
   function showTalentPick() {
     const box = $('talentPick');
     if (!box.hidden || !kingMeta.pending) return;
-    const avail = TALENTS.filter(t => tal(t.id) < TAL_MAX && (!t.need || has(t.need)));
+    const avail = TALENTS.filter(t => tal(t.id) < TAL_MAX && (!t.need || has(t.need) || spellOn(t.need)));
     if (!avail.length) { kingMeta.pending = 0; saveKing(); return; }
     for (let i = avail.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [avail[i], avail[j]] = [avail[j], avail[i]]; }
     $('tpLvl').textContent = kingMeta.lvl - kingMeta.pending + 1;
@@ -3656,6 +3703,6 @@
     for (const s of list) { x.drawImage(s.c, px * scale, (h - 3 - s.h) * scale, s.w * scale, s.h * scale); px += s.w + 3; }
     return postPNG(c, name);
   }
-  window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS,
+  window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, KING_POWERS,
     enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, buyUnit, knightsBlocked, get isAttack() { return isAttack(); } };
 })();

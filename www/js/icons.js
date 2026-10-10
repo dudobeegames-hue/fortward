@@ -179,11 +179,14 @@ const UI_ICONS = (() => {
     return pix(N, M, (x, y) => out[y][x]);
   }
   // kúzla: šípová salva (3 šípy vedľa seba), ohnivá guľa, mráz (vločka), blesk
-  const spellVolley = outlined(14, 14, put => {
-    for (const cx of [3, 7, 11]) {
-      for (const y of [1, 2]) { put(cx - 1, y, '#e84838'); put(cx + 1, y, '#e84838'); }
-      for (let y = 1; y <= 9; y++) put(cx, y, '#c8a272');
-      put(cx - 1, 10, '#e8eef8'); put(cx, 10, '#ffffff'); put(cx + 1, 10, '#9aa4b8'); put(cx, 11, '#e8eef8');
+  const spellVolley = outlined(19, 19, put => {
+    for (const d of [-3, 0, 3]) { // tri rovnobežné šípy letiace na severovýchod
+      const xs = 5 + d, ys = 12 + d, xe = 11 + d, ye = 6 + d;
+      for (let t = 1; t <= 6; t++) put(xs + t, ys - t, '#c8a272');
+      put(xs, ys, '#e84838');
+      for (const [x, y] of [[xs - 1, ys], [xs, ys + 1], [xs + 1, ys]]) put(x, y, '#e84838'); // pierka
+      for (const [x, y] of [[xe, ye - 1], [xe + 1, ye], [xe + 1, ye - 1], [xe + 1, ye - 2], [xe + 2, ye - 1]]) put(x, y, '#b8c0d0'); // hrot
+      put(xe + 2, ye - 2, '#ffffff');
     }
   });
   const spellFire = outlined(14, 14, put => {

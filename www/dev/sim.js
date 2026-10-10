@@ -109,13 +109,13 @@ window.SIM = (() => {
 
   // šípová salva do najväčšej skupiny
   function aiVolley(useVolley) {
-    if (!useVolley || s.volleyT > 0 || !s.enemies.length) return;
+    if (!useVolley || s.volleyT > 0 || !s.enemies.length || !F.kingMeta.slots.includes('volley')) return;
     let best = null, bn = 0;
     for (const e of s.enemies) {
       let n = 0; for (const o of s.enemies) if (Math.hypot(o.x - e.x, o.y - e.y) < 13) n++;
       if (n > bn || (n === bn && best && e.y > best.y)) { bn = n; best = e; }
     }
-    if (best) F.volley(best.x, best.y - 5);
+    if (best) F.castSpell('volley', best.x, best.y - 5);
   }
 
   // útok: dokupovanie strojov a posíl počas boja
@@ -136,20 +136,25 @@ window.SIM = (() => {
     }
     // kúzla do najväčšej skupiny: ohnivá guľa, mráz pri radnici, blesk na najbližšieho k radnici
     const crowd = R => { let best = null, bn = 0; for (const e of s.enemies) { let n = 0; for (const o of s.enemies) if (Math.hypot(o.x - e.x, o.y - e.y) < R) n++; if (n > bn) { bn = n; best = e; } } return [best, bn]; };
-    if (F.has('fireball') && s.fireCd <= 0) { const [b, n] = crowd(16); if (b && n >= 3) F.castSpell('fireball', b.x, b.y); }
-    if (F.has('freeze') && s.freezeCd <= 0) {
+    if (F.kingMeta.slots.includes('freeze') && s.freezeCd <= 0) {
       let n = 0; for (const e of s.enemies) if (Math.hypot(e.x - G.hallCx, e.y - G.hallTop) < 70) n++;
       const [b] = crowd(24);
       if (n >= 6 && b) F.castSpell('freeze', b.x, b.y);
     }
-    if (F.has('lightning') && s.boltCd <= 0 && s.enemies.length) {
+    if (F.kingMeta.slots.includes('lightning') && s.boltCd <= 0 && s.enemies.length) {
       const e = s.enemies.reduce((a, o) => (o.y > a.y ? o : a));
       F.castSpell('lightning', e.x, e.y);
     }
   }
 
+  function fillSlots() {
+    const k = F.kingMeta;
+    k.slots = k.slots || [null, null, null];
+    k.slots.forEach((v, i) => { if (!v && k.lvl >= F.KING_SLOT_LVL[i]) k.slots[i] = F.KING_POWERS.find(p => !k.slots.includes(p)); });
+  }
   function mission(m, opts) {
     opts = Object.assign({ volley: true }, opts);
+    fillSlots();
     F.startMission(m);
     const waves = [];
     for (;;) {
@@ -158,7 +163,7 @@ window.SIM = (() => {
       const limit = 60 * (attack() ? 1500 : 400); // obliehanie môže trvať cez niekoľko vĺn
       while (s.phase === 'battle' && steps < limit) { F.update(1 / 60); steps++; if (steps % 15 === 0) { aiVolley(opts.volley); aiAbilities(); if (steps % 60 === 0) aiSiege(); } }
       waves.push(Math.round(s.hallHp / F.hallMax() * 100));
-      if (s.phase === 'pause') { F.enterBuild(); continue; }
+      if (s.phase === 'pause') { fillSlots(); F.enterBuild(); continue; }
       const fort = s.fort ? { keep: Math.round(s.fort.hp / s.fort.max * 100), king: s.fort.kingE ? Math.round(Math.max(0, s.fort.kingE.hp) / s.fort.kingE.max * 100) : null } : null;
       return { m, won: s.phase === 'won' || !!(s.fort && s.fort.dead), timeout: s.phase === 'battle', wave: s.wave, minHall: Math.min(...waves), hallLvl: s.hallLvl, gold: s.gold, waves: waves.join(' '), fort, enemies: s.enemies.length, soldiers: s.soldiers.length };
     }
