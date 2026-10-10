@@ -3603,9 +3603,15 @@
   function unrollScroll(anim) {
     const p = $('scrollPaper');
     p.ontransitionend = null; p.style.transition = 'none'; p.style.height = anim ? '0px' : 'auto';
-    if (!anim) return;
     void p.offsetHeight;
-    const h = p.scrollHeight;
+    const h = p.scrollHeight, PXS = 3;
+    const aw = Math.ceil(p.clientWidth / PXS), ah = Math.ceil(h / PXS);
+    p.style.backgroundImage = 'url(' + UI_ICONS.scrollPaper(aw, ah) + ')'; p.style.backgroundSize = aw * PXS + 'px ' + ah * PXS + 'px';
+    document.querySelectorAll('#slots .rod').forEach(r => {
+      const rw = Math.ceil(r.offsetWidth / PXS);
+      r.style.backgroundImage = 'url(' + UI_ICONS.scrollRod(rw) + ')'; r.style.backgroundSize = rw * PXS + 'px 27px';
+    });
+    if (!anim) return;
     p.style.transition = 'height .9s cubic-bezier(.3,.7,.3,1) .3s';
     p.style.height = h + 'px';
     p.ontransitionend = () => { p.style.height = 'auto'; };

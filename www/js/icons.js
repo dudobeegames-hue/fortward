@@ -223,6 +223,68 @@ const UI_ICONS = (() => {
     '..............',
   ], { K: '#1c140e', Y: '#f8e048', W: '#ffffff' });
 
+  // ---- zvitok v pixel-art štýle: pergamen (tieňovanie s Bayerovým ditheringom) a drevené tyče so zlatými hlavicami ----
+  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  const bayer = (x, y) => (BAYER[(y & 3) * 4 + (x & 3)] + 0.5) / 16;
+  const hash = (x, y) => { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+  const hex = c => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
+  function canvasArt(w, h, fn) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const x2 = c.getContext('2d'), id = x2.createImageData(w, h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const col = fn(x, y); if (!col) continue;
+      const k = (y * w + x) * 4; id.data[k] = col[0]; id.data[k + 1] = col[1]; id.data[k + 2] = col[2]; id.data[k + 3] = 255;
+    }
+    x2.putImageData(id, 0, 0);
+    return c.toDataURL();
+  }
+  const PARCH = ['#3a2412', '#5e3c1c', '#7e5428', '#9c7038', '#b88c4c', '#cfa863', '#dfc07c', '#ecd59a', '#f6e7bb'].map(hex);
+  // pergamen w×h bodov: svetlo zľava hore, stmavnuté zvlnené okraje, škvrny, vlákna a tieň pod tyčami
+  function scrollPaper(w, h) {
+    const N = PARCH.length - 1;
+    const edge = y => (hash(7, y >> 1) > 0.78 ? 1 : 0) + (hash(9, y >> 2) > 0.9 ? 1 : 0); // nepravidelný okraj
+    return canvasArt(w, h, (x, y) => {
+      const l = edge(y), r = edge(y + 999);
+      if (x < l || x > w - 1 - r) return null;
+      if (x === l || x === w - 1 - r) return PARCH[0];            // tmavý obrys
+      const dx = Math.min(x - l, w - 1 - r - x), dy = Math.min(y, h - 1 - y);
+      let v = 0.74;
+      v += 0.08 * (1 - (x / w) * 0.6 - (y / h) * 0.4);            // svetlo zľava hore
+      v -= Math.max(0, 7 - dx) * 0.045;                           // zvinutie a stmavnutie pri bokoch
+      v -= Math.max(0, 5 - dy) * 0.05;                            // tieň pod tyčami
+      v += Math.sin(x * 0.19 + y * 0.11) * 0.035 + Math.sin(x * 0.06 - y * 0.15 + 2.1) * 0.045 + Math.sin(y * 0.33 + x * 0.02) * 0.02; // škvrny
+      if (hash(x, y) < 0.012) v -= 0.12;                          // vlákna a zrnká
+      const lv = Math.max(1, Math.min(N, Math.floor(v * N + bayer(x, y))));
+      return PARCH[lv];
+    });
+  }
+  const WOOD = ['#22140a', '#4a2e14', '#6a4220', '#8a5a2a', '#a87038', '#c48a4a', '#dca468', '#f0c890'].map(hex);
+  const GOLD = ['#2e2006', '#6a4a10', '#9a7018', '#c89a28', '#e8c040', '#f8e070', '#fff8c0'].map(hex);
+  // tyč w×9 bodov: valec z dreva s letokruhmi, tmavé objímky a zlaté hlavice na koncoch
+  function scrollRod(w) {
+    const H = 9, KN = 5;
+    const row = [0, 6, 7, 5, 4, 4, 3, 2, 0];                    // svetlo valca po riadkoch (horná lesklá hrana, spodok v tieni)
+    return canvasArt(w, H, (x, y) => {
+      const kx = x < KN ? x : x > w - 1 - KN ? w - 1 - x : -1;  // vzdialenosť od konca (hlavica)
+      if (kx >= 0) {                                            // zlatá hlavica: zaoblená, svetlo zľava hore
+        const ex = (kx - 2.5) / 2.6, ey = (y - 4) / 4.6;
+        if (ex * ex + ey * ey > 1) return null;
+        const ox = (kx - 2.5) / 2.6, oy1 = (y - 5) / 4.6, oy0 = (y - 3) / 4.6;
+        if (ox * ox + oy1 * oy1 > 1 || ox * ox + oy0 * oy0 > 1 || kx === 0) return GOLD[0];
+        const side = x < KN ? 1 : -1;                           // ľavá hlavica svieti zľava, pravá je viac v tieni
+        let g = 4 - (y - 3) * 0.7 + (side > 0 ? 0.6 : -0.4) + (kx < 2 ? -0.6 : 0.3);
+        if (y === 2 && kx === 2) g = 6;
+        return GOLD[Math.max(1, Math.min(6, Math.round(g)))];
+      }
+      if (x === KN || x === w - 1 - KN) return y === 0 || y === H - 1 ? WOOD[0] : GOLD[1 + (y < 4 ? 1 : 0)]; // objímka
+      if (y === 0 || y === H - 1) return WOOD[0];
+      let lv = row[y];
+      if (hash(x >> 2, y) < 0.18 && y > 2) lv -= 1;             // letokruhy
+      if (hash(x, y * 3) < 0.05) lv -= 1;
+      return WOOD[Math.max(1, Math.min(7, lv))];
+    });
+  }
+
   // ---- vlajky 18×12 bodov ----
   const FW = 18, FH = 12;
   const stripesH = cols => (x, y) => cols[Math.floor(y * cols.length / FH)];
@@ -302,5 +364,5 @@ const UI_ICONS = (() => {
     { id: 'zh', name: '中文' },
   ];
 
-  return { pix, music, sound, plus, home, hall, trophy, star, swords, chest, spellVolley, spellFire, spellFrost, spellBolt, flags, langs };
+  return { pix, music, sound, plus, home, hall, trophy, star, swords, chest, spellVolley, spellFire, spellFrost, spellBolt, scrollPaper, scrollRod, flags, langs };
 })();
