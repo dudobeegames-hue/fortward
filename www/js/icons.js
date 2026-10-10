@@ -13,7 +13,7 @@ const UI_ICONS = (() => {
         x += n;
       }
     }
-    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + ' ' + h + '" shape-rendering="crispEdges">' + r + '</svg>');
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="' + w * 3 + '" height="' + h * 3 + '" viewBox="0 0 ' + w + ' ' + h + '" shape-rendering="crispEdges">' + r + '</svg>');
   }
   // obrázok z textovej mapy: každé písmeno je farba z palety, bodka je prázdna
   const fromMap = (rows, pal) => pix(rows[0].length, rows.length, (x, y) => pal[rows[y][x]] || null);
@@ -64,36 +64,55 @@ const UI_ICONS = (() => {
   ], { K: '#1c140e', L: '#b8f890', G: '#5ccf3c', D: '#2c8a2c' });
 
   // ikonky mapy: domček (menu), pohár (trofeje), hviezda
+  // domček a sieň: rovnaký kameň (L/S), tmavý obrys a zlaté svetlo ako pohár a kráľ
+  const STONE = { K: '#1c140e', L: '#ece4d2', S: '#b8ae9a', D: '#3a2c22', Y: '#f8d048', O: '#b88420', R: '#b04a34', Q: '#7c2e20' };
   const home = fromMap([
-    '.......KK.......',
-    '......KLLK.KKK..',
-    '.....KLLLLKKDK..',
-    '....KLLKKLLKDK..',
-    '...KLLKMMKLLKK..',
-    '..KLLKMMMMKLLK..',
-    '.KLLKMMKKMMKLLK.',
-    'KLLKMMMKKMMMKLLK',
-    'KKKKMMMMMMMMKKKK',
-    '..KMMMMMMMMMMK..',
-    '..KMMMMKKMMMMK..',
-    '..KMMMKDDKMMMK..',
-    '..KMMMKDDKMMMK..',
-    '..KMMMKDDKMMMK..',
-    '..KKKKKKKKKKKK..',
-  ], { K: '#1c140e', L: '#f4e6c4', M: '#b8a27a', D: '#6a5636' });
+    '......KK..KKK.',
+    '.....KRRK.KSK.',
+    '....KRRRQKKSK.',
+    '...KRRRRRQKSK.',
+    '..KRRRRRRRQKK.',
+    '.KRRRRRRRRRQK.',
+    'KKKKKKKKKKKKKK',
+    '.KLLLLLLLLLLK.',
+    '.KLKKKLLKKKLK.',
+    '.KLKYKLLKDKLK.',
+    '.KLKKKLLKDKLK.',
+    '.KSSSSSSKDKSK.',
+    '.KSSSSSSKDKSK.',
+    'KKKKKKKKKKKKKK',
+  ], STONE);
+  const hall = fromMap([
+    '......KK......',
+    '.....KLLK.....',
+    '....KLLLLK....',
+    '...KLLYYLLK...',
+    '..KLLYYYYLLK..',
+    '.KLLLLYYLLLLK.',
+    'KKKKKKKKKKKKKK',
+    '.KLSKDLSKDLSK.',
+    '.KLSKDLSKDLSK.',
+    '.KLSKDLSKDLSK.',
+    '.KLSKDLSKDLSK.',
+    'KKKKKKKKKKKKKK',
+    'KLLLLLLLLLLLLK',
+    'KKKKKKKKKKKKKK',
+  ], STONE);
   const trophy = fromMap([
-    '..KKKKKKKK..',
-    'KKKYYYYWYKKK',
-    'KYKYYYYWYKYK',
-    'KYKYYYYYYKYK',
-    '.KKYYYYYYKK.',
-    '..KOYYYYOK..',
-    '...KOYYOK...',
-    '....KYYK....',
-    '....KOOK....',
-    '...KYYYYK...',
-    '..KYYYYYYK..',
-    '..KKKKKKKK..',
+    '..KKKKKKKKKK..',
+    'KKKYYYYYYWYKKK',
+    'KYKYYYYYYWYKYK',
+    'KYKYYYYYYYYKYK',
+    'KYKOYYYYYYOKYK',
+    '.KKKOYYYYOKKK.',
+    '....KOYYOK....',
+    '.....KYYK.....',
+    '.....KOOK.....',
+    '.....KYYK.....',
+    '....KYYYYK....',
+    '...KYYYYYYK...',
+    '...KOOOOOOK...',
+    '...KKKKKKKK...',
   ], { K: '#1c140e', Y: '#f8d048', O: '#b88420', W: '#fff7c8' });
   const star = fromMap([
     '.....K.....',
@@ -188,5 +207,5 @@ const UI_ICONS = (() => {
     { id: 'zh', name: '中文' },
   ];
 
-  return { pix, music, sound, plus, home, trophy, star, flags, langs };
+  return { pix, music, sound, plus, home, hall, trophy, star, flags, langs };
 })();

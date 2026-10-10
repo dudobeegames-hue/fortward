@@ -2526,7 +2526,7 @@
     ICONS.u_siegeRam = spriteURL(SPR.siegeRam[0], 2); ICONS.u_siegeCat = spriteURL(SPR.siegeCat[0], 2);
     $('buyRam').querySelector('img').src = ICONS.u_siegeRam; $('buyCat').querySelector('img').src = ICONS.u_siegeCat;
     $('kingIcon').src = ICONS.king;
-    $('icoHall').src = ICONS.hall; $('icoHero').src = ICONS.king;
+    $('icoHall').src = UI_ICONS.hall; $('icoHero').src = ICONS.king;
     for (const k of ['orc', 'garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' ? 2 : 3);
     ICONS.coin = spriteURL(SPR.coin[0], 4);
     ICONS.gem = spriteURL(SPR.gem[0], 4);
