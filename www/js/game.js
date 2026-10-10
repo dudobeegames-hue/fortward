@@ -375,7 +375,7 @@
     screen.style.width = cw + 'px'; screen.style.height = ch + 'px';
     const game = $('game');
     game.style.width = cw + 'px'; game.style.height = ch + 'px';
-    island = buildIsland(W, H, 21);
+    island = buildIsland(W, H, 21); island.ships = null;
     layoutField();
   }
   // mriežka a krajina bojiska (výška závisí od misie)
@@ -2357,14 +2357,14 @@
     // žiara na zemi a ohorené miesto
     g.globalAlpha = 0.22 + 0.08 * Math.sin(time * 11 + ph);
     g.fillStyle = '#f89838';
-    for (let dx = -4; dx <= 4; dx++) { const w = Math.round(Math.sqrt(16 - dx * dx) * 0.4); g.fillRect(x + dx, y - w, 1, w * 2 + 1); }
+    for (let dx = -3; dx <= 3; dx++) { const w = Math.round(Math.sqrt(9 - dx * dx) * 0.35); g.fillRect(x + dx, y - w, 1, w * 2 + 1); }
     g.globalAlpha = 1;
-    g.fillStyle = '#2a1a10'; g.fillRect(x - 2, y + 1, 5, 1); g.fillStyle = '#3e2614'; g.fillRect(x - 1, y + 2, 3, 1);
-    const h = 8 + Math.round(Math.sin(time * 9 + ph) * 1.2 + Math.sin(time * 14.3 + ph * 2) * 0.8);
+    g.fillStyle = '#2a1a10'; g.fillRect(x - 1, y + 1, 3, 1);
+    const h = 5 + Math.round(Math.sin(time * 9 + ph) * 0.8 + Math.sin(time * 14.3 + ph * 2) * 0.6);
     for (let r = 0; r < h; r++) {
       const t = r / h;
-      const half = 2.7 * Math.pow(1 - t, 0.75) + (r < 2 ? 0.3 : 0);
-      const cx = x + Math.sin(time * 7 + ph + r * 0.55) * t * 1.8 + Math.sin(time * 3.1 + ph) * t * 0.6;
+      const half = 1.7 * Math.pow(1 - t, 0.75) + (r < 1 ? 0.3 : 0);
+      const cx = x + Math.sin(time * 7 + ph + r * 0.55) * t * 1.2 + Math.sin(time * 3.1 + ph) * t * 0.4;
       for (let px = Math.floor(cx - half - 0.5); px <= Math.ceil(cx + half + 0.5); px++) {
         const d = Math.abs(px - cx) / (half + 0.35);
         if (d > 1) continue;
@@ -2378,6 +2378,74 @@
     if (Math.random() < 0.04) part(x, y - h - 1, (Math.random() - 0.5) * 4, -6 - Math.random() * 4, 1.8, Math.random() < 0.5 ? '#525262' : '#3e3e4c', -2);
   }
 
+  // ---- lode na mori: na juhu lode ľudí (biela plachta s modrým krížom), na severe orkské (tmavá plachta s červeným znakom) ----
+  const SHIP_MAP = [
+    '.....KK......',
+    '.....KPPK....',
+    '.....K.......',
+    '...KKKKKK....',
+    '..KWWWWWLK...',
+    '..KWWBWWLK...',
+    '..KWBBBWLK...',
+    '..KWWBWWLK...',
+    '...KWWWLK....',
+    'KK...K....KKK',
+    'KHHHHHHHHHHHK',
+    '.KhhhhhhhhhK.',
+    '..KKKKKKKKK..',
+  ];
+  const SHIP_PAL = {
+    human: { K: '#1c140e', W: '#f4ecd8', L: '#c8bca0', B: '#3c64c8', P: '#3c64c8', H: '#9a6430', h: '#5a3818' },
+    orc:   { K: '#140c08', W: '#6a5440', L: '#46382a', B: '#c82818', P: '#c82818', H: '#5a3a20', h: '#3a2414' },
+  };
+  function shipCanvas(kind, flip) {
+    const pal = SHIP_PAL[kind], w = SHIP_MAP[0].length, h = SHIP_MAP.length;
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const x = c.getContext('2d');
+    SHIP_MAP.forEach((row, y) => [...row].forEach((ch, i) => { if (pal[ch]) { x.fillStyle = pal[ch]; x.fillRect(flip ? w - 1 - i : i, y, 1, 1); } }));
+    return c;
+  }
+  const seaAt = (x, y) => { x = Math.round(x); y = Math.round(y); return x >= 0 && y >= 0 && x < W && y < H && island.prov[y * W + x] === 255; };
+  function initShips() {
+    const ships = [], sprites = {};
+    for (const k of ['human', 'orc']) sprites[k] = [shipCanvas(k, false), shipCanvas(k, true)];
+    const midY = (island.nodes[0].y + island.nodes[island.nodes.length - 1].y) / 2;
+    const want = [['human', 1], ['human', 1], ['orc', 0], ['orc', 0]];  // 1 = južná polovica, 0 = severná
+    let tries = 0;
+    for (const [kind, south] of want) {
+      while (tries++ < 4000) {
+        const low = H - $('mapBar').offsetHeight * DPR / S - 18;       // nie pod kartami dole
+        const x = 8 + Math.random() * (W - 24), y = 14 + Math.random() * (low - 14);
+        if ((y > midY) !== !!south || (x < 34 && y < 34)) continue;   // ani pri domčeku vľavo hore
+        let ok = true;
+        for (let dx = -10; dx <= 22 && ok; dx += 4) for (const dy of [0, 12]) if (!seaAt(x + dx, y + dy)) ok = false;
+        if (!ok || ships.some(s => Math.hypot(s.x - x, s.y - y) < 30)) continue;
+        ships.push({ kind, x, y, dir: Math.random() < 0.5 ? 1 : -1, spd: 1.6 + Math.random() * 1.4, ph: Math.random() * 6.28 });
+        break;
+      }
+    }
+    island.ships = ships; island.shipSpr = sprites; island.shipT = null;
+  }
+  function drawShips(time) {
+    if (!island.ships) initShips();
+    const dt = island.shipT == null ? 0 : Math.min(0.1, time - island.shipT); island.shipT = time;
+    for (const s of island.ships) {
+      // pláva, kým má pred sebou vodu; pri brehu alebo okraji sa otočí
+      const bow = s.dir > 0 ? s.x + 15 : s.x - 3;
+      if (!seaAt(bow, s.y + 10) || !seaAt(bow, s.y + 4)) s.dir *= -1;
+      else s.x += s.dir * s.spd * dt;
+      const bob = Math.sin(time * 2.2 + s.ph) > 0.3 ? 1 : 0, x = Math.round(s.x), y = Math.round(s.y) + bob;
+      // brázda za loďou
+      const stern = s.dir > 0 ? x - 1 : x + 13;
+      for (let k = 0; k < 5; k++) {
+        if (Math.sin(time * 6 + k * 1.3 + s.ph) < 0) continue;
+        g.globalAlpha = 0.7 - k * 0.12; g.fillStyle = '#e8f8ff';
+        g.fillRect(stern - s.dir * k * 2, y + 11 + (k & 1), 1, 1);
+      }
+      g.globalAlpha = 0.35; g.fillStyle = '#08142e'; g.fillRect(x + 1, y + 12, 11, 1); g.globalAlpha = 1; // tieň na vode
+      g.drawImage(island.shipSpr[s.kind][s.dir > 0 ? 0 : 1], x, y);
+    }
+  }
   function renderMap(time) {
     g.drawImage(island.bg, 0, 0);
     drawProvinces(time);
@@ -2395,6 +2463,7 @@
       g.fillStyle = '#163a7a'; g.fillRect(x, w.y + 1, w.len, 1);
       g.globalAlpha = 1;
     }
+    drawShips(time);
     drawWarFx(time);
     // cestička: dobyté úseky svetlé, zamknuté tmavé bodky
     island.segs.forEach((pts, k) => {
