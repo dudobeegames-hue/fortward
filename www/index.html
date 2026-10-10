@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&family=Rubik:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
+    --drop: 0 4px 10px rgba(0,0,0,.45);
     --ink: #1c140e;
     --panel: #2a1f18;
     --panel2: #3a2c22;
@@ -54,7 +55,7 @@
   #hud-gold { grid-area: gold; }
   /* pauza pod zlatkami */
   #pauseBtn { grid-area: pause; justify-self: end; align-self: start; pointer-events: auto; width: 38px; height: 38px; padding: 0; display: grid; place-items: center;
-    background: rgba(28, 20, 14, .82); border: 2px solid var(--ink); border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 -3px 0 rgba(0,0,0,.35); }
+    background: rgba(28, 20, 14, .82); border: 2px solid var(--ink); border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 -6px 0 rgba(0,0,0,.35), var(--drop); padding-bottom: 4px; }
   #pauseBtn i { display: block; width: 14px; height: 16px; border-left: 5px solid #fff2d0; border-right: 5px solid #fff2d0; box-sizing: border-box; filter: drop-shadow(1px 1px 0 var(--ink)); }
   #pauseBtn:active { transform: translateY(1px); }
   /* ponuka pauzy */
@@ -139,7 +140,7 @@
   #speedBtn {
     min-width: 50px; height: 40px; font-weight: 700; font-size: 17px;
     background: var(--panel2); border: 2px solid var(--ink); border-radius: 8px;
-    box-shadow: inset 0 -3px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.1);
+    box-shadow: inset 0 -6px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.12), var(--drop);
   }
   #volley {
     --p: 100%;
@@ -157,7 +158,7 @@
   .buy {
     width: 46px; height: 52px; padding: 2px 0 0; display: flex; flex-direction: column; align-items: center; justify-content: space-between;
     background: var(--panel2); border: 2px solid var(--ink); border-radius: 8px;
-    box-shadow: inset 0 -3px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.1);
+    box-shadow: inset 0 -6px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.12), var(--drop);
   }
   .buy > img { height: 30px; }
   .buy span { display: flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; color: var(--gold); padding-bottom: 2px; }
@@ -182,10 +183,10 @@
   .btn {
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
     background: var(--panel2); border: 2px solid var(--ink); border-radius: 8px;
-    padding: 9px 11px; font-size: 15px; font-weight: 700; color: #fff; text-shadow: 1px 1px 0 var(--ink);
-    box-shadow: inset 0 -3px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.1);
+    padding: 8px 11px 12px; font-size: 15px; font-weight: 700; color: #fff; text-shadow: 1px 1px 0 var(--ink);
+    box-shadow: inset 0 -6px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.12), var(--drop);
   }
-  .btn:active:not(:disabled) { transform: translateY(1px); box-shadow: inset 0 -1px 0 rgba(0,0,0,.35); }
+  .btn:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 -2px 0 rgba(0,0,0,.35); }
   .btn:disabled { opacity: .45; cursor: default; }
   .btn .cost { display: flex; align-items: center; gap: 4px; color: var(--gold); font-weight: 700; }
   .btn.up { background: #2c4a8c; }
@@ -193,7 +194,7 @@
   .primary {
     background: linear-gradient(#5a86e8, var(--blue)); border: 2px solid var(--ink); border-radius: 10px;
     color: #fff; font-weight: 700; font-size: 17px; padding: 12px 20px; width: 100%;
-    box-shadow: inset 0 -4px 0 var(--blue2), inset 0 2px 0 rgba(255,255,255,.3);
+    box-shadow: inset 0 -6px 0 var(--blue2), inset 0 2px 0 rgba(255,255,255,.3), var(--drop); padding-bottom: 15px;
     text-shadow: 1px 1px 0 var(--ink);
   }
   .primary:active { transform: translateY(2px); box-shadow: inset 0 -2px 0 var(--blue2); }
@@ -276,14 +277,14 @@
   /* tlačidlo Späť: všade rovnako veľké a rovnakej farby */
   .btn.backBtn { flex: 0 0 auto; width: 140px; height: 46px; padding: 0; margin: 4px auto 0; justify-content: center; align-self: center;
     font-size: 17px; font-weight: 700; color: #fff; text-shadow: 1px 1px 0 var(--ink);
-    background: linear-gradient(#3e5694, #26386a); box-shadow: inset 0 -4px 0 #18234a, inset 0 2px 0 rgba(200,220,255,.25); }
+    background: linear-gradient(#3e5694, #26386a); box-shadow: inset 0 -6px 0 #18234a, inset 0 2px 0 rgba(200,220,255,.25), var(--drop); padding-bottom: 5px; }
   .btn.backBtn:active { transform: translateY(2px); box-shadow: inset 0 -2px 0 #18234a; }
   .perksScreen .row.back { justify-content: center; }
   .perksScreen .row.back .btn { flex: 0 0 auto; }
   .brow.backRow { display: flex; gap: 8px; align-items: center; }
   .brow.backRow .backBtn { margin: 0; }
-  .brow.backRow .primary { flex: 1; height: 46px; padding: 0; }
-  #mapPlay { background: linear-gradient(#7ee05e, #3fae3a 55%, #2c8a2c); box-shadow: inset 0 -5px 0 #1f6420, inset 0 2px 0 rgba(255,255,255,.35); }
+  .brow.backRow .primary { flex: 1; height: 46px; padding: 0 0 5px; }
+  #mapPlay { background: linear-gradient(#7ee05e, #3fae3a 55%, #2c8a2c); box-shadow: inset 0 -6px 0 #1f6420, inset 0 2px 0 rgba(255,255,255,.35), var(--drop); }
   #mapPlay:active { box-shadow: inset 0 -2px 0 #1f6420; }
   .brow .primary { font-size: 17px; padding: 9px 10px; }
   .unitCard {
@@ -320,22 +321,17 @@
   #splashBtns.show { opacity: 1; pointer-events: auto; transform: translate(-50%, -35px) scale(1); }
   #splashBtns.hide { opacity: 0; pointer-events: none; }
   .greenBtn, .grayBtn {
-    width: 270px; box-sizing: border-box; padding: 8px 0 14px; border: 3px solid var(--ink); border-radius: 14px;
-    font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 34px; font-weight: 700; letter-spacing: 2px; color: #fff;
+    width: 270px; height: 64px; box-sizing: border-box; padding: 0 0 6px; border: 3px solid var(--ink); border-radius: 14px;
+    font-size: 24px; font-weight: 700; color: #fff;
     background: linear-gradient(#7ee05e, #3fae3a 55%, #2c8a2c);
-    box-shadow: inset 0 -10px 0 #1f6420, inset 0 3px 0 rgba(255,255,255,.35), 0 6px 18px rgba(0,0,0,.55);
-    text-shadow: 2px 2px 0 #1f5a1c;
+    box-shadow: inset 0 -6px 0 #1f6420, inset 0 2px 0 rgba(255,255,255,.35), var(--drop);
+    text-shadow: 1px 1px 0 var(--ink);
   }
   .greenBtn { animation: greenPulse 1.8s ease-in-out .6s infinite; }
-  .grayBtn { font-size: 28px; padding: 11px 0 17px; letter-spacing: 1px;
-    background: linear-gradient(#b4b0b8, #87838c 55%, #6c6872); box-shadow: inset 0 -10px 0 #4c4952, inset 0 3px 0 rgba(255,255,255,.35), 0 6px 18px rgba(0,0,0,.55);
-    text-shadow: 2px 2px 0 #3c3a42; }
+  .grayBtn {
+    background: linear-gradient(#b4b0b8, #87838c 55%, #6c6872); box-shadow: inset 0 -6px 0 #4c4952, inset 0 2px 0 rgba(255,255,255,.35), var(--drop); }
   .greenBtn:active, .grayBtn:active { transform: translateY(2px) scale(.98); animation: none; }
   @keyframes greenPulse { 50% { transform: scale(1.05); } }
-  /* jednoduché H bez hrbolčeka na priečke (písmo Pixelify ho má) */
-  .pxH { display: inline-block; width: .56em; height: .7em; box-sizing: border-box; margin-right: .06em;
-    border-left: .14em solid; border-right: .14em solid; background: linear-gradient(currentColor, currentColor) 0 50% / 100% .14em no-repeat;
-    filter: drop-shadow(2px 2px 0 #1f5a1c); }
   /* nastavenia na úvodnom obrázku: jediné miesto, kde sa zapína hudba a zvuky */
   #setPanel { position: absolute; left: 50%; top: 56%; transform: translate(-50%, -50%); width: 300px; box-sizing: border-box;
     display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 14px; border: 3px solid var(--ink);
@@ -347,7 +343,7 @@
   .setIc { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0; background: none; border: 0; color: #fff;
     font-size: 15px; font-weight: 700; text-shadow: 1px 1px 0 var(--ink); }
   .setIc .ico { position: relative; width: 64px; height: 64px; display: grid; place-items: center; border-radius: 12px; border: 3px solid var(--ink);
-    background: linear-gradient(#5a4836, #3a2c22); box-shadow: inset 0 -5px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.15); }
+    background: linear-gradient(#5a4836, #3a2c22); box-shadow: inset 0 -6px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.15), var(--drop); }
   .setIc .ico img { width: 42px; height: 42px; image-rendering: pixelated; }
   .setIc .ico img.flag { width: 40px; height: auto; outline: 2px solid var(--ink); }
   .setIc:active .ico { transform: translateY(2px); }
@@ -359,11 +355,11 @@
   #langList { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   #langList[hidden], #setMain[hidden] { display: none; }
   .lang { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 8px; border-radius: 9px; border: 2px solid var(--ink); background: var(--panel2); color: #fff; text-align: left;
-    box-shadow: inset 0 -3px 0 rgba(0,0,0,.35); font-size: 14px; font-weight: 600; line-height: 1.1; }
+    box-shadow: inset 0 -6px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.12), var(--drop); font-size: 14px; font-weight: 600; line-height: 1.1; }
   .lang img { width: 27px; height: 18px; flex: 0 0 auto; image-rendering: pixelated; outline: 2px solid var(--ink); }
   .lang span { display: flex; flex-direction: column; min-width: 0; white-space: nowrap; }
   .lang small { color: var(--muted); font-size: 10.5px; font-weight: 500; }
-  .lang.cur { border-color: var(--gold); box-shadow: inset 0 -3px 0 rgba(0,0,0,.35), 0 0 0 1px var(--gold); }
+  .lang.cur { border-color: var(--gold); box-shadow: inset 0 -6px 0 rgba(0,0,0,.35), 0 0 0 1px var(--gold), var(--drop); }
   .lang.soon { opacity: .55; }
   /* menu (pozície, výber rasy): pozadím stmavený úvodný obrázok, názov hry z obrázka ostane hore vidieť */
   .screenOverlay.menuBg { justify-content: flex-start; gap: 10px; background: linear-gradient(rgba(8,6,12,.15), rgba(8,6,12,.15) 20%, rgba(14,10,8,.72) 34%, rgba(14,10,8,.9)), #07061a url(img/splash.jpg) center top / cover no-repeat; }
@@ -385,7 +381,7 @@
   .slotGo { flex: 0 0 auto; width: 42px; height: 42px; display: grid; place-items: center; }
   .slotGo img { width: 27px; height: 27px; image-rendering: pixelated; }
   .slotDel { flex: 0 0 auto; width: 42px; height: 42px; display: grid; place-items: center; padding: 0; background: var(--panel2); border: 2px solid var(--ink); border-radius: 9px;
-    box-shadow: inset 0 -3px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.1); }
+    box-shadow: inset 0 -6px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.12), var(--drop); padding-bottom: 4px; }
   .slotDel img { width: 21px; height: 24px; image-rendering: pixelated; }
   .slotDel:active { transform: translateY(1px); }
   /* vlastné potvrdzovacie okno namiesto okna prehliadača */
@@ -398,7 +394,7 @@
   .askCard p { margin: 0 0 4px; color: var(--muted); font-size: 15px; }
   .askCard .row { display: flex; gap: 10px; width: 100%; }
   .askCard .row button { flex: 1; justify-content: center; font-size: 17px; }
-  #askOk { background: #c8382a; color: #fff; box-shadow: inset 0 -3px 0 #7c1810, inset 0 2px 0 rgba(255,255,255,.25); text-shadow: 1px 1px 0 var(--ink); }
+  #askOk { background: #c8382a; color: #fff; box-shadow: inset 0 -6px 0 #7c1810, inset 0 2px 0 rgba(255,255,255,.25), var(--drop); text-shadow: 1px 1px 0 var(--ink); }
 
   /* ---- Titulná obrazovka ---- */
   .screenOverlay {
@@ -450,7 +446,7 @@
   #mapPanel .brow .btn { justify-content: center; }
   /* ikonky na mape: domček vľavo hore, dole Sieň, Hrdinovia, Trofeje */
   .mapIc { width: 46px; height: 46px; padding: 0; display: grid; place-items: center; border-radius: 10px; border: 3px solid var(--ink);
-    background: linear-gradient(#5a4836, #3a2c22); box-shadow: inset 0 -4px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.15); }
+    background: linear-gradient(#5a4836, #3a2c22); box-shadow: inset 0 -6px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.15), var(--drop); }
   .mapIc img { width: 32px; height: 30px; image-rendering: pixelated; }
   .mapIc:active { transform: translateY(2px); }
   #mapBar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 22px;
@@ -591,7 +587,7 @@
 </style>
 </head>
 <body>
-<div id="splash"><img src="img/splash.jpg" alt="Fortward"><div id="splashBtns"><button id="splashPlay" class="greenBtn" aria-label="Hrať"><span class="pxH"></span>rať</button><button id="splashSet" class="grayBtn">Nastavenia</button></div><div id="setPanel" hidden><h2 id="setHead">Nastavenia</h2><div id="setMain" class="setIcons"><button class="setIc snd" data-kind="music"><span class="ico"><img id="icoMusic" alt=""></span><b>Hudba</b></button><button class="setIc snd" data-kind="sfx"><span class="ico"><img id="icoSound" alt=""></span><b>Zvuky</b></button><button class="setIc" id="langBtn"><span class="ico"><img id="icoLang" class="flag" alt=""></span><b>Jazyk</b></button></div><div id="langList" hidden></div><button id="setBack" class="btn backBtn">Späť</button></div></div>
+<div id="splash"><img src="img/splash.jpg" alt="Fortward"><div id="splashBtns"><button id="splashPlay" class="greenBtn">Hrať</button><button id="splashSet" class="grayBtn">Nastavenia</button></div><div id="setPanel" hidden><h2 id="setHead">Nastavenia</h2><div id="setMain" class="setIcons"><button class="setIc snd" data-kind="music"><span class="ico"><img id="icoMusic" alt=""></span><b>Hudba</b></button><button class="setIc snd" data-kind="sfx"><span class="ico"><img id="icoSound" alt=""></span><b>Zvuky</b></button><button class="setIc" id="langBtn"><span class="ico"><img id="icoLang" class="flag" alt=""></span><b>Jazyk</b></button></div><div id="langList" hidden></div><button id="setBack" class="btn backBtn">Späť</button></div></div>
 <div id="logoIntro"><img src="img/logo.jpg" alt="DBee games"></div>
 <script src="js/splash.js"></script>
 <div id="game">
