@@ -3534,7 +3534,18 @@
     SPLASH.show(); AUDIO.play('click');
   }
   $('mapHome').addEventListener('click', showMenu);
-  $('slotsBack').addEventListener('click', showMenu);
+  // štítok na zvitku: zvitok sa zvinie nahor a ukáže sa úvodná obrazovka
+  $('icoTag').src = UI_ICONS.scrollTag;
+  $('scrollTag').addEventListener('click', () => {
+    const p = $('scrollPaper');
+    if (p.dataset.rolling) return;
+    p.dataset.rolling = '1';
+    p.ontransitionend = null; p.style.transition = 'none'; p.style.height = p.scrollHeight + 'px';
+    void p.offsetHeight;
+    p.style.transition = 'height .6s cubic-bezier(.6,0,.8,.4)'; p.style.height = '0px';
+    AUDIO.play('paper');
+    setTimeout(() => { delete p.dataset.rolling; showMenu(); }, 650);
+  });
   $('raceBack').addEventListener('click', () => showSlots());
   // Nastavenia na úvodnom obrázku: jediné miesto pre hudbu, zvuky a jazyk
   function syncSound() {

@@ -293,6 +293,26 @@ const UI_ICONS = (() => {
     });
   }
 
+  // modrý látkový štítok so šípkou hore (visí zo spodnej tyče zvitku, zvinie ho)
+  const scrollTag = fromMap([
+    'KKKKKKKKKKK',
+    'KLBBBBBBBDK',
+    'KLBBBBBBBDK',
+    'KLBBBWBBBDK',
+    'KLBBWWWBBDK',
+    'KLBWWWWWBDK',
+    'KLWWWWWWWDK',
+    'KLBDWWWDBDK',
+    'KLBBWWWBBDK',
+    'KLBBWWWBBDK',
+    'KLBBDDDBBDK',
+    'KLBBBBBBBDK',
+    'KLBBKKKBBDK',
+    'KLBK...KBDK',
+    'KLK.....KDK',
+    'KK.......KK',
+  ], { K: '#1c140e', L: '#8ab4ff', B: '#3c64c8', D: '#22337a', W: '#fff7e0' });
+
   // ---- vlajky 18×12 bodov ----
   const FW = 18, FH = 12;
   const stripesH = cols => (x, y) => cols[Math.floor(y * cols.length / FH)];
@@ -372,5 +392,5 @@ const UI_ICONS = (() => {
     { id: 'zh', name: '中文' },
   ];
 
-  return { pix, music, sound, plus, home, hall, trophy, star, swords, chest, spellVolley, spellFire, spellFrost, spellBolt, scrollPaper, scrollRod, flags, langs };
+  return { pix, music, sound, plus, home, hall, trophy, star, swords, chest, spellVolley, spellFire, spellFrost, spellBolt, scrollPaper, scrollRod, scrollTag, flags, langs };
 })();
