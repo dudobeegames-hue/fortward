@@ -128,6 +128,27 @@ const UI_ICONS = (() => {
     '.KK.....KK.',
   ], PAL);
 
+  // prekrížené meče (karta Boj): čepeľ 2 body široká, zlatá záštita, hnedá rukoväť, zlatá hlavica
+  const swords = (() => {
+    const N = 14, g = [...Array(N)].map(() => Array(N).fill(null));
+    const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < N && y < N) g[y][x] = c; };
+    for (const dir of [1, -1]) {
+      for (let t = 1; t <= 11; t++) {
+        const x = dir === 1 ? t : N - 1 - t, y = t;
+        if (t <= 7) { put(x, y, '#f0f4fc'); put(x + dir, y, '#9aa4b8'); }
+        else if (t === 8) for (let k = -2; k <= 2; k++) put(x + k, y - k * dir, '#f8d048');
+        else if (t <= 10) put(x, y, '#8a5a2a');
+        else put(x, y, '#f8d048');
+      }
+    }
+    const out = g.map(r => r.slice());
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (g[y][x]) continue;
+      if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => g[y + dy] && g[y + dy][x + dx])) out[y][x] = '#1c140e';
+    }
+    return pix(N, N, (x, y) => out[y][x]);
+  })();
+
   // ---- vlajky 18×12 bodov ----
   const FW = 18, FH = 12;
   const stripesH = cols => (x, y) => cols[Math.floor(y * cols.length / FH)];
@@ -207,5 +228,5 @@ const UI_ICONS = (() => {
     { id: 'zh', name: '中文' },
   ];
 
-  return { pix, music, sound, plus, home, hall, trophy, star, flags, langs };
+  return { pix, music, sound, plus, home, hall, trophy, star, swords, flags, langs };
 })();

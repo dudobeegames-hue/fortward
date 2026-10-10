@@ -3121,8 +3121,8 @@
     $('title').hidden = true;
     $('map').hidden = false;
     if (!st.mapAnim) st.mapSel = Math.min(st.unlocked, MISSIONS.length);
-    $('missionBox').hidden = true;
-    renderMapPanel(); renderMapBar();
+    setTab('map', true);
+    renderMapPanel();
     focusMapNode(st.mapAnim ? st.mapAnim.seg + 2 : st.mapSel, true);
     saveStats(); checkAch();
     if (!st.mapAnim) afterDeck(); // pri odomykaní hradu príde výber až po kartičkách
@@ -3169,7 +3169,7 @@
     $('hallBtnTxt').textContent = '★' + free; $('hallBtnTxt').hidden = !free;
     $('trophyTxt').textContent = fresh; $('trophyTxt').hidden = !fresh;
   }
-  $('icoHome').src = UI_ICONS.home; $('icoTrophy').src = UI_ICONS.trophy;
+  $('icoHome').src = UI_ICONS.home; $('icoTrophy').src = UI_ICONS.trophy; $('icoSwords').src = UI_ICONS.swords;
   const openMission = () => { renderMapPanel(); $('missionBox').hidden = false; };
   const closeMission = () => { $('missionBox').hidden = true; };
   $('mapClose').addEventListener('click', () => { AUDIO.play('click'); closeMission(); });
@@ -3195,13 +3195,11 @@
       b.addEventListener('click', () => {
         if (starsFree() < cost || lvl >= PERK_MAX) return;
         meta.perks[pk.id] = lvl + 1; saveJSON(sk('perks'), meta.perks);
-        AUDIO.play('upgrade'); renderPerks();
+        AUDIO.play('upgrade'); renderPerks(); renderMapBar();
       });
       row.appendChild(b); list.appendChild(row);
     }
   }
-  $('hallBtn').addEventListener('click', () => { AUDIO.play('click'); $('perks').hidden = false; renderPerks(); });
-  $('perkBack').addEventListener('click', () => { AUDIO.play('click'); $('perks').hidden = true; renderMapBar(); });
 
   // ---- Hrdinovia: zatiaľ len kráľ, ďalší hrdinovia prídu neskôr ----
   function renderHeroes() {
@@ -3217,8 +3215,6 @@
       list.appendChild(h);
     }
   }
-  $('heroBtn').addEventListener('click', () => { AUDIO.play('click'); renderHeroes(); $('heroes').hidden = false; });
-  $('heroBack').addEventListener('click', () => { AUDIO.play('click'); $('heroes').hidden = true; });
 
   // ---- Trofeje ----
   function renderTrophies() {
@@ -3230,11 +3226,23 @@
     }
     $('trophyCount').textContent = ACH.filter(a => ach[a.id]).length + ' / ' + ACH.length;
   }
-  $('trophyBtn').addEventListener('click', () => {
-    AUDIO.play('click'); checkAch(); renderTrophies(); $('trophies').hidden = false;
-    achSeen = Math.max(achSeen, ...ACH.map(a => ach[a.id] || 0)); saveJSON(sk('achSeen'), achSeen); // po prezretí odznak zmizne
-  });
-  $('trophyBack').addEventListener('click', () => { AUDIO.play('click'); $('trophies').hidden = true; renderMapBar(); });
+
+  // ---- karty pod mapou: Boj (mapa), Sieň, Hrdinovia, Trofeje – prepína sa len medzi nimi ----
+  let mapTab = 'map';
+  function setTab(t, quiet) {
+    mapTab = t;
+    document.querySelectorAll('.tabCard').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+    $('perks').hidden = t !== 'hall'; $('heroes').hidden = t !== 'heroes'; $('trophies').hidden = t !== 'trophies';
+    if (t === 'hall') renderPerks();
+    if (t === 'heroes') renderHeroes();
+    if (t === 'trophies') {
+      checkAch(); renderTrophies();
+      achSeen = Math.max(achSeen, ...ACH.map(a => ach[a.id] || 0)); saveJSON(sk('achSeen'), achSeen); // po prezretí odznak zmizne
+    }
+    closeMission(); renderMapBar();
+    if (!quiet) AUDIO.play('click');
+  }
+  document.querySelectorAll('.tabCard').forEach(b => b.addEventListener('click', () => { if (b.dataset.tab !== mapTab) setTab(b.dataset.tab); }));
 
   function tapMap(x, y) {
     if (st.mapAnim) return;
@@ -3354,6 +3362,7 @@
   $('mapPlay').addEventListener('click', () => { if (!st.mapAnim && tierOpen(st.mapSel, st.mapTier || 0)) startMission(st.mapSel, st.mapTier || 0); });
   // Menu na mape aj Späť z pozícií vedú na úvodný obrázok (Hrať / Nastavenia)
   function showMenu() {
+    setTab('map', true);
     st.phase = 'title';
     $('map').hidden = true; $('slots').hidden = true; $('title').hidden = true;
     SPLASH.show(); AUDIO.play('click');

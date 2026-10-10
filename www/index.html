@@ -449,13 +449,21 @@
     background: linear-gradient(#5a4836, #3a2c22); box-shadow: inset 0 -4px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.15); }
   .mapIc img { width: 28px; height: 28px; image-rendering: pixelated; }
   .mapIc:active { transform: translateY(2px); }
-  #mapBar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 22px;
-    padding: 18px 12px calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(rgba(8,14,30,0), rgba(8,14,30,.75)); }
-  #mapBar .setIc { flex: 0 0 auto; width: 76px; }
-  #mapBar .ico img { width: auto; height: auto; max-width: 48px; image-rendering: pixelated; } /* 3 body na pixel ako kráľ */
-  .setIc .badge { position: absolute; top: -9px; right: -11px; min-width: 22px; height: 22px; padding: 0 5px; box-sizing: border-box; border-radius: 11px; border: 2px solid var(--ink);
+  /* spodný riadok 4 kariet; zvolená karta sa povysunie a jej obsah je nad riadkom */
+  #mapBar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 9; height: calc(86px + env(safe-area-inset-bottom)); box-sizing: border-box;
+    padding: 12px 10px env(safe-area-inset-bottom); display: flex; gap: 8px; align-items: flex-start;
+    background: linear-gradient(#2a1f18, #16100c); border-top: 3px solid var(--ink); box-shadow: inset 0 2px 0 rgba(255,255,255,.06); }
+  .tabCard { flex: 1; height: 64px; position: relative; display: grid; place-items: center; padding: 0 0 4px; border: 3px solid var(--ink); border-radius: 12px;
+    background: linear-gradient(#4e3e2e, #34271e); box-shadow: inset 0 -4px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.12);
+    transition: transform .18s ease, background-color .18s ease; }
+  .tabCard img { image-rendering: pixelated; opacity: .7; transition: opacity .18s ease; }
+  .tabCard.on { transform: translateY(-18px); background: linear-gradient(#7a6248, #4a3828); border-color: #b88420;
+    box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px #f8d048, inset 0 -4px 0 rgba(0,0,0,.35), 0 6px 14px rgba(0,0,0,.5); }
+  .tabCard.on img { opacity: 1; }
+  .tabScreen.screenOverlay { bottom: calc(86px + env(safe-area-inset-bottom)); }
+  .setIc .badge, .tabCard .badge { position: absolute; top: -9px; right: -11px; min-width: 22px; height: 22px; padding: 0 5px; box-sizing: border-box; border-radius: 11px; border: 2px solid var(--ink);
     background: var(--gold); color: var(--ink); font-style: normal; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 13px; line-height: 18px; text-align: center; text-shadow: none; }
-  .setIc .badge[hidden] { display: none; }
+  .setIc .badge[hidden], .tabCard .badge[hidden] { display: none; }
   /* hrdinovia */
   #heroList { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
   .hero { width: 220px; height: 220px; box-sizing: border-box; flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
@@ -648,10 +656,12 @@
     <div class="mapHead">
       <button id="mapHome" class="mapIc" title="Menu" aria-label="Menu"><img id="icoHome" alt=""></button>
     </div>
+    <!-- spodný riadok kariet: Boj (mapa), Sieň, Hrdinovia, Trofeje; zvolená karta je povysunutá -->
     <div id="mapBar">
-      <button id="hallBtn" class="setIc"><span class="ico"><img id="icoHall" alt=""><em id="hallBtnTxt" class="badge" hidden>0</em></span><b>Sieň</b></button>
-      <button id="heroBtn" class="setIc"><span class="ico"><img id="icoHero" alt=""></span><b>Hrdinovia</b></button>
-      <button id="trophyBtn" class="setIc"><span class="ico"><img id="icoTrophy" alt=""><em id="trophyTxt" class="badge" hidden>0</em></span><b>Trofeje</b></button>
+      <button class="tabCard on" data-tab="map" title="Boj"><img id="icoSwords" alt="Boj"></button>
+      <button class="tabCard" data-tab="hall" title="Sieň"><img id="icoHall" alt="Sieň"><em id="hallBtnTxt" class="badge" hidden>0</em></button>
+      <button class="tabCard" data-tab="heroes" title="Hrdinovia"><img id="icoHero" alt="Hrdinovia"></button>
+      <button class="tabCard" data-tab="trophies" title="Trofeje"><img id="icoTrophy" alt="Trofeje"><em id="trophyTxt" class="badge" hidden>0</em></button>
     </div>
     <!-- okno misie: zjaví sa až po ťuknutí na hrad -->
     <div id="missionBox" class="screenOverlay" hidden>
@@ -683,26 +693,21 @@
     <div id="tpList"></div>
   </div>
 
-  <div id="perks" class="screenOverlay perksScreen" hidden>
+  <div id="perks" class="screenOverlay perksScreen tabScreen" hidden>
     <div class="perkHead"><b>Kráľovská sieň</b><span class="pill">★ <span id="perkStars">0</span></span></div>
     <p class="perkNote">Každý hrad môžeš dobyť na medenej, striebornej a zlatej úrovni – za každú 1 až 3 hviezdy podľa zdravia radnice na konci. Hviezdami kúpiš trvalé bonusy – nákup je natrvalo, vyber si rozumne.</p>
     <div id="perkList"></div>
-    <div class="row back">
-      <button id="perkBack" class="btn backBtn">Späť</button>
-    </div>
   </div>
 
-  <div id="heroes" class="screenOverlay perksScreen" hidden>
+  <div id="heroes" class="screenOverlay perksScreen tabScreen" hidden>
     <div class="perkHead"><b>Hrdinovia</b></div>
     <p class="perkNote">Vyber hrdinu, ktorý pôjde s tvojím vojskom do boja. Hrdina získava skúsenosti za každú prežitú vlnu.</p>
     <div id="heroList"></div>
-    <div class="row back"><button id="heroBack" class="btn backBtn">Späť</button></div>
   </div>
 
-  <div id="trophies" class="screenOverlay perksScreen" hidden>
+  <div id="trophies" class="screenOverlay perksScreen tabScreen" hidden>
     <div class="perkHead"><b>Trofeje</b><span class="pill"><span id="trophyCount">0</span></span></div>
     <div id="trophyList"></div>
-    <div class="row back"><button id="trophyBack" class="btn backBtn">Späť</button></div>
   </div>
 
   <div id="over" class="screenOverlay" hidden>
