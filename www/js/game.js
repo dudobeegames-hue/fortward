@@ -2424,6 +2424,9 @@
         break;
       }
     }
+    // orkské lode prejdú na stranu ľudí: tá vpravo hore po dobytí 9. hradu, druhá po oslobodení ostrova
+    const orcs = ships.filter(s => s.kind === 'orc').sort((a, b) => (b.x - b.y) - (a.x - a.y));
+    orcs.forEach((s, i) => { s.humanFrom = i === 0 ? 10 : 11; });
     island.ships = ships; island.shipSpr = sprites; island.shipT = null;
   }
   function drawShips(time) {
@@ -2443,7 +2446,8 @@
         g.fillRect(stern - s.dir * k * 2, y + 11 + (k & 1), 1, 1);
       }
       g.globalAlpha = 0.35; g.fillStyle = '#08142e'; g.fillRect(x + 1, y + 12, 11, 1); g.globalAlpha = 1; // tieň na vode
-      g.drawImage(island.shipSpr[s.kind][s.dir > 0 ? 0 : 1], x, y);
+      const kind = s.humanFrom && st.unlocked >= s.humanFrom ? 'human' : s.kind;
+      g.drawImage(island.shipSpr[kind][s.dir > 0 ? 0 : 1], x, y);
     }
   }
   function renderMap(time) {
