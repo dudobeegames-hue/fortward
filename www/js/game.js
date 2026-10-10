@@ -3135,7 +3135,6 @@
   function renderMapPanel() {
     const m = st.mapSel, def = MISSIONS[m - 1];
     const done = m < st.unlocked;
-    $('mapProg').textContent = Math.min(st.unlocked - 1, MISSIONS.length) + ' / ' + MISSIONS.length;
     $('mNum').textContent = m;
     $('mNum').className = 'mnum' + (done ? ' done' : '');
     $('mName').textContent = def.name;
@@ -3208,9 +3207,9 @@
   function renderHeroes() {
     const list = $('heroList'); list.innerHTML = '';
     const need = kingXpNeed(kingMeta.lvl), pct = kingMeta.lvl >= KING_MAX_LVL ? 100 : Math.round(kingMeta.xp / need * 100);
-    const k = document.createElement('div'); k.className = 'hero big';
-    k.innerHTML = '<img src="' + ICONS.king + '" alt=""><div class="info"><span class="tag">Vybraný hrdina</span><b>Kráľ · úroveň ' + kingMeta.lvl + '</b>' +
-      '<span class="xpBar"><i style="width:' + pct + '%"></i></span><small>' + kingSummary() + '</small></div>';
+    const k = document.createElement('div'); k.className = 'hero sel';
+    k.innerHTML = '<span class="tag">Vybraný</span><img src="' + ICONS.king + '" alt=""><b>Kráľ · úroveň ' + kingMeta.lvl + '</b>' +
+      '<span class="xpBar"><i style="width:' + pct + '%"></i></span><small>' + kingSummary() + '</small>';
     list.appendChild(k);
     for (let i = 0; i < 2; i++) {
       const h = document.createElement('div'); h.className = 'hero locked';

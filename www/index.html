@@ -60,7 +60,7 @@
   /* ponuka pauzy */
   #pauseBox { z-index: 40; background: rgba(8,6,4,.7); }
   #pauseBox .askCard { gap: 10px; }
-  #pauseBox .askCard button { width: 100%; justify-content: center; font-size: 19px; padding: 11px; }
+  #pauseBox .askCard button { width: 100%; justify-content: center; font-size: 17px; padding: 11px; }
   #pauseBox h2 { margin-bottom: 4px; }
   #hud-king {
     grid-area: king; position: relative; flex-direction: column; align-items: stretch; gap: 3px;
@@ -182,7 +182,7 @@
   .btn {
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
     background: var(--panel2); border: 2px solid var(--ink); border-radius: 8px;
-    padding: 9px 11px; font-size: 15px; font-weight: 600;
+    padding: 9px 11px; font-size: 15px; font-weight: 700; color: #fff; text-shadow: 1px 1px 0 var(--ink);
     box-shadow: inset 0 -3px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.1);
   }
   .btn:active:not(:disabled) { transform: translateY(1px); box-shadow: inset 0 -1px 0 rgba(0,0,0,.35); }
@@ -192,9 +192,9 @@
   .btn.sell { background: #4a2a22; }
   .primary {
     background: linear-gradient(#5a86e8, var(--blue)); border: 2px solid var(--ink); border-radius: 10px;
-    color: #fff; font-weight: 700; font-size: 20px; padding: 12px 20px; width: 100%;
+    color: #fff; font-weight: 700; font-size: 17px; padding: 12px 20px; width: 100%;
     box-shadow: inset 0 -4px 0 var(--blue2), inset 0 2px 0 rgba(255,255,255,.3);
-    text-shadow: 1px 1px 0 var(--blue2);
+    text-shadow: 1px 1px 0 var(--ink);
   }
   .primary:active { transform: translateY(2px); box-shadow: inset 0 -2px 0 var(--blue2); }
 
@@ -244,7 +244,7 @@
   .btn.move { justify-content: center; background: #3a4a2a; }
   .brow.undoRow { grid-template-columns: 1.15fr 0.85fr 1.3fr; }
   .brow.undoRow #repairBtn { font-size: 13px; padding: 8px 6px; }
-  .btn.undo { justify-content: center; font-size: 15px; }
+  .btn.undo { justify-content: center; font-size: 17px; }
   .mNew { display: flex; flex-wrap: nowrap; overflow-x: auto; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; scrollbar-width: none; }
   .mNew em { font-style: normal; color: var(--gold); display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,.25); border-radius: 6px; padding: 3px 7px 3px 4px; }
   .mNew img { height: 18px; }
@@ -283,6 +283,8 @@
   .brow.backRow { display: flex; gap: 8px; align-items: center; }
   .brow.backRow .backBtn { margin: 0; }
   .brow.backRow .primary { flex: 1; height: 46px; padding: 0; }
+  #mapPlay { background: linear-gradient(#7ee05e, #3fae3a 55%, #2c8a2c); box-shadow: inset 0 -5px 0 #1f6420, inset 0 2px 0 rgba(255,255,255,.35); }
+  #mapPlay:active { box-shadow: inset 0 -2px 0 #1f6420; }
   .brow .primary { font-size: 17px; padding: 9px 10px; }
   .unitCard {
     display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center;
@@ -343,7 +345,7 @@
   /* tri ikonky vedľa seba: Hudba, Zvuky, Jazyk */
   .setIcons { display: flex; justify-content: space-between; gap: 8px; }
   .setIc { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0; background: none; border: 0; color: #fff;
-    font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 16px; font-weight: 700; text-shadow: 1px 1px 0 var(--ink); }
+    font-size: 15px; font-weight: 700; text-shadow: 1px 1px 0 var(--ink); }
   .setIc .ico { position: relative; width: 64px; height: 64px; display: grid; place-items: center; border-radius: 12px; border: 3px solid var(--ink);
     background: linear-gradient(#5a4836, #3a2c22); box-shadow: inset 0 -5px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.15); }
   .setIc .ico img { width: 42px; height: 42px; image-rendering: pixelated; }
@@ -459,15 +461,15 @@
     background: var(--gold); color: var(--ink); font-style: normal; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 13px; line-height: 18px; text-align: center; text-shadow: none; }
   .setIc .badge[hidden] { display: none; }
   /* hrdinovia */
-  #heroList { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
-  .hero { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 8px; border-radius: 10px; border: 2px solid var(--ink); background: rgba(0,0,0,.28); text-align: center; color: #fff; }
-  .hero.big { grid-column: 1 / -1; flex-direction: row; text-align: left; gap: 12px; border-color: var(--gold); background: rgba(248,208,72,.08); box-shadow: 0 0 0 1px var(--gold); }
-  .hero img { width: 44px; height: 44px; object-fit: contain; image-rendering: pixelated; }
-  .hero.big img { width: 56px; height: 56px; }
-  .hero .info { flex: 1; display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
-  .hero b { font-size: 17px; }
-  .hero small { color: var(--muted); font-size: 12px; }
-  .hero .tag { color: var(--gold); font-size: 12px; font-weight: 700; }
+  #heroList { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+  .hero { width: 220px; height: 220px; box-sizing: border-box; flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+    padding: 12px; border-radius: 14px; border: 3px solid var(--ink); background: rgba(0,0,0,.3); text-align: center; color: #fff; }
+  .hero.sel { border-color: var(--gold); background: rgba(248,208,72,.08); box-shadow: 0 0 0 1px var(--gold), inset 0 0 24px rgba(248,208,72,.12); }
+  .hero img { width: 84px; height: 84px; object-fit: contain; image-rendering: pixelated; }
+  .hero b { font-size: 18px; }
+  .hero small { color: var(--muted); font-size: 12px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .hero .tag { color: var(--gold); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .hero .xpBar { width: 100%; }
   .hero.locked img { filter: brightness(0); opacity: .45; }
   .hero.locked b { color: var(--muted); }
   /* trofeje: sivé, kým ich hráč nezíska */
@@ -649,7 +651,6 @@
   <div id="map" hidden>
     <div class="mapHead">
       <button id="mapHome" class="mapIc" title="Menu" aria-label="Menu"><img id="icoHome" alt=""></button>
-      <span class="pill">Dobyté <span id="mapProg">0 / 10</span></span>
     </div>
     <div id="mapBar">
       <button id="hallBtn" class="setIc"><span class="ico"><img id="icoHall" alt=""><em id="hallBtnTxt" class="badge" hidden>0</em></span><b>Sieň</b></button>
