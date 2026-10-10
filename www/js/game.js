@@ -69,7 +69,7 @@
   const SPELLS = {
     volley:    { name: 'Šípová salva', tech: 'volley',    cdKey: 'volleyT' },
     fireball:  { name: 'Ohnivá guľa',  tech: 'fireball',  cdKey: 'fireCd', cd: 22, R: 18 },
-    freeze:    { name: 'Mráz',         tech: 'freeze',    cdKey: 'freezeCd', cd: 30, R: 26, dur: 3 },
+    freeze:    { name: 'Mráz',         tech: 'freeze',    cdKey: 'freezeCd', cd: 30, R: 26, dur: 2.5 },
     lightning: { name: 'Blesk',        tech: 'lightning', cdKey: 'boltCd', cd: 18, reach: 34 },
   };
   const spellMax = id => id === 'volley' ? volleyCd() : SPELLS[id].cd;
@@ -708,6 +708,7 @@
   const DIFF = {
     // sila nepriateľov podľa misie (násobok zdravia v 1. vlne) – misia 1 je úvodná a ľahká, misia 10 skúška
     missionHp: [0.95, 1.5, 2.3, 2.55, 2.55, 2.7, 2.9, 3.4, 3.2, 4.0], // 6–10 silnejšie: hráč má stajne, zbrojnicu a sokoly
+    copperHp:  [1, 1, 1, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15],     // medená úroveň od misie 4 tuhšia (hrdina má už schopnosti); strieborná a zlatá bez zmeny
     hpWave: 1.10, hpWaveMission: 0.006, hpMission: 0.25,   // rast zdravia počas misie (neskoršie misie rastú rýchlejšie)
     countWave: 2, countMission: 1,                         // počet nepriateľov vo vlne
     typeShift: 0.8, bruteFrom: 5, bruteRate: 0.03,         // ako rýchlo pribúdajú orkovia a surovci
@@ -724,7 +725,7 @@
     const tr = TIERS[st.tier || 0];
     const n = 6 + Math.round(w * DIFF.countWave + (m - 1) * DIFF.countMission) + tr.extra;
     const mHp = DIFF.missionHp ? DIFF.missionHp[m - 1] : 1 + DIFF.hpMission * (m - 1);
-    const hpMul = Math.pow(DIFF.hpWave + DIFF.hpWaveMission * (m - 1), w - 1) * mHp * tr.hp;
+    const hpMul = Math.pow(DIFF.hpWave + DIFF.hpWaveMission * (m - 1), w - 1) * mHp * (st.tier ? tr.hp : DIFF.copperHp[m - 1]);
     const gap = Math.max(0.3, 1.3 - ew * 0.04);
     for (let i = 0; i < n; i++) {
       const r = Math.random();
@@ -1657,7 +1658,7 @@
       if (!cur) { hint('Blesk treba zoslať na nepriateľa'); AUDIO.play('deny'); return false; }
       const pts = [{ x: cur.x + 6, y: Math.max(0, cur.y - 120) }];
       for (let n = 0; n < 3 && cur; n++) { hit.push(cur); pts.push({ x: cur.x, y: cur.y - cur.h * 0.5 }); cur = near(cur.x, cur.y, hit); }
-      hit.forEach((e, n) => { damage(e, (n ? 27 : 45) * pow); e.stunT = Math.max(e.stunT || 0, 0.4); });
+      hit.forEach((e, n) => { damage(e, (n ? 21 : 35) * pow); e.stunT = Math.max(e.stunT || 0, 0.4); });
       st.bolts.push({ pts, life: 0.3, max: 0.3 });
       AUDIO.play('bolt'); AUDIO.play('boom'); st.shake = Math.max(st.shake, 0.15);
     }
