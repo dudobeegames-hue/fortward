@@ -91,11 +91,14 @@ function buildIsland(W, H, seed) {
     if (dd <= 1) prov[y * W + x] = provOf(x, y);
     if (dd > 1) {
       const depth = dd - 1;
-      let v = 0.8 - depth * 2.6 + (fbm(x * 0.06, y * 0.06, seed + 5) - 0.5) * 0.15;
-      const wave = (y + Math.round(Math.sin(x * 0.12 + y * 0.03) * 2)) % 7 === 0 && hash2(x >> 2, y, seed + 6) > 0.45;
-      if (wave) v += 0.12;
+      // plytčina pri brehu svetlá, ďalej postupne hlbšie, ale nikdy nie čierna; vlnenie z fbm
+      let v = 0.78 - Math.min(1, depth / 0.35) * 0.32 - Math.min(1, depth / 1.2) * 0.12;
+      v += (fbm(x * 0.05, y * 0.05, seed + 5) - 0.5) * 0.22 + (fbm(x * 0.18, y * 0.12, seed + 12) - 0.5) * 0.08;
+      const swell = Math.sin(x * 0.11 + y * 0.045 + fbm(x * 0.03, y * 0.03, seed + 13) * 6);
+      if (swell > 0.82) v += 0.07; else if (swell < -0.9) v -= 0.05;                  // dlhé vlny
+      if (depth < 0.06) v += (0.06 - depth) * 2.5;                                     // tyrkysová plytčina
       if (depth < 0.035) { v = 0.95; if (depth < 0.018) foam.push({ x, y, ph: hash2(x, y, 7) * 6.28 }); }
-      set(x, y, pickRamp(SEA, Math.max(0.04, v), x, y));
+      set(x, y, pickRamp(SEA, Math.max(0.22, v), x, y));
     } else if (dd > 0.92) {
       set(x, y, pickRamp(SAND, 0.6 + (hash2(x, y, seed + 8) - 0.5) * 0.3 - (dd - 0.92) * 3, x, y));
     } else {
@@ -134,6 +137,15 @@ function buildIsland(W, H, seed) {
     }
   }
   cx.putImageData(img, 0, 0);
+  // hrebene vĺn na otvorenom mori (kreslia sa pohyblivo počas hry)
+  const waves = [];
+  for (let k = 0; k < 900 && waves.length < 140; k++) {
+    const wx = Math.floor(hash2(k, 3, seed + 51) * (W - 8)), wy = Math.floor(hash2(k, 5, seed + 53) * (H - 2));
+    if (prov[wy * W + wx] !== 255 || prov[wy * W + Math.min(W - 1, wx + 6)] !== 255) continue;
+    const dd = Math.hypot((wx - icx) / rx, (wy - icy) / ry);
+    if (dd < 1.08) continue;                                                           // nie v príboji
+    waves.push({ x: wx, y: wy, len: 3 + Math.floor(hash2(k, 7, seed + 55) * 4), ph: hash2(k, 9, seed + 57) * 6.28 });
+  }
   // miesta ohňov v napadnutých provinciách (pár bodov okolo hradu na súši)
   const fires = L.nodes.map((n, i) => {
     const pts = [];
@@ -146,7 +158,7 @@ function buildIsland(W, H, seed) {
     }
     return pts;
   });
-  return { bg: c, foam, segs, nodes: L.nodes, prov, fires, fort: makeOrcFort(), castle: makeMiniCastle(false), castleLocked: makeMiniCastle(true) };
+  return { bg: c, foam, waves, segs, nodes: L.nodes, prov, fires, fort: makeOrcFort(), castle: makeMiniCastle(false), castleLocked: makeMiniCastle(true) };
 }
 
 // pevnosť orkov pri misii 10

@@ -2348,23 +2348,34 @@
   function drawWarFx(time) {
     island.nodes.forEach((nd, i) => {
       if (provState(i) !== 'attacked' || (st.provAnim && st.provAnim.i === i)) return;
-      for (const f of island.fires[i]) {
-        const fl = Math.floor(time * 8 + f.ph) % 3, h = 3 + fl;
-        g.fillStyle = PAL.K; g.fillRect(f.x - 2, f.y - h, 5, h + 2);
-        g.fillStyle = '#d83818'; g.fillRect(f.x - 1, f.y - h + 1, 3, h);
-        g.fillStyle = '#f89838'; g.fillRect(f.x - 1, f.y - h + 2, 3, h - 1);
-        g.fillStyle = '#fff070'; g.fillRect(f.x, f.y - 1 - (fl === 2 ? 1 : 0), 1, 2);
-        if (Math.random() < 0.04) part(f.x, f.y - h - 1, (Math.random() - 0.5) * 4, -6 - Math.random() * 4, 1.6, Math.random() < 0.5 ? '#525262' : '#3e3e4c', -2);
-      }
-      // šípky útoku zo severu k hradu
-      for (let k = 0; k < 3; k++) {
-        const t = ((time * 0.8 + k / 3) % 1), ay = Math.round(nd.y - 40 + t * 18), ax = nd.x + 13;
-        g.globalAlpha = Math.sin(t * Math.PI);
-        for (let w = 0; w < 3; w++) { g.fillStyle = PAL.K; g.fillRect(ax - w - 1, ay + w - 1, w * 2 + 3, 1); }
-        for (let w = 0; w < 2; w++) { g.fillStyle = '#e84838'; g.fillRect(ax - (1 - w), ay + w, (1 - w) * 2 + 1, 1); }
-        g.globalAlpha = 1;
-      }
+      for (const f of island.fires[i]) drawFlame(f.x, f.y, f.ph, time);
     });
+  }
+  // plameň po bodoch: zúžený nahor, jazyky sa vlnia, horúce biele jadro dole, tmavočervené okraje a špička
+  const FLAME = ['#6a1408', '#b02810', '#d83818', '#f89838', '#f8d048', '#fff7c8'];
+  function drawFlame(x, y, ph, time) {
+    // žiara na zemi a ohorené miesto
+    g.globalAlpha = 0.22 + 0.08 * Math.sin(time * 11 + ph);
+    g.fillStyle = '#f89838';
+    for (let dx = -4; dx <= 4; dx++) { const w = Math.round(Math.sqrt(16 - dx * dx) * 0.4); g.fillRect(x + dx, y - w, 1, w * 2 + 1); }
+    g.globalAlpha = 1;
+    g.fillStyle = '#2a1a10'; g.fillRect(x - 2, y + 1, 5, 1); g.fillStyle = '#3e2614'; g.fillRect(x - 1, y + 2, 3, 1);
+    const h = 8 + Math.round(Math.sin(time * 9 + ph) * 1.2 + Math.sin(time * 14.3 + ph * 2) * 0.8);
+    for (let r = 0; r < h; r++) {
+      const t = r / h;
+      const half = 2.7 * Math.pow(1 - t, 0.75) + (r < 2 ? 0.3 : 0);
+      const cx = x + Math.sin(time * 7 + ph + r * 0.55) * t * 1.8 + Math.sin(time * 3.1 + ph) * t * 0.6;
+      for (let px = Math.floor(cx - half - 0.5); px <= Math.ceil(cx + half + 0.5); px++) {
+        const d = Math.abs(px - cx) / (half + 0.35);
+        if (d > 1) continue;
+        const heat = (1 - t) * 0.95 + (1 - d) * 0.55 - 0.35 + Math.sin(time * 17 + px * 1.7 + r) * 0.06;
+        const k = heat > 0.9 ? 5 : heat > 0.68 ? 4 : heat > 0.48 ? 3 : heat > 0.28 ? 2 : heat > 0.12 ? 1 : 0;
+        g.fillStyle = FLAME[k]; g.fillRect(px, y - r, 1, 1);
+      }
+    }
+    // odletujúce iskry a dym
+    if (Math.random() < 0.05) part(x + (Math.random() - 0.5) * 3, y - h, (Math.random() - 0.5) * 6, -10 - Math.random() * 8, 0.6, Math.random() < 0.5 ? '#f8d048' : '#f89838', -4);
+    if (Math.random() < 0.04) part(x, y - h - 1, (Math.random() - 0.5) * 4, -6 - Math.random() * 4, 1.8, Math.random() < 0.5 ? '#525262' : '#3e3e4c', -2);
   }
 
   function renderMap(time) {
@@ -2373,6 +2384,17 @@
     // príboj
     g.fillStyle = 'rgba(240,250,255,0.85)';
     for (const f of island.foam) if (Math.sin(time * 1.8 + f.ph) > 0.55) g.fillRect(f.x, f.y, 1, 1);
+    // hrebene vĺn na otvorenom mori: krátke svetlé čiarky, pomaly plávajú a objavujú sa/miznú
+    for (const w of island.waves) {
+      const a = Math.sin(time * 0.9 + w.ph);
+      if (a < 0.2) continue;
+      const x = Math.round(w.x + Math.sin(time * 0.35 + w.ph) * 2);
+      g.globalAlpha = Math.min(1, (a - 0.2) * 1.6);
+      g.fillStyle = '#8ad0e8'; g.fillRect(x, w.y, w.len, 1);
+      g.fillStyle = '#e8f8ff'; g.fillRect(x + 1, w.y, Math.max(1, w.len - 2), 1);
+      g.fillStyle = '#163a7a'; g.fillRect(x, w.y + 1, w.len, 1);
+      g.globalAlpha = 1;
+    }
     drawWarFx(time);
     // cestička: dobyté úseky svetlé, zamknuté tmavé bodky
     island.segs.forEach((pts, k) => {
