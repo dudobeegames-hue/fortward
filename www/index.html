@@ -434,6 +434,13 @@
   .race.sel { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold2), 0 0 14px rgba(248,208,72,.25); }
   .race.sel .tag { color: var(--gold); }
   .race.gem .tag { color: #88b4ff; }
+  /* rasy na pergamene */
+  .paper .race { background: rgba(255,248,228,.45); border-color: #5e3c1c; border-radius: 4px; box-shadow: inset 0 -3px 0 rgba(90,60,30,.2); color: #3a2410; }
+  .paper .race .tag { color: #6a5034; }
+  .paper .race.sel { border-color: #a8700c; box-shadow: inset 0 0 0 1px #f8d048, 0 0 10px rgba(248,208,72,.45); }
+  .paper .race.sel .tag { color: #a8700c; }
+  .paper .race.gem .tag { color: #2c4a9c; }
+  .paper .race > img { image-rendering: pixelated; }
   .note { font-size: 11px; color: #7c6c5a; text-align: center; margin: 0; }
 
   #over h2 { margin: 0; font-size: 34px; color: var(--red); text-shadow: 3px 3px 0 var(--ink); }
@@ -705,21 +712,27 @@
     <!-- zvitok: horná tyč stojí, pergamen sa rozvinie nadol a spodná tyč ide s ním -->
     <div class="scroll">
       <div class="rod"></div>
-      <div class="paper" id="scrollPaper"><div class="paperIn">
+      <div class="paper"><div class="paperIn">
         <h2 class="menuHead">Vyber pozíciu</h2>
         <div id="slotList"></div>
       </div></div>
       <div class="rod"></div>
-      <button id="scrollTag" class="scrollTag" title="Späť" aria-label="Späť"><img id="icoTag" alt=""></button>
+      <button id="slotsTag" class="scrollTag" title="Späť" aria-label="Späť"><img alt=""></button>
     </div>
   </div>
 
   <div id="title" class="screenOverlay menuBg" hidden>
     <div id="gemBox" class="pill"><img class="gem" alt=""><span>0</span></div>
     <div class="menuSpace"></div>
-    <h2 class="menuHead">Vyber si rasu</h2>
-    <div id="races"></div>
-    <button id="raceBack" class="btn backBtn">Späť</button>
+    <div class="scroll">
+      <div class="rod"></div>
+      <div class="paper"><div class="paperIn">
+        <h2 class="menuHead">Vyber si rasu</h2>
+        <div id="races"></div>
+      </div></div>
+      <div class="rod"></div>
+      <button id="raceTag" class="scrollTag" title="Späť" aria-label="Späť"><img alt=""></button>
+    </div>
   </div>
 
   <div id="map" hidden>

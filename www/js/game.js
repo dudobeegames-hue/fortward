@@ -3535,18 +3535,19 @@
   }
   $('mapHome').addEventListener('click', showMenu);
   // štítok na zvitku: zvitok sa zvinie nahor a ukáže sa úvodná obrazovka
-  $('icoTag').src = UI_ICONS.scrollTag;
-  $('scrollTag').addEventListener('click', () => {
-    const p = $('scrollPaper');
+  document.querySelectorAll('.scrollTag img').forEach(i => { i.src = UI_ICONS.scrollTag; });
+  function rollUp(screen, done) {
+    const p = $(screen).querySelector('.paper');
     if (p.dataset.rolling) return;
     p.dataset.rolling = '1';
     p.ontransitionend = null; p.style.transition = 'none'; p.style.height = p.scrollHeight + 'px';
     void p.offsetHeight;
     p.style.transition = 'height .6s cubic-bezier(.6,0,.8,.4)'; p.style.height = '0px';
     AUDIO.play('paper');
-    setTimeout(() => { delete p.dataset.rolling; showMenu(); }, 650);
-  });
-  $('raceBack').addEventListener('click', () => showSlots());
+    setTimeout(() => { delete p.dataset.rolling; done(); }, 650);
+  }
+  $('slotsTag').addEventListener('click', () => rollUp('slots', showMenu));
+  $('raceTag').addEventListener('click', () => rollUp('title', () => showSlots()));
   // Nastavenia na úvodnom obrázku: jediné miesto pre hudbu, zvuky a jazyk
   function syncSound() {
     document.querySelectorAll('.setIc.snd').forEach(b => {
@@ -3611,15 +3612,16 @@
     box.onclick = ev => { if (ev.target === box) close(); };
   }
   // rozvinutie zvitku s pozíciami (výška pergamenu z 0 na plnú, spodná tyč ide s ním)
-  function unrollScroll(anim) {
-    const p = $('scrollPaper');
+  function unrollScroll(anim, screen) {
+    screen = screen || 'slots';
+    const p = $(screen).querySelector('.paper');
     p.ontransitionend = null; p.style.transition = 'none'; p.style.height = anim ? '0px' : 'auto';
     void p.offsetHeight;
     const h = p.scrollHeight, PXS = 3;
     const aw = Math.ceil(p.clientWidth / PXS), ah = Math.ceil(h / PXS);
     p.style.backgroundImage = 'url(' + UI_ICONS.scrollPaper(aw, ah) + ')'; p.style.backgroundSize = aw * PXS + 'px ' + ah * PXS + 'px';
-    if (!aw || !h) { requestAnimationFrame(() => unrollScroll(anim)); return; } // ešte nemá rozmery
-    document.querySelectorAll('#slots .rod').forEach(r => {
+    if (!aw || !h) { requestAnimationFrame(() => unrollScroll(anim, screen)); return; } // ešte nemá rozmery
+    $(screen).querySelectorAll('.rod').forEach(r => {
       const rw = Math.ceil(r.offsetWidth / PXS);
       r.style.backgroundImage = 'url(' + UI_ICONS.scrollRod(rw) + ')'; r.style.backgroundSize = rw * PXS + 'px 27px';
     });
@@ -3629,7 +3631,7 @@
     p.ontransitionend = () => { p.style.height = 'auto'; };
     setTimeout(() => AUDIO.play('paper'), 300); // zvuk spolu s rozvíjaním
   }
-  window.addEventListener('resize', () => { if (!$('slots').hidden) unrollScroll(false); });
+  window.addEventListener('resize', () => { for (const sc of ['slots', 'title']) if (!$(sc).hidden) unrollScroll(false, sc); });
   function showSlots(opts) {
     st.phase = 'title';
     $('title').hidden = true; $('map').hidden = true;
@@ -3675,6 +3677,7 @@
       });
       box.appendChild(c);
     }
+    unrollScroll(true, 'title');
   }
 
   // odpočet budovania počas obliehania (stojí, kým kráľ vyberá talent)
