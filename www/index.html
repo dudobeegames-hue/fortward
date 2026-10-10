@@ -63,6 +63,8 @@
   #pauseBox .askCard { gap: 10px; }
   #pauseBox .askCard button { width: 100%; justify-content: center; font-size: 17px; padding: 11px; }
   #pauseBox h2 { margin-bottom: 4px; }
+  #pauseBox .pauseSnd { display: flex; justify-content: center; gap: 16px; margin-bottom: 4px; }
+  #pauseBox .pauseSnd .setIc { flex: 0 0 auto; width: auto; padding: 0; }
   #hud-king {
     grid-area: king; position: relative; flex-direction: column; align-items: stretch; gap: 3px;
     padding: 4px 8px 6px;
@@ -635,7 +637,7 @@
 </style>
 </head>
 <body>
-<div id="splash"><img src="img/splash.jpg" alt="Fortward"><div id="splashBtns"><button id="splashPlay" class="greenBtn">Hrať</button><button id="splashSet" class="grayBtn">Nastavenia</button></div><div id="setPanel" hidden><h2 id="setHead">Nastavenia</h2><div id="setMain" class="setIcons"><button class="setIc snd" data-kind="music"><span class="ico"><img id="icoMusic" alt=""></span><b>Hudba</b></button><button class="setIc snd" data-kind="sfx"><span class="ico"><img id="icoSound" alt=""></span><b>Zvuky</b></button><button class="setIc" id="langBtn"><span class="ico"><img id="icoLang" class="flag" alt=""></span><b>Jazyk</b></button></div><div id="langList" hidden></div><button id="setBack" class="btn backBtn">Späť</button></div></div>
+<div id="splash"><img src="img/splash.jpg" alt="Fortward"><div id="splashBtns"><button id="splashPlay" class="greenBtn">Hrať</button><button id="splashSet" class="grayBtn">Nastavenia</button></div><div id="setPanel" hidden><h2 id="setHead">Nastavenia</h2><div id="setMain" class="setIcons"><button class="setIc snd" data-kind="music"><span class="ico"><img class="icoMusic" alt=""></span><b>Hudba</b></button><button class="setIc snd" data-kind="sfx"><span class="ico"><img class="icoSound" alt=""></span><b>Zvuky</b></button><button class="setIc" id="langBtn"><span class="ico"><img id="icoLang" class="flag" alt=""></span><b>Jazyk</b></button></div><div id="langList" hidden></div><button id="setBack" class="btn backBtn">Späť</button></div></div>
 <div id="logoIntro"><img src="img/logo.jpg" alt="DBee games"></div>
 <script src="js/splash.js"></script>
 <div id="game">
@@ -771,6 +773,7 @@
 
   <div id="pauseBox" class="screenOverlay" hidden>
     <div class="askCard"><h2>Pauza</h2>
+      <div class="pauseSnd"><button class="setIc snd" data-kind="music" title="Hudba"><span class="ico"><img class="icoMusic" alt="Hudba"></span></button><button class="setIc snd" data-kind="sfx" title="Zvuky"><span class="ico"><img class="icoSound" alt="Zvuky"></span></button></div>
       <button id="pauseGo" class="primary">Pokračovať</button>
       <button id="pauseRestart" class="btn">Reštart</button>
       <button id="pauseQuit" class="btn">Ukončiť</button></div>

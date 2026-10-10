@@ -194,8 +194,8 @@ function makeOrcFort() {
 
 // ---- Odomykanie: čo prináša každá misia (misia 1 = základná výbava) ----
 const UNLOCKS = [
-  [{ id: 'tower', name: 'Strážna veža', icon: 'tower' }, { id: 'wall', name: 'Hradby', icon: 'wall' }],
-  [{ id: 'pit', name: 'Jama s ostňami', icon: 'pit' }, { id: 'mine', name: 'Zlatá baňa', icon: 'mine' }],
+  [{ id: 'tower', name: 'Strážna veža', icon: 'tower' }, { id: 'wall', name: 'Hradby', icon: 'wall' }, { id: 'pit', name: 'Jama s ostňami', icon: 'pit' }],
+  [{ id: 'mine', name: 'Zlatá baňa', icon: 'mine' }],
   [{ id: 'gate', name: 'Brána', icon: 'gate', desc: 'Prerob hradbu na bránu – tvoji rytieri cez ňu prejdú, horda nie.' }, { id: 'wallArcher', name: 'Lukostrelec na hradbách', icon: 'u_archer', desc: 'Postav lukostrelca priamo na hradbu – strieľa rýchle šípy na hordu.' }],
   [{ id: 'barracks', name: 'Kasárne a rytieri', icon: 'barracks' }],
   [{ id: 'range', name: 'Strelnica a lukostrelci', icon: 'range' }, { id: 'catapult', name: 'Katapult', icon: 'catapult' }],

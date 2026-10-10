@@ -271,7 +271,7 @@
   Object.assign(st, { mission: 1, unlocked: 1, mapSel: 1, mapAnim: null, tech: techFor(1) });
   const has = id => st.tech.has(id);
   const lvlCap = () => has('lvl5') ? MAX_LVL : 3;                       // úroveň stavieb a strelcov
-  const hallCap = lvlCap;                                                // úroveň radnice
+  const hallCap = () => st.mission === 1 ? 2 : lvlCap();                // úroveň radnice (v úvodnej misii najviac 2)
   // stavby majú najviac úroveň radnice: drevená radnica = drevené stavby, kameň až po jej vylepšení
   const bCap = () => Math.min(lvlCap(), st.hallLvl);
   const LVL_NAME = ['', 'drevo', 'kameň', 'kameň s kovaním', 'tmavé opevnenie', 'kráľovský kameň'];
@@ -2752,7 +2752,8 @@
         acts.appendChild(btn('Vylepšiť radnicu', c, st.gold >= c, () => {
           st.gold -= c; st.hallLvl++; st.hallHp += 200; st.king.hp = kingMax();
         }, 'up'));
-      } else if (st.hallLvl < MAX_LVL) acts.appendChild(lockBtn('Radnica úr. ' + (st.hallLvl + 1), 'lvl5'));
+      } else if (st.mission === 1 && st.hallLvl < lvlCap()) acts.appendChild(btn('🔒 Radnica úr. 3 · od misie 2', null, false, () => { }, 'locked'));
+      else if (st.hallLvl < MAX_LVL) acts.appendChild(lockBtn('Radnica úr. ' + (st.hallLvl + 1), 'lvl5'));
       else acts.appendChild(btn('Max. úroveň', null, false, () => { }));
       if (has('volleyUp') && spellOn('volley')) { // salvu má kráľ len ak ju dal do slotu
         const vc = volleyUpCost();
@@ -3547,7 +3548,7 @@
     AUDIO.setPref(b.dataset.kind, !AUDIO.prefs[b.dataset.kind]);
     syncSound(); AUDIO.play('click');
   }));
-  $('icoMusic').src = UI_ICONS.music; $('icoSound').src = UI_ICONS.sound; $('icoLang').src = UI_ICONS.flags.sk;
+  document.querySelectorAll('.icoMusic').forEach(i => { i.src = UI_ICONS.music; }); document.querySelectorAll('.icoSound').forEach(i => { i.src = UI_ICONS.sound; }); $('icoLang').src = UI_ICONS.flags.sk;
   // jazyky: zatiaľ len slovenčina, ostatné sú pripravené miesta s vlajkou (preklad príde, keď budú texty hotové)
   UI_ICONS.langs.forEach(l => {
     const b = document.createElement('button');
