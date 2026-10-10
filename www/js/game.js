@@ -657,7 +657,6 @@
         const pool = buildWave(MISSION_WAVES).filter(q => !ENEMY[q.type].boss && !ENEMY[q.type].fly);
         for (let k = 0; k < 3 + Math.floor(Math.random() * 2) && pool.length; k++) st.spawnQ.push(Object.assign(pool.splice(Math.floor(Math.random() * pool.length), 1)[0], { gap: 0.6 }));
         st.spawnT = Math.min(st.spawnT, 0.3);
-        toast('Výpad posádky hradu!');
       }
     }
     for (const q of F.pal) q.flash = Math.max(0, q.flash - dt);
