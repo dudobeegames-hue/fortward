@@ -248,6 +248,14 @@ const UI_ICONS = (() => {
       if (x < l || x > w - 1 - r) return null;
       if (x === l || x === w - 1 - r) return PARCH[0];            // tmavý obrys
       const dx = Math.min(x - l, w - 1 - r - x), dy = Math.min(y, h - 1 - y);
+      // zvinutý okraj pri tyči: riadky 3–8 od hornej/spodnej hrany tvoria malý valec (svetlo zhora)
+      const CURL = [null, null, null, 2, 5, 7, 8, 6, 3, 1];
+      const ci = dy;                                             // hore aj dole rovnako: tieň – svetlá hrana – tieň
+      if (dy < CURL.length && CURL[ci] != null && ci < CURL.length) {
+        let lv = CURL[ci] - Math.max(0, 4 - dx);                  // na bokoch je valec tmavší
+        if (hash(x, y) < 0.08) lv -= 1;
+        return PARCH[Math.max(1, Math.min(8, lv))];
+      }
       let v = 0.74;
       v += 0.08 * (1 - (x / w) * 0.6 - (y / h) * 0.4);            // svetlo zľava hore
       v -= Math.max(0, 7 - dx) * 0.045;                           // zvinutie a stmavnutie pri bokoch

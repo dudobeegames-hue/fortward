@@ -370,7 +370,7 @@
   .scroll { width: calc(100% - 12px); display: flex; flex-direction: column; align-items: center; }
   .rod { position: relative; z-index: 1; width: calc(100% + 24px); height: 27px; image-rendering: pixelated; background: no-repeat 0 0; filter: drop-shadow(0 3px 0 rgba(0,0,0,.35)); }
   .paper { width: 100%; height: 0; overflow: hidden; margin: -9px 0; box-sizing: border-box; background: #dfc07c no-repeat 0 0; image-rendering: pixelated; }
-  .paperIn { padding: 22px 14px 24px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .paperIn { padding: 34px 14px 34px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
   .paper .menuHead { color: #5a3418; text-shadow: 1px 1px 0 rgba(255,245,215,.7); }
   .paper .slot { background: rgba(255,248,228,.45); border-color: #5e3c1c; border-radius: 4px; box-shadow: inset 0 -3px 0 rgba(90,60,30,.2); color: #3a2410; }
   .paper .slot.empty { background: rgba(120,80,30,.08); border-color: #7e5428; border-radius: 4px; }
@@ -651,7 +651,7 @@
 <body>
 <div id="splash"><img src="img/splash.jpg" alt="Fortward"><div id="splashBtns"><button id="splashPlay" class="greenBtn">Hrať</button><button id="splashSet" class="grayBtn">Nastavenia</button></div><div id="setPanel" hidden><h2 id="setHead">Nastavenia</h2><div id="setMain" class="setIcons"><button class="setIc snd" data-kind="music"><span class="ico"><img class="icoMusic" alt=""></span><b>Hudba</b></button><button class="setIc snd" data-kind="sfx"><span class="ico"><img class="icoSound" alt=""></span><b>Zvuky</b></button><button class="setIc" id="langBtn"><span class="ico"><img id="icoLang" class="flag" alt=""></span><b>Jazyk</b></button></div><div id="langList" hidden></div><button id="setBack" class="btn backBtn">Späť</button></div></div>
 <div id="logoIntro"><img src="img/logo.jpg" alt="DBee games"></div>
-<script src="js/splash.js"></script>
+<script src="js/splash.js?v=__BUILD__"></script>
 <div id="game">
   <canvas id="screen"></canvas>
 
@@ -814,7 +814,7 @@
   requestAnimationFrame(() => requestAnimationFrame(() => {
     const list = ['audio', 'sprites', 'scene', 'buildings', 'map', 'icons', 'game'];
     list.forEach((n, i) => {
-      const s = document.createElement('script'); s.src = 'js/' + n + '.js'; s.async = false;
+      const s = document.createElement('script'); s.src = 'js/' + n + '.js?v=__BUILD__'; s.async = false; // verziu doplní nasadenie, mobil tak nevezme starý skript z pamäte
       if (i === list.length - 1) s.onload = () => SPLASH.done();
       document.body.appendChild(s);
     });

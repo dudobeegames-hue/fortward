@@ -24,6 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # verzia nasadenia do adries skriptov – prehliadač po nasadení nenačíta staré skripty z pamäte
+      - name: Verzia skriptov
+        run: sed -i "s/__BUILD__/${GITHUB_SHA::8}/g" www/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: www
