@@ -1929,7 +1929,7 @@
       for (const e of st.enemies) if (!e.dead && !e.d.fly && Math.abs(e.y - fw.y) < 6 && Math.abs(e.x - fw.x) < fw.w / 2) {
         e.burnT = Math.max(e.burnT || 0, 1.5); e.burnDps = Math.max(e.burnDps || 0, fw.dps);
       }
-      if (Math.random() < 0.9) part(fw.x + (Math.random() - 0.5) * fw.w, fw.y + (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 6, -14 - Math.random() * 12, 0.45, ['#fff7c8', '#f8d048', '#f89838', '#d83818'][Math.random() * 4 | 0], -10);
+      if (Math.random() < 0.45) { const u = 0.15 + Math.random() * 0.7; part(fw.x - fw.w / 2 + u * fw.w, fw.y - 4, (Math.random() - 0.5) * 6, -12 - Math.random() * 10, 0.5, ['#fff7c8', '#f8d048', '#f89838'][Math.random() * 3 | 0], -10); }
     }
     st.fireWalls = st.fireWalls.filter(fw => fw.t > 0);
     // strely
@@ -2288,6 +2288,47 @@
     g.fillRect(x1 - L + 1, y1, L, 1); g.fillRect(x1, y1 - L + 1, 1, L);
   }
 
+  // ohnivá stena: na zemi mäkká žiara a žeravé uhlíky (bez tvrdých okrajov), nad tým jazyky plameňov,
+  // ktoré sú v strede najvyššie a ku krajom plynule klesajú; kreslia sa podľa hĺbky medzi nepriateľmi
+  const fireEnv = (fw, x) => { const u = x / fw.w; return u <= 0 || u >= 1 ? 0 : Math.pow(Math.sin(Math.PI * u), 0.7); };
+  const fireFade = fw => Math.min(1, fw.t / 0.6, (SPELLS.firewall.dur - fw.t) / 0.25 + 0.15);
+  function drawFireGround(fw, time) {
+    const a = fireFade(fw), x0 = fw.x - fw.w / 2, y0 = fw.y;
+    g.globalAlpha = 0.16 * a; g.fillStyle = '#f89838';
+    g.beginPath(); g.ellipse(fw.x, y0, fw.w / 2 + 6, 7, 0, 0, 6.29); g.fill();
+    g.globalAlpha = 0.22 * a; g.fillStyle = '#f8d048';
+    g.beginPath(); g.ellipse(fw.x, y0, fw.w / 2 - 2, 3.5, 0, 0, 6.29); g.fill();
+    g.globalAlpha = a;
+    for (let i = 0; i < fw.w; i += 2) { // uhlíky na zemi, mihotavé
+      const e = fireEnv(fw, i); if (e < 0.2) continue;
+      const fl = Math.sin(time * 7 + i * 1.9) > 0.2;
+      g.fillStyle = fl ? '#f89838' : '#c03818';
+      g.fillRect(Math.round(x0 + i + hash2(i, 3, 7) * 2), Math.round(y0 - 1 + hash2(i, 5, 9) * 3), 1, 1);
+    }
+    g.globalAlpha = 1;
+  }
+  function drawFireFlames(fw, time, front) {
+    const a = fireFade(fw) * (front ? 0.8 : 0.88), x0 = Math.round(fw.x - fw.w / 2), base = Math.round(fw.y) + (front ? 3 : 1);
+    g.globalAlpha = a;
+    for (let i = front ? 2 : 1; i < fw.w; i += 3) { // jeden jazyk plameňa každé 3 body (s malým posunom, aby to nebolo pravidelné)
+      const e = fireEnv(fw, i); if (e < 0.12) continue;
+      const tx = x0 + i + Math.round(hash2(i, front ? 6 : 1, 4) * 2 - 1);
+      const n = 0.55 + 0.45 * Math.sin(time * (8 + hash2(i, 2, 5) * 5) + i * 2.3 + (front ? 1.7 : 0));
+      const h = Math.max(2, Math.round(e * (5 + 6 * n) * (front ? 0.45 : 1)));
+      const sway = Math.round(Math.sin(time * 5 + i) * 0.6);
+      for (let dx = -1; dx <= 1; dx++) {
+        const hh = Math.round(h * (dx ? 0.6 : 1));
+        if (hh < 1) continue;
+        const x = tx + dx;
+        g.fillStyle = '#c83018'; g.fillRect(x, base - hh, 1, hh);
+        const ho = Math.round(hh * 0.7); g.fillStyle = '#f87830'; g.fillRect(x, base - ho, 1, ho);
+        if (!dx) { const hy = Math.round(hh * 0.4); g.fillStyle = '#f8d048'; g.fillRect(x, base - hy, 1, hy); }
+      }
+      g.fillStyle = '#d83818'; g.fillRect(tx + sway, base - h - 1, 1, 1); // špička sa kníše
+      if (h > 7) { g.fillStyle = '#fff7c8'; g.fillRect(tx, base - 2, 1, 1); }
+    }
+    g.globalAlpha = 1;
+  }
   // dosah: jemne vyplnený kruh a výrazný prerušovaný okraj (tmavý obrys + zlatá), aby bol vidieť na každom teréne; čiarky pomaly obiehajú
   function drawRange(cx, cy, rr, time) {
     g.globalAlpha = 0.13; g.fillStyle = '#fff070';
@@ -2857,8 +2898,13 @@
     if (playing) for (const b of st.blds) if (TRAPS[b.kind]) drawPit(b, time);
     if (st.phase === 'build') drawBuildOverlay(time);
     for (const m of st.marks) drawMark(m);
+    for (const fw of st.fireWalls || []) drawFireGround(fw, time);
     // objekty zoradené podľa základne (hĺbka)
     const objs = [];
+    for (const fw of st.fireWalls || []) { // nepriateľ za stenou je za plameňmi, pred ňou pred nimi; nízky predný rad zakryje nohy tomu, kto práve prechádza
+      objs.push({ y: fw.y - 1, f: () => drawFireFlames(fw, time, false) });
+      objs.push({ y: fw.y + 3, f: () => drawFireFlames(fw, time, true) });
+    }
     if (playing) {
       objs.push({ y: G.hallBot, f: () => drawHall(time) });
       for (const b of st.blds) if (!TRAPS[b.kind]) objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), x: b.c, f: () => drawBuilding(b, time) });
@@ -2898,20 +2944,6 @@
     for (const dr of st.drops) drawDrop(dr);
     drawFog(time);
     for (const b of st.bolts) drawBolt(b);
-    for (const fw of st.fireWalls || []) {
-      const a = Math.min(1, fw.t / 0.5), x0 = Math.round(fw.x - fw.w / 2), y0 = Math.round(fw.y);
-      g.globalAlpha = 0.35 * a; g.fillStyle = '#f89838'; g.fillRect(x0 - 2, y0 - 4, fw.w + 4, 8); // žiara
-      g.globalAlpha = a;
-      g.fillStyle = '#3a1408'; g.fillRect(x0, y0 + 1, fw.w, 2); // spálená zem
-      for (let x = 0; x < fw.w; x++) {
-        const h = 3 + Math.round(4 * Math.abs(Math.sin(x * 0.7 + time * 9)) + 3 * Math.abs(Math.sin(x * 0.31 - time * 6)));
-        g.fillStyle = '#d83818'; g.fillRect(x0 + x, y0 + 1 - h, 1, h);
-        g.fillStyle = '#f89838'; g.fillRect(x0 + x, y0 + 1 - Math.round(h * 0.7), 1, Math.round(h * 0.7));
-        if (h > 6) { g.fillStyle = '#f8d048'; g.fillRect(x0 + x, y0 + 1 - Math.round(h * 0.4), 1, Math.round(h * 0.4)); }
-        if (h > 8 && x % 3 === 0) { g.fillStyle = '#fff7c8'; g.fillRect(x0 + x, y0 - 1, 1, 1); }
-      }
-      g.globalAlpha = 1;
-    }
     for (const sh of st.shields || []) {
       const a = Math.min(1, sh.t / 0.4, (sh.max - sh.t) / 0.2 + 0.2);
       g.globalAlpha = 0.18 * a; g.fillStyle = '#fff070';
