@@ -924,6 +924,7 @@
   function startWave() {
     if (st.fort && st.fort.dead) { missionWon(); return; } // poistka: hrad už padol
     undoStack = [];
+    for (const id in SPELLS) st[SPELLS[id].cdKey] = 0; // každá vlna začína s nabitými schopnosťami hrdinu
     if (isAttack()) {
       st.orcWaveOn = false;
       st.pendingWave = st.wave < MISSION_WAVES ? buildWave(st.wave + 1) : null;
