@@ -490,20 +490,20 @@ const UI_ICONS = (() => {
     'SSSSSSSSSSSSSS',
     'MSMMMMMSMMMMMM',
   ], TABP);
-  const tabArmy = fromMap([
-    '....LLLL....',
-    '..LLMMMMSS..',
-    '.LMMMMMMMMS.',
-    'LMMMMMMMMMMS',
-    'LMMMMMMMMMMS',
-    'LM........MS',
-    'LMMMMM.MMMMS',
-    'LMMMMM.MMMMS',
-    'LMMM.M.M.MMS',
-    'LMMMMM.MMMMS',
-    '.LMMMMMMMMS.',
-    '..SSSSSSSS..',
-  ], TABP);
+  const tabArmy = (() => { // meč šikmo za štítom s krížom
+    const N = 16, g = [...Array(N)].map(() => Array(N).fill(null));
+    const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < N && y < N) g[y][x] = TABP[c]; };
+    for (let t = 0; t <= 10; t++) { put(14 - t, t, 'L'); put(15 - t, t, 'M'); put(14 - t, t + 1, 'S'); } // čepeľ
+    for (let k = -2; k <= 2; k++) { put(4 + k, 10 + k, 'M'); put(5 + k, 10 + k, 'S'); } // záštita
+    put(3, 12, 'M'); put(2, 13, 'M'); put(3, 13, 'S'); put(1, 14, 'L'); put(2, 14, 'S'); // rukoväť a hlavica
+    for (let y = 4; y <= 15; y++) { // štít vpredu
+      const hw = y < 11 ? 4 : Math.max(0, 4 - Math.round((y - 10) * 0.9));
+      for (let x = 10 - hw; x <= 10 + hw; x++) put(x, y, x === 10 - hw || y === 4 ? 'L' : x === 10 + hw ? 'S' : x < 10 ? 'M' : 'S');
+    }
+    for (let y = 6; y <= 13; y++) put(10, y, 'L'); // kríž na štíte
+    for (let x = 7; x <= 13; x++) put(x, 8, 'L');
+    return pix(N, N, (x, y) => g[y][x]);
+  })();
   const tabSiege = fromMap([
     '..........LMS..',
     '.........LMMMS.',
@@ -519,19 +519,21 @@ const UI_ICONS = (() => {
     '.LMS......LMS..',
     '.SSS......SSS..',
   ], TABP);
-  const tabSupport = fromMap([
+  const tabSupport = fromMap([ // kladivo remeselníka
+    '.LLLLLLLLLLM.',
+    '.LMMMMMMMMMS.',
+    '.LMMMMMMMMMS.',
+    '.LMMMMMMMMMS.',
+    '.SSSSSSSSSSS.',
     '.....LMS.....',
-    '..LS.LMS.LS..',
-    '.LMMSMMMSMMS.',
-    '..SMMMMMMMS..',
-    '..LMMS.SMMS..',
-    'LLMMS...SMMSS',
-    'LMMM.....MMMS',
-    'SSMMS...SMMSS',
-    '..LMMS.SMMS..',
-    '..SMMMMMMMS..',
-    '.LMMSMMMSMMS.',
-    '..SS.LMS.SS..',
+    '.....LMS.....',
+    '.....LMS.....',
+    '.....LMS.....',
+    '.....SSS.....',
+    '.....LMS.....',
+    '.....SSS.....',
+    '.....LMS.....',
+    '.....LMS.....',
     '.....SSS.....',
   ], TABP);
   const tabs = { towers: tabTowers, walls: tabWalls, army: tabArmy, siege: tabSiege, support: tabSupport };

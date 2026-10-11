@@ -186,31 +186,96 @@ function buildScene(W, H, G, seed, themeIdx) {
   if (th.river) { // potok / rieka naprieč poľom
     const R = th.river, ry = H * R.y;
     const rcy = x => ry + Math.sin(x * 0.045 + seed) * 7;
+    const hwAt = x => R.hw + (vnoise(x * 0.2, 0.5, seed + 51) - 0.5) * 2;
+    // breh: pás piesku a kamienkov, nad vodou a pod ňou zvlášť široký a nepravidelný
+    const bankN = x => 0.8 + Math.pow(vnoise(x * 0.09, 1.5, seed + 71), 1.4) * 6.5; // miestami úzky a zarastený, inde široká piesočná pláž
+    const bankS = x => 0.8 + Math.pow(vnoise(x * 0.08, 3.5, seed + 73), 1.4) * 5.5;
+    const pebbles = R.ford ? 0.86 : 0.93;
     for (let x = 0; x < W; x++) {
-      const cy = rcy(x), hw = R.hw + (vnoise(x * 0.2, 0.5, seed + 51) - 0.5) * 2;
-      for (let y = Math.floor(cy - hw - 2); y <= Math.ceil(cy + hw + 2); y++) {
+      const cy = rcy(x), hw = hwAt(x), bn = bankN(x), bs = bankS(x);
+      for (let y = Math.floor(cy - hw - bn - 1); y <= Math.ceil(cy + hw + bs + 1); y++) {
         if (y < 0 || y >= H) continue;
-        const dy = Math.abs(y - cy);
+        const dy = y - cy, ady = Math.abs(dy);
         const onRoad = roadD(x, y) < 1;
+        if (ady > hw) { // breh
+          const t = (ady - hw) / (dy < 0 ? bn : bs); // 0 = pri vode, 1 = pri tráve
+          if (t > 1) continue;
+          blocked[y * W + x] = 1;
+          if (onRoad && R.bridge) continue; // cesta ide až k mostu
+          const hsh = hash2(x, y, seed + 81);
+          if (t > 0.6 && hsh < (t - 0.6) * 2.4) continue; // tráva zubato zasahuje do piesku
+          if (t < 0.25) { set(x, y, pickRamp(TR.sand, 0.04 + hsh * 0.22, x, y)); continue; } // mokrý tmavší piesok pri vode
+          set(x, y, pickRamp(TR.sand, 0.2 + t * 0.38 + (hsh - 0.5) * 0.25 + (dy < 0 ? 0.06 : -0.06) - (onRoad ? 0.1 : 0), x, y));
+          if (hsh > pebbles) { set(x, y, pickRamp(RAMP.stone, 0.62 + hash2(x, y, 9) * 0.3, x, y)); set(x, y + 1, RAMP.stone[2]); } // kamienok s tieňom
+          else if (hsh < 0.05 && t > 0.35) set(x, y, RAMP.grass[hsh < 0.025 ? 4 : 5]); // steblo trávy v piesku
+          continue;
+        }
         blocked[y * W + x] = 1;
-        if (dy > hw) { // breh
-          set(x, y, pickRamp(R.ford ? RAMP.stone : TR.mud, 0.45 + (y < cy ? 0.15 : -0.05), x, y));
-          continue;
-        }
-        if (onRoad && R.bridge) { // drevený most
-          const rx = Math.abs(x - roadCx(y)), rhw = roadHw(y);
-          if (rx > rhw - 1) set(x, y, rx > rhw ? K : WOOD[5]);
-          else set(x, y, pickRamp(WOOD, (Math.floor(y) % 2 ? 0.55 : 0.4) - (x > roadCx(y) ? 0.08 : 0), x, y));
-          continue;
-        }
-        let v = 0.62 - (1 - dy / hw) * 0.3 + ((x + Math.round(y * 2)) % 9 === 0 ? 0.18 : 0);
+        // voda: pri brehu plytká a svetlejšia, v strede hlboká; jemné šikmé vlnky
+        const depth = 1 - ady / hw;
+        let v = 0.74 - depth * 0.44 + ((x + Math.round(y * 2.3) + Math.round(Math.sin(y * 0.9 + x * 0.21) * 2)) % 11 === 0 ? 0.15 : 0);
+        if (dy < 0 && hw - ady < 1.3) v -= 0.2; // tieň pod severným brehom
+        else if (dy > 0 && hw - ady < 1) v += 0.1; // svetlý lem pri južnom brehu
         if (onRoad && R.ford) v += 0.22; // plytčina na brode
         water[y * W + x] = onRoad && R.ford ? 2 : 1;
         set(x, y, pickRamp(TR.water, v, x, y));
       }
-      if (R.bridge && roadD(x, cy) < 1) { // tieň mosta / zábradlie
-        const rx = x - roadCx(cy), rhw = roadHw(cy);
-        if (Math.abs(rx) > rhw - 1 && Math.abs(rx) <= rhw) { set(x, cy - hw - 3, WOOD[5]); set(x, cy - hw - 2, K); }
+    }
+    const nearRoad = (x, y, m) => roadD(x, y) < m;
+    // trsy trávy na okraji brehu, trstina pri vode, kamene v prúde, lekná
+    for (let x = 1; x < W - 1; x++) {
+      const cy = rcy(x), hw = hwAt(x);
+      if (nearRoad(x, cy, 6)) continue;
+      const h1 = hash2(x, 11, seed), h2 = hash2(x, 13, seed), h3 = hash2(x, 17, seed);
+      if (h1 > 0.55) { // tráva prevísa cez okraj brehu (hore aj dole)
+        const gy = Math.round(cy - hw - bankN(x)), gy2 = Math.round(cy + hw + bankS(x));
+        const len = 1 + Math.round(h2 * 2);
+        for (let k = 0; k <= len; k++) { set(x, gy + k, RAMP.grass[k ? 4 : 5]); set(x, gy2 - k, RAMP.grass[k ? 3 : 4]); }
+      }
+      if (h3 > 0.9 && x % 2 === 0) { // trstina pri vode s hnedým klasom
+        const north = h2 > 0.5, by = Math.round(north ? cy - hw + 1 : cy + hw), ht = 4 + Math.round(h1 * 3);
+        for (let k = 0; k < ht; k++) set(x, by - k, RAMP.grass[k < 2 ? 3 : 4]);
+        set(x, by - ht, WOOD[3]); set(x, by - ht - 1, WOOD[4]); set(x, by - ht + 1, WOOD[2]);
+        if (h1 > 0.5) for (let k = 0; k < ht - 2; k++) set(x + 1, by - k, RAMP.grass[3]); // druhé steblo
+      }
+      if (h2 > 0.965 && !nearRoad(x, cy, 14)) { // kameň v prúde s penou
+        const sy = Math.round(cy + (h1 - 0.5) * hw);
+        for (let dx = -1; dx <= 1; dx++) { set(x + dx, sy, RAMP.stone[dx < 0 ? 6 : 4]); set(x + dx, sy + 1, RAMP.stone[2]); }
+        set(x, sy - 1, RAMP.stone[5]);
+        set(x - 2, sy + 1, TR.water[7]); set(x + 2, sy, TR.water[7]); set(x + 3, sy + 1, TR.water[6]);
+      }
+      if (!R.ford && h1 > 0.975 && !nearRoad(x, cy, 16)) { // leknín
+        const ly = Math.round(cy + (h3 - 0.5) * hw * 0.8);
+        for (let dx = -2; dx <= 2; dx++) for (let dy = -1; dy <= 1; dy++) if (Math.abs(dx) + Math.abs(dy) < 3) set(x + dx, ly + dy, RAMP.grass[dy < 0 ? 5 : 4]);
+        set(x + 1, ly - 1, TR.water[4]); set(x - 1, ly, RAMP.grass[6]); // zárez a lesk
+        if (h2 > 0.5) { set(x, ly, hexRGB('#f4b8d0')); set(x, ly - 1, hexRGB('#ffffff')); } // kvet
+      }
+    }
+    if (R.bridge) { // drevený most: rovné okraje, dosky naprieč, zábradlie so stĺpikmi, tieň na vode
+      const bcx = Math.round(roadCx(ry)), half = Math.round(roadHw(ry)) + 1, x0 = bcx - half, x1 = bcx + half;
+      let top = 1e9, bot = -1e9;
+      for (let x = x0; x <= x1; x++) { top = Math.min(top, rcy(x) - hwAt(x) - bankN(x) * 0.5); bot = Math.max(bot, rcy(x) + hwAt(x) + bankS(x) * 0.5); }
+      top = Math.floor(top); bot = Math.ceil(bot);
+      for (let y = top + 2; y <= bot + 1; y++) for (const sx of [x1 + 1, x1 + 2]) if (water[y * W + sx]) darken(sx, y, sx === x1 + 1 ? 0.55 : 0.75);
+      for (let x = x0 + 1; x <= x1 + 2; x++) if (water[(bot + 1) * W + x]) darken(x, bot + 1, 0.6);
+      for (let y = top; y <= bot; y++) for (let x = x0; x <= x1; x++) {
+        water[y * W + x] = 0; blocked[y * W + x] = 1;
+        const row = y - top;
+        if (x === x0 || x === x1) { set(x, y, K); continue; }
+        if (x === x0 + 1 || x === x1 - 1) { // trám zábradlia, stĺpik každých 5 bodov
+          set(x, y, row % 5 === 0 ? WOOD[2] : x === x0 + 1 ? WOOD[6] : WOOD[4]);
+          continue;
+        }
+        if (row % 3 === 2) { set(x, y, WOOD[1]); continue; } // šev medzi doskami
+        const plank = Math.floor(row / 3);
+        const pv = 0.56 + (hash2(plank, 7, seed) - 0.5) * 0.28 + (row % 3 === 0 ? 0.1 : 0) + (x - x0 < 4 ? 0.06 : 0) - (x1 - x < 4 ? 0.1 : 0);
+        set(x, y, pickRamp(WOOD, pv + (hash2(x, y, 5) - 0.5) * 0.08, x, y));
+        if (row % 3 === 0 && (x === x0 + 3 || x === x1 - 3)) set(x, y, RAMP.stone[5]); // klinec
+      }
+      for (let x = x0 + 2; x <= x1 - 2; x++) { set(x, top, WOOD[2]); set(x, bot, WOOD[2]); } // prahy na koncoch
+      for (const px of [x0, x1]) for (let y = top; y <= bot; y++) if ((y - top) % 5 === 0) { // prúd sa čerí okolo stĺpov
+        const qx = px + (px === x0 ? -1 : 1);
+        if (water[y * W + qx]) { set(qx, y, TR.water[7]); if (water[(y + 1) * W + qx]) set(qx, y + 1, TR.water[6]); }
       }
     }
     if (R.ford) { // kamene v brode

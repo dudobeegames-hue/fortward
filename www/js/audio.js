@@ -111,6 +111,8 @@ const AUDIO = (() => {
   const SFX = {
     arrow: () => { tone({ type: 'triangle', f: rnd(700, 900), f2: 260, t: 0.08, vol: 0.07 }); noise({ freq: 3000, q: 0.8, t: 0.06, vol: 0.05, filter: 'highpass' }); },
     bolt: () => { tone({ type: 'square', f: 180, f2: 90, t: 0.06, vol: 0.06, lp: 900 }); noise({ freq: 1800, q: 2, t: 0.09, vol: 0.09 }); },
+    ice: () => { tone({ type: 'triangle', f: rnd(1700, 2100), f2: 2600, t: 0.12, vol: 0.05 }); noise({ filter: 'highpass', freq: 6000, t: 0.08, vol: 0.03 }); },
+    lance: () => { tone({ type: 'sawtooth', f: 120, f2: 70, t: 0.18, vol: 0.06, lp: 700 }); noise({ freq: 900, q: 1.5, t: 0.12, vol: 0.08 }); },
     fire: () => { noise({ filter: 'lowpass', freq: 400, f2: 2400, t: 0.35, vol: 0.12, attack: 0.08 }); },
     boom: () => { noise({ filter: 'lowpass', freq: 1400, f2: 90, t: 0.5, vol: 0.32 }); tone({ type: 'sine', f: 110, f2: 38, t: 0.45, vol: 0.32 }); },
     hit: () => { noise({ freq: rnd(1200, 2000), q: 1.5, t: 0.05, vol: 0.08 }); },
@@ -139,7 +141,7 @@ const AUDIO = (() => {
     },
     unlock: () => { [784, 988, 1175, 1568].forEach((f, k) => tone({ type: 'triangle', f, t: 0.2, vol: 0.06, at: k * 0.08 })); },
   };
-  const MIN_GAP = { arrow: 0.05, bolt: 0.06, hit: 0.035, die: 0.05, coin: 0.05, thud: 0.07, hallHit: 0.12, clang: 0.08, kingHit: 0.1, fire: 0.1, boom: 0.06 };
+  const MIN_GAP = { ice: 0.06, lance: 0.1, arrow: 0.05, bolt: 0.06, hit: 0.035, die: 0.05, coin: 0.05, thud: 0.07, hallHit: 0.12, clang: 0.08, kingHit: 0.1, fire: 0.1, boom: 0.06 };
   const last = {};
   function play(name) {
     if (!prefs.sfx || !ctx || ctx.state !== 'running' || !SFX[name]) return;

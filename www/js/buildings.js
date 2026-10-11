@@ -268,6 +268,78 @@ function makeMageTower(lvl) {
   return p.finish();
 }
 
+// ---- Ľadová veža – štíhla veža s ľadovou strechou a žiariacim kryštálom navrchu, 5 úrovní ----
+const ROOF_ICE = ['#0e2030', '#163450', '#1e4c70', '#2c6a94', '#4890bc', '#78bce0', '#b8e8ff'].map(hexRGB);
+const ICE_HI = hexRGB('#e8f8ff'), ICE_MID = hexRGB('#88d0f0'), ICE_DK = hexRGB('#3c88b8');
+function makeIceTower(lvl) {
+  lvl = lvl || 2;
+  const M = LVL_MAT[lvl], body = matBody(lvl);
+  const h = [0, 42, 44, 46, 48, 50][lvl];
+  const p = painter(18, h);
+  const y0 = h - 22;
+  if (M.wood) paintWoodBody(p, 3, 14, y0, h - 2);
+  else paintTowerBody(p, 3, 14, y0, h - 2, 91, body);
+  for (let y = 0; y < 5; y++) for (let x = 0; x < 2; x++) p.set(8 + x, y0 + 6 + y, y === 0 ? DARKWIN : ICE_MID); // okno svieti na modro
+  for (let y = h - 8; y <= h - 2; y++) for (let x = 7; x <= 10; x++) p.shade(x, y, WOOD, y === h - 8 ? 0.2 : 0.45);
+  if (lvl >= 3) for (let x = 3; x <= 14; x++) p.set(x, y0 + 13, x % 3 === 0 ? ICE_HI : ICE_DK); // ľadový pás
+  if (M.gold) for (let x = 3; x <= 14; x++) { p.set(x, y0 + 1, x % 2 ? GOLD : GOLD2); p.set(x, h - 10, x % 2 ? GOLD : GOLD2); }
+  if (M.wood) for (let x = 1; x <= 16; x++) for (let y = y0 - 4; y <= y0 + 1; y++) p.shade(x, y, WOOD, y === y0 - 4 ? 0.75 : y === y0 + 1 ? 0.15 : 0.5);
+  else paintParapet(p, 1, 16, y0 - 4, y0 + 1, body, lvl);
+  for (let k = 0; k < 4; k++) p.set(3 + k * 4, y0 + 2, ICE_HI); // cencúle pod cimburím
+  const coneTop = y0 - 12;
+  paintCone(p, 8.5, coneTop, y0 - 3, lvl >= 4 ? 9 : 8, ROOF_ICE);
+  // kryštál: kosoštvorec s lesklou hranou
+  const cy = coneTop - 4;
+  for (let dy = -3; dy <= 3; dy++) {
+    const w = 2 - Math.floor(Math.abs(dy) * 0.6);
+    for (let dx = -w; dx <= w + 1; dx++) p.set(8 + dx, cy + dy, dx <= 0 ? (dy < 0 ? ICE_HI : ICE_MID) : ICE_DK);
+  }
+  p.set(8, cy - 2, hexRGB('#ffffff'));
+  return p.finish();
+}
+
+// ---- Balista – nízka masívna veža s veľkou kušou navrchu, 5 úrovní ----
+function paintBallista(p, top, lvl) {
+  const STR = hexRGB('#f0e6c8'), SHAFT = hexRGB('#d8c090'), TIP = hexRGB('#e8ecf4'), FLETCH = hexRGB('#e84838');
+  for (let x = 4; x <= 13; x++) for (let y = top + 8; y <= top + 10; y++) p.set(x, y, y === top + 8 ? (lvl >= 3 ? RIVET : WOOD[4]) : y === top + 10 ? WOOD[1] : WOOD[2]); // otočný podstavec
+  for (let y = top + 1; y <= top + 9; y++) { p.shade(8, y, WOOD, 0.8); p.shade(9, y, WOOD, 0.42); } // lôžko mieri na hordu
+  for (let x = 0; x <= 17; x++) { // luk: hrubé ramená prehnuté dopredu, na kráľovskej úrovni zlaté konce
+    const off = Math.round(2.2 * Math.pow((x - 8.5) / 8.5, 2)), y = top + 4 - off;
+    const end = x <= 1 || x >= 16;
+    p.set(x, y, end && lvl === 5 ? GOLD : lvl >= 3 ? (x % 4 === 1 ? RIVET : IRON) : WOOD[5]);
+    p.set(x, y + 1, lvl >= 3 ? hexRGB('#26262e') : WOOD[2]);
+  }
+  pLine(p, 0, top + 4, 8, top + 8, (x, y) => p.set(x, y, STR)); // tetiva natiahnutá k zadku lôžka
+  pLine(p, 17, top + 4, 9, top + 8, (x, y) => p.set(x, y, STR));
+  for (let y = top - 1; y <= top + 6; y++) p.set(8, y, SHAFT); // nabitý šíp
+  p.set(8, top - 2, TIP); p.set(9, top - 1, TIP); p.set(7, top - 1, RIVET);
+  p.set(7, top + 6, FLETCH); p.set(9, top + 6, FLETCH); p.set(7, top + 7, FLETCH);
+}
+function makeBallistaTower(lvl) {
+  lvl = lvl || 2;
+  const M = LVL_MAT[lvl];
+  if (M.wood) { // drevené lešenie
+    const p = painter(18, 30);
+    for (const lx of [3, 14]) for (let y = 13; y <= 28; y++) p.shade(lx, y, WOOD, lx === 3 ? 0.65 : 0.38);
+    pLine(p, 4, 14, 13, 28, (x, y) => p.shade(x, y, WOOD, 0.5));
+    pLine(p, 13, 14, 4, 28, (x, y) => p.shade(x, y, WOOD, 0.4));
+    for (let y = 10; y <= 13; y++) for (let x = 1; x <= 16; x++) p.shade(x, y, WOOD, y === 10 ? 0.8 : y === 13 ? 0.15 : 0.52 - (x - 1) * 0.015);
+    paintBallista(p, 3, lvl);
+    return p.finish();
+  }
+  const h = [0, 0, 30, 32, 34, 36][lvl], body = matBody(lvl);
+  const p = painter(18, h);
+  paintTowerBody(p, 2, 15, 13, h - 2, 97, body); // širšie a nižšie telo
+  for (let y = h - 7; y <= h - 2; y++) for (let x = 7; x <= 10; x++) p.shade(x, y, WOOD, y === h - 7 ? 0.2 : 0.45 - (x - 7) * 0.05);
+  for (let y = 17; y <= 18; y++) for (let x = 5; x <= 12; x++) if (x % 3 !== 1) p.set(x, y, DARKWIN); // strieľne
+  if (M.iron) paintBand(p, 2, 15, h - 10);
+  if (M.gold) for (let x = 2; x <= 15; x++) p.set(x, 14, x % 2 ? GOLD : GOLD2);
+  if (M.banner) paintBanner(p, 13, 15, 3, 6, M.banner);
+  paintParapet(p, 1, 16, 9, 13, body, lvl);
+  paintBallista(p, 3, lvl);
+  return p.finish();
+}
+
 // ---- Kasárne (sprite 18x26) ----
 function makeBarracks() {
   const p = painter(18, 26);
@@ -1065,6 +1137,8 @@ function initBuildingSprites() {
   BSPR.hall = [1, 2, 3, 4, 5].map(l => makeHall(l));
   BSPR.tower = [1, 2, 3, 4, 5].map(l => makeArcherTower(l));
   BSPR.mage = [1, 2, 3, 4, 5].map(l => makeMageTower(l));
+  BSPR.icetower = [1, 2, 3, 4, 5].map(l => makeIceTower(l));
+  BSPR.ballista = [1, 2, 3, 4, 5].map(l => makeBallistaTower(l));
   BSPR.barracks = makeBarracks();
   BSPR.pit = makePit();
   BSPR.catapult = makeCatapult();

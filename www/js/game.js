@@ -25,6 +25,8 @@
     falconry: { name: 'Sokoliareň',   short: 'Sokoly',  cost: 120, hp: 180, block: true, desc: 'Vypúšťa sokoly – letia ponad hradby a lovia netopiere, šamanov a podkopníkov; strelci ich ľahko zostrelia' },
     armory:   { name: 'Zbrojnica',    short: 'Zbrojnica', cost: 100, hp: 240, block: true, desc: 'Vysiela kopijníkov – útočia spoza rytierov a sú silní proti jazde' },
     mage:     { name: 'Veža mága',    short: 'Mág',    cost: 150, hp: 240, range: 70, dmg: 14, cd: 2.2, proj: 'fire', speed: 115, splash: 16, block: true, desc: 'Ohnivá guľa zasiahne celú skupinu' },
+    icetower: { name: 'Ľadová veža',  short: 'Ľad',    cost: 90,  hp: 220, range: 72, dmg: 5,  cd: 1.3, proj: 'ice', speed: 150, chill: 2.2, block: true, desc: 'Ľadové strely spomalia zasiahnutého aj nepriateľov okolo neho' },
+    ballista: { name: 'Balista',      short: 'Balista', cost: 140, hp: 260, range: 118, dmg: 34, cd: 3.2, proj: 'lance', speed: 250, block: true, desc: 'Ťažký šíp prestrelí celý rad nepriateľov na zemi' },
     wall:     { name: 'Hradby',       short: 'Hradby', cost: 12,  hp: 240, block: true, desc: 'Zatarasí cestu – horda ich musí rozbiť alebo obísť' },
     pit:      { name: 'Jama s ostňami', short: 'Jama', cost: 30,  dmg: 12, block: false, desc: 'Zraní a spomalí každého, kto ňou prejde' },
     catapult: { name: 'Katapult',     short: 'Katapult', cost: 140, hp: 200, range: 150, minRange: 36, dmg: 26, cd: 3.6, proj: 'rock', speed: 120, splash: 20, block: true, desc: 'Hádže balvany ďaleko do hordy (nie na lietajúcich)' },
@@ -37,7 +39,7 @@
   };
   const TRAPS = { pit: 1, firepit: 1, beartrap: 1 };
   const FIRE_BURN = 4; // ohnivá jama: horenie trvá 4 s (pri 8/s = 32 poškodenia – viac za zlato ako jama s ostňami, tá zas spomaľuje)
-  const SHOOTERS = { tower: 1, mage: 1, catapult: 1 };
+  const SHOOTERS = { tower: 1, mage: 1, catapult: 1, icetower: 1, ballista: 1 };
   // špecializácie veží (od úrovne 3)
   const SPECS = {
     fire:   { name: 'Ohnivé šípy',   desc: 'zásah zapáli nepriateľa', col: '#f89838', dmg: 1,    cd: 1,    range: 0 },
@@ -103,7 +105,7 @@
   const uCd = u => WUNIT[u.type].cd * Math.pow(0.92, u.lvl - 1);
   const uRange = u => WUNIT[u.type].range + 4 * (u.lvl - 1);
   const uUpCost = u => Math.round(WUNIT[u.type].cost * 0.9 * Math.pow(1.6, u.lvl - 1));
-  const BUILD_ORDER = ['paving', 'tower', 'wall', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'catapult', 'mage', 'chapel', 'firepit', 'beartrap', 'workshop'];
+  const BUILD_ORDER = ['paving', 'tower', 'wall', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'catapult', 'mage', 'icetower', 'ballista', 'chapel', 'firepit', 'beartrap', 'workshop'];
   const ENEMY = {
     goblin:  { spr: 'goblin',  hp: 12,  speed: 24, atk: 4,  atkCd: 0.8, gold: 3,  blood: '#62a03a' },
     orc:     { spr: 'orc',     hp: 32,  speed: 16, atk: 9,  atkCd: 1.0, gold: 6,  blood: '#62a03a' },
@@ -312,7 +314,7 @@
     shield:    { name: 'Svätý štít',   desc: 'Budovy aj radnica v okolí chvíľu neberú žiadne poškodenie.', icon: 'sp_shield' },
     heal:      { name: 'Uzdravenie',   desc: 'Ihneď vylieči paladina a rytierov okolo neho.',           icon: 'sp_heal' },
     firewall:  { name: 'Ohnivá stena', desc: 'Pás ohňa na zvolenom mieste podpáli každého, kto ním prejde.', icon: 'sp_firewall' },
-    teleport:  { name: 'Teleport',     desc: 'Čarodejka sa premiestni na zvolené miesto a omráči nepriateľov okolo.', icon: 'sp_teleport' },
+    teleport:  { name: 'Teleport',     desc: 'Čarodejka sa premiestni na zvolené miesto, zraní a omráči nepriateľov okolo a hneď sa vráti k radnici.', icon: 'sp_teleport' },
   };
   const slotOpen = i => kingMeta.lvl >= KING_SLOT_LVL[i];
   const spellOn = id => kingMeta.slots.some((s, i) => s === id && slotOpen(i));
@@ -888,6 +890,7 @@
     $('bottom').hidden = true;
     // rytieri a kráľ sa vrátia a vyliečia
     for (const s of st.soldiers) { s.hp = s.max; s.tgt = null; }
+    st.fireWalls = []; st.shields = []; // schopnosti hrdinu po vlne dohasnú
     if (st.king && st.king.dead && st.king.fadeT == null) st.king.fadeT = 0; // padnutý kráľ sa po vlne vytratí
     if (st.king && st.king.dead) later(() => { if (st.phase === 'build' && st.king.dead) hint(heroFell() + ' – ' + (heroDef().fem ? 'oživíš ju' : 'oživíš ho') + ' v radnici'); }, 900);
     if (st.king && !st.king.dead) { st.king.hp = kingMax(); st.king.down = 0; st.king.tgt = null; st.king.flash = 0; st.king.swing = 0; st.king.x = st.king.hx; st.king.y = st.king.hy; }
@@ -1395,6 +1398,7 @@
   }
 
   function hitUnit(u, dmg) {
+    if (u.isKing && u.tpBack > 0) return; // čarodejku počas teleportu nič nezraní
     u.hp -= dmg * (u.armor || 1); u.flash = 0.08;
     part(u.x, u.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.3, '#e84838', 100);
     if (u.hp > 0) return;
@@ -1584,6 +1588,28 @@
   function fireFrom(b) {
     const def = BUILD[b.kind], c = bCenter(b);
     return shoot(c.x, c.y, c.x, tileY(b.r) + T - (b.kind === 'mage' ? 36 : 28), bRange(b), b.spec === 'fire' ? 'farrow' : def.proj, def.speed * (b.spec === 'sniper' ? 1.4 : 1), bDmg(b), def.splash || 0);
+  }
+  // ľadová veža: strela spomalí cieľ aj susedov (spomalenie sa predlžuje s úrovňou)
+  function fireIce(b) {
+    const def = BUILD.icetower, c = bCenter(b);
+    if (!shoot(c.x, c.y, c.x, tileY(b.r) + T - 38, bRange(b), 'ice', def.speed, bDmg(b), 0)) return false;
+    st.proj[st.proj.length - 1].chill = def.chill + 0.3 * (b.lvl - 1);
+    return true;
+  }
+  // balista: šíp letí rovno cez cieľ až na koniec dosahu a zraní každého na zemi, koho cestou prebodne
+  function fireBallista(b) {
+    const def = BUILD.ballista, c = bCenter(b), rng = bRange(b), ox = c.x, oy = tileY(b.r) + T - 26;
+    let best = null, bd = 1e9;
+    for (const e of st.enemies) {
+      if (e.dead || e.d.fly || e.y < 4 || Math.hypot(e.x - c.x, e.y - c.y) > rng) continue;
+      const t = tileAt(e.x, e.y), v = st.dist[t.r * G.cols + t.c] || 0;
+      if (v < bd) { bd = v; best = e; }
+    }
+    if (!best) return false;
+    const dx = best.x - ox, dy = best.y - best.h * 0.5 - oy, d = Math.hypot(dx, dy) || 1;
+    st.proj.push({ k: 'lance', lance: true, x: ox, y: oy, vx: dx / d, vy: dy / d, spd: def.speed, dmg: bDmg(b), trav: 0, max: rng + 24, hit: new Set() });
+    AUDIO.play('lance');
+    return true;
   }
   function fireWallUnit(b) {
     const u = b.unit, d = WUNIT[u.type], c = bCenter(b);
@@ -1817,6 +1843,7 @@
     if (id === 'teleport') {
       for (let q = 0; q < 18; q++) part(k.x, k.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.5, q % 2 ? '#c8a0ff' : '#ffffff', 20);
       k.x = Math.max(G.gx0 + 4, Math.min(G.gx0 + G.cols * T - 4, x)); k.y = y; k.tgt = null; k.next = null;
+      k.tpBack = 0.45; // po údere sa hneď vráti teleportom k radnici
       for (const e of st.enemies) if (!e.dead && Math.hypot(e.x - k.x, (e.y - k.y) / 0.7) < sp.R) { damage(e, 10 * pow); e.stunT = Math.max(e.stunT || 0, 1.2 * (e.d.boss ? 0.4 : 1)); }
       for (let q = 0; q < 34; q++) { const a = Math.random() * 6.28, v = 20 + Math.random() * 40; part(k.x, k.y - 6, Math.cos(a) * v, Math.sin(a) * v * 0.6 - 10, 0.5, ['#c8a0ff', '#ffffff', '#8a5ae0'][q % 3], 30); }
       st.marks.push({ x: k.x, y: k.y, life: 0.5, max: 0.5, ice: true });
@@ -1883,6 +1910,8 @@
     for (const b of st.blds) {
       b.flash = Math.max(0, b.flash - dt);
       if (b.kind === 'tower' || b.kind === 'mage') { b.cd -= dt; if (b.cd <= 0 && fireFrom(b)) b.cd = bCd(b); }
+      else if (b.kind === 'icetower') { b.cd -= dt; if (b.cd <= 0 && fireIce(b)) b.cd = bCd(b); }
+      else if (b.kind === 'ballista') { b.cd -= dt; if (b.cd <= 0 && fireBallista(b)) b.cd = bCd(b); }
       else if (b.kind === 'catapult') { b.cd -= dt; if (b.cd <= 0 && fireCatapult(b)) b.cd = bCd(b); }
       else if (b.unit) { b.unit.cd -= dt; if (b.unit.cd <= 0 && fireWallUnit(b)) b.unit.cd = uCd(b.unit); }
       else if (UNIT_HOME[b.kind]) updateBarracks(b, dt);
@@ -1910,7 +1939,15 @@
     if (k.dead) k.deadT += dt;
     else {
       const hd = heroDef();
-      if (hd.range) updateSorc(k, dt);
+      if (k.tpBack > 0) { // čarodejka po údere teleportom: chvíľu stojí na mieste, potom sa vráti k radnici
+        k.tpBack -= dt;
+        if (k.tpBack <= 0) {
+          for (let q = 0; q < 16; q++) part(k.x, k.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.5, q % 2 ? '#c8a0ff' : '#ffffff', 20);
+          k.x = k.hx; k.y = k.hy; k.tgt = null; k.next = null;
+          for (let q = 0; q < 16; q++) part(k.x, k.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.5, q % 2 ? '#c8a0ff' : '#ffffff', 20);
+          AUDIO.play('bolt');
+        }
+      } else if (hd.range) updateSorc(k, dt);
       else updateFighter(k, dt, k.hx, k.hy, hd.reach + T + 10 * tal('reach'), kingDmg(), true, moveKnight); // vyráža o políčko pred stavebnú zónu, chodí len cez brány
       if (tal('regen') && k.hp < kingMax()) k.hp = Math.min(kingMax(), k.hp + kingMax() * 0.015 * tal('regen') * dt);
       if (hd.aura) { // paladin lieči rytierov okolo seba
@@ -1934,6 +1971,16 @@
     st.fireWalls = st.fireWalls.filter(fw => fw.t > 0);
     // strely
     for (const p of st.proj) {
+      if (p.lance) { // šíp balisty: letí rovno, prebodne každého na zemi (ďalší dostanú o štvrtinu menej)
+        const step = p.spd * dt;
+        p.x += p.vx * step; p.y += p.vy * step; p.trav += step;
+        for (const e of st.enemies) if (!e.dead && !e.d.fly && !p.hit.has(e) && Math.hypot(e.x - p.x, (e.y - e.h * 0.5) - p.y) < 6) {
+          p.hit.add(e); damage(e, p.dmg * (p.hit.size === 1 ? 1 : 0.75));
+          for (let k = 0; k < 4; k++) part(e.x, e.y - e.h * 0.5, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.3, e.d.blood || '#8c2018', 80);
+        }
+        if (p.trav >= p.max || p.y < -10 || p.x < -10 || p.x > W + 10) p.done = true;
+        continue;
+      }
       if (p.arc) { // balvan z katapultu letí po oblúku na miesto
         p.t += dt / p.dur;
         const t = Math.min(1, p.t);
@@ -2011,6 +2058,10 @@
         const a = Math.random() * 6.28, s = 20 + Math.random() * 50;
         part(p.tx, p.ty, Math.cos(a) * s, Math.sin(a) * s, 0.25 + Math.random() * 0.3, ['#fff070', '#f89838', '#d83818', '#3e2614'][k % 4], 0);
       }
+    } else if (p.k === 'ice') { // ľadová strela: spomalí cieľ aj tých okolo, pri dopade sa rozletia ľadové úlomky
+      for (const e of st.enemies) if (!e.dead && Math.hypot(e.x - p.tx, (e.y - e.h * 0.5) - p.ty) < 12) e.chillT = Math.max(e.chillT || 0, p.chill || 2);
+      if (p.tgt && !p.tgt.dead) damage(p.tgt, p.dmg);
+      for (let k = 0; k < 8; k++) { const a = Math.random() * 6.28, v = 10 + Math.random() * 25; part(p.tx, p.ty, Math.cos(a) * v, Math.sin(a) * v - 6, 0.35, k % 2 ? '#e8f8ff' : '#88d0f0', 40); }
     } else if (p.tgt && !p.tgt.dead) {
       if (p.k === 'farrow') { p.tgt.burnT = 3; p.tgt.burnDps = Math.max(p.tgt.burnDps || 0, p.dmg * 0.5); }
       damage(p.tgt, p.dmg);
@@ -2238,6 +2289,13 @@
         g.fillStyle = '#4a4e60'; g.fillRect(fx, fy, 1, 6);
         g.fillStyle = SPECS[b.spec].col; g.fillRect(fx + 1, fy + wv, 3, 2);
       }
+      if (b.kind === 'icetower') {
+        g.globalCompositeOperation = 'lighter';
+        g.fillStyle = 'rgba(120,200,255,' + (0.22 + Math.sin(time * 3 + b.c) * 0.1) + ')';
+        g.beginPath(); g.arc(x0 + 9, y0 + T + 1 - spr.h + 4, 4, 0, 6.29); g.fill();
+        g.globalCompositeOperation = 'source-over';
+        if (Math.random() < 0.03) part(x0 + 9 + (Math.random() - 0.5) * 6, y0 + T + 1 - spr.h + 4, 0, 6, 0.6, '#e8f8ff', 10); // padajú ľadové iskričky
+      }
       if (b.kind === 'mage') {
         g.globalCompositeOperation = 'lighter';
         g.fillStyle = 'rgba(255,200,80,' + (0.25 + Math.sin(time * 4 + b.c) * 0.12) + ')';
@@ -2448,6 +2506,20 @@
 
   function drawProj(p) {
     const r = Math.round;
+    if (p.k === 'lance') { // ťažký šíp: drevená žŕdka s kovovým hrotom a červenými pierkami
+      const x = p.x, y = p.y;
+      for (let k = 0; k < 8; k++) { g.fillStyle = k < 2 ? '#e8ecf4' : k > 5 ? '#e84838' : '#a86c38'; g.fillRect(r(x - p.vx * k), r(y - p.vy * k), 1, 1); }
+      g.fillStyle = PAL.K; g.fillRect(r(x + p.vx), r(y + p.vy), 1, 1);
+      return;
+    }
+    if (p.k === 'ice') { // ľadový úlomok so svetlým stredom
+      const x = r(p.x), y = r(p.y);
+      g.fillStyle = PAL.K; g.fillRect(x - 1, y - 2, 3, 5); g.fillRect(x - 2, y - 1, 5, 3);
+      g.fillStyle = '#88d0f0'; g.fillRect(x - 1, y - 1, 3, 3); g.fillRect(x, y - 2, 1, 5);
+      g.fillStyle = '#ffffff'; g.fillRect(x, y - 1, 1, 1);
+      if (Math.random() < 0.5) part(p.x, p.y, 0, 0, 0.25, '#c8ecff', 0);
+      return;
+    }
     if (p.k === 'rock') {
       g.fillStyle = 'rgba(10,8,6,0.35)'; g.fillRect(r(p.x) - 1, r(p.gy), 3, 1);
       const x = r(p.x), y = r(p.y);
@@ -3046,6 +3118,7 @@
     ICONS.tower = spriteURL(BSPR.tower[0], 3);
     ICONS.barracks = spriteURL(BSPR.barracks, 3);
     ICONS.mage = spriteURL(BSPR.mage[0], 3);
+    ICONS.icetower = spriteURL(BSPR.icetower[0], 3); ICONS.ballista = spriteURL(BSPR.ballista[0], 3);
     ICONS.wall = spriteURL(BSPR.wall[0][10], 3);
     ICONS.pit = spriteURL(BSPR.pit, 3);
     for (const k of ['catapult', 'mine', 'chapel', 'firepit', 'beartrap', 'workshop', 'range', 'stables', 'armory', 'falconry']) ICONS[k] = spriteURL(BSPR[k], 3);
@@ -3121,7 +3194,7 @@
 
   // záložky stavebného panela (druhy stavieb); riadok záložiek a riadok označenej stavby majú rovnakú výšku, aby obrazovka neskákala
   const BUILD_TABS = [
-    { id: 'towers',  name: 'Veže',    kinds: ['tower', 'mage'] },
+    { id: 'towers',  name: 'Veže',    kinds: ['tower', 'mage', 'icetower', 'ballista'] },
     { id: 'walls',   name: 'Hradby',  kinds: ['wall', 'pit', 'firepit', 'beartrap'] },
     { id: 'army',    name: 'Vojsko',  kinds: ['barracks', 'range', 'stables', 'armory', 'falconry'] },
     { id: 'siege',   name: 'Stroje',  kinds: ['catapult'] },
@@ -3228,6 +3301,8 @@
       else if (b.kind === 'workshop') stats = 'remeselník opravuje budovy ' + craftRate(b).toFixed(1) + '/s';
       else if (b.kind === 'firepit') stats = 'horenie ' + Math.round(bDmg(b)) + '/s počas ' + FIRE_BURN + ' s';
       else if (b.kind === 'beartrap') stats = 'zastaví na ' + trapStun(b).toFixed(1) + ' s';
+      else if (b.kind === 'icetower') stats = 'spomalí na ' + (d.chill + 0.3 * (b.lvl - 1)).toFixed(1) + ' s · poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);
+      else if (b.kind === 'ballista') stats = 'poškodenie ' + Math.round(bDmg(b)) + ' každému v rade · dosah ' + bRange(b);
       else if (d.range) stats = 'poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);
       else if (UNIT_HOME[b.kind]) { const kt = KTYPES[UNIT_HOME[b.kind]]; stats = UNIT_PLURAL[UNIT_HOME[b.kind]].toLowerCase() + ' ' + knightCap(b) + ' · sila ' + Math.round(knightDmg(b) * kt.dmg); }
       else if (b.kind === 'range') stats = 'lukostrelci ' + archerCap(b) + ' · poškodenie ' + Math.round(archerDmg(b));
