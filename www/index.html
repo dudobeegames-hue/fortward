@@ -231,8 +231,30 @@
   .pcard.flipped .pin { transform: rotateY(180deg); }
   .pcard .pic { height: 60px; display: flex; align-items: flex-end; }
   .pcard .pic img { max-height: 60px; max-width: 64px; }
-  .pcard .front b { font-size: 14px; }
-  .pcard .cost { display: flex; align-items: center; gap: 3px; font-size: 14px; font-weight: 700; color: var(--gold); }
+  .pcard .front b { font-size: 14px; line-height: 18px; height: 18px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pcard .cost { display: flex; align-items: center; gap: 3px; font-size: 14px; font-weight: 700; color: var(--gold); line-height: 18px; height: 18px; white-space: nowrap; }
+  /* akcia označenej stavby (vylepšiť, predať…) – rovnaký rozmer ako karta stavby */
+  .pcard.act .front b { font-size: 12px; }
+  .pcard.act .pic { align-items: center; justify-content: center; }
+  .pcard .pic img.px { height: 36px; width: auto; max-width: 56px; image-rendering: pixelated; }
+  .pcard.act.sell .cost { color: #9cd45a; }
+  .pcard.act.max .front { opacity: .6; }
+  /* horný riadok panela: záložky druhov stavieb alebo názov označenej stavby – vždy rovnako vysoký */
+  #selRow { display: flex; gap: 4px; height: 40px; flex: 0 0 40px; }
+  .btab { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0;
+    background: #1a120d; border: 2px solid var(--ink); border-radius: 8px; color: var(--muted); font: inherit; font-size: 11px; font-weight: 700; }
+  .btab img { height: 26px; width: auto; image-rendering: pixelated; opacity: .7; }
+  .btab.on { border-color: var(--gold); background: #2c2016; box-shadow: 0 0 0 1px var(--gold2); }
+  .btab.on img { opacity: 1; filter: brightness(1.25); }
+  .btab.locked img { opacity: .3; }
+  .selLine { flex: 1; min-width: 0; display: grid; grid-template-columns: 32px 1fr 32px; align-items: center; gap: 6px;
+    background: rgba(0,0,0,.22); border-radius: 8px; padding: 0 4px 0 6px; }
+  .selLine img { max-width: 32px; max-height: 34px; object-fit: contain; }
+  .selLine .info { min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+  .selLine b, .selLine small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .selLine b { font-size: 14px; }
+  .selLine small { font-size: 11.5px; color: var(--muted); }
+  .selX { width: 30px; height: 30px; padding: 0; border: 2px solid var(--ink); border-radius: 8px; background: #3a2a1c; color: var(--text); font-size: 14px; font-weight: 700; }
   .pcard .cost img { width: 13px; height: 13px; }
   .pcard.sel .face { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold2), 0 0 10px rgba(248,208,72,.3); }
   .pcard.poor .front { opacity: .5; }
@@ -599,7 +621,7 @@
   .tierBtn.sel { border-color: var(--tc); background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 1px var(--tc); }
   .tierBtn.sel b { color: var(--tc); }
   .tierBtn.locked { opacity: .45; }
-  .unitCard .warn { color: #ff8a70; font-weight: 600; }
+  .unitCard .warn, .selLine .warn { color: #ff8a70; font-weight: 600; }
   #over .dim { color: var(--muted); font-size: 13px; }
   .mInfo p { margin: 4px 0 0; font-size: 14px; line-height: 1.35; }
   #over .row { display: flex; gap: 8px; width: 100%; }
@@ -717,7 +739,7 @@
   </div>
 
   <div id="build" hidden>
-    <div id="selInfo"></div>
+    <div id="selRow"></div>
     <div id="palette"></div>
     <div class="brow undoRow">
       <button id="repairBtn" class="btn"></button>

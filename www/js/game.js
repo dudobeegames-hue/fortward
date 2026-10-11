@@ -263,7 +263,7 @@
 
   const HALL = { hall: true };
   const st = {
-    phase: 'title', wave: 0, gold: 0, hallLvl: 1, hallHp: 400, volleyLvl: 1, volleyT: 0,
+    phase: 'title', wave: 0, gold: 0, hallLvl: 1, hallHp: 400, volleyLvl: 1, volleyT: 0, bolts: [],
     blds: [], occ: [], paving: {}, dist: null, enemies: [], soldiers: [], king: null,
     proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [],
     spawnQ: [], spawnT: 0, speed: 1, shake: 0, best: 0, boss: null,
@@ -279,8 +279,6 @@
   // stavby majú najviac úroveň radnice: drevená radnica = drevené stavby, kameň až po jej vylepšení
   const bCap = () => Math.min(lvlCap(), st.hallLvl);
   const LVL_NAME = ['', 'drevo', 'kameň', 'kameň s kovaním', 'tmavé opevnenie', 'kráľovský kameň'];
-  const lvlLock = (label, l, wide) => btn('🔒 ' + label + ' · misia ' + lvlMission(l), null, false, () => { }, 'locked' + (wide ? ' wide' : ''));
-  const lockBtn = (label, id, wide) => btn('🔒 ' + label + ' · misia ' + unlockMissionOf(id), null, false, () => { }, 'locked' + (wide ? ' wide' : ''));
   const saveProgress = () => { try { localStorage.setItem(sk('unlocked'), String(st.unlocked)); } catch (e) { } };
   // načíta postup zvolenej pozície do hry
   function loadSlot(n) {
@@ -1790,8 +1788,6 @@
       if (f.t <= 0) { f.done = true; fireballBlast(f.x, f.y); }
     }
     st.fallFx = st.fallFx.filter(f => !f.done);
-    for (const b of st.bolts) b.life -= dt;
-    st.bolts = st.bolts.filter(b => b.life > 0);
     updateFx(dt);
     if (st.phase === 'battle' && !st.spawnQ.length && !st.enemies.length && (!st.fort || (st.orcWaveOn && !st.fort.dead))) endWave();
   }
@@ -1823,6 +1819,8 @@
   }
 
   function updateFx(dt) {
+    for (const b of st.bolts) b.life -= dt; // blesk dohasne aj po konci vlny (posledný zásah prepne hru do stavania)
+    st.bolts = st.bolts.filter(b => b.life > 0);
     for (const q of st.parts) { q.life -= dt; q.vy += q.grav * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.98; }
     st.parts = st.parts.filter(q => q.life > 0);
     for (const t of st.texts) { t.life -= dt; t.y -= 14 * dt; }
@@ -2792,21 +2790,6 @@
 
   const selGroup = () => st.selGroup && st.selGroup.length > 1 && st.selGroup.includes(st.sel) && st.selGroup.every(w => st.blds.includes(w));
 
-  function btn(label, cost, enabled, onClick, cls) {
-    const b = document.createElement('button');
-    b.className = 'btn ' + (cls || '');
-    b.innerHTML = '<span>' + label + '</span>' + (cost != null ? '<span class="cost"><img class="coin" src="' + ICONS.coin + '">' + cost + '</span>' : '');
-    b.disabled = !enabled;
-    b.addEventListener('click', () => {
-      const c = cls || '';
-      if (st.phase === 'build' && !c.includes('move')) snapshot();
-      onClick();
-      AUDIO.play(c.includes('up') ? 'upgrade' : c.includes('sell') ? 'sell' : c.includes('unit') ? 'build' : 'click');
-      renderBuild(); updateHud();
-    });
-    return b;
-  }
-
   // oprava stavby podľa jej hodnoty: úplne zničená by stála 40 % z toho, čo do nej hráč vložil –
   // vždy menej než predať (vráti 50 %) a postaviť znova
   const REPAIR_SHARE = 0.4;
@@ -2826,227 +2809,216 @@
     return c;
   }
 
+  // záložky stavebného panela (druhy stavieb); riadok záložiek a riadok označenej stavby majú rovnakú výšku, aby obrazovka neskákala
+  const BUILD_TABS = [
+    { id: 'towers',  name: 'Veže',    kinds: ['tower', 'mage'] },
+    { id: 'walls',   name: 'Hradby',  kinds: ['wall', 'pit', 'firepit', 'beartrap'] },
+    { id: 'army',    name: 'Vojsko',  kinds: ['barracks', 'range', 'stables', 'armory', 'falconry'] },
+    { id: 'siege',   name: 'Stroje',  kinds: ['catapult'] },
+    { id: 'support', name: 'Podpora', kinds: ['mine', 'chapel', 'workshop', 'paving'] },
+  ];
+  const tabOf = kind => (BUILD_TABS.find(t => t.kinds.includes(kind)) || BUILD_TABS[0]).id;
+  const SPEC_SHORT = { fire: 'Oheň', rapid: 'Rýchlosť', sniper: 'Ostreľovač' };
+  const coinTxt = n => '<img class="coin" src="' + ICONS.coin + '">' + n;
+
   function renderBuild() {
     const pal = $('palette'); pal.innerHTML = '';
-    for (const kind of BUILD_ORDER) {
-      const d = BUILD[kind];
-      const b = document.createElement('button');
-      if (!has(kind)) { // zamknutá stavba
-        const um = unlockMissionOf(kind);
-        b.className = 'pcard locked';
-        b.innerHTML = '<span class="pin"><span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost">🔒 misia ' + um + '</span></span></span>';
-        b.addEventListener('click', () => { toast(d.name + ' sa odomkne v misii ' + um); AUDIO.play('deny'); });
-        pal.appendChild(b);
-        continue;
-      }
-      if (st.flip && st.flip !== st.tool) st.flip = null;
-      b.className = 'pcard' + (st.tool === kind ? ' sel' : '') + (st.flip === kind ? ' flipped' : '') + (st.gold < costOf(kind) ? ' poor' : '');
-      const tip = kind === 'wall' ? ' Ťahaj prstom pre celý rad.' : kind === 'paving' ? ' Ťahaj prstom pre celú plochu.' : '';
-      b.innerHTML = '<span class="pin">' +
-        '<span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost"><img class="coin" src="' + ICONS.coin + '">' + costOf(kind) + '</span></span>' +
-        '<span class="face back"><b>' + d.name + '</b><small>' + d.desc + '.' + tip + '</small></span></span>';
-      b.addEventListener('pointerdown', ev => { if (st.phase === 'build') cardPress = { kind, x: ev.clientX, y: ev.clientY }; });
+    const row = $('selRow'); row.innerHTML = '';
+    // karta akcie označenej stavby – rovnako veľká ako karta stavby
+    const act = (icon, label, cost, enabled, onClick, cls, px) => {
+      const b = document.createElement('button'), c = cls || '';
+      b.className = 'pcard act' + (enabled ? '' : ' poor') + (c ? ' ' + c : '');
+      b.innerHTML = '<span class="pin"><span class="face front"><span class="pic"><img' + (px ? ' class="px"' : '') + ' src="' + icon + '"></span><b>' + label + '</b><span class="cost">' + (cost == null ? '' : cost) + '</span></span></span>';
       b.addEventListener('click', () => {
-        if (suppressCardClick) { suppressCardClick = false; return; } // bol to ťah, nie ťuk
-        AUDIO.play('click');
-        if (st.tool === kind) { // druhý ťuk na vybranú kartu ju otočí (vzadu je popis), ďalší ju otočí späť
-          st.flip = st.flip === kind ? null : kind;
-          b.classList.toggle('flipped', st.flip === kind);
-          return;
-        }
-        st.tool = kind; st.flip = null; st.sel = null; st.moving = null; renderBuild();
+        if (!enabled) { AUDIO.play('deny'); if (typeof onClick === 'string') toast(onClick); return; }
+        if (st.phase === 'build') snapshot();
+        onClick();
+        AUDIO.play(c.includes('up') ? 'upgrade' : c.includes('sell') ? 'sell' : c.includes('unit') ? 'build' : 'click');
+        renderBuild(); updateHud();
       });
       pal.appendChild(b);
-    }
-    const info = $('selInfo'); info.innerHTML = '';
-    const card = (icon, title, text) => {
-      const c = document.createElement('div'); c.className = 'unitCard';
-      c.innerHTML = '<img src="' + icon + '"><div class="info"><b>' + title + '</b><small>' + text + '</small></div>';
-      info.appendChild(c);
     };
-    const acts = document.createElement('div'); acts.className = 'acts';
-    if (st.tool) {
-      // bez textu nad paletou (panel neskáče) – popis stavby je na zadnej strane jej karty
-    } else if (st.sel === HALL) {
-      card(ICONS.hall, 'Radnica · úr. ' + st.hallLvl + ' (' + LVL_NAME[st.hallLvl] + ')', 'Kráľ ju bráni. Vylepšenie pridá zdravie, silu kráľa, rozšíri územie o 1 rad' +
-        (st.hallLvl < MAX_LVL ? ' a dovolí vylepšiť stavby na úroveň ' + (st.hallLvl + 1) + ' (' + LVL_NAME[st.hallLvl + 1] + ').' : '.'));
-      if (st.hallLvl < hallCap()) {
-        const c = hallUpCost();
-        acts.appendChild(btn('Vylepšiť radnicu', c, st.gold >= c, () => {
-          st.gold -= c; st.hallLvl++; st.hallHp += 200; st.king.hp = kingMax();
-        }, 'up'));
-      } else if (st.hallLvl < MAX_LVL) acts.appendChild(lvlLock('Radnica úr. ' + (st.hallLvl + 1), st.hallLvl + 1));
-      else acts.appendChild(btn('Max. úroveň', null, false, () => { }));
+    const I = UI_ICONS;
+    const lockAct = (icon, label, m, px) => act(icon, label, '🔒 misia ' + m, false, label + ' sa odomkne v misii ' + m, 'locked', px);
+    // ďalšia úroveň: kúpiť / najprv radnica / zamknutá do misie / maximum
+    const upAct = (lvl, cap, cost, apply, label) => {
+      if (lvl < cap) act(I.actUp, label || 'Vylepšiť', coinTxt(cost), st.gold >= cost, apply, 'up', true);
+      else if (lvl < lvlCap()) act(I.actUp, 'Úr. ' + (lvl + 1), '🔒 radnica', false, 'Najprv vylepši radnicu', 'locked', true);
+      else if (lvl < MAX_LVL) lockAct(I.actUp, 'Úr. ' + (lvl + 1), lvlMission(lvl + 1), true);
+      else act(I.star, 'Max. úr.', '', false, null, 'max', true);
+    };
+    const selRow = (icon, title, stats) => {
+      const d = document.createElement('div'); d.className = 'selLine';
+      d.innerHTML = '<img src="' + icon + '"><div class="info"><b>' + title + '</b><small>' + stats + '</small></div><button class="selX" title="Zavrieť">✕</button>';
+      d.querySelector('.selX').addEventListener('click', () => { st.sel = null; st.selGroup = null; st.moving = null; AUDIO.play('click'); renderBuild(); });
+      row.appendChild(d);
+    };
+    const sellAll = (list, refund) => () => {
+      st.gold += refund; st.blds = st.blds.filter(x => !list.includes(x)); st.sel = null; st.selGroup = null;
+      for (const s of st.soldiers) if (list.includes(s.home)) s.dead = true;
+      st.soldiers = st.soldiers.filter(s => !s.dead);
+      rebuildOcc();
+    };
+
+    if (st.sel === HALL) {
+      const k = st.king;
+      selRow(ICONS.hall, 'Radnica · úr. ' + st.hallLvl + ' (' + LVL_NAME[st.hallLvl] + ')', 'zdravie ' + Math.ceil(st.hallHp) + '/' + hallMax() + ' · kráľ úr. ' + kingMeta.lvl + (k && k.dead ? ' · padol' : '') + ' · vylepšenie rozšíri územie a dovolí vyššie stavby');
+      upAct(st.hallLvl, hallCap(), hallUpCost(), () => { const c = hallUpCost(); st.gold -= c; st.hallLvl++; st.hallHp += 200; st.king.hp = kingMax(); });
+      if (k && k.dead) { const c = reviveCost(); act(ICONS.king, 'Oživiť kráľa', coinTxt(c), st.gold >= c, reviveKing, 'up'); }
       if (has('volleyUp') && spellOn('volley')) { // salvu má kráľ len ak ju dal do slotu
         const vc = volleyUpCost();
-        acts.appendChild(btn('Salva úr. ' + (st.volleyLvl + 1), vc, st.gold >= vc, () => { st.gold -= vc; st.volleyLvl++; }));
-      } else if (!has('volleyUp')) acts.appendChild(lockBtn('Salva', 'volleyUp'));
-      info.appendChild(acts);
-      card(ICONS.king, 'Kráľ · úr. ' + kingMeta.lvl + (st.king && st.king.dead ? ' · padol' : ''), kingSummary());
-      if (st.king && st.king.dead) {
-        const ka = document.createElement('div'); ka.className = 'acts';
-        const c = reviveCost();
-        ka.appendChild(btn('Oživiť kráľa', c, st.gold >= c, reviveKing, 'up wide'));
-        info.appendChild(ka);
-      }
+        act(I.spellVolley, 'Salva úr. ' + (st.volleyLvl + 1), coinTxt(vc), st.gold >= vc, () => { st.gold -= vc; st.volleyLvl++; }, 'up', true);
+      } else if (!has('volleyUp')) lockAct(I.spellVolley, 'Salva', unlockMissionOf('volleyUp'), true);
     } else if (selGroup()) {
       // hromadné akcie pre označenú skupinu (rad hradieb alebo všetky stavby jedného druhu)
       const grp = st.selGroup, kind = grp[0].kind, d = BUILD[kind], isWall = kind === 'wall', cap = bCap();
       const minL = Math.min(...grp.map(w => w.lvl)), maxL = Math.max(...grp.map(w => w.lvl));
-      card(ICONS[kind], (isWall ? 'Rad hradieb' : d.name + ' – všetky') + ' · ' + grp.length + ' ks',
-        'Úroveň ' + (minL === maxL ? minL : minL + '–' + maxL) + '. Akcie platia pre každú stavbu v skupine – najprv pre tie najslabšie, kým stačí zlato.');
-      // tlačidlo „pre všetky“: ak zlato nestačí, urobí toľko, koľko sa dá („3 z 6“)
-      const bulk = (to, name, list, costFn, apply, cls) => {
+      selRow(ICONS[kind], (isWall ? 'Rad hradieb' : d.name + ' – všetky') + ' · ' + grp.length + ' ks', 'úroveň ' + (minL === maxL ? minL : minL + '–' + maxL) + ' · akcie platia pre celú skupinu, najprv pre najslabšie');
+      // karta „pre všetky“: ak zlato nestačí, urobí toľko, koľko sa dá („3/6“)
+      const bulk = (icon, name, list, costFn, apply, cls, px) => {
         if (!list.length) return;
         let sum = 0; const pick = [];
         for (const x of list) { const c = costFn(x); if (sum + c > st.gold) break; sum += c; pick.push(x); }
         const all = pick.length === list.length;
-        to.appendChild(btn(name + (all || !pick.length ? ' (' + list.length + ')' : ' · ' + pick.length + ' z ' + list.length),
-          pick.length ? sum : list.reduce((t, x) => t + costFn(x), 0), pick.length > 0, () => { for (const x of pick) apply(x); rebuildOcc(); }, cls));
+        act(icon, name + ' ' + (all || !pick.length ? list.length + '×' : pick.length + '/' + list.length),
+          coinTxt(pick.length ? sum : list.reduce((t, x) => t + costFn(x), 0)), pick.length > 0, () => { for (const x of pick) apply(x); rebuildOcc(); }, cls, px);
       };
-      const byLvl = (a, b) => a.lvl - b.lvl;
-      const cand = grp.filter(w => w.lvl < cap).sort(byLvl);
-      if (cand.length) bulk(acts, 'Vylepšiť všetky', cand, bUpCost, w => {
+      const cand = grp.filter(w => w.lvl < cap).sort((a, b) => a.lvl - b.lvl);
+      if (cand.length) bulk(I.actUp, 'Vylepšiť', cand, bUpCost, w => {
         const ratio = d.hp ? w.hp / bMaxHp(w) : 1, c = bUpCost(w);
         st.gold -= c; w.spent += c; w.lvl++;
         if (d.hp) w.hp = Math.ceil(bMaxHp(w) * ratio);
-      }, 'up wide');
-      else if (maxL < lvlCap()) acts.appendChild(btn('Úr. ' + (maxL + 1) + ' – najprv vylepši radnicu', null, false, () => { }, 'locked wide'));
-      else if (maxL < MAX_LVL) acts.appendChild(lvlLock('Úr. ' + (maxL + 1), maxL + 1, true));
-      else acts.appendChild(btn('Max. úroveň', null, false, () => { }, 'wide'));
-      if (d.hp) {
-        bulk(acts, 'Opraviť', grp.filter(w => bRepairCost(w) > 0), bRepairCost, w => { st.gold -= bRepairCost(w); w.hp = bMaxHp(w); });
-      }
+      }, 'up', true);
+      else upAct(maxL, maxL, 0, null);
+      if (d.hp) bulk(I.actRepair, 'Opraviť', grp.filter(w => bRepairCost(w) > 0), bRepairCost, w => { st.gold -= bRepairCost(w); w.hp = bMaxHp(w); }, '', true);
       const refund = grp.reduce((t, w) => t + Math.floor(w.spent / 2) + (w.unit ? Math.floor(w.unit.spent / 2) : 0), 0);
-      acts.appendChild(btn('Predať všetky +' + refund, null, true, () => {
-        st.gold += refund; st.blds = st.blds.filter(x => !grp.includes(x)); st.sel = null; st.selGroup = null;
-        for (const s of st.soldiers) if (grp.includes(s.home)) s.dead = true;
-        st.soldiers = st.soldiers.filter(s => !s.dead);
-        rebuildOcc();
-      }, 'sell'));
-      info.appendChild(acts);
-      const section = (title) => { const t = document.createElement('div'); t.className = 'secTitle'; t.textContent = title; info.appendChild(t); const a = document.createElement('div'); a.className = 'acts'; info.appendChild(a); return a; };
+      act(ICONS.coin, 'Predať ' + grp.length + '×', '+' + refund, true, sellAll(grp, refund), 'sell', true);
       if (isWall) {
-        // ostne a ich druh
         const bare = grp.filter(w => !w.spikes), plain = grp.filter(w => w.spikes && !w.spikeType);
-        if (bare.length || plain.length) {
-          const sa = section('Ostne');
-          if (!has('spikes')) sa.appendChild(lockBtn('Ostne', 'spikes', true));
-          else bulk(sa, 'Ostne na všetky', bare, () => SPIKE_COST, w => { st.gold -= SPIKE_COST; w.spent += SPIKE_COST; w.spikes = true; }, 'wide');
-          if (plain.length) {
-            if (!has('spikeTypes')) sa.appendChild(lockBtn('Ohnivé a ľadové ostne', 'spikeTypes', true));
-            else for (const k in SPIKE_TYPES) bulk(sa, SPIKE_TYPES[k].name, plain, () => SPIKE_TYPE_COST, w => { st.gold -= SPIKE_TYPE_COST; w.spent += SPIKE_TYPE_COST; w.spikeType = k; }, 'wide');
-          }
+        if (bare.length) {
+          if (!has('spikes')) lockAct(I.actSpikes, 'Ostne', unlockMissionOf('spikes'), true);
+          else bulk(I.actSpikes, 'Ostne', bare, () => SPIKE_COST, w => { st.gold -= SPIKE_COST; w.spent += SPIKE_COST; w.spikes = true; }, '', true);
         }
-        // strelci na hradbách
+        if (plain.length) {
+          if (!has('spikeTypes')) lockAct(I.actSpikesFire, 'Ohnivé/ľadové', unlockMissionOf('spikeTypes'), true);
+          else for (const k in SPIKE_TYPES) bulk(k === 'fire' ? I.actSpikesFire : I.actSpikesIce, SPIKE_TYPES[k].name.split(' ')[0], plain, () => SPIKE_TYPE_COST, w => { st.gold -= SPIKE_TYPE_COST; w.spent += SPIKE_TYPE_COST; w.spikeType = k; }, '', true);
+        }
         const free = grp.filter(w => !w.gate && !w.unit), manned = grp.filter(w => w.unit && w.unit.lvl < lvlCap()).sort((a, b) => a.unit.lvl - b.unit.lvl);
-        if (has('wallArcher') && (free.length || manned.length)) {
-          const ua = section('Strelci na hradbách');
-          if (free.length) for (const type in WUNIT) {
-            const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
-            if (!has(tid)) { ua.appendChild(lockBtn(wd.name, tid)); continue; }
-            bulk(ua, '<img class="uicon" src="' + ICONS['u_' + type] + '">' + wd.name, free, () => wd.cost, w => { st.gold -= wd.cost; w.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit');
-          }
-          if (manned.length) bulk(ua, 'Vylepšiť strelcov', manned, w => uUpCost(w.unit), w => { const c = uUpCost(w.unit); st.gold -= c; w.unit.spent += c; w.unit.lvl++; }, 'up wide');
+        if (has('wallArcher') && free.length) for (const type in WUNIT) {
+          const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
+          if (!has(tid)) { lockAct(ICONS['u_' + type], wd.name, unlockMissionOf(tid)); continue; }
+          bulk(ICONS['u_' + type], wd.name, free, () => wd.cost, w => { st.gold -= wd.cost; w.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit');
         }
+        if (manned.length) bulk(I.actUp, 'Strelci', manned, w => uUpCost(w.unit), w => { const c = uUpCost(w.unit); st.gold -= c; w.unit.spent += c; w.unit.lvl++; }, 'up', true);
       }
     } else if (st.sel) {
       const b = st.sel, d = BUILD[b.kind];
       let stats = '';
-      if (b.kind === 'chapel') stats = 'Mních lieči rytierov a kráľa ' + HELPERS.chapel.rate(b).toFixed(1) + '/s';
-      else if (b.kind === 'mine') stats = 'Po vlne +' + Math.round(mineGold(b) * goldMul()) + ' zlata';
-      else if (b.kind === 'workshop') stats = 'Remeselník opravuje budovy ' + craftRate(b).toFixed(1) + '/s';
-      else if (b.kind === 'firepit') stats = 'Horenie ' + Math.round(bDmg(b)) + '/s počas ' + FIRE_BURN + ' s (spolu ' + Math.round(bDmg(b) * FIRE_BURN) + ')';
-      else if (b.kind === 'beartrap') stats = 'Zastaví na ' + trapStun(b).toFixed(1) + ' s';
-      else if (d.range) stats = 'Poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);
-      else if (UNIT_HOME[b.kind]) { const kt = KTYPES[UNIT_HOME[b.kind]]; stats = UNIT_PLURAL[UNIT_HOME[b.kind]] + ' ' + knightCap(b) + ' · sila ' + Math.round(knightDmg(b) * kt.dmg) + ' · ' + kt.desc; }
-      else if (b.kind === 'range') stats = 'Lukostrelci ' + archerCap(b) + ' · poškodenie ' + Math.round(archerDmg(b)) + ' · dosah ' + ARCHER_RANGE;
-      else if (b.kind === 'pit') stats = 'Poškodenie ' + Math.round(bDmg(b)) + ' · spomalí na polovicu';
+      if (b.kind === 'chapel') stats = 'mních lieči rytierov a kráľa ' + HELPERS.chapel.rate(b).toFixed(1) + '/s';
+      else if (b.kind === 'mine') stats = 'po vlne +' + Math.round(mineGold(b) * goldMul()) + ' zlata';
+      else if (b.kind === 'workshop') stats = 'remeselník opravuje budovy ' + craftRate(b).toFixed(1) + '/s';
+      else if (b.kind === 'firepit') stats = 'horenie ' + Math.round(bDmg(b)) + '/s počas ' + FIRE_BURN + ' s';
+      else if (b.kind === 'beartrap') stats = 'zastaví na ' + trapStun(b).toFixed(1) + ' s';
+      else if (d.range) stats = 'poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);
+      else if (UNIT_HOME[b.kind]) { const kt = KTYPES[UNIT_HOME[b.kind]]; stats = UNIT_PLURAL[UNIT_HOME[b.kind]].toLowerCase() + ' ' + knightCap(b) + ' · sila ' + Math.round(knightDmg(b) * kt.dmg); }
+      else if (b.kind === 'range') stats = 'lukostrelci ' + archerCap(b) + ' · poškodenie ' + Math.round(archerDmg(b));
+      else if (b.kind === 'pit') stats = 'poškodenie ' + Math.round(bDmg(b)) + ' · spomalí';
       if (d.hp) stats += (stats ? ' · ' : '') + 'zdravie ' + Math.ceil(b.hp) + '/' + bMaxHp(b);
-      if (b.gate) stats += ' · rytieri cez ňu prejdú';
       if (b.spikes) stats += ' · ' + (b.spikeType ? SPIKE_TYPES[b.spikeType].name.toLowerCase() : 'ostne') + ' ' + spikeDmg(b);
       if (b.kind === 'wall' && b.nb) stats += ' · spojenie +' + Math.round(WALL_LINK * b.nb * 100) + ' %';
+      if (b.unit) stats += ' · ' + WUNIT[b.unit.type].name.toLowerCase() + ' úr. ' + b.unit.lvl + ' (poškodenie ' + Math.round(uDmg(b.unit)) + ')';
       if (b.spec) stats += ' · ' + SPECS[b.spec].name;
-      if ((UNIT_HOME[b.kind] || b.kind === 'range') && knightsBlocked(b)) stats += '<br><span class="warn">⚠ Vojaci sa nedostanú von – postav bránu v hradbách alebo uvoľni cestu</span>';
-      card(b.gate ? ICONS.gate : ICONS[b.kind], (b.gate ? 'Brána' : d.name) + ' · úr. ' + b.lvl, stats);
-      if (b.lvl < bCap()) {
-        const c = bUpCost(b);
-        acts.appendChild(btn('Vylepšiť', c, st.gold >= c, () => {
-          const ratio = d.hp ? b.hp / bMaxHp(b) : 1;
-          st.gold -= c; b.spent += c; b.lvl++;
-          if (d.hp) b.hp = Math.ceil(bMaxHp(b) * ratio);
-          rebuildOcc();
-        }, 'up'));
-      } else if (b.lvl < lvlCap()) acts.appendChild(btn('Úr. ' + (b.lvl + 1) + ' – najprv radnica', null, false, () => { }, 'locked'));
-      else if (b.lvl < MAX_LVL) acts.appendChild(lvlLock('Úr. ' + (b.lvl + 1), b.lvl + 1));
-      else acts.appendChild(btn('Max. úroveň', null, false, () => { }));
-      const fc = bRepairCost(b);
-      if (fc) acts.appendChild(btn('Opraviť', fc, st.gold >= fc, () => { st.gold -= fc; b.hp = bMaxHp(b); rebuildOcc(); }));
-      const refund = Math.floor(b.spent / 2) + (b.unit ? Math.floor(b.unit.spent / 2) : 0);
-      acts.appendChild(btn('Predať +' + refund, null, true, () => {
-        st.gold += refund; st.blds = st.blds.filter(x => x !== b); st.sel = null;
-        for (const s of st.soldiers) if (s.home === b) s.dead = true;
-        st.soldiers = st.soldiers.filter(s => !s.dead);
+      if (b.gate) stats += ' · rytieri cez ňu prejdú';
+      if ((UNIT_HOME[b.kind] || b.kind === 'range') && knightsBlocked(b)) stats = '<span class="warn">⚠ vojaci sa nedostanú von</span> · ' + stats;
+      selRow(b.gate ? ICONS.gate : ICONS[b.kind], (b.gate ? 'Brána' : d.name) + ' · úr. ' + b.lvl, stats);
+      upAct(b.lvl, bCap(), bUpCost(b), () => {
+        const ratio = d.hp ? b.hp / bMaxHp(b) : 1, c = bUpCost(b);
+        st.gold -= c; b.spent += c; b.lvl++;
+        if (d.hp) b.hp = Math.ceil(bMaxHp(b) * ratio);
         rebuildOcc();
-      }, 'sell'));
-      acts.appendChild(btn(st.moving === b ? 'Zrušiť presun' : 'Presunúť (zadarmo)', null, true, () => { st.moving = st.moving === b ? null : b; if (st.moving) hint('Ťukni na voľné políčko v zóne – alebo stavbu rovno potiahni prstom'); }, 'wide move'));
-      if (b.kind === 'wall') {
-        if (b.gate) acts.appendChild(btn('Zmeniť späť na hradbu', null, true, () => { b.gate = false; }, 'wide'));
-        else if (b.unit) acts.appendChild(btn('Na bránu – najprv odvolaj strelca', null, false, () => { }, 'wide'));
-        else if (!has('gate')) acts.appendChild(lockBtn('Brána', 'gate', true));
-        else { const gc = gateCost(); acts.appendChild(btn('Prerobiť na bránu', gc, st.gold >= gc, () => { st.gold -= gc; b.spent += gc; b.gate = true; }, 'wide')); }
-      }
-      if (b.kind === 'wall' && !b.spikes) {
-        if (has('spikes')) acts.appendChild(btn('Ostne (zrania útočníkov)', SPIKE_COST, st.gold >= SPIKE_COST, () => { st.gold -= SPIKE_COST; b.spent += SPIKE_COST; b.spikes = true; }, 'wide'));
-        else acts.appendChild(lockBtn('Ostne', 'spikes', true));
-      }
-      if (b.kind === 'wall' && b.spikes && !b.spikeType) {
-        if (!has('spikeTypes')) acts.appendChild(lockBtn('Ohnivé a ľadové ostne', 'spikeTypes', true));
-        else for (const k in SPIKE_TYPES) acts.appendChild(btn(SPIKE_TYPES[k].name, SPIKE_TYPE_COST, st.gold >= SPIKE_TYPE_COST, () => { st.gold -= SPIKE_TYPE_COST; b.spent += SPIKE_TYPE_COST; b.spikeType = k; }, 'wide'));
-      }
-      info.appendChild(acts);
-      const section = (title) => { const t = document.createElement('div'); t.className = 'secTitle'; t.textContent = title; info.appendChild(t); const a = document.createElement('div'); a.className = 'acts'; info.appendChild(a); return a; };
+      });
+      const fc = bRepairCost(b);
+      if (fc) act(I.actRepair, 'Opraviť', coinTxt(fc), st.gold >= fc, () => { st.gold -= fc; b.hp = bMaxHp(b); rebuildOcc(); }, '', true);
+      const refund = Math.floor(b.spent / 2) + (b.unit ? Math.floor(b.unit.spent / 2) : 0);
+      act(ICONS.coin, 'Predať', '+' + refund, true, sellAll([b], refund), 'sell', true);
       if (b.kind === 'tower' && !b.spec) {
-        if (!has('spec')) section('Špecializácia').appendChild(lockBtn('Špecializácia', 'spec', true));
-        else if (b.lvl < 3) section('Špecializácia').appendChild(btn('Od úrovne 3', null, false, () => { }, 'locked wide'));
-        else {
-          const sa = section('Špecializácia (vyber jednu)');
-          for (const k in SPECS) sa.appendChild(btn(SPECS[k].name, SPEC_COST, st.gold >= SPEC_COST, () => { st.gold -= SPEC_COST; b.spent += SPEC_COST; b.spec = k; }, 'up spec'));
-        }
+        if (!has('spec')) lockAct(I.actSpec.fire, 'Špecializácia', unlockMissionOf('spec'), true);
+        else if (b.lvl < 3) act(I.actSpec.fire, 'Špecializácia', 'od úr. 3', false, 'Špecializácia sa dá vybrať od úrovne 3', 'locked', true);
+        else for (const k in SPECS) act(I.actSpec[k], SPEC_SHORT[k], coinTxt(SPEC_COST), st.gold >= SPEC_COST, () => { st.gold -= SPEC_COST; b.spent += SPEC_COST; b.spec = k; }, 'up', true);
       }
-      if (b.kind === 'wall' && !b.gate && (has('wallArcher') || b.unit)) {
-        const t = document.createElement('div'); t.className = 'secTitle'; t.textContent = 'Strelec na hradbe';
-        info.appendChild(t);
-        const ua = document.createElement('div'); ua.className = 'acts';
+      if (b.kind === 'wall') {
         const u = b.unit;
-        if (!u) {
-          for (const type in WUNIT) {
-            const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
-            if (!has(tid)) { ua.appendChild(lockBtn(wd.name, tid)); continue; }
-            ua.appendChild(btn('<img class="uicon" src="' + ICONS['u_' + type] + '">' + wd.name, wd.cost, st.gold >= wd.cost, () => {
-              st.gold -= wd.cost; b.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost };
-            }, 'unit'));
-          }
-        } else {
-          const wd = WUNIT[u.type];
-          const uc = document.createElement('div'); uc.className = 'unitCard';
-          uc.innerHTML = '<img src="' + ICONS['u_' + u.type] + '"><div class="info"><b>' + wd.name + ' · úr. ' + u.lvl + '</b><small>Poškodenie ' + Math.round(uDmg(u)) + ' · dosah ' + uRange(u) + ' · ' + wd.desc + '</small></div>';
-          info.appendChild(uc);
-          if (u.lvl < lvlCap()) {
-            const c = uUpCost(u);
-            ua.appendChild(btn('Vylepšiť strelca', c, st.gold >= c, () => { st.gold -= c; u.spent += c; u.lvl++; }, 'up'));
-          } else if (u.lvl < MAX_LVL) ua.appendChild(lvlLock('Úr. ' + (u.lvl + 1), u.lvl + 1));
-          else ua.appendChild(btn('Max. úroveň', null, false, () => { }));
+        if (u) {
+          upAct(u.lvl, lvlCap(), uUpCost(u), () => { const c = uUpCost(u); st.gold -= c; u.spent += c; u.lvl++; }, 'Strelec');
           const ur = Math.floor(u.spent / 2);
-          ua.appendChild(btn('Odvolať +' + ur, null, true, () => { st.gold += ur; b.unit = null; }, 'sell'));
+          act(I.actDown, 'Odvolať', '+' + ur, true, () => { st.gold += ur; b.unit = null; }, 'sell', true);
+        } else if (!b.gate && has('wallArcher')) for (const type in WUNIT) {
+          const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
+          if (!has(tid)) { lockAct(ICONS['u_' + type], wd.name, unlockMissionOf(tid)); continue; }
+          act(ICONS['u_' + type], wd.name, coinTxt(wd.cost), st.gold >= wd.cost, () => { st.gold -= wd.cost; b.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit');
         }
-        info.appendChild(ua);
+        if (b.gate) act(ICONS.wall, 'Na hradbu', '', true, () => { b.gate = false; });
+        else if (!u) {
+          if (!has('gate')) lockAct(ICONS.gate, 'Brána', unlockMissionOf('gate'));
+          else { const gc = gateCost(); act(ICONS.gate, 'Brána', coinTxt(gc), st.gold >= gc, () => { st.gold -= gc; b.spent += gc; b.gate = true; }); }
+        }
+        if (!b.spikes) {
+          if (has('spikes')) act(I.actSpikes, 'Ostne', coinTxt(SPIKE_COST), st.gold >= SPIKE_COST, () => { st.gold -= SPIKE_COST; b.spent += SPIKE_COST; b.spikes = true; }, '', true);
+          else lockAct(I.actSpikes, 'Ostne', unlockMissionOf('spikes'), true);
+        } else if (!b.spikeType) {
+          if (!has('spikeTypes')) lockAct(I.actSpikesFire, 'Ohnivé/ľadové', unlockMissionOf('spikeTypes'), true);
+          else for (const k in SPIKE_TYPES) act(k === 'fire' ? I.actSpikesFire : I.actSpikesIce, SPIKE_TYPES[k].name.split(' ')[0], coinTxt(SPIKE_TYPE_COST), st.gold >= SPIKE_TYPE_COST, () => { st.gold -= SPIKE_TYPE_COST; b.spent += SPIKE_TYPE_COST; b.spikeType = k; }, '', true);
+        }
       }
-    } else if (st.king && st.king.dead) {
-      card(ICONS.king, 'Kráľ padol', 'Bez kráľa radnicu nikto nebráni. Oživ ho pred ďalšou vlnou.');
-      const c = reviveCost();
-      acts.appendChild(btn('Oživiť kráľa', c, st.gold >= c, reviveKing, 'up wide'));
-      info.appendChild(acts);
+    } else {
+      // nič nie je označené: záložky s druhmi stavieb a karty stavieb zvolenej záložky
+      if (st.tool) st.buildTab = tabOf(st.tool);
+      const tab = BUILD_TABS.find(t => t.id === st.buildTab) || BUILD_TABS[0];
+      for (const t of BUILD_TABS) {
+        const tb = document.createElement('button');
+        const open = t.kinds.some(k => has(k));
+        tb.className = 'btab' + (t === tab ? ' on' : '') + (open ? '' : ' locked');
+        tb.title = t.name;
+        tb.innerHTML = '<img src="' + UI_ICONS.tabs[t.id] + '" alt="' + t.name + '">';
+        tb.addEventListener('click', () => {
+          if (st.buildTab === t.id) return;
+          st.buildTab = t.id; AUDIO.play('click');
+          if (st.tool && !t.kinds.includes(st.tool)) { st.tool = null; st.flip = null; }
+          renderBuild();
+        });
+        row.appendChild(tb);
+      }
+      if (st.king && st.king.dead) { const c = reviveCost(); act(ICONS.king, 'Oživiť kráľa', coinTxt(c), st.gold >= c, reviveKing, 'up'); }
+      for (const kind of BUILD_ORDER.filter(k => tab.kinds.includes(k))) {
+        const d = BUILD[kind];
+        const b = document.createElement('button');
+        if (!has(kind)) { // zamknutá stavba
+          const um = unlockMissionOf(kind);
+          b.className = 'pcard locked';
+          b.innerHTML = '<span class="pin"><span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost">🔒 misia ' + um + '</span></span></span>';
+          b.addEventListener('click', () => { toast(d.name + ' sa odomkne v misii ' + um); AUDIO.play('deny'); });
+          pal.appendChild(b);
+          continue;
+        }
+        if (st.flip && st.flip !== st.tool) st.flip = null;
+        b.className = 'pcard' + (st.tool === kind ? ' sel' : '') + (st.flip === kind ? ' flipped' : '') + (st.gold < costOf(kind) ? ' poor' : '');
+        const tip = kind === 'wall' ? ' Ťahaj prstom pre celý rad.' : kind === 'paving' ? ' Ťahaj prstom pre celú plochu.' : '';
+        b.innerHTML = '<span class="pin">' +
+          '<span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost"><img class="coin" src="' + ICONS.coin + '">' + costOf(kind) + '</span></span>' +
+          '<span class="face back"><b>' + d.name + '</b><small>' + d.desc + '.' + tip + '</small></span></span>';
+        b.addEventListener('pointerdown', ev => { if (st.phase === 'build') cardPress = { kind, x: ev.clientX, y: ev.clientY }; });
+        b.addEventListener('click', () => {
+          if (suppressCardClick) { suppressCardClick = false; return; } // bol to ťah, nie ťuk
+          AUDIO.play('click');
+          if (st.tool === kind) { // druhý ťuk na vybranú kartu ju otočí (vzadu je popis), ďalší ju otočí späť
+            st.flip = st.flip === kind ? null : kind;
+            b.classList.toggle('flipped', st.flip === kind);
+            return;
+          }
+          st.tool = kind; st.flip = null; st.sel = null; st.moving = null; renderBuild();
+        });
+        pal.appendChild(b);
+      }
     }
     $('nextWave').textContent = !isAttack() ? 'Do boja' : st.wave >= MISSION_WAVES ? 'Zaútočiť' : 'Do útoku';
     const rc = repairCost();
@@ -3138,8 +3110,9 @@
     addBuilding('wall', c, r); stats.builds++;
     for (let k = 0; k < 5; k++) part(tileX(c) + 8 + (Math.random() - 0.5) * 12, tileY(r) + 12, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.4, '#c6a272', 60);
   }
-  // ---- presúvanie stavieb (ťahaním alebo tlačidlom „Presunúť“) ----
-  let bdrag = null;                       // ťahaná stavba {b, start, hover, moved}
+  // ---- presúvanie stavieb (podržať prst na stavbe a potiahnuť) ----
+  let bdrag = null;                       // ťahaná stavba {b, start, hover, moved, armed}
+  const HOLD_MS = 350;                    // po takomto podržaní prsta sa stavba chytí na presun
   let pdrag = null;                       // ťahanie novej stavby na miesto {kind, t: políčko pod prstom alebo null}
   let vscroll = null;                     // posúvanie bojiska prstom pri budovaní {y0, v0, moved, p}
   let cardPress = null, suppressCardClick = false; // stlačená karta v paneli (ťah začne po pohnutí prstom)
@@ -3187,20 +3160,21 @@
     }
     if (st.phase !== 'build') return;
     const t = evTile(p);
-    if (st.moving) { // režim presunu z tlačidla: ťuk na cieľové políčko
-      const b = st.moving;
-      if (occAt(t.c, t.r) === b) { st.moving = null; renderBuild(); return; }
-      moveBuilding(b, t.c, t.r);
-      return;
-    }
     if (st.tool === 'paving' && inZone(t.c, t.r) && !inHall(t.c, t.r)) { // dlažba: ťuk = jedna (alebo zobrať), ťah = celá plocha
       drag = { kind: 'paving', path: paveFree(t.c, t.r) ? [t] : [], last: t, start: t, moved: false };
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
       return;
     }
     const o = occAt(t.c, t.r);
-    if (o && o !== HALL) { // chytenie stavby: ťuk = výber, ťahanie = presun
-      bdrag = { b: o, start: t, hover: t, moved: false };
+    if (o && o !== HALL) { // stavba: ťuk = výber, podržanie prsta = chytí sa a ťahom sa presunie, skorý ťah = posúvanie bojiska
+      const bd = bdrag = { b: o, start: t, hover: t, moved: false, armed: false, y0: ev.clientY, x0: ev.clientX, v0: st.viewUp || 0, p };
+      bd.timer = setTimeout(() => {
+        if (bdrag !== bd || st.phase !== 'build') return;
+        bd.armed = true;
+        st.sel = o; st.selGroup = null; st.tool = null;
+        AUDIO.play('click'); renderBuild();
+        try { navigator.vibrate && navigator.vibrate(15); } catch (e) { }
+      }, HOLD_MS);
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
       return;
     }
@@ -3266,6 +3240,14 @@
       return;
     }
     if (bdrag && st.phase === 'build') {
+      if (!bdrag.armed) { // prst sa pohol skôr, než stavbu chytil: posúva sa bojisko
+        if (Math.hypot(ev.clientX - bdrag.x0, ev.clientY - bdrag.y0) < 8) return;
+        clearTimeout(bdrag.timer);
+        vscroll = { y0: bdrag.y0, v0: bdrag.v0, moved: true, p: bdrag.p }; bdrag = null;
+        const r = screen.getBoundingClientRect();
+        st.viewUp = vscroll.v0 + (ev.clientY - vscroll.y0) / r.height * H;
+        return;
+      }
       const t = evTile(evPos(ev));
       if (t.c !== bdrag.start.c || t.r !== bdrag.start.r) bdrag.moved = true;
       bdrag.hover = t;
@@ -3299,13 +3281,15 @@
       return;
     }
     if (bdrag) {
-      const bd = bdrag; bdrag = null;
+      const bd = bdrag; bdrag = null; clearTimeout(bd.timer);
       if (st.phase !== 'build') return;
+      if (bd.armed && !bd.moved) return; // podržal a pustil na mieste: stavba zostáva označená
       if (!bd.moved) {
         const now = performance.now(), dbl = lastTap && lastTap.b === bd.b && now - lastTap.t < 400;
         lastTap = dbl ? null : { b: bd.b, t: now };
         st.sel = bd.b; st.selGroup = dbl ? (bd.b.kind === 'wall' ? wallRow(bd.b) : st.blds.filter(x => x.kind === bd.b.kind)) : null; st.tool = null; st.moving = null;
         AUDIO.play('click'); renderBuild();
+        if (!st.moveHint) { st.moveHint = true; hint('Stavbu presunieš: podrž na nej prst a potiahni ju'); }
       }
       else moveBuilding(bd.b, bd.hover.c, bd.hover.r);
       return;

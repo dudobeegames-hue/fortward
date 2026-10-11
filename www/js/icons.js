@@ -380,6 +380,144 @@ const UI_ICONS = (() => {
     })(),
   };
 
+  // ikonky akcií pri označenej stavbe (karty v paneli): vylepšiť, odvolať, opraviť, ostne, šíp špecializácie
+  const actUp = fromMap([
+    '.....K.....',
+    '....KLK....',
+    '...KLGGK...',
+    '..KLGGGDK..',
+    '.KLGGGGGDK.',
+    'KKKKGGGKKKK',
+    '...KGGDK...',
+    '...KGGDK...',
+    '...KGGDK...',
+    '...KGDDK...',
+    '...KKKKK...',
+  ], { K: '#1c140e', L: '#b8f890', G: '#5ccf3c', D: '#2c8a2c' });
+  const actDown = fromMap([
+    '...KKKKK...',
+    '...KLRRK...',
+    '...KLRRK...',
+    '...KLRRK...',
+    '...KLRDK...',
+    'KKKKLRDKKKK',
+    '.KLRRRRRDK.',
+    '..KLRRRDK..',
+    '...KRRDK...',
+    '....KDK....',
+    '.....K.....',
+  ], { K: '#1c140e', L: '#ffa890', R: '#e84838', D: '#a8261c' });
+  const actRepair = fromMap([
+    'KKKKKKKKKK',
+    'KSWWSSSSDK',
+    'KSSSSSSSDK',
+    'KDDDDDDDDK',
+    'KKKKBbKKKK',
+    '...KBbK...',
+    '...KBbK...',
+    '...KBbK...',
+    '...KBbK...',
+    '...KBbK...',
+    '...KKKK...',
+  ], { K: '#1c140e', S: '#a8b0c0', W: '#f0f4fc', D: '#626a7c', B: '#c6a272', b: '#8a5a2a' });
+  const spikes = (tip, mid, dark) => fromMap([
+    '..K...K...K..',
+    '.KWK.KWK.KWK.',
+    '.KSK.KSK.KSK.',
+    'KSSDKSSDKSSDK',
+    'KKKKKKKKKKKKK',
+    'KBBbBBBbBBBbK',
+    'KBbbBBbbBBbbK',
+    'KKKKKKKKKKKKK',
+  ], { K: '#1c140e', W: tip, S: mid, D: dark, B: '#a8a0a0', b: '#6a6270' });
+  const actSpikes = spikes('#f0f4fc', '#a8b0c0', '#626a7c');
+  const actSpikesFire = spikes('#ffd890', '#f89838', '#c03818');
+  const actSpikesIce = spikes('#ffffff', '#a8d8ff', '#5888d8');
+  const arrow = col => fromMap([
+    'KK.......K...',
+    'KFK......KK..',
+    '.KFKKKKKKKWK.',
+    '..KFHHHHHHHWK',
+    '.KFKKKKKKKWK.',
+    'KFK......KK..',
+    'KK.......K...',
+  ], { K: '#1c140e', F: col, H: '#8a5a2a', W: '#e8ecf4' });
+  const actSpec = { fire: arrow('#f89838'), rapid: arrow('#9cd45a'), sniper: arrow('#c8a0ff') };
+
+  // ikonky záložiek stavebného panela: len hnedé tóny (ladia so záložkami), bez farieb z hry
+  const TABP = { L: '#c8a478', M: '#9a7650', S: '#6a4e34' };
+  const tabTowers = fromMap([
+    'LL..LLL..LL',
+    'LLLLLLLLLLM',
+    'MMMMMMMMMMS',
+    '.LMMMMMMMS.',
+    '.LMMM.MMMS.',
+    '.LMMM.MMMS.',
+    '.LMMMMMMMS.',
+    '.LMMMMMMMS.',
+    '.LMMMMMMMS.',
+    '.LMM...MMS.',
+    '.LMM...MMS.',
+    'LLMM...MMSS',
+  ], TABP);
+  const tabWalls = fromMap([
+    'LL..LL..LL..LL',
+    'LL..LL..LL..LL',
+    'LLLLLLLLLLLLLL',
+    'MMMSMMMMMSMMMM',
+    'SSSSSSSSSSSSSS',
+    'MSMMMMMSMMMMMM',
+    'SSSSSSSSSSSSSS',
+    'MMMSMMMMMSMMMM',
+    'SSSSSSSSSSSSSS',
+    'MSMMMMMSMMMMMM',
+  ], TABP);
+  const tabArmy = fromMap([
+    '....LLLL....',
+    '..LLMMMMSS..',
+    '.LMMMMMMMMS.',
+    'LMMMMMMMMMMS',
+    'LMMMMMMMMMMS',
+    'LM........MS',
+    'LMMMMM.MMMMS',
+    'LMMMMM.MMMMS',
+    'LMMM.M.M.MMS',
+    'LMMMMM.MMMMS',
+    '.LMMMMMMMMS.',
+    '..SSSSSSSS..',
+  ], TABP);
+  const tabSiege = fromMap([
+    '..........LMS..',
+    '.........LMMMS.',
+    '.........SMMS..',
+    '........MS.....',
+    '.......MS......',
+    '......MS.......',
+    '.....MS..L.....',
+    '....MS..LMS....',
+    '...MS..LMMMS...',
+    'LLLLLLLLLLLLLLS',
+    'MMMMMMMMMMMMMMS',
+    '.LMS......LMS..',
+    '.SSS......SSS..',
+  ], TABP);
+  const tabSupport = fromMap([
+    '.....LMS.....',
+    '..LS.LMS.LS..',
+    '.LMMSMMMSMMS.',
+    '..SMMMMMMMS..',
+    '..LMMS.SMMS..',
+    'LLMMS...SMMSS',
+    'LMMM.....MMMS',
+    'SSMMS...SMMSS',
+    '..LMMS.SMMS..',
+    '..SMMMMMMMS..',
+    '.LMMSMMMSMMS.',
+    '..SS.LMS.SS..',
+    '.....SSS.....',
+  ], TABP);
+  const tabs = { towers: tabTowers, walls: tabWalls, army: tabArmy, siege: tabSiege, support: tabSupport };
+
   // poradie jazykov v Nastaveniach; zatiaľ hrá len slovenčina, ostatné prídu s prekladom
   const langs = [
     { id: 'sk', name: 'Slovenčina', ready: true },
@@ -392,5 +530,6 @@ const UI_ICONS = (() => {
     { id: 'zh', name: '中文' },
   ];
 
-  return { pix, music, sound, plus, home, hall, trophy, star, swords, chest, spellVolley, spellFire, spellFrost, spellBolt, scrollPaper, scrollRod, scrollTag, flags, langs };
+  return { pix, music, sound, plus, home, hall, trophy, star, swords, chest, spellVolley, spellFire, spellFrost, spellBolt, scrollPaper, scrollRod, scrollTag, flags, langs,
+    actUp, actDown, actRepair, actSpikes, actSpikesFire, actSpikesIce, actSpec, tabs };
 })();
