@@ -232,6 +232,7 @@
   };
   const slotOpen = i => kingMeta.lvl >= KING_SLOT_LVL[i];
   const spellOn = id => kingMeta.slots.some((s, i) => s === id && slotOpen(i));
+  const kingUp = () => !!(st.king && !st.king.dead); // schopnosti hrdinu (kúzla, pokrik) idú len kým žije
   const emptySlots = () => kingMeta.slots.filter((s, i) => !s && slotOpen(i)).length;
   const tal = id => kingMeta.tal[id] || 0;
   const kingXpNeed = l => 60 + 40 * (l - 1);
@@ -271,11 +272,14 @@
   // postup na mape: unlocked = najvyššia odomknutá misia (11 = ostrov oslobodený)
   Object.assign(st, { mission: 1, unlocked: 1, mapSel: 1, mapAnim: null, tech: techFor(1) });
   const has = id => st.tech.has(id);
-  const lvlCap = () => has('lvl5') ? MAX_LVL : 3;                       // úroveň stavieb a strelcov
-  const hallCap = () => st.mission === 1 ? 2 : lvlCap();                // úroveň radnice (v úvodnej misii najviac 2)
+  // úroveň radnice, stavieb a strelcov: každá ďalšia úroveň po dvoch misiách (misia 1–2 úr. 1, od 3. úr. 2, 5. úr. 3, 7. úr. 4, 9. úr. 5)
+  const lvlMission = l => 2 * l - 1;
+  const lvlCap = () => Math.min(MAX_LVL, 1 + Math.floor((st.mission - 1) / 2));
+  const hallCap = lvlCap;
   // stavby majú najviac úroveň radnice: drevená radnica = drevené stavby, kameň až po jej vylepšení
   const bCap = () => Math.min(lvlCap(), st.hallLvl);
   const LVL_NAME = ['', 'drevo', 'kameň', 'kameň s kovaním', 'tmavé opevnenie', 'kráľovský kameň'];
+  const lvlLock = (label, l, wide) => btn('🔒 ' + label + ' · misia ' + lvlMission(l), null, false, () => { }, 'locked' + (wide ? ' wide' : ''));
   const lockBtn = (label, id, wide) => btn('🔒 ' + label + ' · misia ' + unlockMissionOf(id), null, false, () => { }, 'locked' + (wide ? ' wide' : ''));
   const saveProgress = () => { try { localStorage.setItem(sk('unlocked'), String(st.unlocked)); } catch (e) { } };
   // načíta postup zvolenej pozície do hry
@@ -1616,6 +1620,7 @@
 
   function ability(id) {
     if (st.phase !== 'battle' || !has(id)) return;
+    if (!kingUp()) { AUDIO.play('deny'); hint('Kráľ padol – jeho schopnosti nefungujú'); return; }
     const a = ABIL[id];
     if (id === 'warcry') {
       if (st.cryCd > 0) { AUDIO.play('deny'); return; }
@@ -1626,6 +1631,7 @@
   // ---- kúzla ----
   function selectSpell(id) {
     if (st.phase !== 'battle' || !spellOn(id)) return;
+    if (!kingUp()) { st.spellSel = null; AUDIO.play('deny'); hint('Kráľ padol – jeho schopnosti nefungujú'); return; }
     if (st.spellSel === id) { st.spellSel = null; AUDIO.play('click'); return; }
     if (st[SPELLS[id].cdKey] > 0) { AUDIO.play('deny'); return; }
     st.spellSel = id; AUDIO.play('click');
@@ -1638,7 +1644,7 @@
     if (castSpell(id, x, y)) st.spellSel = null;
   }
   function castSpell(id, x, y) {
-    if (st.phase !== 'battle' || !spellOn(id) || st[SPELLS[id].cdKey] > 0) { AUDIO.play('deny'); return false; }
+    if (st.phase !== 'battle' || !spellOn(id) || !kingUp() || st[SPELLS[id].cdKey] > 0) { AUDIO.play('deny'); return false; }
     if (id === 'volley') { volley(x, y); return true; }
     const sp = SPELLS[id], pow = spellPow();
     if (id === 'fireball') { // guľa padá z neba a vybuchne
@@ -2708,14 +2714,17 @@
       el.hidden = !has(id);
       const pp = cd > 0 ? 1 - cd / max : 1;
       el.style.setProperty('--p', (pp * 100) + '%');
-      el.classList.toggle('ready', pp >= 1);
+      el.classList.toggle('ready', pp >= 1 && kingUp());
+      el.classList.toggle('dead', !kingUp());
     }
+    if (st.spellSel && !kingUp()) st.spellSel = null;
     for (const b of document.querySelectorAll('.spell')) {
       const id = b.dataset.spell, sp = SPELLS[id], cd = st[sp.cdKey] || 0;
       b.hidden = !spellOn(id);
       const p = cd > 0 ? 1 - cd / spellMax(id) : 1;
       b.style.setProperty('--p', (p * 100) + '%');
-      b.classList.toggle('ready', p >= 1 && st.spellSel !== id);
+      b.classList.toggle('ready', p >= 1 && st.spellSel !== id && kingUp());
+      b.classList.toggle('dead', !kingUp());
       b.classList.toggle('sel', st.spellSel === id);
     }
     const bb = $('hud-boss'), B = st.boss;
@@ -2866,8 +2875,7 @@
         acts.appendChild(btn('Vylepšiť radnicu', c, st.gold >= c, () => {
           st.gold -= c; st.hallLvl++; st.hallHp += 200; st.king.hp = kingMax();
         }, 'up'));
-      } else if (st.mission === 1 && st.hallLvl < lvlCap()) acts.appendChild(btn('🔒 Radnica úr. 3 · od misie 2', null, false, () => { }, 'locked'));
-      else if (st.hallLvl < MAX_LVL) acts.appendChild(lockBtn('Radnica úr. ' + (st.hallLvl + 1), 'lvl5'));
+      } else if (st.hallLvl < MAX_LVL) acts.appendChild(lvlLock('Radnica úr. ' + (st.hallLvl + 1), st.hallLvl + 1));
       else acts.appendChild(btn('Max. úroveň', null, false, () => { }));
       if (has('volleyUp') && spellOn('volley')) { // salvu má kráľ len ak ju dal do slotu
         const vc = volleyUpCost();
@@ -2904,7 +2912,7 @@
         if (d.hp) w.hp = Math.ceil(bMaxHp(w) * ratio);
       }, 'up wide');
       else if (maxL < lvlCap()) acts.appendChild(btn('Úr. ' + (maxL + 1) + ' – najprv vylepši radnicu', null, false, () => { }, 'locked wide'));
-      else if (maxL < MAX_LVL) acts.appendChild(lockBtn('Úr. ' + (minL + 1), 'lvl5', true));
+      else if (maxL < MAX_LVL) acts.appendChild(lvlLock('Úr. ' + (maxL + 1), maxL + 1, true));
       else acts.appendChild(btn('Max. úroveň', null, false, () => { }, 'wide'));
       if (d.hp) {
         bulk(acts, 'Opraviť', grp.filter(w => bRepairCost(w) > 0), bRepairCost, w => { st.gold -= bRepairCost(w); w.hp = bMaxHp(w); });
@@ -2970,7 +2978,7 @@
           rebuildOcc();
         }, 'up'));
       } else if (b.lvl < lvlCap()) acts.appendChild(btn('Úr. ' + (b.lvl + 1) + ' – najprv radnica', null, false, () => { }, 'locked'));
-      else if (b.lvl < MAX_LVL) acts.appendChild(lockBtn('Úr. ' + (b.lvl + 1), 'lvl5'));
+      else if (b.lvl < MAX_LVL) acts.appendChild(lvlLock('Úr. ' + (b.lvl + 1), b.lvl + 1));
       else acts.appendChild(btn('Max. úroveň', null, false, () => { }));
       const fc = bRepairCost(b);
       if (fc) acts.appendChild(btn('Opraviť', fc, st.gold >= fc, () => { st.gold -= fc; b.hp = bMaxHp(b); rebuildOcc(); }));
@@ -3027,7 +3035,7 @@
           if (u.lvl < lvlCap()) {
             const c = uUpCost(u);
             ua.appendChild(btn('Vylepšiť strelca', c, st.gold >= c, () => { st.gold -= c; u.spent += c; u.lvl++; }, 'up'));
-          } else if (u.lvl < MAX_LVL) ua.appendChild(lockBtn('Úr. ' + (u.lvl + 1), 'lvl5'));
+          } else if (u.lvl < MAX_LVL) ua.appendChild(lvlLock('Úr. ' + (u.lvl + 1), u.lvl + 1));
           else ua.appendChild(btn('Max. úroveň', null, false, () => { }));
           const ur = Math.floor(u.spent / 2);
           ua.appendChild(btn('Odvolať +' + ur, null, true, () => { st.gold += ur; b.unit = null; }, 'sell'));
@@ -3687,8 +3695,9 @@
   function showMenu() {
     setTab('map', true);
     st.phase = 'title';
-    $('map').hidden = true; $('slots').hidden = true; $('title').hidden = true;
-    SPLASH.show(); AUDIO.play('click');
+    // obrazovky pod úvodným obrázkom sa skryjú až po jeho zjavení, inak by cez prelínanie prebliklo bojisko/ostrov
+    SPLASH.show(() => { $('map').hidden = true; $('slots').hidden = true; $('title').hidden = true; });
+    AUDIO.play('click');
   }
   $('mapHome').addEventListener('click', showMenu);
   // štítok na zvitku: zvitok sa zvinie nahor a ukáže sa úvodná obrazovka

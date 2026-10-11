@@ -169,6 +169,11 @@ function buildScene(W, H, G, seed, themeIdx) {
     const py = Math.round(H * 0.42), pe = Math.round(edge(py)) + 4;
     for (let y = py; y < py + 5; y++) for (let x = 0; x < pe; x++) set(x, y, pickRamp(WOOD, y === py ? 0.7 : y === py + 4 ? 0.15 : (x % 4 === 0 ? 0.3 : 0.5), x, y));
     for (let x = 2; x < pe; x += 5) { set(x, py + 5, WOOD[1]); set(x, py + 6, WOOD[1]); }
+    // pena pod mólom by cez dosky preblikávala
+    for (let i = foam.length - 1; i >= 0; i--) {
+      const f = foam[i];
+      if (f.x < pe && (f.y >= py && f.y < py + 5 || (f.y === py + 5 || f.y === py + 6) && f.x >= 2 && (f.x - 2) % 5 === 0)) foam.splice(i, 1);
+    }
     // loďka
     const by = Math.round(H * 0.2), bx0 = 2;
     for (let x = 0; x < 11; x++) { set(bx0 + x, by, x === 0 || x === 10 ? K : WOOD[5]); set(bx0 + x, by + 1, x === 0 || x === 10 ? K : WOOD[3]); }

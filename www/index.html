@@ -153,6 +153,7 @@
   .spell.ready img { opacity: 1; }
   .spell[data-spell=volley] img { width: 38px; height: 38px; } /* 19x19 bodov = 2 px na bod */
   .spell.ready { animation: glow 1.2s ease-in-out infinite; }
+  .spell.dead, .abil.dead { filter: grayscale(1) brightness(.7); animation: none; } /* kráľ padol – schopnosti nefungujú */
   .spell.sel { transform: scale(1.12); animation: none; box-shadow: 0 0 0 3px #fff7c8, 0 0 16px 4px var(--c); }
   .abils { display: flex; gap: 8px; align-items: flex-end; }
   .leftCtl { display: flex; gap: 6px; align-items: flex-end; }

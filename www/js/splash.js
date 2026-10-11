@@ -42,11 +42,13 @@ const SPLASH = (() => {
       el.classList.add('out'); hideT = setTimeout(() => { el.hidden = true; leaving = false; }, 900);
     });
   }
-  function show() {
+  // shown: zavolá sa, až keď obrázok úplne zakryje obrazovku (dovtedy má zostať viditeľné, čo je pod ním)
+  function show(shown) {
     const el = document.getElementById('splash');
     clearTimeout(hideT); leaving = false;
     el.hidden = false; void el.offsetWidth;            // aby sa obrázok plynulo zjavil
     el.classList.remove('out');
+    if (shown) setTimeout(() => { if (!el.hidden && !el.classList.contains('out')) shown(); }, 850);
   }
   return api;
 })();
