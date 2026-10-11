@@ -380,20 +380,7 @@ const UI_ICONS = (() => {
     })(),
   };
 
-  // ikonky akcií pri označenej stavbe (karty v paneli): vylepšiť, odvolať, opraviť, ostne, šíp špecializácie
-  const actUp = fromMap([
-    '.....K.....',
-    '....KLK....',
-    '...KLGGK...',
-    '..KLGGGDK..',
-    '.KLGGGGGDK.',
-    'KKKKGGGKKKK',
-    '...KGGDK...',
-    '...KGGDK...',
-    '...KGGDK...',
-    '...KGDDK...',
-    '...KKKKK...',
-  ], { K: '#1c140e', L: '#b8f890', G: '#5ccf3c', D: '#2c8a2c' });
+  // ikonky akcií pri označenej stavbe (karty v paneli): odvolať, opraviť, šíp špecializácie
   const actDown = fromMap([
     '...KKKKK...',
     '...KLRRK...',
@@ -420,19 +407,6 @@ const UI_ICONS = (() => {
     '...KBbK...',
     '...KKKK...',
   ], { K: '#1c140e', S: '#a8b0c0', W: '#f0f4fc', D: '#626a7c', B: '#c6a272', b: '#8a5a2a' });
-  const spikes = (tip, mid, dark) => fromMap([
-    '..K...K...K..',
-    '.KWK.KWK.KWK.',
-    '.KSK.KSK.KSK.',
-    'KSSDKSSDKSSDK',
-    'KKKKKKKKKKKKK',
-    'KBBbBBBbBBBbK',
-    'KBbbBBbbBBbbK',
-    'KKKKKKKKKKKKK',
-  ], { K: '#1c140e', W: tip, S: mid, D: dark, B: '#a8a0a0', b: '#6a6270' });
-  const actSpikes = spikes('#f0f4fc', '#a8b0c0', '#626a7c');
-  const actSpikesFire = spikes('#ffd890', '#f89838', '#c03818');
-  const actSpikesIce = spikes('#ffffff', '#a8d8ff', '#5888d8');
   const arrow = col => fromMap([
     'KK.......K...',
     'KFK......KK..',
@@ -531,5 +505,5 @@ const UI_ICONS = (() => {
   ];
 
   return { pix, music, sound, plus, home, hall, trophy, star, swords, chest, spellVolley, spellFire, spellFrost, spellBolt, scrollPaper, scrollRod, scrollTag, flags, langs,
-    actUp, actDown, actRepair, actSpikes, actSpikesFire, actSpikesIce, actSpec, tabs };
+    actDown, actRepair, actSpec, tabs };
 })();

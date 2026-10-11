@@ -272,9 +272,10 @@
   // postup na mape: unlocked = najvyššia odomknutá misia (11 = ostrov oslobodený)
   Object.assign(st, { mission: 1, unlocked: 1, mapSel: 1, mapAnim: null, tech: techFor(1) });
   const has = id => st.tech.has(id);
-  // úroveň radnice, stavieb a strelcov: každá ďalšia úroveň po dvoch misiách (misia 1–2 úr. 1, od 3. úr. 2, 5. úr. 3, 7. úr. 4, 9. úr. 5)
-  const lvlMission = l => 2 * l - 1;
-  const lvlCap = () => Math.min(MAX_LVL, 1 + Math.floor((st.mission - 1) / 2));
+  // úroveň radnice, stavieb a strelcov podľa misie: 1 → úr. 1, 2–3 → úr. 2, 4–5 → úr. 3, 6–8 → úr. 4, 9–10 → úr. 5
+  const LVL_FROM = [0, 1, 2, 4, 6, 9];
+  const lvlMission = l => LVL_FROM[l];
+  const lvlCap = () => { let l = 1; while (l < MAX_LVL && st.mission >= lvlMission(l + 1)) l++; return l; };
   const hallCap = lvlCap;
   // stavby majú najviac úroveň radnice: drevená radnica = drevené stavby, kameň až po jej vylepšení
   const bCap = () => Math.min(lvlCap(), st.hallLvl);
@@ -691,7 +692,7 @@
   function newGame() {
     undoStack = [];
     Object.assign(st, {
-      wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.15 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, tool: null, sel: null, hallFlash: 0, shake: 0, soldierN: 0,
+      wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.15 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, hallFlash: 0, shake: 0, soldierN: 0,
       blds: [], paving: {}, enemies: [], soldiers: [], proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
       cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, spellSel: null, fallFx: [], bolts: [], siegeHold: false, siegeT: 0, introPan: null,
     });
@@ -765,6 +766,7 @@
     $('bottom').hidden = true;
     // rytieri a kráľ sa vrátia a vyliečia
     for (const s of st.soldiers) { s.hp = s.max; s.tgt = null; }
+    if (st.king && st.king.dead && st.king.fadeT == null) st.king.fadeT = 0; // padnutý kráľ sa po vlne vytratí
     if (st.king && !st.king.dead) { st.king.hp = kingMax(); st.king.down = 0; st.king.tgt = null; st.king.flash = 0; st.king.swing = 0; st.king.x = st.king.hx; st.king.y = st.king.hy; }
     for (const b of st.blds) b.flash = 0;
     $('build').hidden = false;
@@ -1266,7 +1268,7 @@
     part(u.x, u.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.3, '#e84838', 100);
     if (u.hp > 0) return;
     if (u.isKing) { // kráľ padol – do konca vlny nebojuje, po vlne ho možno oživiť za zlato
-      u.dead = true; u.deadT = 0; u.tgt = null; u.flash = 0;
+      u.dead = true; u.deadT = 0; u.fadeT = null; u.tgt = null; u.flash = 0;
       for (let k = 0; k < 10; k++) part(u.x, u.y - 6, (Math.random() - 0.5) * 40, -Math.random() * 40, 0.6, '#f8d048', 80);
       AUDIO.play('crumble');
       slowmoT = SLOWMO_DUR;
@@ -1830,6 +1832,7 @@
     st.shake = Math.max(0, st.shake - dt);
     st.hallFlash = Math.max(0, st.hallFlash - dt);
     if (st.king) st.king.flash = Math.max(0, (st.king.flash || 0) - dt);
+    if (st.king && st.king.fadeT != null) st.king.fadeT += dt;
     for (const b of st.blds) if (b.flash > 0) b.flash = Math.max(0, b.flash - dt);
   }
 
@@ -1896,15 +1899,17 @@
     }
   }
 
-  // padnutý kráľ: klesne na kolená (nohy zmiznú pod ním), plášť sa zavlní, nad korunou krúžia hviezdičky, potom zmizne
-  const KING_GONE = 3.2;
+  // padnutý kráľ: klesne na kolená (nohy zmiznú pod ním), plášť sa zavlní, nad korunou krúžia hviezdičky;
+  // leží tak do konca vlny, potom sa vytratí (fadeT beží od konca vlny)
+  const KING_FADE = 0.6;
+  const kingLying = k => k.fadeT == null || k.fadeT < KING_FADE;
   // pri páde kráľa sa boj na chvíľu spomalí na tretinu (v reálnom čase), aby si to hráč všimol
   const SLOWMO_DUR = 1.0;
   let slowmoT = 0;
   function drawDeadKing(k, time) {
     const fr = SPR.king[0], t = k.deadT;
     const fall = Math.min(1, t / 0.45), drop = Math.round(4 * fall * fall);
-    const alpha = t < 2.6 ? 1 : Math.max(0, 1 - (t - 2.6) / 0.6);
+    const alpha = k.fadeT == null ? 1 : Math.max(0, 1 - k.fadeT / KING_FADE);
     const x0 = Math.round(k.x - fr.w / 2), y0 = Math.round(k.y - fr.h) + drop, gy = Math.round(k.y);
     const amp = t < 1.3 ? 1.6 * (1 - t / 1.3) : 0; // vlnenie plášťa doznieva
     g.globalAlpha = alpha;
@@ -1956,6 +1961,41 @@
     g.fillStyle = col; g.fillRect(x, y, Math.max(1, Math.round(w * ratio)), 1);
   }
 
+  function drawSpikes(ctx, x0, y0, type) {
+    const sk = type ? SPIKE_TYPES[type] : null;
+    for (let k = 1; k < T - 1; k += 3) { ctx.fillStyle = PAL.K; ctx.fillRect(x0 + k, y0 + 6, 1, 3); ctx.fillStyle = sk ? sk.tip : '#f4f4f8'; ctx.fillRect(x0 + k, y0 + 5, 1, 1); ctx.fillStyle = sk ? sk.body : '#bcc0cc'; ctx.fillRect(x0 + k, y0 + 6, 1, 2); }
+  }
+  // náhľad stavby na karte presne tak, ako bude vyzerať po akcii (materiál úrovne, brána, ostne, strelec, vlajka špecializácie)
+  const previewCache = {};
+  function bPreview(o) {
+    const lv = Math.max(1, Math.min(5, o.lvl || 1)), u = o.unit;
+    const key = [o.kind, lv, o.gate ? 1 : 0, o.spikes ? o.spikeType || 1 : 0, u ? u.type + u.lvl : '', o.spec || ''].join('|');
+    if (previewCache[key]) return previewCache[key];
+    if (o.kind === 'hall') return (previewCache[key] = spriteURL(bsprOf('hall', lv), 2));
+    const c = document.createElement('canvas'), x = c.getContext('2d');
+    if (o.kind === 'wall') {
+      const y0 = o.gate ? 15 : u ? 9 : 6; // nad hradbou len toľko miesta, koľko treba (strážnica / strelec)
+      c.width = T; c.height = y0 + 18;
+      x.drawImage(BSPR.wall[lv - 1][10].c, 0, y0 - 6);
+      if (o.spikes) drawSpikes(x, 0, y0, o.spikeType);
+      if (o.gate) x.drawImage(BSPR.gatehouse[lv - 1].c, 0, y0 - 15);
+      else if (u) {
+        const us = SPR[WUNIT[u.type].spr][0];
+        x.drawImage(us.c, 0, 0, us.w, 11, 1, y0 - 9, us.w, 11);
+        if (u.lvl > 1) pxText(x, String(u.lvl), 1, y0 - 8, '#88b4ff');
+      }
+    } else {
+      const spr = bsprOf(o.kind, lv), w = Math.max(T, spr.w), tx = Math.floor((w - T) / 2);
+      c.width = w; c.height = spr.h + 5;
+      x.drawImage(spr.c, tx + T / 2 - Math.floor(spr.w / 2), 5);
+      if (o.spec) { x.fillStyle = '#4a4e60'; x.fillRect(tx + 13, 1, 1, 6); x.fillStyle = SPECS[o.spec].col; x.fillRect(tx + 14, 1, 3, 2); }
+      if (lv > 1) pxText(x, String(lv), tx + T - 3, 5 + spr.h - 7, '#f8d048');
+    }
+    return (previewCache[key] = spriteURL({ c, w: c.width, h: c.height }, 3));
+  }
+  // náhľad stavby po zmene (jej vlastnosti s prepísanými hodnotami)
+  const after = (b, ch) => bPreview(Object.assign({ kind: b.kind, lvl: b.lvl, gate: b.gate, spikes: b.spikes, spikeType: b.spikeType, unit: b.unit, spec: b.spec }, ch));
+
   function drawBuilding(b, time) {
     const x0 = tileX(b.c), y0 = tileY(b.r);
     let spr;
@@ -1974,8 +2014,7 @@
       if (joinsBuilding(b.c + 1, b.r)) slice(x0 + T, 4);
       if (joinsBuilding(b.c - 1, b.r)) slice(x0 - 4, 4);
       if (b.spikes) { // ostne na čele hradby
-        const sk = b.spikeType ? SPIKE_TYPES[b.spikeType] : null;
-        for (let k = 1; k < T - 1; k += 3) { g.fillStyle = PAL.K; g.fillRect(x0 + k, y0 + 6, 1, 3); g.fillStyle = sk ? sk.tip : '#f4f4f8'; g.fillRect(x0 + k, y0 + 5, 1, 1); g.fillStyle = sk ? sk.body : '#bcc0cc'; g.fillRect(x0 + k, y0 + 6, 1, 2); }
+        drawSpikes(g, x0, y0, b.spikeType);
         if (b.spikeType === 'fire' && Math.random() < 0.04) part(x0 + 2 + Math.random() * (T - 4), y0 + 5, 0, -10, 0.4, '#f89838', -5);
       }
       if (b.gate) {
@@ -2617,7 +2656,7 @@
       for (const b of st.blds) if (!TRAPS[b.kind]) objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), x: b.c, f: () => drawBuilding(b, time) });
       for (const s of st.soldiers) objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: s.y, f: () => drawFighter(s, s.spr || 'soldier') });
       if (st.king && !st.king.dead) objs.push({ y: st.king.y, f: () => drawFighter(st.king, 'king') });
-      else if (st.king && st.king.deadT < KING_GONE) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
+      else if (st.king && kingLying(st.king)) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
     }
     for (const e of st.enemies) objs.push({ y: e.y, f: () => drawEnemy(e, time) });
     if (st.fort) {
@@ -2779,7 +2818,7 @@
     Object.assign(st, { gold: sn.gold, hallLvl: sn.hallLvl, hallHp: sn.hallHp, volleyLvl: sn.volleyLvl, blds: sn.blds, paving: sn.paving });
     st.sel = null; st.selGroup = null; st.tool = null; st.moving = null;
     if (st.king) {
-      if (sn.kingDead && !st.king.dead) Object.assign(st.king, { dead: true, deadT: KING_GONE });
+      if (sn.kingDead && !st.king.dead) Object.assign(st.king, { dead: true, deadT: 9, fadeT: KING_FADE });
       else if (!sn.kingDead) st.king.dead = false;
       st.king.hp = kingMax(); st.king.x = st.king.hx; st.king.y = st.king.hy;
     }
@@ -2800,7 +2839,7 @@
     const k = st.king, c = reviveCost();
     if (!k || !k.dead || st.gold < c) return;
     st.gold -= c;
-    Object.assign(k, { dead: false, deadT: 0, hp: kingMax(), x: k.hx, y: k.hy, tgt: null, flash: 0, swing: 0, cd: 0 });
+    Object.assign(k, { dead: false, deadT: 0, fadeT: null, hp: kingMax(), x: k.hx, y: k.hy, tgt: null, flash: 0, swing: 0, cd: 0 });
     for (let q = 0; q < 24; q++) part(k.x + (Math.random() - 0.5) * 10, k.y - Math.random() * 14, (Math.random() - 0.5) * 30, -20 - Math.random() * 30, 0.8, ['#f8d048', '#fff070', '#ffffff'][q % 3], 30);
   }
   function repairCost() {
@@ -2841,10 +2880,11 @@
     const I = UI_ICONS;
     const lockAct = (icon, label, m, px) => act(icon, label, '🔒 misia ' + m, false, label + ' sa odomkne v misii ' + m, 'locked', px);
     // ďalšia úroveň: kúpiť / najprv radnica / zamknutá do misie / maximum
-    const upAct = (lvl, cap, cost, apply, label) => {
-      if (lvl < cap) act(I.actUp, label || 'Vylepšiť', coinTxt(cost), st.gold >= cost, apply, 'up', true);
-      else if (lvl < lvlCap()) act(I.actUp, 'Úr. ' + (lvl + 1), '🔒 radnica', false, 'Najprv vylepši radnicu', 'locked', true);
-      else if (lvl < MAX_LVL) lockAct(I.actUp, 'Úr. ' + (lvl + 1), lvlMission(lvl + 1), true);
+    // icon = náhľad stavby na ďalšej úrovni
+    const upAct = (lvl, cap, cost, apply, label, icon) => {
+      if (lvl < cap) act(icon, label || 'Vylepšiť', coinTxt(cost), st.gold >= cost, apply, 'up');
+      else if (lvl < lvlCap()) act(icon, 'Úr. ' + (lvl + 1), '🔒 radnica', false, 'Najprv vylepši radnicu', 'locked');
+      else if (lvl < MAX_LVL) lockAct(icon, 'Úr. ' + (lvl + 1), lvlMission(lvl + 1));
       else act(I.star, 'Max. úr.', '', false, null, 'max', true);
     };
     const selRow = (icon, title, stats) => {
@@ -2863,7 +2903,7 @@
     if (st.sel === HALL) {
       const k = st.king;
       selRow(ICONS.hall, 'Radnica · úr. ' + st.hallLvl + ' (' + LVL_NAME[st.hallLvl] + ')', 'zdravie ' + Math.ceil(st.hallHp) + '/' + hallMax() + ' · kráľ úr. ' + kingMeta.lvl + (k && k.dead ? ' · padol' : '') + ' · vylepšenie rozšíri územie a dovolí vyššie stavby');
-      upAct(st.hallLvl, hallCap(), hallUpCost(), () => { const c = hallUpCost(); st.gold -= c; st.hallLvl++; st.hallHp += 200; st.king.hp = kingMax(); });
+      upAct(st.hallLvl, hallCap(), hallUpCost(), () => { const c = hallUpCost(); st.gold -= c; st.hallLvl++; st.hallHp += 200; st.king.hp = kingMax(); }, null, bPreview({ kind: 'hall', lvl: st.hallLvl + 1 }));
       if (k && k.dead) { const c = reviveCost(); act(ICONS.king, 'Oživiť kráľa', coinTxt(c), st.gold >= c, reviveKing, 'up'); }
       if (has('volleyUp') && spellOn('volley')) { // salvu má kráľ len ak ju dal do slotu
         const vc = volleyUpCost();
@@ -2884,32 +2924,32 @@
           coinTxt(pick.length ? sum : list.reduce((t, x) => t + costFn(x), 0)), pick.length > 0, () => { for (const x of pick) apply(x); rebuildOcc(); }, cls, px);
       };
       const cand = grp.filter(w => w.lvl < cap).sort((a, b) => a.lvl - b.lvl);
-      if (cand.length) bulk(I.actUp, 'Vylepšiť', cand, bUpCost, w => {
+      if (cand.length) bulk(after(cand[0], { lvl: cand[0].lvl + 1, unit: null, gate: false, spikes: false, spec: null }), 'Vylepšiť', cand, bUpCost, w => {
         const ratio = d.hp ? w.hp / bMaxHp(w) : 1, c = bUpCost(w);
         st.gold -= c; w.spent += c; w.lvl++;
         if (d.hp) w.hp = Math.ceil(bMaxHp(w) * ratio);
-      }, 'up', true);
-      else upAct(maxL, maxL, 0, null);
+      }, 'up');
+      else upAct(maxL, maxL, 0, null, null, bPreview({ kind, lvl: maxL + 1 }));
       if (d.hp) bulk(I.actRepair, 'Opraviť', grp.filter(w => bRepairCost(w) > 0), bRepairCost, w => { st.gold -= bRepairCost(w); w.hp = bMaxHp(w); }, '', true);
       const refund = grp.reduce((t, w) => t + Math.floor(w.spent / 2) + (w.unit ? Math.floor(w.unit.spent / 2) : 0), 0);
       act(ICONS.coin, 'Predať ' + grp.length + '×', '+' + refund, true, sellAll(grp, refund), 'sell', true);
       if (isWall) {
         const bare = grp.filter(w => !w.spikes), plain = grp.filter(w => w.spikes && !w.spikeType);
         if (bare.length) {
-          if (!has('spikes')) lockAct(I.actSpikes, 'Ostne', unlockMissionOf('spikes'), true);
-          else bulk(I.actSpikes, 'Ostne', bare, () => SPIKE_COST, w => { st.gold -= SPIKE_COST; w.spent += SPIKE_COST; w.spikes = true; }, '', true);
+          if (!has('spikes')) lockAct(after(bare[0], { spikes: true, unit: null, gate: false }), 'Ostne', unlockMissionOf('spikes'));
+          else bulk(after(bare[0], { spikes: true, spikeType: null, unit: null, gate: false }), 'Ostne', bare, () => SPIKE_COST, w => { st.gold -= SPIKE_COST; w.spent += SPIKE_COST; w.spikes = true; }, '', true);
         }
         if (plain.length) {
-          if (!has('spikeTypes')) lockAct(I.actSpikesFire, 'Ohnivé/ľadové', unlockMissionOf('spikeTypes'), true);
-          else for (const k in SPIKE_TYPES) bulk(k === 'fire' ? I.actSpikesFire : I.actSpikesIce, SPIKE_TYPES[k].name.split(' ')[0], plain, () => SPIKE_TYPE_COST, w => { st.gold -= SPIKE_TYPE_COST; w.spent += SPIKE_TYPE_COST; w.spikeType = k; }, '', true);
+          if (!has('spikeTypes')) lockAct(after(plain[0], { spikeType: 'fire', unit: null, gate: false }), 'Ohnivé/ľadové', unlockMissionOf('spikeTypes'));
+          else for (const k in SPIKE_TYPES) bulk(after(plain[0], { spikeType: k, unit: null, gate: false }), SPIKE_TYPES[k].name.split(' ')[0], plain, () => SPIKE_TYPE_COST, w => { st.gold -= SPIKE_TYPE_COST; w.spent += SPIKE_TYPE_COST; w.spikeType = k; }, '', true);
         }
         const free = grp.filter(w => !w.gate && !w.unit), manned = grp.filter(w => w.unit && w.unit.lvl < lvlCap()).sort((a, b) => a.unit.lvl - b.unit.lvl);
         if (has('wallArcher') && free.length) for (const type in WUNIT) {
           const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
           if (!has(tid)) { lockAct(ICONS['u_' + type], wd.name, unlockMissionOf(tid)); continue; }
-          bulk(ICONS['u_' + type], wd.name, free, () => wd.cost, w => { st.gold -= wd.cost; w.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit');
+          bulk(after(free[0], { unit: { type, lvl: 1 }, gate: false }), wd.name, free, () => wd.cost, w => { st.gold -= wd.cost; w.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit');
         }
-        if (manned.length) bulk(I.actUp, 'Strelci', manned, w => uUpCost(w.unit), w => { const c = uUpCost(w.unit); st.gold -= c; w.unit.spent += c; w.unit.lvl++; }, 'up', true);
+        if (manned.length) bulk(after(manned[0], { unit: { type: manned[0].unit.type, lvl: manned[0].unit.lvl + 1 } }), 'Strelci', manned, w => uUpCost(w.unit), w => { const c = uUpCost(w.unit); st.gold -= c; w.unit.spent += c; w.unit.lvl++; }, 'up', true);
       }
     } else if (st.sel) {
       const b = st.sel, d = BUILD[b.kind];
@@ -2930,13 +2970,13 @@
       if (b.spec) stats += ' · ' + SPECS[b.spec].name;
       if (b.gate) stats += ' · rytieri cez ňu prejdú';
       if ((UNIT_HOME[b.kind] || b.kind === 'range') && knightsBlocked(b)) stats = '<span class="warn">⚠ vojaci sa nedostanú von</span> · ' + stats;
-      selRow(b.gate ? ICONS.gate : ICONS[b.kind], (b.gate ? 'Brána' : d.name) + ' · úr. ' + b.lvl, stats);
+      selRow(after(b, {}), (b.gate ? 'Brána' : d.name) + ' · úr. ' + b.lvl, stats);
       upAct(b.lvl, bCap(), bUpCost(b), () => {
         const ratio = d.hp ? b.hp / bMaxHp(b) : 1, c = bUpCost(b);
         st.gold -= c; b.spent += c; b.lvl++;
         if (d.hp) b.hp = Math.ceil(bMaxHp(b) * ratio);
         rebuildOcc();
-      });
+      }, null, after(b, { lvl: b.lvl + 1 }));
       const fc = bRepairCost(b);
       if (fc) act(I.actRepair, 'Opraviť', coinTxt(fc), st.gold >= fc, () => { st.gold -= fc; b.hp = bMaxHp(b); rebuildOcc(); }, '', true);
       const refund = Math.floor(b.spent / 2) + (b.unit ? Math.floor(b.unit.spent / 2) : 0);
@@ -2944,30 +2984,30 @@
       if (b.kind === 'tower' && !b.spec) {
         if (!has('spec')) lockAct(I.actSpec.fire, 'Špecializácia', unlockMissionOf('spec'), true);
         else if (b.lvl < 3) act(I.actSpec.fire, 'Špecializácia', 'od úr. 3', false, 'Špecializácia sa dá vybrať od úrovne 3', 'locked', true);
-        else for (const k in SPECS) act(I.actSpec[k], SPEC_SHORT[k], coinTxt(SPEC_COST), st.gold >= SPEC_COST, () => { st.gold -= SPEC_COST; b.spent += SPEC_COST; b.spec = k; }, 'up', true);
+        else for (const k in SPECS) act(after(b, { spec: k }), SPEC_SHORT[k], coinTxt(SPEC_COST), st.gold >= SPEC_COST, () => { st.gold -= SPEC_COST; b.spent += SPEC_COST; b.spec = k; }, 'up', true);
       }
       if (b.kind === 'wall') {
         const u = b.unit;
         if (u) {
-          upAct(u.lvl, lvlCap(), uUpCost(u), () => { const c = uUpCost(u); st.gold -= c; u.spent += c; u.lvl++; }, 'Strelec');
+          upAct(u.lvl, lvlCap(), uUpCost(u), () => { const c = uUpCost(u); st.gold -= c; u.spent += c; u.lvl++; }, 'Strelec', after(b, { unit: { type: u.type, lvl: u.lvl + 1 } }));
           const ur = Math.floor(u.spent / 2);
           act(I.actDown, 'Odvolať', '+' + ur, true, () => { st.gold += ur; b.unit = null; }, 'sell', true);
         } else if (!b.gate && has('wallArcher')) for (const type in WUNIT) {
           const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
           if (!has(tid)) { lockAct(ICONS['u_' + type], wd.name, unlockMissionOf(tid)); continue; }
-          act(ICONS['u_' + type], wd.name, coinTxt(wd.cost), st.gold >= wd.cost, () => { st.gold -= wd.cost; b.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit');
+          act(after(b, { unit: { type, lvl: 1 } }), wd.name, coinTxt(wd.cost), st.gold >= wd.cost, () => { st.gold -= wd.cost; b.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit');
         }
-        if (b.gate) act(ICONS.wall, 'Na hradbu', '', true, () => { b.gate = false; });
+        if (b.gate) act(after(b, { gate: false }), 'Na hradbu', '', true, () => { b.gate = false; });
         else if (!u) {
-          if (!has('gate')) lockAct(ICONS.gate, 'Brána', unlockMissionOf('gate'));
-          else { const gc = gateCost(); act(ICONS.gate, 'Brána', coinTxt(gc), st.gold >= gc, () => { st.gold -= gc; b.spent += gc; b.gate = true; }); }
+          if (!has('gate')) lockAct(after(b, { gate: true }), 'Brána', unlockMissionOf('gate'));
+          else { const gc = gateCost(); act(after(b, { gate: true }), 'Brána', coinTxt(gc), st.gold >= gc, () => { st.gold -= gc; b.spent += gc; b.gate = true; }); }
         }
         if (!b.spikes) {
-          if (has('spikes')) act(I.actSpikes, 'Ostne', coinTxt(SPIKE_COST), st.gold >= SPIKE_COST, () => { st.gold -= SPIKE_COST; b.spent += SPIKE_COST; b.spikes = true; }, '', true);
-          else lockAct(I.actSpikes, 'Ostne', unlockMissionOf('spikes'), true);
+          if (has('spikes')) act(after(b, { spikes: true }), 'Ostne', coinTxt(SPIKE_COST), st.gold >= SPIKE_COST, () => { st.gold -= SPIKE_COST; b.spent += SPIKE_COST; b.spikes = true; }, '', true);
+          else lockAct(after(b, { spikes: true }), 'Ostne', unlockMissionOf('spikes'));
         } else if (!b.spikeType) {
-          if (!has('spikeTypes')) lockAct(I.actSpikesFire, 'Ohnivé/ľadové', unlockMissionOf('spikeTypes'), true);
-          else for (const k in SPIKE_TYPES) act(k === 'fire' ? I.actSpikesFire : I.actSpikesIce, SPIKE_TYPES[k].name.split(' ')[0], coinTxt(SPIKE_TYPE_COST), st.gold >= SPIKE_TYPE_COST, () => { st.gold -= SPIKE_TYPE_COST; b.spent += SPIKE_TYPE_COST; b.spikeType = k; }, '', true);
+          if (!has('spikeTypes')) lockAct(after(b, { spikeType: 'fire' }), 'Ohnivé/ľadové', unlockMissionOf('spikeTypes'));
+          else for (const k in SPIKE_TYPES) act(after(b, { spikeType: k }), SPIKE_TYPES[k].name.split(' ')[0], coinTxt(SPIKE_TYPE_COST), st.gold >= SPIKE_TYPE_COST, () => { st.gold -= SPIKE_TYPE_COST; b.spent += SPIKE_TYPE_COST; b.spikeType = k; }, '', true);
         }
       }
     } else {
