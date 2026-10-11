@@ -3467,14 +3467,15 @@
     const es = emptySlots(); $('heroTxt').textContent = es; $('heroTxt').hidden = !es; // voľný slot na schopnosť
   }
   $('icoHome').src = UI_ICONS.home; $('icoTrophy').src = UI_ICONS.trophy; $('icoSwords').src = UI_ICONS.swords; $('icoShop').src = UI_ICONS.chest;
-  const openMission = () => { renderMapPanel(); $('missionBox').hidden = false; };
+  let boxDown = false; // položil sa prst/myš do okna misie od jeho otvorenia?
+  const openMission = () => { renderMapPanel(); boxDown = false; $('missionBox').hidden = false; };
   const closeMission = () => { $('missionBox').hidden = true; };
   $('mapClose').addEventListener('click', () => { AUDIO.play('click'); closeMission(); });
-  // ťuk vedľa okna ho zavrie – ale len ak sa prst aj položil vedľa okna: na dotykovej obrazovke príde po ťuku na hrad
-  // ešte oneskorený „click“ a ten by trafil práve otvorené pozadie a okno hneď zavrel
-  let boxDown = false;
-  $('missionBox').addEventListener('pointerdown', ev => { boxDown = ev.target === $('missionBox'); });
-  $('missionBox').addEventListener('click', ev => { if (ev.target === $('missionBox') && boxDown) closeMission(); boxDown = false; });
+  // na dotykovej obrazovke príde po ťuku na hrad ešte oneskorený „click“ na to isté miesto – trafil by práve otvorené okno
+  // (pozadie ho zavrelo, tlačidlo Hrať spustilo misiu); okno preto prijme klik, až keď sa doň prst naozaj položí
+  $('missionBox').addEventListener('pointerdown', () => { boxDown = true; }, true);
+  $('missionBox').addEventListener('click', ev => { if (!boxDown) { ev.stopPropagation(); ev.preventDefault(); } }, true);
+  $('missionBox').addEventListener('click', ev => { if (ev.target === $('missionBox')) closeMission(); });
 
   function kingSummary() {
     const xp = kingMeta.lvl >= KING_MAX_LVL ? 'najvyššia úroveň' : 'XP ' + kingMeta.xp + ' / ' + kingXpNeed(kingMeta.lvl);
