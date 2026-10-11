@@ -138,7 +138,6 @@
   const kingDmg = () => 12 * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.15 * tal('str'));
   const volleyDmg = () => (6 + 4 * (st.volleyLvl - 1)) * (1 + 0.25 * perk('archery')) * (1 + 0.15 * tal('archers'));
   const volleyCd = () => Math.max(2, 5 - 0.25 * (st.volleyLvl - 1) - 0.4 * perk('archery'));
-  const volleyUpCost = () => Math.round(60 * Math.pow(1.6, st.volleyLvl - 1));
 
   // ---- Kráľovská sieň: trvalé bonusy za hviezdy ----
   const PERKS = [
@@ -224,7 +223,7 @@
   const KING_SLOT_LVL = [2, 5, 9];
   const KING_POWERS = ['volley', 'freeze', 'lightning'];
   const POWER_INFO = {
-    volley:    { name: 'Šípová salva', desc: 'Dážď šípov na zvolené miesto. Vylepšuje sa v radnici.', icon: 'sp_volley' },
+    volley:    { name: 'Šípová salva', desc: 'Dážď šípov na zvolené miesto. Silnejšia s talentmi kráľa.', icon: 'sp_volley' },
     freeze:    { name: 'Mráz',         desc: 'Nepriatelia v okolí na pár sekúnd takmer zamrznú.',     icon: 'sp_frost' },
     lightning: { name: 'Blesk',        desc: 'Silný úder do nepriateľa, preskočí na dvoch ďalších.',  icon: 'sp_bolt' },
     fireball:  { name: 'Ohnivá guľa',  desc: 'Výbuch zraní hordu v okolí a podpáli ju.',              icon: 'sp_fire' },
@@ -2905,10 +2904,6 @@
       selRow(ICONS.hall, 'Radnica · úr. ' + st.hallLvl + ' (' + LVL_NAME[st.hallLvl] + ')', 'zdravie ' + Math.ceil(st.hallHp) + '/' + hallMax() + ' · kráľ úr. ' + kingMeta.lvl + (k && k.dead ? ' · padol' : '') + ' · vylepšenie rozšíri územie a dovolí vyššie stavby');
       upAct(st.hallLvl, hallCap(), hallUpCost(), () => { const c = hallUpCost(); st.gold -= c; st.hallLvl++; st.hallHp += 200; st.king.hp = kingMax(); }, null, bPreview({ kind: 'hall', lvl: st.hallLvl + 1 }));
       if (k && k.dead) { const c = reviveCost(); act(ICONS.king, 'Oživiť kráľa', coinTxt(c), st.gold >= c, reviveKing, 'up'); }
-      if (has('volleyUp') && spellOn('volley')) { // salvu má kráľ len ak ju dal do slotu
-        const vc = volleyUpCost();
-        act(I.spellVolley, 'Salva úr. ' + (st.volleyLvl + 1), coinTxt(vc), st.gold >= vc, () => { st.gold -= vc; st.volleyLvl++; }, 'up', true);
-      } else if (!has('volleyUp')) lockAct(I.spellVolley, 'Salva', unlockMissionOf('volleyUp'), true);
     } else if (selGroup()) {
       // hromadné akcie pre označenú skupinu (rad hradieb alebo všetky stavby jedného druhu)
       const grp = st.selGroup, kind = grp[0].kind, d = BUILD[kind], isWall = kind === 'wall', cap = bCap();
@@ -3275,7 +3270,7 @@
     if (mapDrag && st.phase === 'map') {
       const r = screen.getBoundingClientRect();
       const dy = (ev.clientY - mapDrag.y0) / r.height * H;
-      if (Math.abs(dy) > 3) mapDrag.moved = true;
+      if (Math.abs(ev.clientY - mapDrag.y0) > 10) mapDrag.moved = true; // prst sa pri ťuku trochu pohne – to ešte nie je posun
       if (mapDrag.moved) { mapCam = clampMap(mapDrag.cam0 - dy); mapCamTarget = mapCam; }
       return;
     }
@@ -3475,7 +3470,11 @@
   const openMission = () => { renderMapPanel(); $('missionBox').hidden = false; };
   const closeMission = () => { $('missionBox').hidden = true; };
   $('mapClose').addEventListener('click', () => { AUDIO.play('click'); closeMission(); });
-  $('missionBox').addEventListener('click', ev => { if (ev.target === $('missionBox')) closeMission(); });
+  // ťuk vedľa okna ho zavrie – ale len ak sa prst aj položil vedľa okna: na dotykovej obrazovke príde po ťuku na hrad
+  // ešte oneskorený „click“ a ten by trafil práve otvorené pozadie a okno hneď zavrel
+  let boxDown = false;
+  $('missionBox').addEventListener('pointerdown', ev => { boxDown = ev.target === $('missionBox'); });
+  $('missionBox').addEventListener('click', ev => { if (ev.target === $('missionBox') && boxDown) closeMission(); boxDown = false; });
 
   function kingSummary() {
     const xp = kingMeta.lvl >= KING_MAX_LVL ? 'najvyššia úroveň' : 'XP ' + kingMeta.xp + ' / ' + kingXpNeed(kingMeta.lvl);
@@ -3932,5 +3931,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, KING_POWERS,
-    enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, volleyUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, buyUnit, knightsBlocked, get isAttack() { return isAttack(); } };
+    enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, buyUnit, knightsBlocked, get isAttack() { return isAttack(); } };
 })();
