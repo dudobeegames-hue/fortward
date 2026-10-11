@@ -29,7 +29,7 @@
     pit:      { name: 'Jama s ostňami', short: 'Jama', cost: 30,  dmg: 12, block: false, desc: 'Zraní a spomalí každého, kto ňou prejde' },
     catapult: { name: 'Katapult',     short: 'Katapult', cost: 140, hp: 200, range: 150, minRange: 36, dmg: 26, cd: 3.6, proj: 'rock', speed: 120, splash: 20, block: true, desc: 'Hádže balvany ďaleko do hordy (nie na lietajúcich)' },
     mine:     { name: 'Zlatá baňa',   short: 'Baňa',   cost: 100, hp: 180, block: true, desc: 'Po každej prežitej vlne prinesie zlato' },
-    chapel:   { name: 'Kaplnka',      short: 'Kaplnka', cost: 120, hp: 200, block: true, desc: 'Vyšle mnícha, ktorý chodí za rytiermi a kráľom a lieči ich' },
+    chapel:   { name: 'Kaplnka',      short: 'Kaplnka', cost: 120, hp: 200, block: true, desc: 'Vyšle mnícha, ktorý chodí za rytiermi a hrdinom a lieči ich' },
     firepit:  { name: 'Ohnivá jama',  short: 'Oheň',   cost: 50,  dmg: 8, block: false, desc: 'Kto ňou prejde, niekoľko sekúnd horí' },
     beartrap: { name: 'Medvedia pasca', short: 'Pasca', cost: 40, block: false, desc: 'Chytí nepriateľa a na chvíľu ho zastaví' },
     paving:   { name: 'Dlažba',       short: 'Dlažba', cost: 5, block: false, deco: true, desc: 'Ozdobná kamenná dlažba – dá sa položiť aj pod budovy. Ďalší ťuk ju zoberie späť' },
@@ -72,6 +72,13 @@
     fireball:  { name: 'Ohnivá guľa',  tech: 'fireball',  cdKey: 'fireCd', cd: 22, R: 18 },
     freeze:    { name: 'Mráz',         tech: 'freeze',    cdKey: 'freezeCd', cd: 30, R: 26, dur: 2.5 },
     lightning: { name: 'Blesk',        tech: 'lightning', cdKey: 'boltCd', cd: 18, reach: 34 },
+    // paladin
+    warcry:    { name: 'Pokrik',       cdKey: 'cryCd',    cd: 30, instant: true },
+    shield:    { name: 'Svätý štít',   cdKey: 'shieldCd', cd: 26, R: 30, dur: 4 },
+    heal:      { name: 'Uzdravenie',   cdKey: 'healCd',   cd: 24, instant: true, R: 60 },
+    // čarodejka
+    firewall:  { name: 'Ohnivá stena', cdKey: 'fwCd',     cd: 24, dur: 5, w: 44 },
+    teleport:  { name: 'Teleport',     cdKey: 'tpCd',     cd: 16, R: 18 },
   };
   const spellMax = id => id === 'volley' ? volleyCd() : SPELLS[id].cd;
   const spellPow = () => 1 + 0.15 * (st.mission - 1); // kúzla silnejú s misiou, aby stačili na tuhšiu hordu
@@ -134,8 +141,8 @@
   const hallMax = () => Math.round((400 + 200 * (st.hallLvl - 1)) * (1 + 0.15 * perk('foundations')));
   const hallUpCost = () => Math.round(110 * Math.pow(1.7, st.hallLvl - 1)); // lacnejšie – radnica odomyká aj úrovne stavieb
   const zoneRows = () => 5 + st.hallLvl;
-  const kingMax = () => 120 * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.2 * tal('vit'));
-  const kingDmg = () => 12 * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.15 * tal('str'));
+  const kingMax = () => 120 * heroDef().hp * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.2 * tal('vit'));
+  const kingDmg = () => 12 * heroDef().dmg * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.15 * tal('str'));
   const volleyDmg = () => (6 + 4 * (st.volleyLvl - 1)) * (1 + 0.25 * perk('archery')) * (1 + 0.15 * tal('archers'));
   const volleyCd = () => Math.max(2, 5 - 0.25 * (st.volleyLvl - 1) - 0.4 * perk('archery'));
 
@@ -180,14 +187,14 @@
     { id: 'rich',     name: 'Boháč',             desc: 'Maj naraz 1000 zlata',               icon: 'coin',       ok: () => stats.maxGold >= 1000 },
     { id: 'perfect',  name: 'Nedobytná radnica', desc: 'Vyhraj misiu s nepoškodenou radnicou', icon: 'wall',     ok: () => stats.perfect >= 1 },
     { id: 'boss',     name: 'Lovec vojvodcov',   desc: 'Poraz Vojvodcu orkov',               icon: 'e_shaman',   ok: () => stats.bosses >= 1 },
-    { id: 'king5',    name: 'Skúsený panovník',  desc: 'Kráľ na úrovni 5',                   icon: 'king',       ok: () => kingMeta.lvl >= 5 },
+    { id: 'king5',    name: 'Skúsený panovník',  desc: 'Kráľ na úrovni 5',                   icon: 'king',       ok: () => metaOf('king').lvl >= 5 },
     { id: 'stars10',  name: 'Zberateľ hviezd',   desc: 'Získaj 10 hviezd',                   icon: 'star',       ok: () => starsTotal() >= 10 },
     { id: 'half',     name: 'Polovica ostrova',  desc: 'Oslobodi 5 provincií',               icon: 'barracks',   ok: () => st.unlocked >= 6 },
     { id: 'fort',     name: 'Dobyvateľ',         desc: 'Zbúraj prvú orkskú pevnosť',         icon: 'u_siegeRam', ok: () => st.unlocked >= 7 },
     { id: 'gold3',    name: 'Zlatá koruna',      desc: 'Získaj 3 hviezdy na zlatej úrovni',  icon: 'gem',        ok: () => meta.stars.some(a => a && a[2] >= 3) },
     { id: 'kills1k',  name: 'Postrach hordy',    desc: 'Poraz 1000 nepriateľov',             icon: 'e_bear',     ok: () => stats.kills >= 1000 },
     { id: 'stars30',  name: 'Hviezdny pán',      desc: 'Získaj 30 hviezd',                   icon: 'star',       ok: () => starsTotal() >= 30 },
-    { id: 'king10',   name: 'Legendárny kráľ',   desc: 'Kráľ na úrovni 10',                  icon: 'king',       ok: () => kingMeta.lvl >= 10 },
+    { id: 'king10',   name: 'Legendárny kráľ',   desc: 'Kráľ na úrovni 10',                  icon: 'king',       ok: () => metaOf('king').lvl >= 10 },
     { id: 'orcKing',  name: 'Kráľobijca',        desc: 'Poraz orkského veľkráľa',            icon: 'e_orcKing',  ok: () => stats.orcKings >= 1 },
     { id: 'island',   name: 'Pán ostrova',       desc: 'Oslobodi celý ostrov',               icon: 'gate',       ok: () => st.unlocked >= 11 },
   ];
@@ -218,16 +225,94 @@
     { id: 'roar',    name: 'Hromový hlas',    desc: 'Pokrik trvá o 2 s dlhšie',                         icon: 'king', need: 'warcry' },
     { id: 'frost',   name: 'Ľadový dych',     desc: 'Mráz trvá o 1,5 s dlhšie',                         icon: 'king', need: 'freeze' },
   ];
-  const kingMeta = { lvl: 1, xp: 0, pending: 0, tal: {}, slots: [null, null, null] };
+  TALENTS.find(t => t.id === 'archers').need = 'volley';
+  TALENTS.splice(TALENTS.findIndex(t => t.id === 'roar'), 1); // pokrik má paladin, nie kráľ
+  // hrdinovia ľudí: kráľ od začiatku, paladin a čarodejka za gemy; do vlny ide vždy len jeden (vyberá sa pred vlnou)
+  const HEROES = {
+    king:    { name: 'Kráľ',      spr: 'king',    hp: 1,    dmg: 1,    cd: 0.8, spd: 26, reach: 40, powers: ['volley', 'freeze', 'lightning'],
+      desc: 'Vyvážený bojovník, mečom zasiahne celú skupinu.' },
+    paladin: { name: 'Paladin',   spr: 'paladin', hp: 1.6,  dmg: 0.8,  cd: 1.0, spd: 20, reach: 32, aura: 2.5, powers: ['warcry', 'shield', 'heal'], price: 300,
+      desc: 'Obranca s veľkým zdravím. Drží hordu a lieči rytierov okolo seba.' },
+    sorc:    { name: 'Čarodejka', spr: 'sorc',    hp: 0.65, dmg: 1.15, cd: 1.4, spd: 24, range: 72, fem: true, powers: ['fireball', 'firewall', 'teleport'], price: 300,
+      desc: 'Z diaľky strieľa ohnivé strely, aj na netopiere. Vydrží však málo.' },
+  };
+  const HERO_IDS = Object.keys(HEROES);
+  // talenty paladina a čarodejky (rovnaké id = rovnaký účinok ako u kráľa)
+  const HERO_TALENTS = {
+    king: TALENTS,
+    paladin: [
+      { id: 'str',     name: 'Svätá sila',       desc: 'Paladin udiera o 15 % silnejšie',                icon: 'hero' },
+      { id: 'vit',     name: 'Požehnaná zbroj',  desc: 'Paladin má o 20 % viac zdravia',                 icon: 'hero' },
+      { id: 'swift',   name: 'Ľahké kladivo',    desc: 'Paladin udiera o 12 % rýchlejšie',               icon: 'hero' },
+      { id: 'reach',   name: 'Strážca brány',    desc: 'Paladin vyráža na hordu ďalej od radnice',       icon: 'hero' },
+      { id: 'regen',   name: 'Viera',            desc: 'Paladin sa v boji sám lieči',                    icon: 'hero' },
+      { id: 'rally',   name: 'Nezlomný',         desc: 'Oživenie paladina o 25 % lacnejšie',             icon: 'hero' },
+      { id: 'aura',    name: 'Svätá aura',       desc: 'Paladin lieči rytierov okolo seba o 50 % rýchlejšie', icon: 'hero' },
+      { id: 'command', name: 'Velenie',          desc: 'Rytieri o 10 % silnejší a odolnejší',            icon: 'barracks', need: 'barracks' },
+      { id: 'roar',    name: 'Hromový hlas',     desc: 'Pokrik trvá o 2 s dlhšie',                       icon: 'hero', need: 'warcry' },
+      { id: 'bless',   name: 'Pevný štít',       desc: 'Svätý štít trvá o 1,5 s dlhšie',                 icon: 'hero', need: 'shield' },
+    ],
+    sorc: [
+      { id: 'str',     name: 'Žeravý plameň',    desc: 'Ohnivé strely o 15 % silnejšie',                 icon: 'hero' },
+      { id: 'vit',     name: 'Ochranný amulet',  desc: 'Čarodejka má o 20 % viac zdravia',               icon: 'hero' },
+      { id: 'swift',   name: 'Rýchle kúzlenie',  desc: 'Čarodejka strieľa o 12 % rýchlejšie',            icon: 'hero' },
+      { id: 'reach',   name: 'Bystrý zrak',      desc: 'Ohnivé strely letia o 10 ďalej',                 icon: 'hero' },
+      { id: 'regen',   name: 'Elixír',           desc: 'Čarodejka sa v boji sama lieči',                 icon: 'hero' },
+      { id: 'rally',   name: 'Fénix',            desc: 'Oživenie čarodejky o 25 % lacnejšie',            icon: 'hero' },
+      { id: 'tax',     name: 'Alchýmia',         desc: 'Po každej vlne +6 zlata navyše',                 icon: 'coin' },
+      { id: 'pyro',    name: 'Spaľujúci oheň',   desc: 'Ohnivá guľa a ohnivá stena o 30 % silnejšie',    icon: 'hero' },
+    ],
+  };
+  const newHeroMeta = () => ({ lvl: 1, xp: 0, pending: 0, tal: {}, slots: [null, null, null] });
+  const kingMeta = newHeroMeta(); // vždy údaje práve nasadeného hrdinu (st.hero); ostatní sú uložení každý zvlášť
+  const heroDef = () => HEROES[st.hero] || HEROES.king;
+  const heroName = () => heroDef().name;
+  const heroFell = () => heroName() + (heroDef().fem ? ' padla' : ' padol');
+  const heroKey = id => id === 'king' ? 'king' : 'hero_' + id;
+  function loadHeroMeta(id) {
+    const m = Object.assign(newHeroMeta(), loadJSON(sk(heroKey(id)), {}));
+    if (!Array.isArray(m.slots) || m.slots.length !== 3) m.slots = [null, null, null];
+    return m;
+  }
+  const metaOf = id => id === st.hero ? kingMeta : loadHeroMeta(id);
+  const saveMetaOf = (id, m) => saveJSON(sk(heroKey(id)), m);
+  // gemy a kúpení hrdinovia patria hráčovi (všetkým pozíciám)
+  const GEMS_KEY = 'fortward.gems', HEROES_KEY = 'fortward.heroes';
+  const gems = () => loadJSON(GEMS_KEY, 0) || 0;
+  const ownedHeroes = () => ['king'].concat((loadJSON(HEROES_KEY, []) || []).filter(id => HEROES[id] && id !== 'king'));
+  const ownsHero = id => ownedHeroes().includes(id);
+  // počas vývoja sa hrdinovia odomykajú ručne tlačidlom Odomknúť (zadarmo); cena v gemoch (price) sa zapojí, keď bude obchod
+  function buyHero(id) {
+    const h = HEROES[id];
+    if (!h || ownsHero(id)) return;
+    heroesSeen(); // zapamätá doterajších, aby sa leskol len nový
+    saveJSON(HEROES_KEY, ownedHeroes().filter(x => x !== 'king').concat(id));
+    AUDIO.play('unlock'); toast(h.name + (h.fem ? ' sa pridala' : ' sa pridal') + ' k tvojim hrdinom');
+    updateGems(); if (mapTab === 'heroes') renderHeroes(); if (mapTab === 'shop') renderShop();
+  }
+  const updateGems = () => { const g = document.querySelector('#gemBox span'); if (g) g.textContent = gems(); };
+  // nasadí iného hrdinu (údaje doterajšieho sa uložia)
+  function setActiveHero(id) {
+    if (!HEROES[id] || !ownsHero(id)) id = 'king';
+    if (st.hero && st.hero !== id) saveMetaOf(st.hero, kingMeta);
+    st.hero = id; saveJSON(sk('hero'), id);
+    const m = loadHeroMeta(id);
+    for (const k in kingMeta) delete kingMeta[k];
+    Object.assign(kingMeta, m);
+    if (ICONS.king) syncHeroIcons();
+  }
   // schopnosti hrdinu: 3 sloty, odomknú sa na úrovni 2, 5 a 9; hráč si do slotu vyberie jednu z ponuky
   const KING_SLOT_LVL = [2, 5, 9];
-  const KING_POWERS = ['volley', 'freeze', 'lightning'];
   const POWER_INFO = {
     volley:    { name: 'Šípová salva', desc: 'Dážď šípov na zvolené miesto. Silnejšia s talentmi kráľa.', icon: 'sp_volley' },
     freeze:    { name: 'Mráz',         desc: 'Nepriatelia v okolí na pár sekúnd takmer zamrznú.',     icon: 'sp_frost' },
     lightning: { name: 'Blesk',        desc: 'Silný úder do nepriateľa, preskočí na dvoch ďalších.',  icon: 'sp_bolt' },
     fireball:  { name: 'Ohnivá guľa',  desc: 'Výbuch zraní hordu v okolí a podpáli ju.',              icon: 'sp_fire' },
-    warcry:    { name: 'Pokrik',       desc: 'Na chvíľu posilní a zrýchli hrdinu aj rytierov.',        icon: 'king' }, // v zálohe pre iného hrdinu
+    warcry:    { name: 'Pokrik',       desc: 'Na chvíľu posilní a zrýchli hrdinu aj rytierov.',        icon: 'sp_warcry' },
+    shield:    { name: 'Svätý štít',   desc: 'Budovy aj radnica v okolí chvíľu neberú žiadne poškodenie.', icon: 'sp_shield' },
+    heal:      { name: 'Uzdravenie',   desc: 'Ihneď vylieči paladina a rytierov okolo neho.',           icon: 'sp_heal' },
+    firewall:  { name: 'Ohnivá stena', desc: 'Pás ohňa na zvolenom mieste podpáli každého, kto ním prejde.', icon: 'sp_firewall' },
+    teleport:  { name: 'Teleport',     desc: 'Čarodejka sa premiestni na zvolené miesto a omráči nepriateľov okolo.', icon: 'sp_teleport' },
   };
   const slotOpen = i => kingMeta.lvl >= KING_SLOT_LVL[i];
   const spellOn = id => kingMeta.slots.some((s, i) => s === id && slotOpen(i));
@@ -235,7 +320,7 @@
   const emptySlots = () => kingMeta.slots.filter((s, i) => !s && slotOpen(i)).length;
   const tal = id => kingMeta.tal[id] || 0;
   const kingXpNeed = l => 60 + 40 * (l - 1);
-  const saveKing = () => saveJSON(sk('king'), kingMeta);
+  const saveKing = () => saveMetaOf(st.hero || 'king', kingMeta);
   function gainKingXp(n) {
     if (kingMeta.lvl >= KING_MAX_LVL) return 0;
     kingMeta.xp += n;
@@ -262,7 +347,7 @@
 
   const HALL = { hall: true };
   const st = {
-    phase: 'title', wave: 0, gold: 0, hallLvl: 1, hallHp: 400, volleyLvl: 1, volleyT: 0, bolts: [],
+    phase: 'title', hero: 'king', wave: 0, gold: 0, hallLvl: 1, hallHp: 400, volleyLvl: 1, volleyT: 0, bolts: [],
     blds: [], occ: [], paving: {}, dist: null, enemies: [], soldiers: [], king: null,
     proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [],
     spawnQ: [], spawnT: 0, speed: 1, shake: 0, best: 0, boss: null,
@@ -271,6 +356,31 @@
   // postup na mape: unlocked = najvyššia odomknutá misia (11 = ostrov oslobodený)
   Object.assign(st, { mission: 1, unlocked: 1, mapSel: 1, mapAnim: null, tech: techFor(1) });
   const has = id => st.tech.has(id);
+  // novinky: odomknutá stavba / vylepšenie / hrdina, na ktoré hráč ešte neťukol – jeho karta a záložka sa lesknú
+  const SHINE_TECH = { gate: 1, spikes: 1, spikeTypes: 1, wallArcher: 1, wallCrossbow: 1, spec: 1, lvl2: 1, lvl3: 1, lvl4: 1, lvl5: 1 };
+  let seenNew = [];
+  function loadSeen() { // prvé spustenie: všetko doteraz odomknuté berie ako videné, lesknú sa až ďalšie novinky
+    seenNew = loadJSON(sk('seenNew'), null);
+    if (!Array.isArray(seenNew)) { seenNew = [...techFor(st.unlocked)]; saveJSON(sk('seenNew'), seenNew); }
+  }
+  const isNew = id => (!!BUILD[id] || !!SHINE_TECH[id]) && techFor(st.unlocked).has(id) && unlockMissionOf(id) > 1 && !seenNew.includes(id);
+  function markSeen(id) { if (seenNew.includes(id)) return; seenNew.push(id); saveJSON(sk('seenNew'), seenNew); }
+  // novo odomknutý hrdina (pre celý účet)
+  const HEROES_SEEN_KEY = 'fortward.heroesSeen';
+  function heroesSeen() {
+    let v = loadJSON(HEROES_SEEN_KEY, null);
+    if (!Array.isArray(v)) { v = ownedHeroes(); saveJSON(HEROES_SEEN_KEY, v); }
+    return v;
+  }
+  const heroIsNew = id => ownsHero(id) && !heroesSeen().includes(id);
+  function markHeroSeen(id) { const v = heroesSeen(); if (!v.includes(id)) { v.push(id); saveJSON(HEROES_SEEN_KEY, v); } }
+  // pridá lesk na kartu, kým na ňu hráč neťukne
+  function shineIf(el, on, seen) {
+    if (!el || !on) return el;
+    el.classList.add('shine');
+    el.addEventListener('click', seen, true);
+    return el;
+  }
   // úroveň radnice, stavieb a strelcov podľa misie: 1 → úr. 1, 2–3 → úr. 2, 4–5 → úr. 3, 6–8 → úr. 4, 9–10 → úr. 5
   const LVL_FROM = [0, 1, 2, 4, 6, 9];
   const lvlMission = l => LVL_FROM[l];
@@ -287,14 +397,13 @@
     for (const k in meta.perks) delete meta.perks[k];
     Object.assign(meta.perks, loadJSON(sk('perks'), {}));
     if (meta.perks.armor) { delete meta.perks.armor; saveJSON(sk('perks'), meta.perks); } // zrušený bonus – hviezdy sa vrátia
-    for (const k in kingMeta) delete kingMeta[k];
-    Object.assign(kingMeta, { lvl: 1, xp: 0, pending: 0, tal: {}, slots: [null, null, null] }, loadJSON(sk('king'), {}));
-    if (!Array.isArray(kingMeta.slots) || kingMeta.slots.length !== 3) kingMeta.slots = [null, null, null];
+    st.hero = null; setActiveHero(loadJSON(sk('hero'), 'king'));
     Object.assign(stats, { kills: 0, builds: 0, bosses: 0, orcKings: 0, perfect: 0, maxGold: 0 }, loadJSON(sk('stats'), {}));
     for (const k in ach) delete ach[k];
     Object.assign(ach, loadJSON(sk('ach'), {}));
     achSeen = loadJSON(sk('achSeen'), 0);
     st.unlocked = Math.max(1, Math.min(11, parseInt(localStorage.getItem(sk('unlocked')) || '1', 10) || 1));
+    loadSeen();
     // prejdené misie bez záznamu hviezd (vyhrané pred zavedením hviezd) dostanú 1 bronzovú – víťazstvo dáva vždy aspoň 1
     let fixed = false;
     for (let m = 1; m < st.unlocked && m <= MISSIONS.length; m++) {
@@ -447,6 +556,19 @@
     const run = st.run;
     const go = () => { if (st.run !== run) return; if (st.paused) { setTimeout(go, 200); return; } fn(); };
     setTimeout(go, ms);
+  }
+  // postavička nasadeného hrdinu pri radnici
+  const makeHero = () => ({ x: G.hallCx, y: G.hallTop - 12, hx: G.hallCx, hy: G.hallTop - 12, hp: kingMax(), cd: 0, tgt: null, down: 0, anim: 0, flash: 0, isKing: true, spd: heroDef().spd });
+  // výmena hrdinu pred vlnou: padnutý zostáva padnutý (až do oživenia), ostatní idú do boja zdraví
+  function switchHero(id) {
+    if (st.phase !== 'build' || id === st.hero || !ownsHero(id)) return;
+    st.heroDead[st.hero] = !!(st.king && st.king.dead);
+    setActiveHero(id);
+    st.king = makeHero();
+    if (st.heroDead[id]) Object.assign(st.king, { dead: true, deadT: 9, fadeT: KING_FADE });
+    undoStack.length = 0; // späť by vrátilo stav s iným hrdinom
+    for (let q = 0; q < 16; q++) part(st.king.x, st.king.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.6, ['#f8d048', '#ffffff'][q % 2], 40);
+    AUDIO.play('upgrade'); renderBuild(); updateHud();
   }
   function startMission(m, tier) {
     st.run = (st.run || 0) + 1;
@@ -693,13 +815,14 @@
     Object.assign(st, {
       wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.15 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, hallFlash: 0, shake: 0, soldierN: 0,
       blds: [], paving: {}, enemies: [], soldiers: [], proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
-      cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, spellSel: null, fallFx: [], bolts: [], siegeHold: false, siegeT: 0, introPan: null,
+      cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, shieldCd: 0, healCd: 0, fwCd: 0, tpCd: 0, shields: [], fireWalls: [], heroDead: {},
+      spellSel: null, fallFx: [], bolts: [], siegeHold: false, siegeT: 0, introPan: null,
     });
     rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
     st.fort = isAttack() ? makeFort() : null;
     if (isAttack()) { const bk = addBuilding('barracks', G.hc0 - 1, G.hr0 + 1); bk.spent = 0; } // predvolené kasárne zadarmo
     st.hallHp = hallMax();
-    st.king = { x: G.hallCx, y: G.hallTop - 12, hx: G.hallCx, hy: G.hallTop - 12, hp: kingMax(), cd: 0, tgt: null, down: 0, anim: 0, flash: 0, isKing: true };
+    st.king = makeHero();
     $('title').hidden = true; $('over').hidden = true;
     $('hud').hidden = false;
     enterBuild();
@@ -766,6 +889,7 @@
     // rytieri a kráľ sa vrátia a vyliečia
     for (const s of st.soldiers) { s.hp = s.max; s.tgt = null; }
     if (st.king && st.king.dead && st.king.fadeT == null) st.king.fadeT = 0; // padnutý kráľ sa po vlne vytratí
+    if (st.king && st.king.dead) later(() => { if (st.phase === 'build' && st.king.dead) hint(heroFell() + ' – ' + (heroDef().fem ? 'oživíš ju' : 'oživíš ho') + ' v radnici'); }, 900);
     if (st.king && !st.king.dead) { st.king.hp = kingMax(); st.king.down = 0; st.king.tgt = null; st.king.flash = 0; st.king.swing = 0; st.king.x = st.king.hx; st.king.y = st.king.hy; }
     for (const b of st.blds) b.flash = 0;
     $('build').hidden = false;
@@ -854,7 +978,7 @@
       updateHud();
       return;
     }
-    banner(hold ? 'Vlna odrazená! +' + bonus + ' zlata · obliehanie trvá' : 'Vlna prežitá! +' + bonus + ' zlata' + (st.lastXp ? ' · kráľ +' + st.lastXp + ' XP' : ''));
+    banner(hold ? 'Vlna odrazená! +' + bonus + ' zlata · obliehanie trvá' : 'Vlna prežitá! +' + bonus + ' zlata' + (st.lastXp ? ' · ' + heroName().toLowerCase() + ' +' + st.lastXp + ' XP' : ''));
     AUDIO.play('cleared');
     later(() => { if (st.phase === 'pause') enterBuild(); }, 1000);
     updateHud();
@@ -892,7 +1016,7 @@
       : 'Misia ' + m + ' · ' + MISSIONS[m - 1].name + ' · ' + TIERS[t].name.toLowerCase() + ' úroveň<br>Všetkých ' + MISSION_WAVES + ' vĺn odrazených.' + (first ? '<br>Odomkla sa misia ' + (m + 1) + '.<br><span class="newTech">Nové: ' + UNLOCKS[m].map(u => u.name).join(', ') + '</span>' : '');
     const starLine = '<span class="bigStars">' + starSpan(stars, t) + '</span>' +
       (stars > prevStars ? '<br><span class="newTech">+' + (stars - prevStars) + ' ★ do Kráľovskej siene</span>' : '') + tierNote;
-    const xpLine = st.lastXp ? '<br><span class="newTech">Kráľ +' + st.lastXp + ' XP' + (kingMeta.pending ? ' · nová úroveň ' + kingMeta.lvl + '!' : '') + '</span>' : '';
+    const xpLine = st.lastXp ? '<br><span class="newTech">' + heroName() + ' +' + st.lastXp + ' XP' + (kingMeta.pending ? ' · nová úroveň ' + kingMeta.lvl + '!' : '') + '</span>' : '';
     later(() => showOver(m === MISSIONS.length ? 'Víťazstvo!' : 'Misia splnená!', starLine + '<br>' + text + xpLine, true), 1200);
     saveStats(); later(checkAch, 2200);
     updateHud();
@@ -959,7 +1083,9 @@
     updateHud();
   }
 
+  const shieldAt = (x, y) => st.shields && st.shields.some(sh => Math.hypot(x - sh.x, (y - sh.y) / 0.7) < sh.R);
   function hitBuilding(b, dmg, attacker) {
+    if (shieldAt(tileX(b.c) + T / 2, tileY(b.r) + T / 2)) { if (Math.random() < 0.3) part(tileX(b.c) + T / 2, tileY(b.r) + 4, (Math.random() - 0.5) * 20, -10, 0.3, '#fff070', 0); return; }
     b.hp -= dmg; b.flash = 0.08;
     if (b.spikes && attacker && !attacker.dead) {
       damage(attacker, spikeDmg(b)); part(attacker.x, attacker.y - 6, 0, -10, 0.3, b.spikeType ? SPIKE_TYPES[b.spikeType].tip : '#f4f4f8', 60);
@@ -995,6 +1121,7 @@
   }
 
   function hitHall(dmg, x) {
+    if (shieldAt(x, G.hallTop + 4)) { if (Math.random() < 0.3) part(x, G.hallTop + 2, (Math.random() - 0.5) * 20, -10, 0.3, '#fff070', 0); return; }
     st.hallHp -= dmg; st.hallFlash = 0.08;
     AUDIO.play('hallHit');
     for (let k = 0; k < 4; k++) part(x + (Math.random() - 0.5) * 6, G.hallTop + 2, (Math.random() - 0.5) * 30, -10 - Math.random() * 25, 0.45, Math.random() < 0.5 ? '#848490' : '#525262', 90);
@@ -1169,6 +1296,9 @@
     if (e.d.ram || e.d.sapper) e.foe = null;
     if (e.foe && (e.foe.dead || e.foe.down > 0)) e.foe = null;
     if (!e.foe && !e.d.ram && !e.d.sapper) for (const s of st.soldiers) if ((s.helper || s.archer) && !s.fly && !s.dead && Math.hypot(s.x - e.x, s.y - e.y) < 9) { e.foe = s; break; }
+    // čarodejka nikoho nenapadne mečom, preto si ju horda nájde sama, keď je blízko
+    const sk0 = st.king;
+    if (!e.foe && !e.d.ram && !e.d.sapper && !e.d.fly && sk0 && !sk0.dead && heroDef().range && Math.hypot(sk0.x - e.x, sk0.y - e.y) < 14) e.foe = sk0;
     if (e.foe) {
       if (Math.hypot(e.foe.x - e.x, e.foe.y - e.y) < 12) { attack(() => hitUnit(e.foe, e.d.atk * 0.7 * 1)); return; }
       e.foe = null;
@@ -1186,6 +1316,7 @@
       const dh = Math.hypot(Math.max(hrr.x0 - e.x, 0, e.x - hrr.x1), Math.max(hrr.y0 - e.y, 0, e.y - hrr.y1));
       if (dh < td) { td = dh; tgt = HALL; }
       for (const u of st.soldiers) { const d = Math.hypot(u.x - e.x, u.y - e.y); if (d < (u.fly ? R : td * 0.8)) { td = u.fly ? 0 : d; tgt = u; } } // sokoly zostrelí prednostne
+      if (st.king && !st.king.dead && heroDef().range) { const d = Math.hypot(st.king.x - e.x, st.king.y - e.y); if (d < td * 0.8) { td = d; tgt = st.king; } } // aj na čarodejku
       if (tgt) {
         attackFn(() => {
           let tx, ty;
@@ -1365,6 +1496,20 @@
     return moveTo(u, tileX(u.next.c) + T / 2, tileY(u.next.r) + T / 2 + 3, spd, dt);
   }
 
+  // čarodejka: stojí pri radnici a strieľa ohnivé strely na najbližšieho nepriateľa (aj na netopiere); bez cieľa sa vracia domov
+  function updateSorc(k, dt) {
+    k.flash = Math.max(0, k.flash - dt); k.cd = Math.max(0, k.cd - dt); k.swing = Math.max(0, (k.swing || 0) - dt);
+    const rng = heroDef().range + 10 * tal('reach');
+    let t = null, bd = rng;
+    for (const e of st.enemies) { if (e.dead) continue; const d = Math.hypot(e.x - k.x, e.y - k.y); if (d < bd) { bd = d; t = e; } }
+    if (t) {
+      if (k.cd <= 0) {
+        k.cd = heroDef().cd * (1 - 0.12 * tal('swift')) * (st.cryT > 0 ? 0.6 : 1); k.swing = 0.15;
+        st.proj.push({ k: 'fire', x: k.x + 5, y: k.y - 15, tgt: t, tx: t.x, ty: t.y - t.h * 0.5, dmg: kingDmg(), spd: 150, splash: 8, vx: 0, vy: -1 });
+        AUDIO.play('fire');
+      }
+    } else if (Math.hypot(k.hx - k.x, k.hy - k.y) > 2) { moveKnight(k, k.hx, k.hy, k.spd * waterMul(k), dt); k.anim += dt * 6; }
+  }
   // rytier alebo kráľ: nájdi nepriateľa v okruhu domova, bojuj, inak sa vráť
   function updateFighter(u, dt, homeX, homeY, aggro, dmg, cleave, mover) {
     const go = mover || moveTo;
@@ -1385,7 +1530,7 @@
       else {
         if (!t.foe) t.foe = u;
         if (u.cd <= 0) {
-          u.cd = u.isKing ? 0.8 * (1 - 0.12 * tal('swift')) : 0.8; u.swing = 0.15;
+          u.cd = u.isKing ? heroDef().cd * (1 - 0.12 * tal('swift')) : 0.8; u.swing = 0.15;
           AUDIO.play(u.isKing ? 'kingHit' : 'clang');
           let mul = 1;
           if (spear && t.d.cav) mul *= SPEAR_VS_CAV;                                   // kopija proti jazde
@@ -1619,7 +1764,7 @@
 
   function ability(id) {
     if (st.phase !== 'battle' || !has(id)) return;
-    if (!kingUp()) { AUDIO.play('deny'); hint('Kráľ padol – jeho schopnosti nefungujú'); return; }
+    if (!kingUp()) { AUDIO.play('deny'); hint(heroFell() + ' – schopnosti nefungujú'); return; }
     const a = ABIL[id];
     if (id === 'warcry') {
       if (st.cryCd > 0) { AUDIO.play('deny'); return; }
@@ -1630,7 +1775,8 @@
   // ---- kúzla ----
   function selectSpell(id) {
     if (st.phase !== 'battle' || !spellOn(id)) return;
-    if (!kingUp()) { st.spellSel = null; AUDIO.play('deny'); hint('Kráľ padol – jeho schopnosti nefungujú'); return; }
+    if (!kingUp()) { st.spellSel = null; AUDIO.play('deny'); hint(heroFell() + ' – schopnosti nefungujú'); return; }
+    if (SPELLS[id].instant) { st.spellSel = null; castSpell(id, st.king.x, st.king.y); return; } // bez mierenia: hneď
     if (st.spellSel === id) { st.spellSel = null; AUDIO.play('click'); return; }
     if (st[SPELLS[id].cdKey] > 0) { AUDIO.play('deny'); return; }
     st.spellSel = id; AUDIO.play('click');
@@ -1645,7 +1791,37 @@
   function castSpell(id, x, y) {
     if (st.phase !== 'battle' || !spellOn(id) || !kingUp() || st[SPELLS[id].cdKey] > 0) { AUDIO.play('deny'); return false; }
     if (id === 'volley') { volley(x, y); return true; }
-    const sp = SPELLS[id], pow = spellPow();
+    const sp = SPELLS[id], pow = spellPow(), k = st.king;
+    if (id === 'warcry') {
+      st.cryT = ABIL.warcry.dur + 2 * tal('roar'); st.cryCd = sp.cd; AUDIO.play('horn'); banner('Pokrik!');
+      return true;
+    }
+    if (id === 'heal') {
+      k.hp = Math.min(kingMax(), k.hp + kingMax() * 0.5);
+      for (const s of st.soldiers) if (!s.dead && !s.siege && Math.hypot(s.x - k.x, s.y - k.y) < sp.R) s.hp = Math.min(s.max, s.hp + s.max * 0.6);
+      for (let q = 0; q < 30; q++) { const a = Math.random() * 6.28, r = Math.random() * sp.R * 0.6; part(k.x + Math.cos(a) * r, k.y + Math.sin(a) * r * 0.6, 0, -18 - Math.random() * 10, 0.7, q % 2 ? '#9cd45a' : '#e8ffd0', 0); }
+      st.healCd = sp.cd; AUDIO.play('unlock'); banner('Uzdravenie!');
+      return true;
+    }
+    if (id === 'shield') {
+      st.shields.push({ x, y, R: sp.R, t: sp.dur + 1.5 * tal('bless'), max: sp.dur + 1.5 * tal('bless') });
+      st.shieldCd = sp.cd; AUDIO.play('upgrade');
+      return true;
+    }
+    if (id === 'firewall') {
+      st.fireWalls.push({ x, y, w: sp.w, t: sp.dur, dps: 7 * pow * (1 + 0.3 * tal('pyro')) });
+      st.fwCd = sp.cd; AUDIO.play('fire');
+      return true;
+    }
+    if (id === 'teleport') {
+      for (let q = 0; q < 18; q++) part(k.x, k.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.5, q % 2 ? '#c8a0ff' : '#ffffff', 20);
+      k.x = Math.max(G.gx0 + 4, Math.min(G.gx0 + G.cols * T - 4, x)); k.y = y; k.tgt = null; k.next = null;
+      for (const e of st.enemies) if (!e.dead && Math.hypot(e.x - k.x, (e.y - k.y) / 0.7) < sp.R) { damage(e, 10 * pow); e.stunT = Math.max(e.stunT || 0, 1.2 * (e.d.boss ? 0.4 : 1)); }
+      for (let q = 0; q < 34; q++) { const a = Math.random() * 6.28, v = 20 + Math.random() * 40; part(k.x, k.y - 6, Math.cos(a) * v, Math.sin(a) * v * 0.6 - 10, 0.5, ['#c8a0ff', '#ffffff', '#8a5ae0'][q % 3], 30); }
+      st.marks.push({ x: k.x, y: k.y, life: 0.5, max: 0.5, ice: true });
+      st.tpCd = sp.cd; AUDIO.play('bolt');
+      return true;
+    }
     if (id === 'fireball') { // guľa padá z neba a vybuchne
       st.fallFx.push({ x, y, t: 0.35, max: 0.35 });
       AUDIO.play('fire');
@@ -1674,8 +1850,8 @@
     const sp = SPELLS.fireball, pow = spellPow();
     for (const e of st.enemies) {
       if (e.dead || Math.hypot(e.x - x, (e.y - y) / 0.7) > sp.R) continue;
-      e.burnT = 3; e.burnDps = Math.max(e.burnDps || 0, 4 * pow);
-      damage(e, 20 * pow);
+      e.burnT = 3; e.burnDps = Math.max(e.burnDps || 0, 4 * pow * (1 + 0.3 * tal('pyro')));
+      damage(e, 20 * pow * (1 + 0.3 * tal('pyro')));
     }
     for (let k = 0; k < 46; k++) { const a = Math.random() * 6.28, v = 20 + Math.random() * 60; part(x, y - 3, Math.cos(a) * v, Math.sin(a) * v * 0.6 - 25, 0.35 + Math.random() * 0.4, ['#fff7c8', '#f8d048', '#f89838', '#d83818', '#3e2614'][k % 5], 60); }
     AUDIO.play('boom'); st.shake = Math.max(st.shake, 0.3);
@@ -1732,9 +1908,29 @@
     const k = st.king;
     if (k.dead) k.deadT += dt;
     else {
-      updateFighter(k, dt, k.hx, k.hy, 40 + T + 10 * tal('reach'), kingDmg(), true, moveKnight); // vyráža o políčko pred stavebnú zónu // aj kráľ chodí len cez brány
+      const hd = heroDef();
+      if (hd.range) updateSorc(k, dt);
+      else updateFighter(k, dt, k.hx, k.hy, hd.reach + T + 10 * tal('reach'), kingDmg(), true, moveKnight); // vyráža o políčko pred stavebnú zónu, chodí len cez brány
       if (tal('regen') && k.hp < kingMax()) k.hp = Math.min(kingMax(), k.hp + kingMax() * 0.015 * tal('regen') * dt);
+      if (hd.aura) { // paladin lieči rytierov okolo seba
+        const rate = hd.aura * (1 + 0.5 * tal('aura'));
+        for (const s of st.soldiers) if (!s.dead && !s.siege && s.hp < s.max && Math.hypot(s.x - k.x, s.y - k.y) < 30) {
+          s.hp = Math.min(s.max, s.hp + rate * dt);
+          if (Math.random() < 0.04) part(s.x + (Math.random() - 0.5) * 6, s.y - 8, 0, -12, 0.5, '#9cd45a', 0);
+        }
+      }
     }
+    // svätý štít a ohnivá stena dohasínajú
+    for (const sh of st.shields) sh.t -= dt;
+    st.shields = st.shields.filter(sh => sh.t > 0);
+    for (const fw of st.fireWalls) {
+      fw.t -= dt;
+      for (const e of st.enemies) if (!e.dead && !e.d.fly && Math.abs(e.y - fw.y) < 6 && Math.abs(e.x - fw.x) < fw.w / 2) {
+        e.burnT = Math.max(e.burnT || 0, 1.5); e.burnDps = Math.max(e.burnDps || 0, fw.dps);
+      }
+      if (Math.random() < 0.9) part(fw.x + (Math.random() - 0.5) * fw.w, fw.y + (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 6, -14 - Math.random() * 12, 0.45, ['#fff7c8', '#f8d048', '#f89838', '#d83818'][Math.random() * 4 | 0], -10);
+    }
+    st.fireWalls = st.fireWalls.filter(fw => fw.t > 0);
     // strely
     for (const p of st.proj) {
       if (p.arc) { // balvan z katapultu letí po oblúku na miesto
@@ -1782,6 +1978,7 @@
     st.volleyT = Math.max(0, st.volleyT - dt);
     st.cryT = Math.max(0, st.cryT - dt); st.cryCd = Math.max(0, st.cryCd - dt);
     st.freezeCd = Math.max(0, st.freezeCd - dt); st.fireCd = Math.max(0, st.fireCd - dt); st.boltCd = Math.max(0, st.boltCd - dt);
+    for (const key of ['shieldCd', 'healCd', 'fwCd', 'tpCd']) st[key] = Math.max(0, (st[key] || 0) - dt);
     for (const f of st.fallFx) { // padajúca ohnivá guľa s chvostom iskier
       f.t -= dt;
       const fy = f.y - 90 * Math.max(0, f.t / f.max), fx = f.x + 30 * Math.max(0, f.t / f.max);
@@ -1887,6 +2084,7 @@
     shadow(u.x, u.y, u.siege ? 8 : 4);
     g.drawImage(u.flash > 0 ? fr.f : fr.c, x, y);
     if (sprName === 'craft') drawHammer(u, x, y);
+    if (sprName === 'sorc' && Math.random() < 0.25) part(x + 12, y + 1, (Math.random() - 0.5) * 4, -8 - Math.random() * 6, 0.35, Math.random() < 0.5 ? '#fff070' : '#f87830', 0); // plamienok na palici
     if (st.cryT > 0 && Math.random() < 0.15) part(u.x + (Math.random() - 0.5) * 8, u.y - 8, 0, -16, 0.4, '#f8d048', 0); // pokrik
     if (u.stunT > 0) { // hviezdičky nad omráčeným
       const t = performance.now() / 1000;
@@ -1906,7 +2104,7 @@
   const SLOWMO_DUR = 1.0;
   let slowmoT = 0;
   function drawDeadKing(k, time) {
-    const fr = SPR.king[0], t = k.deadT;
+    const fr = SPR[heroDef().spr][0], t = k.deadT;
     const fall = Math.min(1, t / 0.45), drop = Math.round(4 * fall * fall);
     const alpha = k.fadeT == null ? 1 : Math.max(0, 1 - k.fadeT / KING_FADE);
     const x0 = Math.round(k.x - fr.w / 2), y0 = Math.round(k.y - fr.h) + drop, gy = Math.round(k.y);
@@ -2089,6 +2287,19 @@
     g.fillRect(x1 - L + 1, y1, L, 1); g.fillRect(x1, y1 - L + 1, 1, L);
   }
 
+  // dosah: jemne vyplnený kruh a výrazný prerušovaný okraj (tmavý obrys + zlatá), aby bol vidieť na každom teréne; čiarky pomaly obiehajú
+  function drawRange(cx, cy, rr, time) {
+    g.globalAlpha = 0.13; g.fillStyle = '#fff070';
+    g.beginPath(); g.arc(cx, cy, rr, 0, 6.29); g.fill();
+    g.globalAlpha = 1;
+    const n = Math.round(rr * 6.283), off = Math.floor(time * 10), pts = [];
+    for (let k = 0; k < n; k++) {
+      if (((k + off) >> 2) % 2) continue; // čiarky dlhé 4 body
+      const a = k / n * 6.283; pts.push([Math.round(cx + Math.cos(a) * rr), Math.round(cy + Math.sin(a) * rr)]);
+    }
+    g.fillStyle = PAL.K; for (const [x, y] of pts) g.fillRect(x - 1, y - 1, 3, 3);
+    g.fillStyle = '#fff070'; for (const [x, y] of pts) g.fillRect(x, y, 1, 1);
+  }
   // náhľad ťahanej novej stavby – kreslí sa nad stavbami, aby bolo červené políčko vidieť aj cez budovu
   function drawPlaceGhost(time) {
     if (!pdrag || !pdrag.t) return;
@@ -2104,6 +2315,7 @@
     else g.drawImage(spr.c, hx + T / 2 - Math.floor(spr.w / 2), hy + T + 1 - spr.h);
     g.globalAlpha = 1;
     corners(hx, hy, hx + T - 1, hy + T - 1, ok ? '#9cd45a' : (blink ? '#e84838' : '#ff9a80'));
+    if (BUILD[kind].range) drawRange(hx + T / 2, hy + T / 2, bRange({ kind, lvl: 1 }), time); // dosah už pri ukladaní
   }
 
   function drawBuildOverlay(time) {
@@ -2188,11 +2400,7 @@
       const b = st.sel, x = tileX(b.c), y = tileY(b.r);
       corners(x, y, x + T - 1, y + T - 1, col);
       const rr0 = BUILD[b.kind].range ? bRange(b) : b.unit ? uRange(b.unit) : 0;
-      if (rr0) {
-        const c = bCenter(b), rr = rr0, n = Math.round(rr * 1.6);
-        g.fillStyle = 'rgba(255,240,112,0.5)';
-        for (let k = 0; k < n; k += 2) { const a = k / n * 6.283; g.fillRect(Math.round(c.x + Math.cos(a) * rr), Math.round(c.y + Math.sin(a) * rr), 1, 1); }
-      }
+      if (rr0) { const c = bCenter(b); drawRange(c.x, c.y, rr0, time); }
     }
   }
 
@@ -2654,7 +2862,7 @@
       objs.push({ y: G.hallBot, f: () => drawHall(time) });
       for (const b of st.blds) if (!TRAPS[b.kind]) objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), x: b.c, f: () => drawBuilding(b, time) });
       for (const s of st.soldiers) objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: s.y, f: () => drawFighter(s, s.spr || 'soldier') });
-      if (st.king && !st.king.dead) objs.push({ y: st.king.y, f: () => drawFighter(st.king, 'king') });
+      if (st.king && !st.king.dead) objs.push({ y: st.king.y, f: () => drawFighter(st.king, heroDef().spr) });
       else if (st.king && kingLying(st.king)) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
     }
     for (const e of st.enemies) objs.push({ y: e.y, f: () => drawEnemy(e, time) });
@@ -2689,6 +2897,28 @@
     for (const dr of st.drops) drawDrop(dr);
     drawFog(time);
     for (const b of st.bolts) drawBolt(b);
+    for (const fw of st.fireWalls || []) {
+      const a = Math.min(1, fw.t / 0.5), x0 = Math.round(fw.x - fw.w / 2), y0 = Math.round(fw.y);
+      g.globalAlpha = 0.35 * a; g.fillStyle = '#f89838'; g.fillRect(x0 - 2, y0 - 4, fw.w + 4, 8); // žiara
+      g.globalAlpha = a;
+      g.fillStyle = '#3a1408'; g.fillRect(x0, y0 + 1, fw.w, 2); // spálená zem
+      for (let x = 0; x < fw.w; x++) {
+        const h = 3 + Math.round(4 * Math.abs(Math.sin(x * 0.7 + time * 9)) + 3 * Math.abs(Math.sin(x * 0.31 - time * 6)));
+        g.fillStyle = '#d83818'; g.fillRect(x0 + x, y0 + 1 - h, 1, h);
+        g.fillStyle = '#f89838'; g.fillRect(x0 + x, y0 + 1 - Math.round(h * 0.7), 1, Math.round(h * 0.7));
+        if (h > 6) { g.fillStyle = '#f8d048'; g.fillRect(x0 + x, y0 + 1 - Math.round(h * 0.4), 1, Math.round(h * 0.4)); }
+        if (h > 8 && x % 3 === 0) { g.fillStyle = '#fff7c8'; g.fillRect(x0 + x, y0 - 1, 1, 1); }
+      }
+      g.globalAlpha = 1;
+    }
+    for (const sh of st.shields || []) {
+      const a = Math.min(1, sh.t / 0.4, (sh.max - sh.t) / 0.2 + 0.2);
+      g.globalAlpha = 0.18 * a; g.fillStyle = '#fff070';
+      g.beginPath(); g.ellipse(sh.x, sh.y, sh.R, sh.R * 0.7, 0, 0, 6.29); g.fill();
+      g.globalAlpha = 0.7 * a; g.strokeStyle = '#f8d048'; g.lineWidth = 1;
+      g.beginPath(); g.ellipse(sh.x, sh.y, sh.R, sh.R * 0.7, 0, 0, 6.29); g.stroke();
+      g.globalAlpha = 1;
+    }
     for (const q of st.parts) {
       g.globalAlpha = Math.min(1, q.life / q.max * 2);
       g.fillStyle = q.col; g.fillRect(Math.round(q.x), Math.round(q.y), 1, 1);
@@ -2724,6 +2954,7 @@
     $('hallFill').className = r < 0.3 ? 'low' : '';
     $('hallTxt').textContent = 'Radnica ' + Math.max(0, Math.ceil(st.hallHp)) + ' / ' + hallMax();
     $('kingLvl').textContent = kingMeta.lvl;
+    $('hud-king').classList.toggle('swap', st.phase === 'build' && ownedHeroes().length > 1);
     $('xpFill').style.width = (kingMeta.lvl >= KING_MAX_LVL ? 100 : Math.min(100, kingMeta.xp / kingXpNeed(kingMeta.lvl) * 100)) + '%';
   }
 
@@ -2772,6 +3003,12 @@
   }
 
   const ICONS = {};
+  const heroIcon = id => ICONS['hero_' + id] || ICONS.king;
+  // portrét nasadeného hrdinu v HUD a na karte Hrdinovia
+  function syncHeroIcons() {
+    $('kingIcon').src = heroIcon(st.hero); $('icoHero').src = heroIcon(st.hero);
+    $('hud-king').title = heroName() + (ownedHeroes().length > 1 ? ' – ťukni pred vlnou a vymeň hrdinu' : '');
+  }
   function initIcons() {
     ICONS.tower = spriteURL(BSPR.tower[0], 3);
     ICONS.barracks = spriteURL(BSPR.barracks, 3);
@@ -2784,17 +3021,19 @@
     ICONS.u_crossbow = spriteURL(SPR.knight[0], 3);
     ICONS.hall = spriteURL(BSPR.hall[2], 2);
     ICONS.king = spriteURL(SPR.king[0], 3);
+    for (const id of HERO_IDS) ICONS['hero_' + id] = spriteURL(SPR[HEROES[id].spr][0], 3);
     ICONS.u_knight = spriteURL(SPR.soldier[0], 3); ICONS.u_footArcher = spriteURL(SPR.footArcher[0], 3);
     $('buyKnight').querySelector('img').src = ICONS.u_knight; $('buyArcher').querySelector('img').src = ICONS.u_footArcher;
     ICONS.u_siegeRam = spriteURL(SPR.siegeRam[0], 2); ICONS.u_siegeCat = spriteURL(SPR.siegeCat[0], 2);
     $('buyRam').querySelector('img').src = ICONS.u_siegeRam; $('buyCat').querySelector('img').src = ICONS.u_siegeCat;
-    $('kingIcon').src = ICONS.king;
-    $('icoHall').src = UI_ICONS.hall; $('icoHero').src = ICONS.king;
+    $('icoHall').src = UI_ICONS.hall;
+    syncHeroIcons(); updateGems();
     for (const k of ['orc', 'garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' ? 2 : 3);
     ICONS.coin = spriteURL(SPR.coin[0], 4);
     ICONS.paving = spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3);
-    Object.assign(ICONS, { sp_volley: UI_ICONS.spellVolley, sp_fire: UI_ICONS.spellFire, sp_frost: UI_ICONS.spellFrost, sp_bolt: UI_ICONS.spellBolt });
-    const SPI = { volley: 'sp_volley', fireball: 'sp_fire', freeze: 'sp_frost', lightning: 'sp_bolt' };
+    Object.assign(ICONS, { sp_volley: UI_ICONS.spellVolley, sp_fire: UI_ICONS.spellFire, sp_frost: UI_ICONS.spellFrost, sp_bolt: UI_ICONS.spellBolt,
+      sp_warcry: UI_ICONS.spellHorn, sp_shield: UI_ICONS.spellShield, sp_heal: UI_ICONS.spellHeal, sp_firewall: UI_ICONS.spellFirewall, sp_teleport: UI_ICONS.spellTeleport });
+    const SPI = { volley: 'sp_volley', fireball: 'sp_fire', freeze: 'sp_frost', lightning: 'sp_bolt', warcry: 'sp_warcry', shield: 'sp_shield', heal: 'sp_heal', firewall: 'sp_firewall', teleport: 'sp_teleport' };
     document.querySelectorAll('.spell').forEach(b => { b.querySelector('img').src = ICONS[SPI[b.dataset.spell]]; });
     ICONS.gem = spriteURL(SPR.gem[0], 4);
     document.querySelectorAll('img.coin').forEach(i => { i.src = ICONS.coin; });
@@ -2875,13 +3114,15 @@
         renderBuild(); updateHud();
       });
       pal.appendChild(b);
+      return b;
     };
+    const shineTech = (el, id) => shineIf(el, isNew(id), () => markSeen(id));
     const I = UI_ICONS;
     const lockAct = (icon, label, m, px) => act(icon, label, '🔒 misia ' + m, false, label + ' sa odomkne v misii ' + m, 'locked', px);
     // ďalšia úroveň: kúpiť / najprv radnica / zamknutá do misie / maximum
     // icon = náhľad stavby na ďalšej úrovni
-    const upAct = (lvl, cap, cost, apply, label, icon) => {
-      if (lvl < cap) act(icon, label || 'Vylepšiť', coinTxt(cost), st.gold >= cost, apply, 'up');
+    const upAct = (lvl, cap, cost, apply, label, icon, newId) => {
+      if (lvl < cap) shineTech(act(icon, label || 'Vylepšiť', coinTxt(cost), st.gold >= cost, apply, 'up'), newId);
       else if (lvl < lvlCap()) act(icon, 'Úr. ' + (lvl + 1), '🔒 radnica', false, 'Najprv vylepši radnicu', 'locked');
       else if (lvl < MAX_LVL) lockAct(icon, 'Úr. ' + (lvl + 1), lvlMission(lvl + 1));
       else act(I.star, 'Max. úr.', '', false, null, 'max', true);
@@ -2901,9 +3142,9 @@
 
     if (st.sel === HALL) {
       const k = st.king;
-      selRow(ICONS.hall, 'Radnica · úr. ' + st.hallLvl + ' (' + LVL_NAME[st.hallLvl] + ')', 'zdravie ' + Math.ceil(st.hallHp) + '/' + hallMax() + ' · kráľ úr. ' + kingMeta.lvl + (k && k.dead ? ' · padol' : '') + ' · vylepšenie rozšíri územie a dovolí vyššie stavby');
-      upAct(st.hallLvl, hallCap(), hallUpCost(), () => { const c = hallUpCost(); st.gold -= c; st.hallLvl++; st.hallHp += 200; st.king.hp = kingMax(); }, null, bPreview({ kind: 'hall', lvl: st.hallLvl + 1 }));
-      if (k && k.dead) { const c = reviveCost(); act(ICONS.king, 'Oživiť kráľa', coinTxt(c), st.gold >= c, reviveKing, 'up'); }
+      selRow(ICONS.hall, 'Radnica · úr. ' + st.hallLvl + ' (' + LVL_NAME[st.hallLvl] + ')', 'zdravie ' + Math.ceil(st.hallHp) + '/' + hallMax() + ' · ' + heroName().toLowerCase() + ' úr. ' + kingMeta.lvl + (k && k.dead ? (heroDef().fem ? ' · padla' : ' · padol') : '') + ' · vylepšenie rozšíri územie a dovolí vyššie stavby');
+      upAct(st.hallLvl, hallCap(), hallUpCost(), () => { const c = hallUpCost(); st.gold -= c; st.hallLvl++; st.hallHp += 200; st.king.hp = kingMax(); }, null, bPreview({ kind: 'hall', lvl: st.hallLvl + 1 }), 'lvl' + (st.hallLvl + 1));
+      if (k && k.dead) { const c = reviveCost(); act(heroIcon(st.hero), 'Oživiť', coinTxt(c), st.gold >= c, reviveKing, 'up'); }
     } else if (selGroup()) {
       // hromadné akcie pre označenú skupinu (rad hradieb alebo všetky stavby jedného druhu)
       const grp = st.selGroup, kind = grp[0].kind, d = BUILD[kind], isWall = kind === 'wall', cap = bCap();
@@ -2949,7 +3190,7 @@
     } else if (st.sel) {
       const b = st.sel, d = BUILD[b.kind];
       let stats = '';
-      if (b.kind === 'chapel') stats = 'mních lieči rytierov a kráľa ' + HELPERS.chapel.rate(b).toFixed(1) + '/s';
+      if (b.kind === 'chapel') stats = 'mních lieči rytierov a hrdinu ' + HELPERS.chapel.rate(b).toFixed(1) + '/s';
       else if (b.kind === 'mine') stats = 'po vlne +' + Math.round(mineGold(b) * goldMul()) + ' zlata';
       else if (b.kind === 'workshop') stats = 'remeselník opravuje budovy ' + craftRate(b).toFixed(1) + '/s';
       else if (b.kind === 'firepit') stats = 'horenie ' + Math.round(bDmg(b)) + '/s počas ' + FIRE_BURN + ' s';
@@ -2979,7 +3220,7 @@
       if (b.kind === 'tower' && !b.spec) {
         if (!has('spec')) lockAct(I.actSpec.fire, 'Špecializácia', unlockMissionOf('spec'), true);
         else if (b.lvl < 3) act(I.actSpec.fire, 'Špecializácia', 'od úr. 3', false, 'Špecializácia sa dá vybrať od úrovne 3', 'locked', true);
-        else for (const k in SPECS) act(after(b, { spec: k }), SPEC_SHORT[k], coinTxt(SPEC_COST), st.gold >= SPEC_COST, () => { st.gold -= SPEC_COST; b.spent += SPEC_COST; b.spec = k; }, 'up', true);
+        else for (const k in SPECS) shineTech(act(after(b, { spec: k }), SPEC_SHORT[k], coinTxt(SPEC_COST), st.gold >= SPEC_COST, () => { st.gold -= SPEC_COST; b.spent += SPEC_COST; b.spec = k; }, 'up', true), 'spec');
       }
       if (b.kind === 'wall') {
         const u = b.unit;
@@ -2990,19 +3231,19 @@
         } else if (!b.gate && has('wallArcher')) for (const type in WUNIT) {
           const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
           if (!has(tid)) { lockAct(ICONS['u_' + type], wd.name, unlockMissionOf(tid)); continue; }
-          act(after(b, { unit: { type, lvl: 1 } }), wd.name, coinTxt(wd.cost), st.gold >= wd.cost, () => { st.gold -= wd.cost; b.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit');
+          shineTech(act(after(b, { unit: { type, lvl: 1 } }), wd.name, coinTxt(wd.cost), st.gold >= wd.cost, () => { st.gold -= wd.cost; b.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit'), tid);
         }
         if (b.gate) act(after(b, { gate: false }), 'Na hradbu', '', true, () => { b.gate = false; });
         else if (!u) {
           if (!has('gate')) lockAct(after(b, { gate: true }), 'Brána', unlockMissionOf('gate'));
-          else { const gc = gateCost(); act(after(b, { gate: true }), 'Brána', coinTxt(gc), st.gold >= gc, () => { st.gold -= gc; b.spent += gc; b.gate = true; }); }
+          else { const gc = gateCost(); shineTech(act(after(b, { gate: true }), 'Brána', coinTxt(gc), st.gold >= gc, () => { st.gold -= gc; b.spent += gc; b.gate = true; }), 'gate'); }
         }
         if (!b.spikes) {
-          if (has('spikes')) act(after(b, { spikes: true }), 'Ostne', coinTxt(SPIKE_COST), st.gold >= SPIKE_COST, () => { st.gold -= SPIKE_COST; b.spent += SPIKE_COST; b.spikes = true; }, '', true);
+          if (has('spikes')) shineTech(act(after(b, { spikes: true }), 'Ostne', coinTxt(SPIKE_COST), st.gold >= SPIKE_COST, () => { st.gold -= SPIKE_COST; b.spent += SPIKE_COST; b.spikes = true; }, '', true), 'spikes');
           else lockAct(after(b, { spikes: true }), 'Ostne', unlockMissionOf('spikes'));
         } else if (!b.spikeType) {
           if (!has('spikeTypes')) lockAct(after(b, { spikeType: 'fire' }), 'Ohnivé/ľadové', unlockMissionOf('spikeTypes'));
-          else for (const k in SPIKE_TYPES) act(after(b, { spikeType: k }), SPIKE_TYPES[k].name.split(' ')[0], coinTxt(SPIKE_TYPE_COST), st.gold >= SPIKE_TYPE_COST, () => { st.gold -= SPIKE_TYPE_COST; b.spent += SPIKE_TYPE_COST; b.spikeType = k; }, '', true);
+          else for (const k in SPIKE_TYPES) shineTech(act(after(b, { spikeType: k }), SPIKE_TYPES[k].name.split(' ')[0], coinTxt(SPIKE_TYPE_COST), st.gold >= SPIKE_TYPE_COST, () => { st.gold -= SPIKE_TYPE_COST; b.spent += SPIKE_TYPE_COST; b.spikeType = k; }, '', true), 'spikeTypes');
         }
       }
     } else {
@@ -3012,7 +3253,7 @@
       for (const t of BUILD_TABS) {
         const tb = document.createElement('button');
         const open = t.kinds.some(k => has(k));
-        tb.className = 'btab' + (t === tab ? ' on' : '') + (open ? '' : ' locked');
+        tb.className = 'btab' + (t === tab ? ' on' : '') + (open ? '' : ' locked') + (t.kinds.some(isNew) ? ' shine' : '');
         tb.title = t.name;
         tb.innerHTML = '<img src="' + UI_ICONS.tabs[t.id] + '" alt="' + t.name + '">';
         tb.addEventListener('click', () => {
@@ -3023,7 +3264,6 @@
         });
         row.appendChild(tb);
       }
-      if (st.king && st.king.dead) { const c = reviveCost(); act(ICONS.king, 'Oživiť kráľa', coinTxt(c), st.gold >= c, reviveKing, 'up'); }
       for (const kind of BUILD_ORDER.filter(k => tab.kinds.includes(k))) {
         const d = BUILD[kind];
         const b = document.createElement('button');
@@ -3041,6 +3281,7 @@
         b.innerHTML = '<span class="pin">' +
           '<span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost"><img class="coin" src="' + ICONS.coin + '">' + costOf(kind) + '</span></span>' +
           '<span class="face back"><b>' + d.name + '</b><small>' + d.desc + '.' + tip + '</small></span></span>';
+        shineIf(b, isNew(kind), () => markSeen(kind));
         b.addEventListener('pointerdown', ev => { if (st.phase === 'build') cardPress = { kind, x: ev.clientX, y: ev.clientY }; });
         b.addEventListener('click', () => {
           if (suppressCardClick) { suppressCardClick = false; return; } // bol to ťah, nie ťuk
@@ -3465,6 +3706,7 @@
     $('hallBtnTxt').textContent = '★' + free; $('hallBtnTxt').hidden = !free;
     $('trophyTxt').textContent = fresh; $('trophyTxt').hidden = !fresh;
     const es = emptySlots(); $('heroTxt').textContent = es; $('heroTxt').hidden = !es; // voľný slot na schopnosť
+    document.querySelector('.tabCard[data-tab=heroes]').classList.toggle('shine', HERO_IDS.some(heroIsNew));
   }
   $('icoHome').src = UI_ICONS.home; $('icoTrophy').src = UI_ICONS.trophy; $('icoSwords').src = UI_ICONS.swords; $('icoShop').src = UI_ICONS.chest;
   let boxDown = false; // položil sa prst/myš do okna misie od jeho otvorenia?
@@ -3479,8 +3721,8 @@
 
   function kingSummary() {
     const xp = kingMeta.lvl >= KING_MAX_LVL ? 'najvyššia úroveň' : 'XP ' + kingMeta.xp + ' / ' + kingXpNeed(kingMeta.lvl);
-    const taken = TALENTS.filter(t => tal(t.id)).map(t => t.name + (tal(t.id) > 1 ? ' ' + tal(t.id) + '×' : ''));
-    return xp + ' · ' + (taken.length ? taken.join(', ') : 'XP získava za každú prežitú vlnu');
+    const taken = (HERO_TALENTS[st.hero] || TALENTS).filter(t => tal(t.id)).map(t => t.name + (tal(t.id) > 1 ? ' ' + tal(t.id) + '×' : ''));
+    return xp + ' · ' + (taken.length ? taken.join(', ') : 'XP získava za každú vlnu, v ktorej bojuje');
   }
   function renderPerks() {
     $('perkStars').textContent = starsFree() + ' / ' + starsTotal();
@@ -3503,44 +3745,57 @@
   }
 
   // ---- Hrdinovia: zatiaľ len kráľ, ďalší hrdinovia prídu neskôr ----
+  // karta Hrdinovia: kúpení hrdinovia s úrovňou a schopnosťami (nasadený má zlatý rámik), ostatní s cenou v gemoch
   function renderHeroes() {
     const list = $('heroList'); list.innerHTML = '';
-    const need = kingXpNeed(kingMeta.lvl), pct = kingMeta.lvl >= KING_MAX_LVL ? 100 : Math.round(kingMeta.xp / need * 100);
-    const k = document.createElement('div'); k.className = 'hero sel';
-    k.innerHTML = '<div class="heroMain"><span class="tag">Vybraný</span><img src="' + ICONS.king + '" alt=""><b>Kráľ · úroveň ' + kingMeta.lvl + '</b>' +
-      '<span class="xpBar"><i style="width:' + pct + '%"></i></span><small>' + kingSummary() + '</small></div>';
-    list.appendChild(k);
-    // tri sloty schopností vnútri rámika, zvisle vedľa kráľa
-    const row = document.createElement('div'); row.className = 'skills';
-    kingMeta.slots.forEach((id, i) => {
-      const b = document.createElement('button');
-      if (!slotOpen(i)) { b.className = 'skill lock'; b.innerHTML = '<span>úroveň ' + KING_SLOT_LVL[i] + '</span>'; b.addEventListener('click', () => AUDIO.play('deny')); }
-      else if (!id) { b.className = 'skill empty'; b.innerHTML = '<img src="' + UI_ICONS.plus + '" alt=""><span>Vybrať</span>'; b.addEventListener('click', () => openSkillPick(i)); }
-      else { b.className = 'skill'; b.innerHTML = '<img src="' + ICONS[POWER_INFO[id].icon] + '" alt=""><span>' + POWER_INFO[id].name + '</span>'; } // výber je natrvalo
-      row.appendChild(b);
-    });
-    k.appendChild(row);
-    for (let i = 0; i < 2; i++) {
-      const h = document.createElement('div'); h.className = 'hero locked';
-      h.innerHTML = '<img src="' + ICONS.king + '" alt=""><b>Nový hrdina</b><small>čoskoro</small>';
-      list.appendChild(h);
+    for (const id of HERO_IDS) {
+      const h = HEROES[id];
+      if (!ownsHero(id)) {
+        const c = document.createElement('div'); c.className = 'hero locked';
+        c.innerHTML = '<img src="' + heroIcon(id) + '" alt=""><b>' + h.name + '</b><small>' + h.desc + '</small>';
+        const bb = document.createElement('button'); bb.className = 'btn up buy';
+        bb.textContent = 'Odomknúť';
+        bb.addEventListener('click', () => buyHero(id));
+        c.appendChild(bb); list.appendChild(c);
+        continue;
+      }
+      const m = metaOf(id), on = id === st.hero;
+      const need = kingXpNeed(m.lvl), pct = m.lvl >= KING_MAX_LVL ? 100 : Math.round(m.xp / need * 100);
+      const c = document.createElement('div'); c.className = 'hero sel' + (on ? '' : ' off');
+      shineIf(c, heroIsNew(id), () => { markHeroSeen(id); c.classList.remove('shine'); renderMapBar(); });
+      c.innerHTML = '<div class="heroMain"><span class="tag">' + (on ? 'Nasadený' : 'Ťukni a nasaď') + '</span><img src="' + heroIcon(id) + '" alt=""><b>' + h.name + ' · úroveň ' + m.lvl + '</b>' +
+        '<span class="xpBar"><i style="width:' + pct + '%"></i></span><small>' + (on ? kingSummary() : h.desc) + '</small></div>';
+      if (!on) c.querySelector('.heroMain').addEventListener('click', () => { setActiveHero(id); AUDIO.play('upgrade'); renderHeroes(); renderMapBar(); });
+      // tri sloty schopností vnútri rámika, zvisle vedľa hrdinu
+      const row = document.createElement('div'); row.className = 'skills';
+      m.slots.forEach((sid, i) => {
+        const bt = document.createElement('button');
+        if (m.lvl < KING_SLOT_LVL[i]) { bt.className = 'skill lock'; bt.innerHTML = '<span>úroveň ' + KING_SLOT_LVL[i] + '</span>'; bt.addEventListener('click', () => AUDIO.play('deny')); }
+        else if (!sid) { bt.className = 'skill empty'; bt.innerHTML = '<img src="' + UI_ICONS.plus + '" alt=""><span>Vybrať</span>'; bt.addEventListener('click', () => openSkillPick(i, id)); }
+        else { bt.className = 'skill'; bt.innerHTML = '<img src="' + ICONS[POWER_INFO[sid].icon] + '" alt=""><span>' + POWER_INFO[sid].name + '</span>'; } // výber je natrvalo
+        row.appendChild(bt);
+      });
+      c.appendChild(row);
+      list.appendChild(c);
     }
   }
 
   // výber schopnosti do slotu (schopnosť z iného slotu sa vymení)
-  function openSkillPick(i) {
+  function openSkillPick(i, id) {
+    id = id || st.hero;
+    const m = metaOf(id);
     AUDIO.play('click');
-    if (kingMeta.slots[i]) return;
+    if (m.slots[i]) return;
     $('skillPickHead').textContent = 'Schopnosť ' + (i + 1);
     const box = $('skillOpts'); box.innerHTML = '';
-    for (const id of KING_POWERS) {
-      const inf = POWER_INFO[id], taken = kingMeta.slots.includes(id);
+    for (const pid of HEROES[id].powers) {
+      const inf = POWER_INFO[pid], taken = m.slots.includes(pid);
       const b = document.createElement('button');
       b.className = 'skillOpt'; b.disabled = taken;
       b.innerHTML = '<img src="' + ICONS[inf.icon] + '" alt=""><span><b>' + inf.name + '</b><small>' + (taken ? 'Hrdina ju už má' : inf.desc) + '</small></span>';
       b.addEventListener('click', () => {
-        if (taken || kingMeta.slots[i]) return;
-        kingMeta.slots[i] = id; saveKing();
+        if (taken || m.slots[i]) return;
+        m.slots[i] = pid; saveMetaOf(id, m);
         AUDIO.play('upgrade'); $('skillPick').hidden = true; renderHeroes(); renderMapBar();
       });
       box.appendChild(b);
@@ -3548,6 +3803,25 @@
     $('skillPick').hidden = false;
   }
   $('skillBack').addEventListener('click', () => { AUDIO.play('click'); $('skillPick').hidden = true; });
+  // pred vlnou: ťuk na portrét hrdinu v HUD otvorí výber, koho nasadiť
+  function openHeroPick() {
+    if (st.phase !== 'build' || ownedHeroes().length < 2) return;
+    AUDIO.play('click');
+    const box = $('heroOpts'); box.innerHTML = '';
+    for (const id of ownedHeroes()) {
+      const h = HEROES[id], m = metaOf(id), dead = id === st.hero ? !!(st.king && st.king.dead) : !!st.heroDead[id];
+      const b = document.createElement('button');
+      b.className = 'skillOpt' + (id === st.hero ? ' cur' : '') + (dead ? ' dead' : '');
+      b.innerHTML = '<img class="hp" src="' + heroIcon(id) + '" alt=""><span><b>' + h.name + ' · úr. ' + m.lvl + '</b><small>' +
+        (id === st.hero ? 'Nasadený' + (dead ? ' – ' + (h.fem ? 'padla' : 'padol') + ', oživ v radnici' : '') : dead ? (h.fem ? 'Padla' : 'Padol') + ' – po nasadení ho oživ v radnici' : h.desc) + '</small></span>';
+      b.addEventListener('click', () => { $('heroPick').hidden = true; if (id !== st.hero) switchHero(id); });
+      box.appendChild(b);
+    }
+    $('heroPick').hidden = false;
+  }
+  $('hud-king').addEventListener('click', openHeroPick);
+  $('heroBack').addEventListener('click', () => { AUDIO.play('click'); $('heroPick').hidden = true; });
+  $('heroPick').addEventListener('click', ev => { if (ev.target === $('heroPick')) $('heroPick').hidden = true; });
   $('skillPick').addEventListener('click', ev => { if (ev.target === $('skillPick')) $('skillPick').hidden = true; });
 
   // ---- Trofeje ----
@@ -3581,21 +3855,26 @@
   function renderShop() {
     const list = $('shopList'); list.innerHTML = '';
     const sec = t => { const h = document.createElement('div'); h.className = 'shopSec'; h.textContent = t; list.appendChild(h); };
-    const item = (cls, img, name, desc, price) => {
+    // počas vývoja: namiesto ceny tlačidlo Odomknúť (zadarmo); rasy okrem ľudí ešte nie sú hrateľné
+    const item = (cls, img, name, desc, label, onClick) => {
       const r = document.createElement('div'); r.className = 'shopItem' + (cls ? ' ' + cls : '');
       r.innerHTML = img + '<div class="info"><b>' + name + '</b><small>' + desc + '</small></div>';
       const b = document.createElement('button'); b.className = 'btn up';
-      b.innerHTML = price;
-      b.addEventListener('click', () => { AUDIO.play('deny'); toast('Nákupy pripravujeme'); });
+      b.textContent = label; b.disabled = !onClick;
+      if (onClick) b.addEventListener('click', onClick);
       r.appendChild(b); list.appendChild(r);
     };
-    const gem = n => '<img src="' + ICONS.gem + '" alt="">' + n;
-    item('bundle', '<img src="' + UI_ICONS.chest + '" alt="">', 'Kompletný balík', 'Odomkne všetky rasy aj hrdinov naraz', gem(2000));
+    const lockedHeroes = HERO_IDS.filter(x => !ownsHero(x));
+    item('bundle', '<img src="' + UI_ICONS.chest + '" alt="">', 'Kompletný balík', 'Odomkne všetkých hrdinov naraz (rasy pribudnú, keď budú hrateľné)',
+      lockedHeroes.length ? 'Odomknúť' : 'Odomknuté', lockedHeroes.length ? () => lockedHeroes.forEach(buyHero) : null);
     sec('Rasy');
     for (const r of RACES.filter(x => x.state !== 'open'))
-      item('', '<img src="' + spriteURL(SPR[r.spr][0], 4) + '" alt="">', r.name, r.state === 'gem' ? 'Nová rasa so svojimi stavbami a jednotkami' : 'Pripravujeme', r.price ? gem(r.price) : 'Čoskoro');
+      item('', '<img src="' + spriteURL(SPR[r.spr][0], 4) + '" alt="">', r.name, 'Pripravujeme – zatiaľ nie je hrateľná', 'Čoskoro', null);
     sec('Hrdinovia');
-    for (let i = 0; i < 2; i++) item('', '<img class="sil" src="' + ICONS.king + '" alt="">', 'Nový hrdina', 'Pripravujeme', 'Čoskoro');
+    for (const id of HERO_IDS.filter(x => HEROES[x].price)) {
+      const h = HEROES[id], own = ownsHero(id);
+      item('', '<img src="' + heroIcon(id) + '" alt="">', h.name, h.desc, own ? (h.fem ? 'Odomknutá' : 'Odomknutý') : 'Odomknúť', own ? null : () => buyHero(id));
+    }
   }
   document.querySelectorAll('.tabCard').forEach(b => b.addEventListener('click', () => { if (b.dataset.tab !== mapTab) setTab(b.dataset.tab); }));
 
@@ -3681,7 +3960,7 @@
   function showTalentPick() {
     const box = $('talentPick');
     if (!box.hidden || !kingMeta.pending) return;
-    const avail = TALENTS.filter(t => tal(t.id) < TAL_MAX && (!t.need || has(t.need) || spellOn(t.need)));
+    const avail = (HERO_TALENTS[st.hero] || TALENTS).filter(t => tal(t.id) < TAL_MAX && (!t.need || has(t.need) || spellOn(t.need)));
     if (!avail.length) { kingMeta.pending = 0; saveKing(); return; }
     for (let i = avail.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [avail[i], avail[j]] = [avail[j], avail[i]]; }
     $('tpLvl').textContent = kingMeta.lvl - kingMeta.pending + 1;
@@ -3692,7 +3971,7 @@
       const c = document.createElement('button');
       c.className = 'tpCard';
       c.style.setProperty('--d', (0.1 + i * 0.12) + 's');
-      c.innerHTML = '<img src="' + ICONS[t.icon] + '"><span class="info"><b>' + t.name + ' <span class="pips">' + '●'.repeat(lv + 1) + '<i>' + '●'.repeat(TAL_MAX - lv - 1) + '</i></span></b><small>' + t.desc + '</small></span>';
+      c.innerHTML = '<img src="' + (t.icon === 'hero' ? heroIcon(st.hero) : ICONS[t.icon]) + '"><span class="info"><b>' + t.name + ' <span class="pips">' + '●'.repeat(lv + 1) + '<i>' + '●'.repeat(TAL_MAX - lv - 1) + '</i></span></b><small>' + t.desc + '</small></span>';
       c.addEventListener('click', () => {
         if (chosen) return;
         chosen = true;
@@ -3931,6 +4210,6 @@
     for (const s of list) { x.drawImage(s.c, px * scale, (h - 3 - s.h) * scale, s.w * scale, s.h * scale); px += s.w + 3; }
     return postPNG(c, name);
   }
-  window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, KING_POWERS,
+  window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, HEROES, switchHero, setActiveHero, ownedHeroes, heroDef,
     enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, buyUnit, knightsBlocked, get isAttack() { return isAttack(); } };
 })();

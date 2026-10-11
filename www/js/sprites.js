@@ -168,6 +168,53 @@ const KING_LEGS = [
    '....KKK.KKK...'],
 ];
 
+// Paladin – zozadu, strieborná prilba so zlatým hrebeňom, biely plášť so zlatým krížom, bojové kladivo
+const PALADIN_BODY = [
+  '.....KKKK.....',
+  '....KgggGK....',
+  '...KwmmmMDKKKK',
+  '...KmmmmMDKwmK',
+  '...KmMMMMDKmMK',
+  '.KwmMDDDDmMKlK',
+  '.KeeeeggeeEKlK',
+  '.KeeeeggeeEKsK',
+  'KeeeggggggEEKK',
+  'KeeeeggeeEEEK.',
+  'KeeeeggeeEEEK.',
+  'KeeeeggeeEEEK.',
+  '.KKKKKKKKKKK..',
+];
+const PALADIN_LEGS = [
+  ['...KmDK.KmDK..',
+   '...KKK..KKK...'],
+  ['....KmDKKmDK..',
+   '....KKK.KKK...'],
+];
+const PAL_PALADIN = { e: '#f4f0e6', E: '#b0a894' };
+// Čarodejka – zozadu, kapucňa, dlhé ryšavé vlasy, karmínový plášť so zlatým opaskom, palica s ohnivou guľou
+const SORC_BODY = [
+  '....KKKKK.KyyK',
+  '...KrrrrRKKffK',
+  '...KrrRRRRKKgK',
+  '...KhhhhHK.KlK',
+  '..KhhHhhHHKKlK',
+  '.KRrhhHhHRRKlK',
+  '.KrrrhHhHRRKsK',
+  'KrrrrrhHRRRKlK',
+  'KrgggggggRRKlK',
+  'KrrrrrRRRRRKlK',
+  'KrrrrRRRRRRKlK',
+  'KrrrRRRRRRRKlK',
+  '.KKKKKKKKKKKlK',
+];
+const SORC_LEGS = [
+  ['...KddK.KddKK.',
+   '...KKK..KKK...'],
+  ['....KddKKddKK.',
+   '....KKK.KKK...'],
+];
+const PAL_SORC = { r: '#c8406c', R: '#6c1c44', h: '#f8a040', H: '#b8501c', y: '#fff070', f: '#f87830' };
+
 
 // Goblin-lukostrelec – kapucňa a luk, strieľa na budovy z diaľky
 const GARCHER_BODY = [
@@ -436,6 +483,8 @@ function initSprites() {
   SPR.mage = [buildSprite(DEF_MAGE)];
   SPR.soldier = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l)));
   SPR.king = KING_LEGS.map(l => buildSprite(KING_BODY.concat(l)));
+  SPR.paladin = PALADIN_LEGS.map(l => buildSprite(PALADIN_BODY.concat(l), PAL_PALADIN));
+  SPR.sorc = SORC_LEGS.map(l => buildSprite(SORC_BODY.concat(l), PAL_SORC));
   SPR.spear = SOLDIER_LEGS.map(l => buildSprite(SPEAR_BODY.concat(l), { c: '#f08868', B: '#b83c28', n: '#6c2018' }));
   SPR.shield = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l), { c: '#d0d4dc', B: '#80869a', n: '#44485a' }));
   SPR.rider = RIDER_FRAMES.map(f => buildSprite(f));

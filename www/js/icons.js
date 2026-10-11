@@ -206,6 +206,50 @@ const UI_ICONS = (() => {
     }
     put(c, c, '#ffffff');
   });
+  // schopnosti paladina (roh, štít, uzdravenie) a čarodejky (ohnivá stena, teleport)
+  const spellHorn = outlined(15, 13, put => {
+    for (let x = 1; x <= 11; x++) { // roh sa rozširuje doprava
+      const h = 1 + Math.floor((x - 1) / 3);
+      for (let y = 6 - h; y <= 6 + h; y++) put(x, y, y === 6 - h ? '#fff2d0' : y >= 6 + h - 0 ? '#b88420' : '#e8c070');
+    }
+    for (let y = 1; y <= 11; y++) put(12, y, '#f8d048');
+    put(13, 3, '#ffffff'); put(14, 1, '#ffffff'); put(13, 9, '#ffffff'); put(14, 11, '#ffffff'); // zvuk
+    put(4, 4, '#8a5a2a'); put(4, 8, '#8a5a2a'); put(8, 3, '#8a5a2a'); put(8, 9, '#8a5a2a'); // pásiky
+  });
+  const spellShield = outlined(13, 15, put => {
+    for (let y = 1; y <= 13; y++) {
+      const half = y < 8 ? 5 : Math.max(0, 5 - Math.ceil((y - 7) * 0.9));
+      for (let x = 6 - half; x <= 6 + half; x++) put(x, y, x === 6 - half || x === 6 + half || y === 1 ? '#f8d048' : x < 6 ? '#e8ecf4' : '#a8b0c0');
+    }
+    for (let y = 3; y <= 10; y++) put(6, y, '#f8d048'); // zlatý kríž
+    for (let x = 3; x <= 9; x++) put(x, 5, '#f8d048');
+    put(4, 3, '#ffffff');
+  });
+  const spellHeal = outlined(13, 13, put => {
+    for (let y = 1; y <= 11; y++) for (let x = 4; x <= 8; x++) put(x, y, x === 4 || y === 1 ? '#c8f8a0' : '#5ccf3c');
+    for (let y = 4; y <= 8; y++) for (let x = 1; x <= 11; x++) put(x, y, y === 4 ? '#c8f8a0' : (x < 4 || x > 8) && y === 8 ? '#2c8a2c' : '#5ccf3c');
+    for (let y = 9; y <= 11; y++) put(8, y, '#2c8a2c');
+    put(5, 2, '#ffffff'); put(2, 5, '#ffffff');
+  });
+  const spellFirewall = outlined(17, 13, put => {
+    for (let x = 1; x <= 15; x++) put(x, 11, '#8a3a18'); // horiaca zem
+    for (const [cx, h] of [[3, 7], [8, 9], [13, 7]]) { // tri plamene vedľa seba
+      for (let y = 0; y < h; y++) {
+        const w = Math.max(0, Math.round((y / h) * 2.6));
+        for (let x = cx - w; x <= cx + w; x++) put(x, 10 - y, y < h * 0.35 ? '#d83818' : y < h * 0.7 ? '#f89838' : '#f8d048');
+      }
+      put(cx, 10 - h, '#fff7c8');
+    }
+    for (const cx of [3, 8, 13]) { put(cx, 9, '#fff7c8'); put(cx, 8, '#f8d048'); }
+  });
+  const spellTeleport = outlined(13, 13, put => {
+    for (let t = 0; t < 34; t++) { // špirála
+      const a = t * 0.45, r = 0.6 + t * 0.15;
+      put(Math.round(6 + Math.cos(a) * r), Math.round(6 + Math.sin(a) * r), t < 10 ? '#ffffff' : t < 22 ? '#c8a0ff' : '#8a5ae0');
+    }
+    put(6, 6, '#ffffff'); put(1, 1, '#fff070'); put(11, 2, '#fff070'); put(2, 11, '#fff070');
+  });
+
   const spellBolt = fromMap([
     '.......KKKKK..',
     '......KWYYYK..',
@@ -504,6 +548,6 @@ const UI_ICONS = (() => {
     { id: 'zh', name: '中文' },
   ];
 
-  return { pix, music, sound, plus, home, hall, trophy, star, swords, chest, spellVolley, spellFire, spellFrost, spellBolt, scrollPaper, scrollRod, scrollTag, flags, langs,
+  return { pix, music, sound, plus, home, hall, trophy, star, swords, chest, spellVolley, spellFire, spellFrost, spellBolt, spellHorn, spellShield, spellHeal, spellFirewall, spellTeleport, scrollPaper, scrollRod, scrollTag, flags, langs,
     actDown, actRepair, actSpec, tabs };
 })();
