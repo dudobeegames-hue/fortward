@@ -685,9 +685,11 @@ function buildKing8() {
     sp(hx - dx * 2, hy - dy * 2, col('g'));                       // hlavica
     sp(hx - dx, hy - dy, col('L'));                               // rukoväť
     for (let k = -2; k <= 2; k++) sp(hx + dx + -dy * k, hy + dy + dx * k, k ? col('G') : col('g')); // záštita naprieč
-    for (let t = 2; t <= 10; t++) {
-      sp(hx + dx * t, hy + dy * t, t >= 9 ? col('W') : col('w'));
-      sp(hx + dx * t + -dy * 0.9, hy + dy * t + dx * 0.9, col('m'));
+    // čepeľ: hustá vzorkovanie po dĺžke aj šírke, aby v šikmých smeroch neostali diery (inak by ich vyplnil čierny obrys)
+    for (let t = 2; t <= 10; t += 0.25) for (const o of [0, 0.45, 0.9]) {
+      const x = Math.round(hx + dx * t - dy * o), y = Math.round(hy + dy * t + dx * o);
+      if (sw.some(q => q[0] === x && q[1] === y)) continue;
+      sw.push([x, y, o > 0.6 ? col('m') : t >= 9 ? col('W') : col('w')]);
     }
     // obrys meča (len okolo neho, telo má vlastný)
     const sm = new Map(sw.map(([x, y, c]) => [x + ',' + y, c]));

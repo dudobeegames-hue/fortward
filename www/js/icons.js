@@ -537,6 +537,23 @@ const UI_ICONS = (() => {
     '.....SSS.....',
   ], TABP);
   const tabs = { towers: tabTowers, walls: tabWalls, army: tabArmy, siege: tabSiege, support: tabSupport };
+  // domček na mape (menu) v rovnakom štýle ako záložky: len hnedé tóny, okno a dvere sú priehľadné
+  const homeTab = fromMap([
+    '......LM..LM..',
+    '.....LMMS.LS..',
+    '....LMMMMSLS..',
+    '...LMMMMMMSS..',
+    '..LMMMMMMMMS..',
+    '.LMMMMMMMMMMS.',
+    'LLLLLLLLLLLLLS',
+    '.LMMMMMMMMMMS.',
+    '.LM..MMMMMMMS.',
+    '.LM..MMM...MS.',
+    '.LMMMMMM...MS.',
+    '.LMMMMMM...MS.',
+    '.LMMMMMM...MS.',
+    'SSSSSSSSSSSSSS',
+  ], TABP);
 
   // poradie jazykov v Nastaveniach; zatiaľ hrá len slovenčina, ostatné prídu s prekladom
   const langs = [
@@ -551,5 +568,5 @@ const UI_ICONS = (() => {
   ];
 
   return { pix, music, sound, plus, home, hall, trophy, star, swords, chest, spellVolley, spellFire, spellFrost, spellBolt, spellHorn, spellShield, spellHeal, spellFirewall, spellTeleport, scrollPaper, scrollRod, scrollTag, flags, langs,
-    actDown, actRepair, actSpec, tabs };
+    actDown, actRepair, actSpec, tabs, homeTab };
 })();

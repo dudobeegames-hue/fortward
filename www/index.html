@@ -510,6 +510,10 @@
     background: linear-gradient(#5a4836, #3a2c22); box-shadow: inset 0 -4px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.15); }
   .mapIc img { width: 28px; height: 28px; image-rendering: pixelated; }
   .mapIc:active { transform: translateY(2px); }
+  /* domček (menu) vyzerá ako záložka stavebného panela: tmavé pole, hnedá ikonka */
+  #mapHome { width: 44px; height: 40px; border: 2px solid var(--ink); border-radius: 8px; background: #1a120d; box-shadow: none; }
+  #mapHome img { width: auto; height: 26px; }
+  #mapHome:active img { filter: brightness(1.25); }
   /* spodný riadok 4 kariet; zvolená karta sa povysunie a jej obsah je nad riadkom */
   #mapBar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 9; height: calc(86px + env(safe-area-inset-bottom)); box-sizing: border-box;
     padding: 12px 10px env(safe-area-inset-bottom); display: flex; gap: 8px; align-items: flex-start;
@@ -518,28 +522,27 @@
     background: linear-gradient(#4e3e2e, #34271e); box-shadow: inset 0 -4px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.12);
     transition: transform .18s ease, background-color .18s ease; }
   .tabCard img { image-rendering: pixelated; opacity: .7; transition: opacity .18s ease; }
+  #icoHero { height: 44px; width: auto; } /* portrét hrdinu rovnako veľký ako ostatné ikonky kariet */
   .tabCard.on { transform: translateY(-18px); background: linear-gradient(#7a6248, #4a3828); border-color: #b88420;
     box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px #f8d048, inset 0 -4px 0 rgba(0,0,0,.35), 0 6px 14px rgba(0,0,0,.5); }
   .tabCard.on img { opacity: 1; }
   /* karta Nákupy: zlatistá, raz za čas po nej prebehne svetelný lesk */
   .tabCard.shop { overflow: hidden; background: linear-gradient(#7a5a2a, #4a3418); }
-  .tabCard.shop::after { content: ''; position: absolute; top: -10px; bottom: -10px; width: 22px; left: -40px; transform: skewX(-20deg); pointer-events: none;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,.85), transparent); animation: shopShine 3s ease-in-out infinite; }
-  @keyframes shopShine { 0%, 60% { left: -40px; } 100% { left: 120%; } }
   /* novinka (odomknutá stavba, vylepšenie, hrdina): rovnaký lesk ako na karte Nákupy, kým naň hráč neťukne */
-  /* lesk ako vrstva cez celý prvok (posúva sa len jej pozadie) – nič neorezáva, takže odznak s číslom ostane celý a v rohu nič nezostáva */
+  /* jeden lesk pre celú hru (Nákupy, záložky, karty, balík): šikmý svetlý prúžok raz za 4 s prebehne cez prvok;
+     je to vrstva cez celý prvok s posúvaným pozadím, takže nič neorezáva (odznaky s číslom ostanú celé) */
   .shine { position: relative; }
   .shine::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
-    background: linear-gradient(105deg, transparent 42%, rgba(255,255,255,.75) 50%, transparent 58%) no-repeat;
-    background-size: 250% 100%; background-position: 150% 0; animation: sweepBg 3s ease-in-out infinite; }
-  @keyframes sweepBg { 0%, 60% { background-position: 150% 0; } 100% { background-position: -60% 0; } }
+    background: linear-gradient(110deg, transparent calc(50% - 16px), rgba(255,255,255,.85) 50%, transparent calc(50% + 16px)) no-repeat;
+    background-size: 300% 100%; background-position: 100% 0; animation: shine 4s ease-in-out infinite; }
+  @keyframes shine { 0%, 70% { background-position: 100% 0; } 100% { background-position: 0% 0; } }
   .tabCard .badge { z-index: 4; }
   /* karta novinky: jedno neónovo modré zablikanie vo vnútri rámu */
-  .pcard.newFlash .face { animation: neonFlash 1.1s ease-out 1; }
-  @keyframes neonFlash {
-    0% { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
-    20% { box-shadow: inset 0 0 0 2px #5cf0ff, inset 0 0 16px 5px rgba(70,200,255,.9); }
-    45% { box-shadow: inset 0 0 0 2px #5cf0ff, inset 0 0 10px 3px rgba(70,200,255,.55); }
+  .pcard.newFlash .face { animation: neonFlash 2.8s ease-in-out 1; }
+  @keyframes neonFlash { /* začne až keď panel dojde, pomaly sa rozžiari, chvíľu svieti a pomaly zhasne */
+    0%, 10% { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+    30% { box-shadow: inset 0 0 0 2px #5cf0ff, inset 0 0 16px 5px rgba(70,200,255,.9); }
+    65% { box-shadow: inset 0 0 0 2px #5cf0ff, inset 0 0 12px 4px rgba(70,200,255,.7); }
     100% { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
   }
   .tabCard.shop img { opacity: 1; }
@@ -556,8 +559,6 @@
   .shopItem .btn img { width: 16px; height: 16px; }
   .shopItem.bundle { position: relative; overflow: hidden; border-color: #b88420; background: linear-gradient(rgba(248,208,72,.18), rgba(248,208,72,.05)); box-shadow: inset 0 0 0 1px #f8d048; }
   .shopItem.bundle b { color: var(--gold); font-size: 18px; }
-  .shopItem.bundle::after { content: ''; position: absolute; top: -20px; bottom: -20px; width: 40px; left: -60px; transform: skewX(-20deg); pointer-events: none;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: shopShine 3.4s ease-in-out infinite; }
   .shopItem .sil { filter: brightness(0); opacity: .45; }
   .tabScreen.screenOverlay { bottom: calc(86px + env(safe-area-inset-bottom)); }
   .setIc .badge, .tabCard .badge { position: absolute; top: -9px; right: -11px; min-width: 22px; height: 22px; padding: 0 5px; box-sizing: border-box; border-radius: 11px; border: 2px solid var(--ink);
@@ -815,7 +816,7 @@
       <button class="tabCard" data-tab="hall" title="Sieň"><img id="icoHall" alt="Sieň"><em id="hallBtnTxt" class="badge" hidden>0</em></button>
       <button class="tabCard" data-tab="heroes" title="Hrdinovia"><img id="icoHero" alt="Hrdinovia"><em id="heroTxt" class="badge" hidden>0</em></button>
       <button class="tabCard" data-tab="trophies" title="Trofeje"><img id="icoTrophy" alt="Trofeje"><em id="trophyTxt" class="badge" hidden>0</em></button>
-      <button class="tabCard shop" data-tab="shop" title="Nákupy"><img id="icoShop" alt="Nákupy"></button>
+      <button class="tabCard shop shine" data-tab="shop" title="Nákupy"><img id="icoShop" alt="Nákupy"></button>
     </div>
     <!-- okno misie: zjaví sa až po ťuknutí na hrad -->
     <div id="missionBox" class="screenOverlay" hidden>

@@ -308,7 +308,7 @@
   const POWER_INFO = {
     volley:    { name: 'Šípová salva', desc: 'Dážď šípov na zvolené miesto. Silnejšia s talentmi kráľa.', icon: 'sp_volley' },
     freeze:    { name: 'Mráz',         desc: 'Nepriatelia v okolí na pár sekúnd takmer zamrznú.',     icon: 'sp_frost' },
-    lightning: { name: 'Blesk',        desc: 'Silný úder do nepriateľa, preskočí na dvoch ďalších.',  icon: 'sp_bolt' },
+    lightning: { name: 'Blesk',        desc: 'Silný úder do nepriateľa, preskočí na dvoch ďalších a všetkých na 2 s omráči.', icon: 'sp_bolt' },
     fireball:  { name: 'Ohnivá guľa',  desc: 'Výbuch zraní hordu v okolí a podpáli ju.',              icon: 'sp_fire' },
     warcry:    { name: 'Pokrik',       desc: 'Na chvíľu posilní a zrýchli hrdinu aj rytierov.',        icon: 'sp_warcry' },
     shield:    { name: 'Svätý štít',   desc: 'Budovy aj radnica v okolí chvíľu neberú žiadne poškodenie.', icon: 'sp_shield' },
@@ -361,11 +361,15 @@
   // novinky: odomknutá stavba / vylepšenie / hrdina, na ktoré hráč ešte neťukol – jeho karta a záložka sa lesknú
   const SHINE_TECH = { gate: 1, spikes: 1, spikeTypes: 1, wallArcher: 1, wallCrossbow: 1, spec: 1, lvl2: 1, lvl3: 1, lvl4: 1, lvl5: 1 };
   let seenNew = [];
-  function loadSeen() { // prvé spustenie: všetko doteraz odomknuté berie ako videné, lesknú sa až ďalšie novinky
+  function loadSeen() { // prvé spustenie: všetko doteraz odomknuté berie ako videné, lesknú sa až ďalšie novinky;
+    // úplne nový hráč (len 1. misia) má ako novinky aj všetky stavby z prvej misie, aby sa s nimi zoznámil
     seenNew = loadJSON(sk('seenNew'), null);
-    if (!Array.isArray(seenNew)) { seenNew = [...techFor(st.unlocked)]; saveJSON(sk('seenNew'), seenNew); }
+    if (!Array.isArray(seenNew)) {
+      seenNew = [...techFor(st.unlocked)].filter(id => st.unlocked > 1 || !BUILD[id]);
+      saveJSON(sk('seenNew'), seenNew);
+    }
   }
-  const isNew = id => (!!BUILD[id] || !!SHINE_TECH[id]) && techFor(st.unlocked).has(id) && unlockMissionOf(id) > 1 && !seenNew.includes(id);
+  const isNew = id => (!!BUILD[id] || !!SHINE_TECH[id]) && techFor(st.unlocked).has(id) && (unlockMissionOf(id) > 1 || !!BUILD[id]) && !seenNew.includes(id);
   function markSeen(id) { if (seenNew.includes(id)) return; seenNew.push(id); saveJSON(sk('seenNew'), seenNew); }
   // novo odomknutý hrdina (pre celý účet)
   const HEROES_SEEN_KEY = 'fortward.heroesSeen';
@@ -378,12 +382,15 @@
   function markHeroSeen(id) { const v = heroesSeen(); if (!v.includes(id)) { v.push(id); saveJSON(HEROES_SEEN_KEY, v); } }
   // karta novinky v paneli: raz neónovo modro zabliká vo vnútri rámu; ak sa panel medzitým prekreslí,
   // zablikanie na novej karte plynule pokračuje (záporné oneskorenie) a potom sa už neopakuje
-  const FLASH_MS = 1100, flashedNew = new Map();
+  const FLASH_MS = 2800, flashedNew = new Map();
   function flashIf(el, on, id, seen) {
     if (!el || !on) return el;
     el.addEventListener('click', seen, true);
     const now = performance.now();
-    if (!flashedNew.has(id)) flashedNew.set(id, now);
+    if (!flashedNew.has(id)) { // po dobliknutí je novinka videná a jej záložka sa prestane lesknúť
+      flashedNew.set(id, now);
+      setTimeout(() => { seen(); refreshTabShine(); }, FLASH_MS);
+    }
     const age = now - flashedNew.get(id);
     if (age < FLASH_MS) { el.classList.add('newFlash'); el.querySelector('.face').style.animationDelay = (-age) + 'ms'; }
     return el;
@@ -1896,7 +1903,7 @@
       if (!cur) { hint('Blesk treba zoslať na nepriateľa'); AUDIO.play('deny'); return false; }
       const pts = [{ x: cur.x + 6, y: Math.max(0, cur.y - 120) }];
       for (let n = 0; n < 3 && cur; n++) { hit.push(cur); pts.push({ x: cur.x, y: cur.y - cur.h * 0.5 }); cur = near(cur.x, cur.y, hit); }
-      hit.forEach((e, n) => { damage(e, (n ? 21 : 35) * pow); e.stunT = Math.max(e.stunT || 0, 0.4); });
+      hit.forEach((e, n) => { damage(e, (n ? 21 : 35) * pow); e.stunT = Math.max(e.stunT || 0, e.d.boss ? 0.8 : 2); }); // blesk omráči na 2 s (bossov kratšie)
       st.bolts.push({ pts, life: 0.3, max: 0.3 });
       AUDIO.play('bolt'); AUDIO.play('boom'); st.shake = Math.max(st.shake, 0.15);
     }
@@ -3221,10 +3228,10 @@
     ICONS.hall = spriteURL(BSPR.hall[2], 2);
     ICONS.king = spriteURL(SPR.king[0], 3);
     for (const id of HERO_IDS) ICONS['hero_' + id] = spriteURL(SPR[HEROES[id].spr][0], 3);
-    if (SPR.king8) { // portrét kráľa spredu (s mečom), orezaný na postavu
-      const src = SPR.king8[2].idle, c = document.createElement('canvas'); c.width = 20; c.height = 21;
-      c.getContext('2d').drawImage(src.c, 2, 3, 20, 21, 0, 0, 20, 21);
-      ICONS.king = ICONS.hero_king = spriteURL({ c, w: 20, h: 21 }, 3);
+    if (SPR.king8) { // portrét kráľa zozadu (s mečom), orezaný na postavu
+      const src = SPR.king8[6].idle, c = document.createElement('canvas'); c.width = 18; c.height = 18;
+      c.getContext('2d').drawImage(src.c, 5, 6, 18, 18, 0, 0, 18, 18);
+      ICONS.king = ICONS.hero_king = spriteURL({ c, w: 18, h: 18 }, 3);
     }
     ICONS.u_knight = spriteURL(SPR.soldier[0], 3); ICONS.u_footArcher = spriteURL(SPR.footArcher[0], 3);
     $('buyKnight').querySelector('img').src = ICONS.u_knight; $('buyArcher').querySelector('img').src = ICONS.u_footArcher;
@@ -3298,6 +3305,12 @@
     { id: 'siege',   name: 'Stroje',  kinds: ['catapult'] },
     { id: 'support', name: 'Podpora', kinds: ['mine', 'chapel', 'workshop', 'paving'] },
   ];
+  function refreshTabShine() {
+    for (const tb of document.querySelectorAll('.btab[data-tab]')) {
+      const t = BUILD_TABS.find(t => t.id === tb.dataset.tab);
+      tb.classList.toggle('shine', !!t && t.kinds.some(isNew));
+    }
+  }
   const tabOf = kind => (BUILD_TABS.find(t => t.kinds.includes(kind)) || BUILD_TABS[0]).id;
   const SPEC_SHORT = { fire: 'Oheň', rapid: 'Rýchlosť', sniper: 'Ostreľovač' };
   const coinTxt = n => '<img class="coin" src="' + ICONS.coin + '">' + n;
@@ -3460,7 +3473,7 @@
         const tb = document.createElement('button');
         const open = t.kinds.some(k => has(k));
         tb.className = 'btab' + (t === tab ? ' on' : '') + (open ? '' : ' locked') + (t.kinds.some(isNew) ? ' shine' : '');
-        tb.title = t.name;
+        tb.title = t.name; tb.dataset.tab = t.id;
         tb.innerHTML = '<img src="' + UI_ICONS.tabs[t.id] + '" alt="' + t.name + '">';
         tb.addEventListener('click', () => {
           if (st.buildTab === t.id) return;
@@ -3915,7 +3928,7 @@
     const es = emptySlots(); $('heroTxt').textContent = es; $('heroTxt').hidden = !es; // voľný slot na schopnosť
     document.querySelector('.tabCard[data-tab=heroes]').classList.toggle('shine', HERO_IDS.some(heroIsNew));
   }
-  $('icoHome').src = UI_ICONS.home; $('icoTrophy').src = UI_ICONS.trophy; $('icoSwords').src = UI_ICONS.swords; $('icoShop').src = UI_ICONS.chest;
+  $('icoHome').src = UI_ICONS.homeTab; $('icoTrophy').src = UI_ICONS.trophy; $('icoSwords').src = UI_ICONS.swords; $('icoShop').src = UI_ICONS.chest;
   let boxDown = false; // položil sa prst/myš do okna misie od jeho otvorenia?
   const openMission = () => { renderMapPanel(); boxDown = false; $('missionBox').hidden = false; };
   const closeMission = () => { $('missionBox').hidden = true; };
@@ -4072,7 +4085,7 @@
       r.appendChild(b); list.appendChild(r);
     };
     const lockedHeroes = HERO_IDS.filter(x => !ownsHero(x));
-    item('bundle', '<img src="' + UI_ICONS.chest + '" alt="">', 'Kompletný balík', 'Odomkne všetkých hrdinov naraz (rasy pribudnú, keď budú hrateľné)',
+    item('bundle shine', '<img src="' + UI_ICONS.chest + '" alt="">', 'Kompletný balík', 'Odomkne všetkých hrdinov naraz (rasy pribudnú, keď budú hrateľné)',
       lockedHeroes.length ? 'Odomknúť' : 'Odomknuté', lockedHeroes.length ? () => lockedHeroes.forEach(buyHero) : null);
     sec('Rasy');
     for (const r of RACES.filter(x => x.state !== 'open'))
