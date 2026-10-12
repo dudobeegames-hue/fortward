@@ -1446,6 +1446,20 @@
     }
     return best;
   }
+  // hrdina bráni celú šírku stavebnej zóny: okrem okruhu pred radnicou zasiahne aj nepriateľa kdekoľvek v zóne
+  // alebo tesne pred ňou (napr. pri veži na okraji)
+  const heroBandTop = () => tileY(zoneTopRow()) - T - 10 * tal('reach');
+  const heroReaches = (e, aggro) => Math.hypot(e.x - st.king.hx, e.y - st.king.hy) <= aggro || e.y >= heroBandTop();
+  function nearestEnemyWhere(x, y, ok, preferFree, fly) {
+    let best = null, bd = 1e9;
+    for (const e of st.enemies) {
+      if (e.dead || (e.d.fly && !fly) || !ok(e)) continue;
+      let d = Math.hypot(e.x - x, e.y - y);
+      if (preferFree && e.foe) d += 25;
+      if (d < bd) { bd = d; best = e; }
+    }
+    return best;
+  }
   function nearestEnemy(x, y, rad, preferFree) {
     let best = null, bd = 1e9;
     for (const e of st.enemies) {
@@ -1529,12 +1543,18 @@
   function updateSorc(k, dt) {
     k.flash = Math.max(0, k.flash - dt); k.cd = Math.max(0, k.cd - dt); k.swing = Math.max(0, (k.swing || 0) - dt);
     const rng = heroDef().range + 10 * tal('reach');
-    let t = null, bd = rng;
-    for (const e of st.enemies) { if (e.dead) continue; const d = Math.hypot(e.x - k.x, e.y - k.y); if (d < bd) { bd = d; t = e; } }
-    if (t) {
+    // cieľ v dostrele, inak najbližší v stavebnej zóne – k tomu podíde, kým ho nemá na dostrel
+    const t = nearestEnemyWhere(k.x, k.y, e => Math.hypot(e.x - k.x, e.y - k.y) <= rng || heroReaches(e, 0), false, true);
+    const inRng = t && Math.hypot(t.x - k.x, t.y - k.y) <= rng;
+    k.aim = inRng ? t : null;
+    if (t && !inRng) { moveKnight(k, t.x, t.y, k.spd * waterMul(k), dt); k.anim += dt * 6; }
+    else if (t) {
       if (k.cd <= 0) {
         k.cd = heroDef().cd * (1 - 0.12 * tal('swift')) * (st.cryT > 0 ? 0.6 : 1); k.swing = 0.15;
-        st.proj.push({ k: 'fire', x: k.x + 5, y: k.y - 15, tgt: t, tx: t.x, ty: t.y - t.h * 0.5, dmg: kingDmg(), spd: 150, splash: 8, vx: 0, vy: -1 });
+        const set = hero8('sorc');
+        if (set) k.face8 = dir8(t.x - k.x, t.y - k.y); // natočí sa k cieľu ešte pred výstrelom
+        const tip = set ? set[k.face8].tip : { x: 5, y: -15 };
+        st.proj.push({ k: 'fire', x: k.x + tip.x, y: k.y + tip.y, tgt: t, tx: t.x, ty: t.y - t.h * 0.5, dmg: kingDmg(), spd: 150, splash: 8, vx: 0, vy: -1 });
         AUDIO.play('fire');
       }
     } else if (Math.hypot(k.hx - k.x, k.hy - k.y) > 2) { moveKnight(k, k.hx, k.hy, k.spd * waterMul(k), dt); k.anim += dt * 6; }
@@ -1544,11 +1564,12 @@
     const go = mover || moveTo;
     u.flash = Math.max(0, u.flash - dt);
     u.cd = Math.max(0, u.cd - dt);
-    if (u.tgt && (u.tgt.dead || Math.hypot(u.tgt.x - homeX, u.tgt.y - homeY) > aggro + 16)) u.tgt = null;
+    const far = e => u.isKing ? !heroReaches(e, aggro + 16) : Math.hypot(e.x - homeX, e.y - homeY) > aggro + 16;
+    if (u.tgt && (u.tgt.dead || far(u.tgt))) u.tgt = null;
     // jazdec si vyberá strelcov, šamanov a podkopníkov; ostatní najbližšieho
     if (!u.tgt && u.ktype === 'rider') u.tgt = priorityEnemy(homeX, homeY, aggro, RIDER_PRIO);
     if (u.ktype === 'spear' && !(u.tgt && u.tgt.d.cav)) { const c = priorityEnemy(u.x, u.y, 90, e => e.d.cav); if (c) u.tgt = c; } // kopijník vyráža proti jazde
-    if (!u.tgt) u.tgt = nearestEnemy(homeX, homeY, aggro, true);
+    if (!u.tgt) u.tgt = u.isKing ? nearestEnemyWhere(u.x, u.y, e => heroReaches(e, aggro), true) : nearestEnemy(homeX, homeY, aggro, true);
     const t = u.tgt;
     const cry = st.cryT > 0 ? 1 : 0, spd = (u.spd || 26) * (1 + 0.4 * cry) * waterMul(u);
     if (cry) dmg *= 1.6;
@@ -2175,12 +2196,13 @@
   }
   // kráľ v 8 smeroch: natočí sa k nepriateľovi, inak smerom chôdze, doma pozerá na hordu; chôdza zo 4 snímok, úder z 3
   const dir8 = (dx, dy) => (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
-  const hero8 = spr => SPR[spr + '8']; // hrdinovia prerobení do 8 smerov (kráľ, paladin)
+  const hero8 = spr => SPR[spr + '8']; // hrdinovia prerobení do 8 smerov (kráľ, paladin, čarodejka)
   function king8Frame(u, set) {
     const mvx = u.x - (u._lx == null ? u.x : u._lx), mvy = u.y - (u._ly == null ? u.y : u._ly);
     u._lx = u.x; u._ly = u.y;
-    const moving = Math.hypot(mvx, mvy) > 0.02, t = u.tgt && !u.tgt.dead ? u.tgt : null;
-    const near = t && Math.hypot(t.x - u.x, t.y - u.y) < 26;
+    const aim = u.aim && !u.aim.dead ? u.aim : null; // čarodejka mieri na diaľku
+    const moving = Math.hypot(mvx, mvy) > 0.02, t = aim || (u.tgt && !u.tgt.dead ? u.tgt : null);
+    const near = t && (aim || Math.hypot(t.x - u.x, t.y - u.y) < 26);
     if (near) u.face8 = dir8(t.x - u.x, t.y - u.y);
     else if (moving) u.face8 = dir8(mvx, mvy);
     else if (Math.hypot(u.hx - u.x, u.hy - u.y) < 3) u.face8 = 6;
@@ -2225,6 +2247,17 @@
     }
     g.globalAlpha = 1;
   }
+  // čarodejka: ohnivá guľa na palici stále jemne žiari a iskrí, pri výstrele sa rozžiari naplno
+  function drawCastFlare(u, v) {
+    const x = u.x + v.tip.x, y = u.y + v.tip.y;
+    if (u.swing > 0) {
+      const p = u.swing / 0.15;
+      g.globalCompositeOperation = 'lighter';
+      g.fillStyle = 'rgba(255,170,60,' + (0.55 * p) + ')'; g.beginPath(); g.arc(x, y, 3 + 3 * p, 0, 6.29); g.fill();
+      g.fillStyle = 'rgba(255,240,140,' + (0.8 * p) + ')'; g.beginPath(); g.arc(x, y, 2, 0, 6.29); g.fill();
+      g.globalCompositeOperation = 'source-over';
+    } else if (Math.random() < 0.2) part(x + (Math.random() - 0.5) * 3, y - 1, (Math.random() - 0.5) * 4, -8 - Math.random() * 6, 0.35, Math.random() < 0.5 ? '#fff070' : '#f87830', 0);
+  }
   // zasiahnutá budova či hrad sa namiesto zafarbenia jemne otrasie o pixel do strán (úlomky pridá hitBuilding / hitFort)
   const hitJit = f => f > 0 ? (Math.floor(performance.now() / 45) % 2 ? 1 : -1) : 0;
   function drawFighter(u, sprName) {
@@ -2233,6 +2266,7 @@
       shadow(u.x, u.y, 5);
       g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), Math.round(u.y - fr.h) + K8_PB); // pod chodidlami je miesto na zbraň
       if (sprName === 'paladin') drawSmash(u);
+      else if (sprName === 'sorc') drawCastFlare(u, hero8(sprName)[u.face8]);
       else if (u.swing > 0) drawSlash(u.x, u.y - 9, u.face8 * Math.PI / 4, 1 - u.swing / 0.3);
       if (st.cryT > 0 && Math.random() < 0.15) part(u.x + (Math.random() - 0.5) * 8, u.y - 8, 0, -16, 0.4, '#f8d048', 0);
       return;
@@ -3277,6 +3311,7 @@
     };
     if (SPR.king8) ICONS.king = ICONS.hero_king = portrait(SPR.king8, 12, 6, 18);
     if (SPR.paladin8) ICONS.hero_paladin = portrait(SPR.paladin8, 11, 4, 20);
+    if (SPR.sorc8) ICONS.hero_sorc = portrait(SPR.sorc8, 11, 3, 20);
     ICONS.u_knight = spriteURL(SPR.soldier[0], 3); ICONS.u_footArcher = spriteURL(SPR.footArcher[0], 3);
     $('buyKnight').querySelector('img').src = ICONS.u_knight; $('buyArcher').querySelector('img').src = ICONS.u_footArcher;
     ICONS.u_siegeRam = spriteURL(SPR.siegeRam[0], 2); ICONS.u_siegeCat = spriteURL(SPR.siegeCat[0], 2);
