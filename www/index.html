@@ -142,8 +142,8 @@
     background: var(--panel2); border: 2px solid var(--ink); border-radius: 8px;
     box-shadow: inset 0 -4px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.12);
   }
-  /* kúzla nad sebou pri pravom okraji; prstenec ukazuje nabitie, zvolené kúzlo svieti */
-  #spells { display: flex; flex-direction: column-reverse; gap: 8px; }
+  /* kúzla nad sebou pri pravom okraji, zvislo v strede obrazovky; prstenec ukazuje nabitie, zvolené kúzlo svieti */
+  #spells { display: flex; flex-direction: column-reverse; gap: 8px; position: absolute; right: 8px; bottom: 50vh; transform: translateY(50%); }
   .spell { --p: 100%; --c: rgba(248,208,72,.95); width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--ink); padding: 0;
     background: conic-gradient(var(--c) var(--p), rgba(28,20,14,.85) 0); display: grid; place-items: center; position: relative;
     transition: transform .12s ease, box-shadow .12s ease; }

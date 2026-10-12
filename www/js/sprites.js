@@ -484,6 +484,7 @@ function initSprites() {
   SPR.soldier = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l)));
   SPR.king = KING_LEGS.map(l => buildSprite(KING_BODY.concat(l)));
   SPR.king8 = buildKing8(); // kráľ v 8 smeroch (chôdza, postoj, úder)
+  SPR.paladin8 = buildPaladin8(); // paladin v 8 smeroch s bojovým kladivom
   SPR.paladin = PALADIN_LEGS.map(l => buildSprite(PALADIN_BODY.concat(l), PAL_PALADIN));
   SPR.sorc = SORC_LEGS.map(l => buildSprite(SORC_BODY.concat(l), PAL_SORC));
   SPR.spear = SOLDIER_LEGS.map(l => buildSprite(SPEAR_BODY.concat(l), { c: '#f08868', B: '#b83c28', n: '#6c2018' }));
@@ -656,26 +657,145 @@ const K8_LEGS = {
     ],
   },
 };
-// ruka s mečom (súradnice v plátne 24×24) a uhol meča v postoji; smer, kam sa pozerá (na úder)
+// ruka so zbraňou (súradnice v plátne 38×28) a uhol meča v postoji; smer, kam sa pozerá (na úder)
 const K8_HAND = {
   // atk = uhly meča pri údere: napriahnutie, švih, dokončenie (spredu meč švihá bokom, nie cez telo)
-  N:  { x: 18, y: 15, idle: -1.15, atk: [-0.2, -1.5, -2.25], legs: 'front' },
-  NE: { x: 18, y: 15, idle: -1.0,  atk: [-1.95, -0.75, 0.05], legs: 'front' },
-  E:  { x: 15, y: 16, idle: -0.85, atk: [-1.95, -0.3, 0.6],   legs: 'side' },
-  SE: { x: 6,  y: 16, idle: -2.2,  atk: [-2.55, 3.1, 2.4],    legs: 'front' },
-  S:  { x: 5,  y: 16, idle: -2.05, atk: [-2.45, 3.0, 2.3],    legs: 'front' },
+  N:  { x: 25, y: 15, idle: -1.15, atk: [-0.2, -1.5, -2.25], legs: 'front' },
+  NE: { x: 25, y: 15, idle: -1.0,  atk: [-1.95, -0.75, 0.05], legs: 'front' },
+  E:  { x: 22, y: 16, idle: -0.85, atk: [-1.95, -0.3, 0.6],   legs: 'side' },
+  SE: { x: 13, y: 16, idle: -2.2,  atk: [-2.55, 3.1, 2.4],    legs: 'front' },
+  S:  { x: 12, y: 16, idle: -2.05, atk: [-2.45, 3.0, 2.3],    legs: 'front' },
 };
-const K8_W = 24, K8_H = 24, K8_BX = 5, K8_BY = 7; // telo 14×17 (s nohami) v plátne s miestom na meč
+// telo 14×17 (s nohami) v plátne s miestom na zbraň: kladivo pri údere siaha až 7 px do strán a 4 px pod chodidlá
+const K8_W = 38, K8_H = 28, K8_BX = 12, K8_BY = 7, K8_PB = 4; // K8_PB = prázdne riadky pod chodidlami
 const KNEEL_DY = 3; // kľačiaci kráľ: o toľko riadkov pod kolenami trčí čepeľ (pred ním v zemi)
 
-function buildKing8() {
-  const pal = PAL, K = hexRGB(PAL.K);
-  const col = ch => hexRGB(pal[ch]);
+// paladin v 8 smeroch: strieborná prilba so zlatým hrebeňom a priezorom, biely plášť a halena so zlatým krížom, bojové kladivo
+const PAL8_BODY = {
+  N: [ // zozadu – hrebeň, prilba, biely plášť so zlatým krížom
+    '.....KggK.....',
+    '....KgggGK....',
+    '...KwmmmmMK...',
+    '...KmmmmMDK...',
+    '...KmMMMMDK...',
+    '..KwmMDDDMDK..',
+    '.KmmeeeeeeMDK.',
+    '.KeeeeggeeEEK.',
+    '.KeeeeggeeEEK.',
+    'KeeegggggggEEK',
+    'KeeeeeggeeEEEK',
+    'KeeeeeggeeEEEK',
+    'KeeeeeeeeEEEEK',
+    '.KKKKKKKKKKKK.',
+  ],
+  NE: [ // šikmo zozadu – vpravo vidno štrbinu priezoru a plechové rameno
+    '.....KggK.....',
+    '....KgggGK....',
+    '...KwmmmmMK...',
+    '...KmmmmMMDK..',
+    '...KmMMMMKDK..',
+    '..KwmMDDDMDK..',
+    '.KmmeeeeeeMMK.',
+    '.KeeeeggeeEMK.',
+    '.KeeeeggeeEDK.',
+    'KeeegggggggMDK',
+    'KeeeeeggeeEEDK',
+    'KeeeeeggeeEEEK',
+    'KeeeeeeeeEEEEK',
+    '.KKKKKKKKKKKK.',
+  ],
+  E: [ // z boku – plášť vzadu, vpredu plech a halena so zlatým krížom, kožený opasok
+    '......KggK....',
+    '.....KgggGK...',
+    '....KwmmmmMK..',
+    '....KmmmmmmMK.',
+    '....KmMKKKKKK.',
+    '....KmMMMmmDK.',
+    '....KDMMMMDK..',
+    '...KeKwmmmDK..',
+    '..KeeKmggmDK..',
+    '.KeeeKgggggK..',
+    '.KeeeKmggMDK..',
+    'KeeeeKLLgLLK..',
+    'KeeeeKmggMDK..',
+    '.KKKKKKKKKK...',
+  ],
+  SE: [ // šikmo spredu – priezor so štrbinou a krížom prieduchov
+    '.....KggK.....',
+    '....KgggGK....',
+    '...KwmmmmMK...',
+    '...KmmmmmMDK..',
+    '...KmKKKKKDK..',
+    '...KmmmgmMDK..',
+    '...KDmmgmMDK..',
+    '..KemMMMMMEK..',
+    '.KeKwmggmMDK..',
+    '.KeKmggggggK..',
+    'KeeKwmggmMDK..',
+    'KeeKLLLgLLLK..',
+    'KeeKwmggmMDK..',
+    '.KKKKKKKKKKK..',
+  ],
+  S: [ // spredu – priezor, náprsník so zlatým krížom, plášť po stranách
+    '.....KggK.....',
+    '....KgggGK....',
+    '...KwmmmmMK...',
+    '...KmmmmmMK...',
+    '...KmKKKKDK...',
+    '...KmmmgmMK...',
+    '...KDmmgmDK...',
+    '..KemMMMMDEK..',
+    '.KeKwmggmDKEK.',
+    '.KeKggggggKEK.',
+    'KeeKwmggmDKEEK',
+    'KeeKLLLgLLKEEK',
+    'KeeKwmggmDKEEK',
+    '.KKKKKKKKKKKK.',
+  ],
+};
+// porazený hrdina kľačí spredu so sklonenou hlavou (12 riadkov, posledný je obrys)
+const K8_KNEEL = [
+  '....K.KK.K....',
+  '...KgKggKgK...',
+  '...KggGgGGK...',
+  '...KsssssSK...',
+  '...KllllllK...',
+  '..KeWlllleEK..',
+  '.KrKeBBBBeKRK.',
+  '.KrKcBBBBnKRK.',
+  'KrrKgggGggKRRK',
+  'KrrKcBBBBnKRRK',
+  'KrrKMMDDMMKRRK', // stehná kľačiaceho
+  '.KKKKKKKKKKKK.',
+];
+const PAL8_KNEEL = [ // prilba sklonená – priezor nie je vidno, len temeno s hrebeňom
+  '.....KggK.....',
+  '....KgggGK....',
+  '...KwmmmmMK...',
+  '...KmmmmmMK...',
+  '...KmMMMMDK...',
+  '..KemDDDDDEK..',
+  '.KeKwmggmDKEK.',
+  '.KeKggggggKEK.',
+  'KeeKwmggmDKEEK',
+  'KeeKLLLgLLKEEK',
+  'KeeKMMDDMMKEEK',
+  '.KKKKKKKKKKKK.',
+];
+
+const buildKing8 = () => buildHero8({ body: K8_BODY, kneel: K8_KNEEL, weapon: 'sword' });
+const buildPaladin8 = () => buildHero8({ body: PAL8_BODY, kneel: PAL8_KNEEL, weapon: 'hammer', pal: PAL_PALADIN });
+
+// hrdina v 8 smeroch: 5 kreslených pohľadov + 3 zrkadlové, zbraň (meč / kladivo) sa dokresľuje pod uhlom
+function buildHero8(spec) {
+  const K = hexRGB(PAL.K);
+  const col = ch => hexRGB((spec.pal && spec.pal[ch]) || PAL[ch]);
+  const hammer = spec.weapon === 'hammer';
   // jedna snímka: telo + nohy + meč pod daným uhlom; vráti pixely
   function frame(view, legRows, ang, lunge) {
     const px = new Array(K8_W * K8_H).fill(null);
     const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < K8_W && y < K8_H && c) px[y * K8_W + x] = c; };
-    const body = K8_BODY[view].concat(legRows), oy = K8_BY + (lunge ? 1 : 0);
+    const body = spec.body[view].concat(legRows), oy = K8_BY + (lunge ? 1 : 0);
     body.forEach((row, r) => { for (let c = 0; c < row.length; c++) if (row[c] !== '.') put(K8_BX + c, oy + r, col(row[c])); });
     // meč: rukoväť a hlavica za rukou, zlatá záštita, dlhá čepeľ s lesklou hranou (bez meča = snímka švihu, meč nahradí efekt)
     const h = K8_HAND[view], hx = h.x, hy = h.y + (lunge ? 1 : 0);
@@ -683,6 +803,13 @@ function buildKing8() {
     const dx = Math.cos(ang), dy = Math.sin(ang);
     const sw = [];
     const sp = (x, y, c) => sw.push([Math.round(x), Math.round(y), c]);
+    const add = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (!sw.some(q => q[0] === x && q[1] === y)) sw.push([x, y, c]); };
+    if (hammer) { // bojové kladivo: dlhá drevená násada so zlatou hlavicou, na konci oceľová hlava naprieč
+      add(hx - dx * 2, hy - dy * 2, col('g'));
+      for (let t = -1; t <= 7; t += 0.25) add(hx + dx * t, hy + dy * t, t > 6 ? col('G') : col('l'));
+      for (let t = 7.5; t <= 10; t += 0.25) for (let o = -2.2; o <= 2.2; o += 0.4)
+        add(hx + dx * t - dy * o, hy + dy * t + dx * o, t >= 9.5 ? col('M') : o < -1.2 ? col('w') : col('m'));
+    } else {
     sp(hx - dx * 2, hy - dy * 2, col('g'));                       // hlavica
     sp(hx - dx, hy - dy, col('L'));                               // rukoväť
     for (let k = -2; k <= 2; k++) sp(hx + dx + -dy * k, hy + dy + dx * k, k ? col('G') : col('g')); // záštita naprieč
@@ -691,6 +818,7 @@ function buildKing8() {
       const x = Math.round(hx + dx * t - dy * o), y = Math.round(hy + dy * t + dx * o);
       if (sw.some(q => q[0] === x && q[1] === y)) continue;
       sw.push([x, y, o > 0.6 ? col('m') : t >= 9 ? col('W') : col('w')]);
+    }
     }
     // obrys meča (len okolo neho, telo má vlastný)
     const sm = new Map(sw.map(([x, y, c]) => [x + ',' + y, c]));
@@ -720,34 +848,29 @@ function buildKing8() {
       idle: toSprite(frame(view, L.idle, h.idle), flip),
       walk: L.walk.map((lr, i) => toSprite(frame(view, lr, h.idle + (i % 2 ? 0.08 : -0.08)), flip)),
       atk: atkAng.map((a, i) => toSprite(frame(view, L.idle, a, i === 1), flip)),
-      slash: toSprite(frame(view, L.idle, null, true), flip), // v momente švihu: bez meča, kreslí sa svetelný oblúk
+      // v momente švihu: meč nahradí svetelný oblúk; kladivo ostane dopadnuté vpredu (hra pridá náraz)
+      slash: toSprite(frame(view, L.idle, hammer ? atkAng[2] : null, true), flip),
     });
     return { n: mk(false), m: mk(true) };
   }
-  // porazený kráľ spredu: kľačí, hlavu má sklonenú (tvár skrytá pod korunou, vidno len čelo a bradu)
-  // a obe ruky opiera o hlavicu meča zapichnutého pred sebou do zeme
+  // porazený hrdina spredu: kľačí so sklonenou hlavou a obe ruky opiera o zbraň pred sebou –
+  // meč je zapichnutý do zeme, kladivo stojí na hlave
   function kneel() {
     const px = new Array(K8_W * K8_H).fill(null);
     const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < K8_W && y < K8_H && c) px[y * K8_W + x] = c; };
-    const body = [
-      '....K.KK.K....',
-      '...KgKggKgK...',
-      '...KggGgGGK...',
-      '...KsssssSK...',
-      '...KllllllK...',
-      '..KeWlllleEK..',
-      '.KrKeBBBBeKRK.',
-      '.KrKcBBBBnKRK.',
-      'KrrKgggGggKRRK',
-      'KrrKcBBBBnKRRK',
-      'KrrKMMDDMMKRRK', // stehná kľačiaceho
-      '.KKKKKKKKKKKK.',
-    ], oy = K8_H - body.length - KNEEL_DY; // pod kolenami ostáva miesto na čepeľ, ktorá sa zabodne do zeme pred ním
+    const body = spec.kneel, oy = K8_H - body.length - KNEEL_DY; // pod kolenami ostáva miesto na zbraň opretú o zem pred ním
     body.forEach((row, r) => { for (let c = 0; c < row.length; c++) if (row[c] !== '.') put(K8_BX + c, oy + r, col(row[c])); });
-    const hx = K8_BX + 7, hy = oy + 7; // ruky na hlavici pri opasku, tvár ostane voľná
-    const sw = [[hx, hy - 2, col('g')], [hx - 1, hy - 2, col('g')], [hx, hy - 1, col('L')], [hx - 1, hy - 1, col('L')]]; // hlavica, rukoväť
-    for (let x = hx - 3; x <= hx + 2; x++) sw.push([x, hy + 1, x === hx - 1 || x === hx ? col('g') : col('G')]); // záštita
-    for (let y = hy + 2; y < K8_H; y++) sw.push([hx - 1, y, col('w')], [hx, y, col('m')]); // čepeľ až do zeme
+    const hx = K8_BX + 7, hy = oy + 7; // ruky na zbrani pri opasku, tvár ostane voľná
+    const sw = [];
+    if (hammer) {
+      sw.push([hx - 1, hy - 1, col('g')], [hx, hy - 1, col('G')]); // hlavica násady
+      for (let y = hy + 1; y < K8_H - 3; y++) sw.push([hx - 1, y, col('l')], [hx, y, col('L')]); // násada
+      for (let x = hx - 3; x <= hx + 2; x++) sw.push([x, K8_H - 3, col('w')], [x, K8_H - 2, col('m')], [x, K8_H - 1, col('M')]); // hlava kladiva na zemi
+    } else {
+      sw.push([hx, hy - 2, col('g')], [hx - 1, hy - 2, col('g')], [hx, hy - 1, col('L')], [hx - 1, hy - 1, col('L')]); // hlavica, rukoväť
+      for (let x = hx - 3; x <= hx + 2; x++) sw.push([x, hy + 1, x === hx - 1 || x === hx ? col('g') : col('G')]); // záštita
+      for (let y = hy + 2; y < K8_H; y++) sw.push([hx - 1, y, col('w')], [hx, y, col('m')]); // čepeľ až do zeme
+    }
     const sm = new Map(sw.map(([x, y, c]) => [x + ',' + y, c]));
     for (const [key] of sm) { // obrys meča – aj cez telo, aby sa meč od neho oddelil
       const [x, y] = key.split(',').map(Number);
@@ -756,7 +879,7 @@ function buildKing8() {
     for (const [key, c] of sm) { const [x, y] = key.split(',').map(Number); put(x, y, c); }
     put(hx - 2, hy, col('s')); put(hx + 1, hy, col('s')); put(hx - 1, hy, col('s')); put(hx, hy, col('s')); // päste
     put(hx - 3, hy, K); put(hx + 2, hy, K);
-    for (let x = hx - 3; x <= hx + 2; x++) put(x, K8_H - 1, x === hx - 3 || x === hx + 2 ? [106, 78, 52] : [74, 52, 34]); // hlina okolo zabodnutej čepele
+    if (!hammer) for (let x = hx - 3; x <= hx + 2; x++) put(x, K8_H - 1, x === hx - 3 || x === hx + 2 ? [106, 78, 52] : [74, 52, 34]); // hlina okolo zabodnutej čepele
     return px;
   }
   const v = { N: views('N'), NE: views('NE'), E: views('E'), SE: views('SE'), S: views('S') };

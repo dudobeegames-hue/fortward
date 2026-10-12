@@ -207,7 +207,6 @@ function buildScene(W, H, G, seed, themeIdx) {
           if (t < 0.25) { set(x, y, pickRamp(TR.sand, 0.04 + hsh * 0.22, x, y)); continue; } // mokrý tmavší piesok pri vode
           set(x, y, pickRamp(TR.sand, 0.2 + t * 0.38 + (hsh - 0.5) * 0.25 + (dy < 0 ? 0.06 : -0.06) - (onRoad ? 0.1 : 0), x, y));
           if (hsh > pebbles) { set(x, y, pickRamp(RAMP.stone, 0.62 + hash2(x, y, 9) * 0.3, x, y)); set(x, y + 1, RAMP.stone[2]); } // kamienok s tieňom
-          else if (hsh < 0.05 && t > 0.35) set(x, y, RAMP.grass[hsh < 0.025 ? 4 : 5]); // steblo trávy v piesku
           continue;
         }
         blocked[y * W + x] = 1;
@@ -222,16 +221,11 @@ function buildScene(W, H, G, seed, themeIdx) {
       }
     }
     const nearRoad = (x, y, m) => roadD(x, y) < m;
-    // trsy trávy na okraji brehu, trstina pri vode, kamene v prúde, lekná
+    // trstina pri vode, kamene v prúde, lekná (breh je bez trávy)
     for (let x = 1; x < W - 1; x++) {
       const cy = rcy(x), hw = hwAt(x);
       if (nearRoad(x, cy, 6)) continue;
       const h1 = hash2(x, 11, seed), h2 = hash2(x, 13, seed), h3 = hash2(x, 17, seed);
-      if (h1 > 0.55) { // tráva prevísa cez okraj brehu (hore aj dole)
-        const gy = Math.round(cy - hw - bankN(x)), gy2 = Math.round(cy + hw + bankS(x));
-        const len = 1 + Math.round(h2 * 2);
-        for (let k = 0; k <= len; k++) { set(x, gy + k, RAMP.grass[k ? 4 : 5]); set(x, gy2 - k, RAMP.grass[k ? 3 : 4]); }
-      }
       if (h3 > 0.9 && x % 2 === 0) { // trstina pri vode s hnedým klasom
         const north = h2 > 0.5, by = Math.round(north ? cy - hw + 1 : cy + hw), ht = 4 + Math.round(h1 * 3);
         for (let k = 0; k < ht; k++) set(x, by - k, RAMP.grass[k < 2 ? 3 : 4]);

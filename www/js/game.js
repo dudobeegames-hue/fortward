@@ -2175,7 +2175,8 @@
   }
   // kráľ v 8 smeroch: natočí sa k nepriateľovi, inak smerom chôdze, doma pozerá na hordu; chôdza zo 4 snímok, úder z 3
   const dir8 = (dx, dy) => (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
-  function king8Frame(u) {
+  const hero8 = spr => SPR[spr + '8']; // hrdinovia prerobení do 8 smerov (kráľ, paladin)
+  function king8Frame(u, set) {
     const mvx = u.x - (u._lx == null ? u.x : u._lx), mvy = u.y - (u._ly == null ? u.y : u._ly);
     u._lx = u.x; u._ly = u.y;
     const moving = Math.hypot(mvx, mvy) > 0.02, t = u.tgt && !u.tgt.dead ? u.tgt : null;
@@ -2184,8 +2185,8 @@
     else if (moving) u.face8 = dir8(mvx, mvy);
     else if (Math.hypot(u.hx - u.x, u.hy - u.y) < 3) u.face8 = 6;
     if (u.face8 == null) u.face8 = 6;
-    const v = SPR.king8[u.face8];
-    if (u.swing > 0) return v.slash; // meč nahradí svetelný oblúk švihu
+    const v = set[u.face8];
+    if (u.swing > 0) return v.slash; // meč nahradí svetelný oblúk švihu (kladivo ostane dopadnuté)
     if (near && u.cd < 0.25) return v.atk[0]; // napriahnutie pred úderom
     if (moving) return v.walk[Math.floor(u.anim * 1.4) % 4];
     return v.idle;
@@ -2207,14 +2208,32 @@
     }
     g.globalAlpha = 1;
   }
+  // úder paladinovho kladiva: pred ním sa po zemi rozbehne zlatý kruh, vyletí prach a iskry
+  function drawSmash(u) {
+    if (!(u.swing > 0)) { u.smashed = false; return; }
+    const a = u.face8 * Math.PI / 4, ix = u.x + Math.cos(a) * 10, iy = u.y + Math.sin(a) * 6 - 1, p = 1 - u.swing / 0.3;
+    if (!u.smashed) {
+      u.smashed = true;
+      for (let k = 0; k < 6; k++) part(ix + (Math.random() - 0.5) * 6, iy, (Math.random() - 0.5) * 40, -12 - Math.random() * 22, 0.4, k < 3 ? '#a08c6c' : '#fff070', 90);
+    }
+    const r = 2 + p * 9, al = Math.max(0, 1 - p);
+    g.globalAlpha = al;
+    for (let i = 0; i < 24; i++) {
+      const t = i / 24 * Math.PI * 2;
+      g.fillStyle = i % 3 ? '#f8d048' : '#ffffff';
+      g.fillRect(Math.round(ix + Math.cos(t) * r), Math.round(iy + Math.sin(t) * r * 0.45), 1, 1);
+    }
+    g.globalAlpha = 1;
+  }
   // zasiahnutá budova či hrad sa namiesto zafarbenia jemne otrasie o pixel do strán (úlomky pridá hitBuilding / hitFort)
   const hitJit = f => f > 0 ? (Math.floor(performance.now() / 45) % 2 ? 1 : -1) : 0;
   function drawFighter(u, sprName) {
-    if (u.isKing && sprName === 'king' && SPR.king8) {
-      const fr = king8Frame(u);
+    if (u.isKing && hero8(sprName)) {
+      const fr = king8Frame(u, hero8(sprName));
       shadow(u.x, u.y, 5);
-      g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), Math.round(u.y - fr.h));
-      if (u.swing > 0) drawSlash(u.x, u.y - 9, u.face8 * Math.PI / 4, 1 - u.swing / 0.3);
+      g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), Math.round(u.y - fr.h) + K8_PB); // pod chodidlami je miesto na zbraň
+      if (sprName === 'paladin') drawSmash(u);
+      else if (u.swing > 0) drawSlash(u.x, u.y - 9, u.face8 * Math.PI / 4, 1 - u.swing / 0.3);
       if (st.cryT > 0 && Math.random() < 0.15) part(u.x + (Math.random() - 0.5) * 8, u.y - 8, 0, -16, 0.4, '#f8d048', 0);
       return;
     }
@@ -2244,8 +2263,9 @@
   const SLOWMO_DUR = 1.0;
   let slowmoT = 0;
   function drawDeadKing(k, time) {
-    if (heroDef().spr === 'king' && SPR.king8 && SPR.king8.kneel) return drawKneelingKing(k, time);
-    const k8 = heroDef().spr === 'king' && SPR.king8, fr = k8 ? SPR.king8[k.face8 == null ? 6 : k.face8].idle : SPR[heroDef().spr][0], t = k.deadT;
+    const set = hero8(heroDef().spr);
+    if (set && set.kneel) return drawKneelingKing(k, time, set);
+    const k8 = !!set, fr = k8 ? set[k.face8 == null ? 6 : k.face8].idle : SPR[heroDef().spr][0], t = k.deadT;
     const fall = Math.min(1, t / 0.45), drop = Math.round(4 * fall * fall);
     const alpha = k.fadeT == null ? 1 : Math.max(0, 1 - k.fadeT / KING_FADE);
     const x0 = Math.round(k.x - fr.w / 2), y0 = Math.round(k.y - fr.h) + drop, gy = Math.round(k.y);
@@ -2272,15 +2292,16 @@
     }
   }
   // porazený kráľ: klesne na kolená, sklonená hlava, meč zapichnutý pred sebou v zemi; plášť sa ešte chvíľu zavlní
-  function drawKneelingKing(k, time) {
-    const fr = SPR.king8.kneel, t = k.deadT, fall = Math.min(1, t / 0.35);
+  function drawKneelingKing(k, time, set) {
+    const fr = set.kneel, t = k.deadT, fall = Math.min(1, t / 0.35);
     const alpha = k.fadeT == null ? 1 : Math.max(0, 1 - k.fadeT / KING_FADE);
     const x0 = Math.round(k.x - fr.w / 2), y0 = Math.round(k.y - fr.h) + KNEEL_DY - Math.round(3 * (1 - fall) * (1 - fall));
     const amp = t < 1.3 ? 1.2 * (1 - t / 1.3) : 0;
     g.globalAlpha = alpha;
     shadow(k.x, k.y, 5);
     for (let r = 0; r < fr.h; r++) {
-      const dx = r >= 15 && r < 21 ? Math.round(Math.sin(t * 14 - r * 0.9) * amp * (r - 14) / 5) : 0; // plášť (nie čepeľ v zemi)
+      const cape = K8_H - KNEEL_DY - 7; // plášť = 6 riadkov nad kolenami (nie zbraň v zemi)
+      const dx = r > cape && r <= cape + 6 ? Math.round(Math.sin(t * 14 - r * 0.9) * amp * (r - cape) / 5) : 0;
       g.drawImage(fr.c, 0, r, fr.w, 1, x0 + dx, y0 + r, fr.w, 1);
     }
     if (fall >= 1 && t < 0.8) { // pri dopade čepele odletí trochu hliny
@@ -2412,6 +2433,7 @@
         g.globalCompositeOperation = 'source-over';
       }
     }
+    if (b.lvl > 1 && b.kind !== 'wall' && tabOf(b.kind) !== 'towers') pxText(g, String(b.lvl), x0 + T - 3, y0 + T - 6, '#f8d048'); // úroveň (veže ju majú len na vzhľade)
   }
   const JOINERS = { wall: 1, tower: 1, mage: 1, icetower: 1, ballista: 1 }; // hradby sa napájajú len na hradby a veže (strážna, mága) – na ostatné budovy nie
   const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL || !!JOINERS[o.kind]); };
@@ -3247,11 +3269,14 @@
     ICONS.hall = spriteURL(BSPR.hall[2], 2);
     ICONS.king = spriteURL(SPR.king[0], 3);
     for (const id of HERO_IDS) ICONS['hero_' + id] = spriteURL(SPR[HEROES[id].spr][0], 3);
-    if (SPR.king8) { // portrét kráľa zozadu (s mečom), orezaný na postavu
-      const src = SPR.king8[6].idle, c = document.createElement('canvas'); c.width = 18; c.height = 18;
-      c.getContext('2d').drawImage(src.c, 5, 6, 18, 18, 0, 0, 18, 18);
-      ICONS.king = ICONS.hero_king = spriteURL({ c, w: 18, h: 18 }, 3);
-    }
+    // portréty hrdinov v 8 smeroch: zozadu so zbraňou, orezané na postavu (kladivo je dlhšie, výrez je väčší)
+    const portrait = (set, x, y, n) => {
+      const c = document.createElement('canvas'); c.width = n; c.height = n;
+      c.getContext('2d').drawImage(set[6].idle.c, x, y, n, n, 0, 0, n, n);
+      return spriteURL({ c, w: n, h: n }, 3);
+    };
+    if (SPR.king8) ICONS.king = ICONS.hero_king = portrait(SPR.king8, 12, 6, 18);
+    if (SPR.paladin8) ICONS.hero_paladin = portrait(SPR.paladin8, 11, 4, 20);
     ICONS.u_knight = spriteURL(SPR.soldier[0], 3); ICONS.u_footArcher = spriteURL(SPR.footArcher[0], 3);
     $('buyKnight').querySelector('img').src = ICONS.u_knight; $('buyArcher').querySelector('img').src = ICONS.u_footArcher;
     ICONS.u_siegeRam = spriteURL(SPR.siegeRam[0], 2); ICONS.u_siegeCat = spriteURL(SPR.siegeCat[0], 2);
