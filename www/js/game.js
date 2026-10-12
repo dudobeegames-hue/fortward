@@ -1543,9 +1543,12 @@
   function updateSorc(k, dt) {
     k.flash = Math.max(0, k.flash - dt); k.cd = Math.max(0, k.cd - dt); k.swing = Math.max(0, (k.swing || 0) - dt);
     const rng = heroDef().range + 10 * tal('reach');
-    // cieľ v dostrele, inak najbližší v stavebnej zóne – k tomu podíde, kým ho nemá na dostrel
-    const t = nearestEnemyWhere(k.x, k.y, e => Math.hypot(e.x - k.x, e.y - k.y) <= rng || heroReaches(e, 0), false, true);
-    const inRng = t && Math.hypot(t.x - k.x, t.y - k.y) <= rng;
+    // cieľ si drží, kým žije a je na dostrel (inak by sa medzi výstrelmi otáčala k inému, než ktorého práve zasahuje);
+    // prednosť má ten, kto ju práve napadol zblízka; inak najbližší v dostrele alebo v stavebnej zóne – k tomu podíde
+    const keep = k.aim && !k.aim.dead && Math.hypot(k.aim.x - k.x, k.aim.y - k.y) <= rng + 8 ? k.aim : null;
+    const attacker = nearestEnemyWhere(k.x, k.y, e => e.foe === k && Math.hypot(e.x - k.x, e.y - k.y) < 16, false, true);
+    const t = attacker || keep || nearestEnemyWhere(k.x, k.y, e => Math.hypot(e.x - k.x, e.y - k.y) <= rng || heroReaches(e, 0), false, true);
+    const inRng = t && Math.hypot(t.x - k.x, t.y - k.y) <= rng + (t === keep ? 8 : 0);
     k.aim = inRng ? t : null;
     if (t && !inRng) { moveKnight(k, t.x, t.y, k.spd * waterMul(k), dt); k.anim += dt * 6; }
     else if (t) {
