@@ -80,7 +80,7 @@
     heal:      { name: 'Uzdravenie',   cdKey: 'healCd',   cd: 24, instant: true, R: 60 },
     // čarodejka
     firewall:  { name: 'Ohnivá stena', cdKey: 'fwCd',     cd: 24, dur: 5, w: 44 },
-    teleport:  { name: 'Teleport',     cdKey: 'tpCd',     cd: 16, R: 18 },
+    teleport:  { name: 'Teleport',     cdKey: 'tpCd',     cd: 16, R: 28 },
   };
   const spellMax = id => id === 'volley' ? volleyCd() : SPELLS[id].cd;
   const spellPow = () => 1 + 0.15 * (st.mission - 1); // kúzla silnejú s misiou, aby stačili na tuhšiu hordu
@@ -376,6 +376,18 @@
   }
   const heroIsNew = id => ownsHero(id) && !heroesSeen().includes(id);
   function markHeroSeen(id) { const v = heroesSeen(); if (!v.includes(id)) { v.push(id); saveJSON(HEROES_SEEN_KEY, v); } }
+  // karta novinky v paneli: raz neónovo modro zabliká vo vnútri rámu; ak sa panel medzitým prekreslí,
+  // zablikanie na novej karte plynule pokračuje (záporné oneskorenie) a potom sa už neopakuje
+  const FLASH_MS = 1100, flashedNew = new Map();
+  function flashIf(el, on, id, seen) {
+    if (!el || !on) return el;
+    el.addEventListener('click', seen, true);
+    const now = performance.now();
+    if (!flashedNew.has(id)) flashedNew.set(id, now);
+    const age = now - flashedNew.get(id);
+    if (age < FLASH_MS) { el.classList.add('newFlash'); el.querySelector('.face').style.animationDelay = (-age) + 'ms'; }
+    return el;
+  }
   // pridá lesk na kartu, kým na ňu hráč neťukne
   function shineIf(el, on, seen) {
     if (!el || !on) return el;
@@ -893,7 +905,7 @@
     st.fireWalls = []; st.shields = []; // schopnosti hrdinu po vlne dohasnú
     if (st.king && st.king.dead && st.king.fadeT == null) st.king.fadeT = 0; // padnutý kráľ sa po vlne vytratí
     if (st.king && st.king.dead) later(() => { if (st.phase === 'build' && st.king.dead) hint(heroFell() + ' – ' + (heroDef().fem ? 'oživíš ju' : 'oživíš ho') + ' v radnici'); }, 900);
-    if (st.king && !st.king.dead) { st.king.hp = kingMax(); st.king.down = 0; st.king.tgt = null; st.king.flash = 0; st.king.swing = 0; st.king.x = st.king.hx; st.king.y = st.king.hy; }
+    if (st.king && !st.king.dead) { st.king.hp = kingMax(); st.king.down = 0; st.king.tgt = null; st.king.flash = 0; st.king.swing = 0; st.king.tpBack = 0; } // domov dôjde sám (heroWalkHome)
     for (const b of st.blds) b.flash = 0;
     $('build').hidden = false;
     renderBuild();
@@ -1224,6 +1236,11 @@
       if (Math.random() < 0.35) part(e.x + (Math.random() - 0.5) * e.w * 0.5, e.y - Math.random() * e.h, 0, -12 - Math.random() * 10, 0.4, Math.random() < 0.5 ? '#f89838' : '#d83818', -10);
       if (e.hp <= 0) { kill(e); return; }
     }
+    if (e.kb) { // odhodený tlakovou vlnou: kĺže preč, potom zostane omráčený
+      e.x += e.kb.vx * dt; e.y += e.kb.vy * dt; e.kb.t -= dt;
+      e.x = Math.max(4, Math.min(W - 4, e.x));
+      if (e.kb.t <= 0) e.kb = null;
+    }
     if (e.stunT > 0) { e.stunT -= dt; return; }
     if (e.frostT > 0) { // zasiahnutý mrazom: takmer stojí aj neútočí
       e.frostT -= dt; dt *= 0.12;
@@ -1535,7 +1552,7 @@
       else {
         if (!t.foe) t.foe = u;
         if (u.cd <= 0) {
-          u.cd = u.isKing ? heroDef().cd * (1 - 0.12 * tal('swift')) : 0.8; u.swing = 0.15;
+          u.cd = u.isKing ? heroDef().cd * (1 - 0.12 * tal('swift')) : 0.8; u.swing = u.isKing ? 0.3 : 0.15; // kráľov úder má dlhší švih (3 snímky)
           AUDIO.play(u.isKing ? 'kingHit' : 'clang');
           let mul = 1;
           if (spear && t.d.cav) mul *= SPEAR_VS_CAV;                                   // kopija proti jazde
@@ -1844,9 +1861,22 @@
       for (let q = 0; q < 18; q++) part(k.x, k.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.5, q % 2 ? '#c8a0ff' : '#ffffff', 20);
       k.x = Math.max(G.gx0 + 4, Math.min(G.gx0 + G.cols * T - 4, x)); k.y = y; k.tgt = null; k.next = null;
       k.tpBack = 0.45; // po údere sa hneď vráti teleportom k radnici
-      for (const e of st.enemies) if (!e.dead && Math.hypot(e.x - k.x, (e.y - k.y) / 0.7) < sp.R) { damage(e, 10 * pow); e.stunT = Math.max(e.stunT || 0, 1.2 * (e.d.boss ? 0.4 : 1)); }
-      for (let q = 0; q < 34; q++) { const a = Math.random() * 6.28, v = 20 + Math.random() * 40; part(k.x, k.y - 6, Math.cos(a) * v, Math.sin(a) * v * 0.6 - 10, 0.5, ['#c8a0ff', '#ffffff', '#8a5ae0'][q % 3], 30); }
-      st.marks.push({ x: k.x, y: k.y, life: 0.5, max: 0.5, ice: true });
+      // tlaková vlna: zasiahnutých odhodí za jej okraj a na 2 s omráči (vojvodcu a veľkráľa len omráči)
+      for (const e of st.enemies) {
+        if (e.dead) continue;
+        const dx = e.x - k.x, dy = (e.y - k.y) / 0.7, d = Math.hypot(dx, dy);
+        if (d >= sp.R) continue;
+        damage(e, 10 * pow);
+        e.stunT = Math.max(e.stunT || 0, e.d.boss ? 0.8 : 2);
+        if (!e.d.boss) {
+          const ux = d > 0.5 ? dx / d : Math.random() - 0.5, uy = d > 0.5 ? dy / d : -1, push = sp.R + 5 - d;
+          e.kb = { vx: ux * push / 0.22, vy: uy * 0.7 * push / 0.22, t: 0.22 };
+        }
+      }
+      for (let q = 0; q < 50; q++) { const a = Math.random() * 6.28, v = 30 + Math.random() * 60; part(k.x, k.y - 4, Math.cos(a) * v, Math.sin(a) * v * 0.6 - 8, 0.55, ['#c8a0ff', '#ffffff', '#8a5ae0', '#e0d0ff'][q % 4], 30); }
+      for (let q = 0; q < 24; q++) { const a = q / 24 * 6.28; part(k.x + Math.cos(a) * 6, k.y + Math.sin(a) * 4, Math.cos(a) * 70, Math.sin(a) * 45, 0.35, '#b8a890', 0); } // prach po zemi
+      st.marks.push({ x: k.x, y: k.y, life: 0.5, max: 0.5, wave: sp.R + 4 });
+      st.shake = Math.max(st.shake, 0.25);
       st.tpCd = sp.cd; AUDIO.play('bolt');
       return true;
     }
@@ -2095,7 +2125,7 @@
     if (e.d.fly) { // netopier mávajúci krídlami, tieň na zemi
       const fr = frames[Math.floor(time * 8 + e.ph) % 2];
       shadow(e.x, e.y + 2, 3);
-      g.drawImage(e.flash > 0 ? fr.f : fr.c, Math.round(e.x - fr.w / 2), Math.round(e.y - 14 + Math.sin(time * 6 + e.ph) * 1.5));
+      g.drawImage(e.flash > 0 ? hitSpr(fr) : fr.c, Math.round(e.x - fr.w / 2), Math.round(e.y - 14 + Math.sin(time * 6 + e.ph) * 1.5));
       return;
     }
     const walking = !e.attacking && !e.foe;
@@ -2110,7 +2140,15 @@
       g.beginPath(); g.ellipse(e.x, e.y - fr.h / 2, fr.w * 0.75, fr.h * 0.7, 0, 0, 6.29); g.fill();
       g.globalCompositeOperation = 'source-over';
     }
-    g.drawImage(e.flash > 0 ? fr.f : fr.c, x, y);
+    g.drawImage(e.flash > 0 ? hitSpr(fr) : fr.c, x, y);
+    if (e.stunT > 0) { // omráčený: okolo hlavy krúžia hviezdičky
+      for (let i = 0; i < 3; i++) {
+        const a = time * 5 + i * 2.094, sx = Math.round(e.x + Math.cos(a) * (fr.w * 0.35 + 2)), sy = Math.round(y - 3 + Math.sin(a) * 2);
+        g.fillStyle = PAL.K; g.fillRect(sx - 2, sy - 1, 5, 3); g.fillRect(sx - 1, sy - 2, 3, 5);
+        g.fillStyle = '#f8d048'; g.fillRect(sx - 1, sy, 3, 1); g.fillRect(sx, sy - 1, 1, 3);
+        g.fillStyle = '#ffffff'; g.fillRect(sx, sy, 1, 1);
+      }
+    }
   }
 
   // kladivo remeselníka: pri chôdzi na pleci, pri oprave sa napriahne do strany a švihne do budovy
@@ -2129,7 +2167,51 @@
     g.fillStyle = '#bcc0cc'; g.fillRect(hd.x, hd.y, hd.w, 1); g.fillRect(hd.x, hd.y, 1, hd.h);
     px(hd.x, hd.y, '#f4f4f8');
   }
+  // kráľ v 8 smeroch: natočí sa k nepriateľovi, inak smerom chôdze, doma pozerá na hordu; chôdza zo 4 snímok, úder z 3
+  const dir8 = (dx, dy) => (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
+  function king8Frame(u) {
+    const mvx = u.x - (u._lx == null ? u.x : u._lx), mvy = u.y - (u._ly == null ? u.y : u._ly);
+    u._lx = u.x; u._ly = u.y;
+    const moving = Math.hypot(mvx, mvy) > 0.02, t = u.tgt && !u.tgt.dead ? u.tgt : null;
+    const near = t && Math.hypot(t.x - u.x, t.y - u.y) < 26;
+    if (near) u.face8 = dir8(t.x - u.x, t.y - u.y);
+    else if (moving) u.face8 = dir8(mvx, mvy);
+    else if (Math.hypot(u.hx - u.x, u.hy - u.y) < 3) u.face8 = 6;
+    if (u.face8 == null) u.face8 = 6;
+    const v = SPR.king8[u.face8];
+    if (u.swing > 0) return v.slash; // meč nahradí svetelný oblúk švihu
+    if (near && u.cd < 0.25) return v.atk[0]; // napriahnutie pred úderom
+    if (moving) return v.walk[Math.floor(u.anim * 1.4) % 4];
+    return v.idle;
+  }
+  // svetelný oblúk švihu meča: rýchlo sa vykreslí v smere úderu a zhasne (biely okraj, modrastý chvost)
+  function drawSlash(cx, cy, face, p) {
+    const sweep = 2.4, a0 = face - sweep / 2, head = Math.min(1, p * 2.6), fade = 1 - Math.max(0, p - 0.4) / 0.6;
+    if (fade <= 0) return;
+    const n = 28;
+    for (let i = 0; i <= n * head; i++) {
+      const tt = i / n, a = a0 + sweep * tt, trail = head - tt; // 0 = čelo oblúka
+      const thick = Math.max(1, Math.round(4 * (1 - trail * 1.3)));
+      for (let k = 0; k < thick; k++) {
+        const r = 13 - k;
+        g.globalAlpha = Math.max(0, fade * (1 - trail * 0.9));
+        g.fillStyle = k === 0 ? '#ffffff' : k === 1 ? '#eef6ff' : k === 2 ? '#b8d0f0' : '#7890c0';
+        g.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * 0.75), 1, 1);
+      }
+    }
+    g.globalAlpha = 1;
+  }
+  // zasiahnutá budova či hrad sa namiesto zafarbenia jemne otrasie o pixel do strán (úlomky pridá hitBuilding / hitFort)
+  const hitJit = f => f > 0 ? (Math.floor(performance.now() / 45) % 2 ? 1 : -1) : 0;
   function drawFighter(u, sprName) {
+    if (u.isKing && sprName === 'king' && SPR.king8) {
+      const fr = king8Frame(u);
+      shadow(u.x, u.y, 5);
+      g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), Math.round(u.y - fr.h));
+      if (u.swing > 0) drawSlash(u.x, u.y - 9, u.face8 * Math.PI / 4, 1 - u.swing / 0.3);
+      if (st.cryT > 0 && Math.random() < 0.15) part(u.x + (Math.random() - 0.5) * 8, u.y - 8, 0, -16, 0.4, '#f8d048', 0);
+      return;
+    }
     const frames = SPR[sprName];
     const fi = u.siege === 'cat' ? (u.fired > 0 ? 1 : 0) : Math.floor(u.anim) % 2, fr = frames[fi];
     const x = Math.round(u.x - fr.w / 2), y = Math.round(u.y - fr.h - (u.swing > 0 && !u.siege ? 1 : 0)) + (u.siege === 'ram' && u.swing > 0 ? -2 : 0);
@@ -2156,7 +2238,7 @@
   const SLOWMO_DUR = 1.0;
   let slowmoT = 0;
   function drawDeadKing(k, time) {
-    const fr = SPR[heroDef().spr][0], t = k.deadT;
+    const k8 = heroDef().spr === 'king' && SPR.king8, fr = k8 ? SPR.king8[k.face8 == null ? 6 : k.face8].idle : SPR[heroDef().spr][0], t = k.deadT;
     const fall = Math.min(1, t / 0.45), drop = Math.round(4 * fall * fall);
     const alpha = k.fadeT == null ? 1 : Math.max(0, 1 - k.fadeT / KING_FADE);
     const x0 = Math.round(k.x - fr.w / 2), y0 = Math.round(k.y - fr.h) + drop, gy = Math.round(k.y);
@@ -2170,7 +2252,7 @@
       g.drawImage(fr.c, 0, r, fr.w, 1, x0 + dx, y, fr.w, 1);
     }
     if (fall >= 1 && alpha > 0) { // hviezdičky okolo koruny
-      const cx = k.x, cy = y0 - 2;
+      const cx = k.x, cy = y0 - 2 + (k8 ? K8_BY : 0); // nad korunou (plátno kráľa má navrchu miesto na meč)
       for (let i = 0; i < 3; i++) {
         const a = time * 5 + i * 2.094, sx = Math.round(cx + Math.cos(a) * 7), sy = Math.round(cy + Math.sin(a) * 2);
         g.fillStyle = PAL.K; g.fillRect(sx - 2, sy - 1, 5, 3); g.fillRect(sx - 1, sy - 2, 3, 5);
@@ -2193,7 +2275,7 @@
   }
   function drawFortKeep(F, time) {
     const k = BSPR.orcKeep, x0 = Math.round(F.x - k.w / 2), y0 = F.y - k.h;
-    g.drawImage(F.flash > 0 ? k.f : k.c, x0, y0);
+    g.drawImage(k.c, x0 + hitJit(F.flash), y0);
     const left = Math.max(0, MISSION_WAVES - st.wave);
     for (let i = 0; i < left; i++) { // 5 zástav na ľavých hradbách, 5 na pravých
       const fx = x0 + (i < 5 ? 2 + i * 3 : 40 + (i - 5) * 3), fy = y0 + 9, wv = Math.floor(time * 5 + i) % 2;
@@ -2254,9 +2336,9 @@
       const m = (joinsV(b.c, b.r - 1) ? 1 : 0) | (joins(b.c + 1, b.r) || edgeR ? 2 : 0) | (joinsV(b.c, b.r + 1) ? 4 : 0) | (joins(b.c - 1, b.r) || edgeL ? 8 : 0);
       const wl = Math.max(1, Math.min(5, b.lvl)) - 1;
       spr = BSPR.wall[wl][m];
-      g.drawImage(b.flash > 0 ? spr.f : spr.c, x0, y0 - 6);
+      g.drawImage(spr.c, x0, y0 - 6);
       // napojenie: kraje obrazovky a susedné budovy (veža, kasárne, mág)
-      const flat = BSPR.wall[wl][m | 2 | 8][b.flash > 0 ? 'f' : 'c'];
+      const flat = BSPR.wall[wl][m | 2 | 8].c;
       const slice = (dx, w) => { for (let k = 0; k < w; k += 4) { const ww = Math.min(4, w - k); g.drawImage(flat, 6, 0, ww, 24, dx + k, y0 - 6, ww, 24); } };
       if (edgeL) slice(0, G.gx0);
       if (edgeR) slice(x0 + T, W - x0 - T);
@@ -2268,7 +2350,7 @@
       }
       if (b.gate) {
         const gh = BSPR.gatehouse[wl];
-        g.drawImage(b.flash > 0 ? gh.f : gh.c, x0, y0 - 15);
+        g.drawImage(gh.c, x0, y0 - 15);
         for (const fx of [x0 + 2, x0 + 12]) { // vlajočky na pilieroch
           const wv = Math.floor(time * 6 + fx * 0.7) % 2;
           g.fillStyle = '#4a4e60'; g.fillRect(fx, y0 - 20, 1, 5);
@@ -2283,7 +2365,7 @@
       }
     } else {
       spr = bsprOf(b.kind, b.lvl);
-      g.drawImage(b.flash > 0 ? spr.f : spr.c, x0 + T / 2 - Math.floor(spr.w / 2), y0 + T + 1 - spr.h);
+      g.drawImage(spr.c, x0 + T / 2 - Math.floor(spr.w / 2) + hitJit(b.flash), y0 + T + 1 - spr.h);
       if (b.spec) { // vlajočka špecializácie na veži
         const fx = x0 + 13, fy = y0 + T + 1 - spr.h - 4, wv = Math.floor(time * 6 + b.c) % 2;
         g.fillStyle = '#4a4e60'; g.fillRect(fx, fy, 1, 6);
@@ -2305,7 +2387,7 @@
     }
     if (b.lvl > 1 && b.kind !== 'wall') pxText(g, String(b.lvl), x0 + T - 3, y0 + T - 6, '#f8d048');
   }
-  const JOINERS = { wall: 1, tower: 1, mage: 1 }; // hradby sa napájajú len na hradby a veže (strážna, mága) – na ostatné budovy nie
+  const JOINERS = { wall: 1, tower: 1, mage: 1, icetower: 1, ballista: 1 }; // hradby sa napájajú len na hradby a veže (strážna, mága) – na ostatné budovy nie
   const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL || !!JOINERS[o.kind]); };
   const joinsV = (c, r) => occAt(c, r) !== HALL && joins(c, r); // na radnicu sa hradby napájajú len z bokov, nie zhora
   const joinsBuilding = (c, r) => { const o = occAt(c, r); return !!o && o !== HALL && o.kind !== 'wall' && !!JOINERS[o.kind]; };
@@ -2313,7 +2395,7 @@
   function drawHall(time) {
     const spr = bsprOf('hall', st.hallLvl);
     const x = Math.round(G.hallCx - spr.w / 2), y = G.hallBot + 1 - spr.h;
-    g.drawImage(st.hallFlash > 0 ? spr.f : spr.c, x, y);
+    g.drawImage(spr.c, x + hitJit(st.hallFlash), y);
     // vlajky
     for (const fx of [x + 7, x + 42]) {
       const wv = Math.floor(time * 6 + fx) % 2;
@@ -2331,7 +2413,7 @@
   function drawPit(b, time) {
     const spr = BSPR[b.kind], x = tileX(b.c), y = tileY(b.r);
     g.globalAlpha = b.kind === 'beartrap' && b.armT > 0 ? 0.45 : 1; // nabíjajúca sa pasca
-    g.drawImage(b.flash > 0 ? spr.f : spr.c, x, y);
+    g.drawImage(spr.c, x, y);
     g.globalAlpha = 1;
     if (b.kind === 'firepit' && st.phase === 'battle' && Math.random() < 0.25) part(x + 4 + Math.random() * 8, y + 6, 0, -10 - Math.random() * 8, 0.5, Math.random() < 0.5 ? '#f89838' : '#fff070', -8);
     if (b.lvl > 1) pxText(g, String(b.lvl), x + T - 3, y + T - 6, '#f8d048');
@@ -2397,7 +2479,7 @@
       if (((k + off) >> 2) % 2) continue; // čiarky dlhé 4 body
       const a = k / n * 6.283; pts.push([Math.round(cx + Math.cos(a) * rr), Math.round(cy + Math.sin(a) * rr)]);
     }
-    g.fillStyle = PAL.K; for (const [x, y] of pts) g.fillRect(x - 1, y - 1, 3, 3);
+    g.fillStyle = 'rgba(28,20,14,0.85)'; for (const [x, y] of pts) g.fillRect(x, y + 1, 1, 1); // tenký tieň pod čiarkou
     g.fillStyle = '#fff070'; for (const [x, y] of pts) g.fillRect(x, y, 1, 1);
   }
   // náhľad ťahanej novej stavby – kreslí sa nad stavbami, aby bolo červené políčko vidieť aj cez budovu
@@ -2577,6 +2659,17 @@
   }
   function drawMark(m) {
     const t = 1 - m.life / m.max;
+    if (m.wave) {
+      const ease = 1 - Math.pow(1 - t, 2);
+      for (const [rr, col, w] of [[m.wave * ease, 'rgba(255,255,255,' + (1 - t) + ')', 2], [m.wave * ease * 0.7, 'rgba(168,104,232,' + (0.9 * (1 - t)) + ')', 2]]) {
+        g.strokeStyle = col; g.lineWidth = w;
+        g.beginPath(); g.ellipse(m.x, m.y, Math.max(1, rr), Math.max(1, rr * 0.7), 0, 0, 6.29); g.stroke();
+      }
+      g.globalAlpha = 0.25 * (1 - t); g.fillStyle = '#c8a0ff';
+      g.beginPath(); g.ellipse(m.x, m.y, Math.max(1, m.wave * ease), Math.max(1, m.wave * ease * 0.7), 0, 0, 6.29); g.fill();
+      g.globalAlpha = 1; g.lineWidth = 1;
+      return;
+    }
     const r = m.no ? 4 : m.ice ? 8 + t * 18 : 6 + t * 10;
     g.fillStyle = m.no ? 'rgba(232,72,56,0.8)' : m.ice ? 'rgba(200,232,255,' + (0.9 * (1 - t)) + ')' : 'rgba(255,240,112,' + (0.9 * (1 - t)) + ')';
     const n = Math.max(8, Math.round(r * 4));
@@ -2988,8 +3081,8 @@
     if (st.fort) {
       const F = st.fort, keep = BSPR.orcKeep;
       if (!F.dead) objs.push({ y: F.y, f: () => drawFortKeep(F, time) });
-      for (const t of F.towers) if (t.hp > 0) objs.push({ y: t.y, f: () => { const s2 = BSPR.orcTower; g.drawImage(t.flash > 0 ? s2.f : s2.c, Math.round(t.x - s2.w / 2), t.y - s2.h); } });
-      for (const q of F.pal) if (q.hp > 0) objs.push({ y: q.y, f: () => { const s2 = F.stone ? (q.gate ? BSPR.orcWallGate : BSPR.orcWall) : q.gate ? BSPR.palisadeGate : BSPR.palisade; g.drawImage(q.flash > 0 ? s2.f : s2.c, q.x - 8, q.y - s2.h); } });
+      for (const t of F.towers) if (t.hp > 0) objs.push({ y: t.y, f: () => { const s2 = BSPR.orcTower; g.drawImage(s2.c, Math.round(t.x - s2.w / 2) + hitJit(t.flash), t.y - s2.h); } });
+      for (const q of F.pal) if (q.hp > 0) objs.push({ y: q.y, f: () => { const s2 = F.stone ? (q.gate ? BSPR.orcWallGate : BSPR.orcWall) : q.gate ? BSPR.palisadeGate : BSPR.palisade; g.drawImage(s2.c, q.x - 8, q.y - s2.h); } });
       for (const q of F.stakes) if (q.hp > 0) objs.push({ y: q.y, f: () => g.drawImage(BSPR.stakes.c, q.x - 8, q.y - BSPR.stakes.h) });
       for (const r of F.rocks.concat(F.prock)) objs.push({ y: 9999, f: () => drawRock(r) });
     }
@@ -3128,6 +3221,11 @@
     ICONS.hall = spriteURL(BSPR.hall[2], 2);
     ICONS.king = spriteURL(SPR.king[0], 3);
     for (const id of HERO_IDS) ICONS['hero_' + id] = spriteURL(SPR[HEROES[id].spr][0], 3);
+    if (SPR.king8) { // portrét kráľa spredu (s mečom), orezaný na postavu
+      const src = SPR.king8[2].idle, c = document.createElement('canvas'); c.width = 20; c.height = 21;
+      c.getContext('2d').drawImage(src.c, 2, 3, 20, 21, 0, 0, 20, 21);
+      ICONS.king = ICONS.hero_king = spriteURL({ c, w: 20, h: 21 }, 3);
+    }
     ICONS.u_knight = spriteURL(SPR.soldier[0], 3); ICONS.u_footArcher = spriteURL(SPR.footArcher[0], 3);
     $('buyKnight').querySelector('img').src = ICONS.u_knight; $('buyArcher').querySelector('img').src = ICONS.u_footArcher;
     ICONS.u_siegeRam = spriteURL(SPR.siegeRam[0], 2); ICONS.u_siegeCat = spriteURL(SPR.siegeCat[0], 2);
@@ -3222,7 +3320,7 @@
       pal.appendChild(b);
       return b;
     };
-    const shineTech = (el, id) => shineIf(el, isNew(id), () => markSeen(id));
+    const shineTech = (el, id) => flashIf(el, isNew(id), id, () => markSeen(id));
     const I = UI_ICONS;
     const lockAct = (icon, label, m, px) => act(icon, label, '🔒 misia ' + m, false, label + ' sa odomkne v misii ' + m, 'locked', px);
     // ďalšia úroveň: kúpiť / najprv radnica / zamknutá do misie / maximum
@@ -3366,6 +3464,7 @@
         tb.innerHTML = '<img src="' + UI_ICONS.tabs[t.id] + '" alt="' + t.name + '">';
         tb.addEventListener('click', () => {
           if (st.buildTab === t.id) return;
+          for (const k of tab.kinds) if (isNew(k)) markSeen(k); // novinku v opúšťanej záložke už hráč videl
           st.buildTab = t.id; AUDIO.play('click');
           if (st.tool && !t.kinds.includes(st.tool)) { st.tool = null; st.flip = null; }
           renderBuild();
@@ -3389,7 +3488,7 @@
         b.innerHTML = '<span class="pin">' +
           '<span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost"><img class="coin" src="' + ICONS.coin + '">' + costOf(kind) + '</span></span>' +
           '<span class="face back"><b>' + d.name + '</b><small>' + d.desc + '.' + tip + '</small></span></span>';
-        shineIf(b, isNew(kind), () => markSeen(kind));
+        flashIf(b, isNew(kind), kind, () => markSeen(kind));
         b.addEventListener('pointerdown', ev => { if (st.phase === 'build') cardPress = { kind, x: ev.clientX, y: ev.clientY }; });
         b.addEventListener('click', () => {
           if (suppressCardClick) { suppressCardClick = false; return; } // bol to ťah, nie ťuk
@@ -4265,6 +4364,15 @@
     $('nextWave').textContent = (st.wave >= MISSION_WAVES ? 'Zaútočiť ' : 'Do útoku ') + Math.ceil(st.siegeT);
   }
 
+  // po vlne (aj počas stavania) sa hrdina pokojne prejde späť k radnici, namiesto skoku na miesto
+  function heroWalkHome(dt) {
+    const k = st.king;
+    if (!k || k.dead || !(st.phase === 'pause' || st.phase === 'build')) return;
+    k.tgt = null; k.flash = Math.max(0, (k.flash || 0) - dt); k.swing = Math.max(0, (k.swing || 0) - dt);
+    if (Math.hypot(k.hx - k.x, k.hy - k.y) <= 1) return;
+    moveKnight(k, k.hx, k.hy, (k.spd || 26) * 1.15, dt);
+    if (!k.next) moveTo(k, k.hx, k.hy, (k.spd || 26) * 1.15, dt); // cesta zatarasená – ide priamo
+  }
   // ---------------- Slučka ----------------
   let last = performance.now(), acc = 0;
   const DT = 1 / 60;
@@ -4278,7 +4386,7 @@
       slowmoT = Math.max(0, slowmoT - dt);
       acc += dt * st.speed * slow;
       while (acc >= DT && st.phase === 'battle') { update(DT); acc -= DT; }
-    } else { acc = 0; updateFx(dt); mapTick(dt); siegeTick(dt); }
+    } else { acc = 0; updateFx(dt); mapTick(dt); siegeTick(dt); heroWalkHome(dt); }
     camTick(dt);
     render(now / 1000);
     hudTick();
@@ -4318,6 +4426,6 @@
     for (const s of list) { x.drawImage(s.c, px * scale, (h - 3 - s.h) * scale, s.w * scale, s.h * scale); px += s.w + 3; }
     return postPNG(c, name);
   }
-  window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, HEROES, switchHero, setActiveHero, ownedHeroes, heroDef,
+  window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, HEROES, switchHero, setActiveHero, ownedHeroes, heroDef, heroWalkHome,
     enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, buyUnit, knightsBlocked, get isAttack() { return isAttack(); } };
 })();

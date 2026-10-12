@@ -527,10 +527,21 @@
     background: linear-gradient(90deg, transparent, rgba(255,255,255,.85), transparent); animation: shopShine 3s ease-in-out infinite; }
   @keyframes shopShine { 0%, 60% { left: -40px; } 100% { left: 120%; } }
   /* novinka (odomknutá stavba, vylepšenie, hrdina): rovnaký lesk ako na karte Nákupy, kým naň hráč neťukne */
-  .shine { position: relative; overflow: hidden; }
-  .shine::after { content: ''; position: absolute; top: -10px; bottom: -10px; width: 22px; left: -40px; transform: skewX(-20deg); pointer-events: none; z-index: 3;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,.85), transparent); animation: shopShine 3s ease-in-out infinite; }
-  .pcard.shine .face, .btab.shine { border-color: var(--gold2); }
+  /* lesk ako vrstva cez celý prvok (posúva sa len jej pozadie) – nič neorezáva, takže odznak s číslom ostane celý a v rohu nič nezostáva */
+  .shine { position: relative; }
+  .shine::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
+    background: linear-gradient(105deg, transparent 42%, rgba(255,255,255,.75) 50%, transparent 58%) no-repeat;
+    background-size: 250% 100%; background-position: 150% 0; animation: sweepBg 3s ease-in-out infinite; }
+  @keyframes sweepBg { 0%, 60% { background-position: 150% 0; } 100% { background-position: -60% 0; } }
+  .tabCard .badge { z-index: 4; }
+  /* karta novinky: jedno neónovo modré zablikanie vo vnútri rámu */
+  .pcard.newFlash .face { animation: neonFlash 1.1s ease-out 1; }
+  @keyframes neonFlash {
+    0% { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+    20% { box-shadow: inset 0 0 0 2px #5cf0ff, inset 0 0 16px 5px rgba(70,200,255,.9); }
+    45% { box-shadow: inset 0 0 0 2px #5cf0ff, inset 0 0 10px 3px rgba(70,200,255,.55); }
+    100% { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+  }
   .tabCard.shop img { opacity: 1; }
   .tabCard.shop.on { background: linear-gradient(#a07a38, #5a4020); }
   /* obchod */
