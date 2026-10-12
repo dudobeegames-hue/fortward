@@ -666,6 +666,7 @@ const K8_HAND = {
   S:  { x: 5,  y: 16, idle: -2.05, atk: [-2.45, 3.0, 2.3],    legs: 'front' },
 };
 const K8_W = 24, K8_H = 24, K8_BX = 5, K8_BY = 7; // telo 14×17 (s nohami) v plátne s miestom na meč
+const KNEEL_DY = 3; // kľačiaci kráľ: o toľko riadkov pod kolenami trčí čepeľ (pred ním v zemi)
 
 function buildKing8() {
   const pal = PAL, K = hexRGB(PAL.K);
@@ -723,9 +724,46 @@ function buildKing8() {
     });
     return { n: mk(false), m: mk(true) };
   }
+  // porazený kráľ spredu: kľačí, hlavu má sklonenú (tvár skrytá pod korunou, vidno len čelo a bradu)
+  // a obe ruky opiera o hlavicu meča zapichnutého pred sebou do zeme
+  function kneel() {
+    const px = new Array(K8_W * K8_H).fill(null);
+    const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < K8_W && y < K8_H && c) px[y * K8_W + x] = c; };
+    const body = [
+      '....K.KK.K....',
+      '...KgKggKgK...',
+      '...KggGgGGK...',
+      '...KsssssSK...',
+      '...KllllllK...',
+      '..KeWlllleEK..',
+      '.KrKeBBBBeKRK.',
+      '.KrKcBBBBnKRK.',
+      'KrrKgggGggKRRK',
+      'KrrKcBBBBnKRRK',
+      'KrrKMMDDMMKRRK', // stehná kľačiaceho
+      '.KKKKKKKKKKKK.',
+    ], oy = K8_H - body.length - KNEEL_DY; // pod kolenami ostáva miesto na čepeľ, ktorá sa zabodne do zeme pred ním
+    body.forEach((row, r) => { for (let c = 0; c < row.length; c++) if (row[c] !== '.') put(K8_BX + c, oy + r, col(row[c])); });
+    const hx = K8_BX + 7, hy = oy + 7; // ruky na hlavici pri opasku, tvár ostane voľná
+    const sw = [[hx, hy - 2, col('g')], [hx - 1, hy - 2, col('g')], [hx, hy - 1, col('L')], [hx - 1, hy - 1, col('L')]]; // hlavica, rukoväť
+    for (let x = hx - 3; x <= hx + 2; x++) sw.push([x, hy + 1, x === hx - 1 || x === hx ? col('g') : col('G')]); // záštita
+    for (let y = hy + 2; y < K8_H; y++) sw.push([hx - 1, y, col('w')], [hx, y, col('m')]); // čepeľ až do zeme
+    const sm = new Map(sw.map(([x, y, c]) => [x + ',' + y, c]));
+    for (const [key] of sm) { // obrys meča – aj cez telo, aby sa meč od neho oddelil
+      const [x, y] = key.split(',').map(Number);
+      for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!sm.has((x + ax) + ',' + (y + ay))) put(x + ax, y + ay, K);
+    }
+    for (const [key, c] of sm) { const [x, y] = key.split(',').map(Number); put(x, y, c); }
+    put(hx - 2, hy, col('s')); put(hx + 1, hy, col('s')); put(hx - 1, hy, col('s')); put(hx, hy, col('s')); // päste
+    put(hx - 3, hy, K); put(hx + 2, hy, K);
+    for (let x = hx - 3; x <= hx + 2; x++) put(x, K8_H - 1, x === hx - 3 || x === hx + 2 ? [106, 78, 52] : [74, 52, 34]); // hlina okolo zabodnutej čepele
+    return px;
+  }
   const v = { N: views('N'), NE: views('NE'), E: views('E'), SE: views('SE'), S: views('S') };
   // 0 E, 1 SE, 2 S, 3 SW, 4 W, 5 NW, 6 N, 7 NE
-  return [v.E.n, v.SE.n, v.S.n, v.SE.m, v.E.m, v.NE.m, v.N.n, v.NE.n];
+  const all = [v.E.n, v.SE.n, v.S.n, v.SE.m, v.E.m, v.NE.m, v.N.n, v.NE.n];
+  all.kneel = toSprite(kneel(), false);
+  return all;
 }
 // sprite (s bielym zábleskom a siluetou) z hotového plátna
 function spriteFromPixels(c) {

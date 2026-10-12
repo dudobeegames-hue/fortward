@@ -104,7 +104,6 @@
   const uDmg = u => WUNIT[u.type].dmg * (1 + 0.4 * (u.lvl - 1)) * (1 + 0.1 * perk('fletching'));
   const uCd = u => WUNIT[u.type].cd * Math.pow(0.92, u.lvl - 1);
   const uRange = u => WUNIT[u.type].range + 4 * (u.lvl - 1);
-  const uUpCost = u => Math.round(WUNIT[u.type].cost * 0.9 * Math.pow(1.6, u.lvl - 1));
   const BUILD_ORDER = ['paving', 'tower', 'wall', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'catapult', 'mage', 'icetower', 'ballista', 'chapel', 'firepit', 'beartrap', 'workshop'];
   const ENEMY = {
     goblin:  { spr: 'goblin',  hp: 12,  speed: 24, atk: 4,  atkCd: 0.8, gold: 3,  blood: '#62a03a' },
@@ -353,7 +352,7 @@
     blds: [], occ: [], paving: {}, dist: null, enemies: [], soldiers: [], king: null,
     proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [],
     spawnQ: [], spawnT: 0, speed: 1, shake: 0, best: 0, boss: null,
-    tool: null, sel: null, hallFlash: 0, soldierN: 0,
+    tool: null, sel: null, soldierN: 0,
   };
   // postup na mape: unlocked = najvyššia odomknutá misia (11 = ostrov oslobodený)
   Object.assign(st, { mission: 1, unlocked: 1, mapSel: 1, mapAnim: null, tech: techFor(1) });
@@ -405,7 +404,8 @@
   // úroveň radnice, stavieb a strelcov podľa misie: 1 → úr. 1, 2–3 → úr. 2, 4–5 → úr. 3, 6–8 → úr. 4, 9–10 → úr. 5
   const LVL_FROM = [0, 1, 2, 4, 6, 9];
   const lvlMission = l => LVL_FROM[l];
-  const lvlCap = () => { let l = 1; while (l < MAX_LVL && st.mission >= lvlMission(l + 1)) l++; return l; };
+  // platí najvyššia odomknutá misia, takže aj v skoršej misii má hráč všetky úrovne, ktoré už odomkol
+  const lvlCap = () => { const m = Math.max(st.mission, st.unlocked); let l = 1; while (l < MAX_LVL && m >= lvlMission(l + 1)) l++; return l; };
   const hallCap = lvlCap;
   // stavby majú najviac úroveň radnice: drevená radnica = drevené stavby, kameň až po jej vylepšení
   const bCap = () => Math.min(lvlCap(), st.hallLvl);
@@ -834,7 +834,7 @@
   function newGame() {
     undoStack = [];
     Object.assign(st, {
-      wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.15 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, hallFlash: 0, shake: 0, soldierN: 0,
+      wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.15 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, shake: 0, soldierN: 0,
       blds: [], paving: {}, enemies: [], soldiers: [], proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
       cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, shieldCd: 0, healCd: 0, fwCd: 0, tpCd: 0, shields: [], fireWalls: [], heroDead: {},
       spellSel: null, fallFx: [], bolts: [], siegeHold: false, siegeT: 0, introPan: null,
@@ -1145,7 +1145,7 @@
 
   function hitHall(dmg, x) {
     if (shieldAt(x, G.hallTop + 4)) { if (Math.random() < 0.3) part(x, G.hallTop + 2, (Math.random() - 0.5) * 20, -10, 0.3, '#fff070', 0); return; }
-    st.hallHp -= dmg; st.hallFlash = 0.08;
+    st.hallHp -= dmg;
     AUDIO.play('hallHit');
     for (let k = 0; k < 4; k++) part(x + (Math.random() - 0.5) * 6, G.hallTop + 2, (Math.random() - 0.5) * 30, -10 - Math.random() * 25, 0.45, Math.random() < 0.5 ? '#848490' : '#525262', 90);
     if (dmg >= 20) st.shake = Math.max(st.shake, 0.15);
@@ -2115,7 +2115,6 @@
     for (const m of st.marks) m.life -= dt;
     st.marks = st.marks.filter(m => m.life > 0);
     st.shake = Math.max(0, st.shake - dt);
-    st.hallFlash = Math.max(0, st.hallFlash - dt);
     if (st.king) st.king.flash = Math.max(0, (st.king.flash || 0) - dt);
     if (st.king && st.king.fadeT != null) st.king.fadeT += dt;
     for (const b of st.blds) if (b.flash > 0) b.flash = Math.max(0, b.flash - dt);
@@ -2245,6 +2244,7 @@
   const SLOWMO_DUR = 1.0;
   let slowmoT = 0;
   function drawDeadKing(k, time) {
+    if (heroDef().spr === 'king' && SPR.king8 && SPR.king8.kneel) return drawKneelingKing(k, time);
     const k8 = heroDef().spr === 'king' && SPR.king8, fr = k8 ? SPR.king8[k.face8 == null ? 6 : k.face8].idle : SPR[heroDef().spr][0], t = k.deadT;
     const fall = Math.min(1, t / 0.45), drop = Math.round(4 * fall * fall);
     const alpha = k.fadeT == null ? 1 : Math.max(0, 1 - k.fadeT / KING_FADE);
@@ -2259,14 +2259,35 @@
       g.drawImage(fr.c, 0, r, fr.w, 1, x0 + dx, y, fr.w, 1);
     }
     if (fall >= 1 && alpha > 0) { // hviezdičky okolo koruny
-      const cx = k.x, cy = y0 - 2 + (k8 ? K8_BY : 0); // nad korunou (plátno kráľa má navrchu miesto na meč)
-      for (let i = 0; i < 3; i++) {
-        const a = time * 5 + i * 2.094, sx = Math.round(cx + Math.cos(a) * 7), sy = Math.round(cy + Math.sin(a) * 2);
-        g.fillStyle = PAL.K; g.fillRect(sx - 2, sy - 1, 5, 3); g.fillRect(sx - 1, sy - 2, 3, 5);
-        g.fillStyle = '#f8d048'; g.fillRect(sx - 1, sy, 3, 1); g.fillRect(sx, sy - 1, 1, 3);
-        g.fillStyle = '#ffffff'; g.fillRect(sx, sy, 1, 1);
-      }
+      drawDizzyStars(k.x, y0 - 2 + (k8 ? K8_BY : 0), time); // nad korunou (plátno kráľa má navrchu miesto na meč)
     }
+    g.globalAlpha = 1;
+  }
+  function drawDizzyStars(cx, cy, time) {
+    for (let i = 0; i < 3; i++) {
+      const a = time * 5 + i * 2.094, sx = Math.round(cx + Math.cos(a) * 7), sy = Math.round(cy + Math.sin(a) * 2);
+      g.fillStyle = PAL.K; g.fillRect(sx - 2, sy - 1, 5, 3); g.fillRect(sx - 1, sy - 2, 3, 5);
+      g.fillStyle = '#f8d048'; g.fillRect(sx - 1, sy, 3, 1); g.fillRect(sx, sy - 1, 1, 3);
+      g.fillStyle = '#ffffff'; g.fillRect(sx, sy, 1, 1);
+    }
+  }
+  // porazený kráľ: klesne na kolená, sklonená hlava, meč zapichnutý pred sebou v zemi; plášť sa ešte chvíľu zavlní
+  function drawKneelingKing(k, time) {
+    const fr = SPR.king8.kneel, t = k.deadT, fall = Math.min(1, t / 0.35);
+    const alpha = k.fadeT == null ? 1 : Math.max(0, 1 - k.fadeT / KING_FADE);
+    const x0 = Math.round(k.x - fr.w / 2), y0 = Math.round(k.y - fr.h) + KNEEL_DY - Math.round(3 * (1 - fall) * (1 - fall));
+    const amp = t < 1.3 ? 1.2 * (1 - t / 1.3) : 0;
+    g.globalAlpha = alpha;
+    shadow(k.x, k.y, 5);
+    for (let r = 0; r < fr.h; r++) {
+      const dx = r >= 15 && r < 21 ? Math.round(Math.sin(t * 14 - r * 0.9) * amp * (r - 14) / 5) : 0; // plášť (nie čepeľ v zemi)
+      g.drawImage(fr.c, 0, r, fr.w, 1, x0 + dx, y0 + r, fr.w, 1);
+    }
+    if (fall >= 1 && t < 0.8) { // pri dopade čepele odletí trochu hliny
+      g.fillStyle = '#6a4e34'; const s = Math.round((t - 0.35) * 8), gy = Math.round(k.y) + KNEEL_DY - 1 - (s > 1 ? 1 : 0);
+      g.fillRect(Math.round(k.x) - 3 - s, gy, 1, 1); g.fillRect(Math.round(k.x) + 2 + s, gy, 1, 1);
+    }
+    if (fall >= 1 && alpha > 0) drawDizzyStars(k.x, y0 + K8_H - 12 - KNEEL_DY - 2, time); // nad sklonenou korunou
     g.globalAlpha = 1;
   }
 
@@ -2368,7 +2389,6 @@
       } else if (b.unit) {
         const us = SPR[WUNIT[b.unit.type].spr][0];
         g.drawImage(us.c, 0, 0, us.w, 11, x0 + 1, y0 - 9, us.w, 11);
-        if (b.unit.lvl > 1) pxText(g, String(b.unit.lvl), x0 + 1, y0 - 8, '#88b4ff');
       }
     } else {
       spr = bsprOf(b.kind, b.lvl);
@@ -2392,7 +2412,6 @@
         g.globalCompositeOperation = 'source-over';
       }
     }
-    if (b.lvl > 1 && b.kind !== 'wall') pxText(g, String(b.lvl), x0 + T - 3, y0 + T - 6, '#f8d048');
   }
   const JOINERS = { wall: 1, tower: 1, mage: 1, icetower: 1, ballista: 1 }; // hradby sa napájajú len na hradby a veže (strážna, mága) – na ostatné budovy nie
   const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL || !!JOINERS[o.kind]); };
@@ -2402,7 +2421,7 @@
   function drawHall(time) {
     const spr = bsprOf('hall', st.hallLvl);
     const x = Math.round(G.hallCx - spr.w / 2), y = G.hallBot + 1 - spr.h;
-    g.drawImage(spr.c, x + hitJit(st.hallFlash), y);
+    g.drawImage(spr.c, x, y); // radnica sa pri zásahu netrasie
     // vlajky
     for (const fx of [x + 7, x + 42]) {
       const wv = Math.floor(time * 6 + fx) % 2;
@@ -3396,13 +3415,12 @@
           if (!has('spikeTypes')) lockAct(after(plain[0], { spikeType: 'fire', unit: null, gate: false }), 'Ohnivé/ľadové', unlockMissionOf('spikeTypes'));
           else for (const k in SPIKE_TYPES) bulk(after(plain[0], { spikeType: k, unit: null, gate: false }), SPIKE_TYPES[k].name.split(' ')[0], plain, () => SPIKE_TYPE_COST, w => { st.gold -= SPIKE_TYPE_COST; w.spent += SPIKE_TYPE_COST; w.spikeType = k; }, '', true);
         }
-        const free = grp.filter(w => !w.gate && !w.unit), manned = grp.filter(w => w.unit && w.unit.lvl < lvlCap()).sort((a, b) => a.unit.lvl - b.unit.lvl);
+        const free = grp.filter(w => !w.gate && !w.unit); // strelci na hradbách sa nevylepšujú
         if (has('wallArcher') && free.length) for (const type in WUNIT) {
           const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
           if (!has(tid)) { lockAct(ICONS['u_' + type], wd.name, unlockMissionOf(tid)); continue; }
           bulk(after(free[0], { unit: { type, lvl: 1 }, gate: false }), wd.name, free, () => wd.cost, w => { st.gold -= wd.cost; w.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit');
         }
-        if (manned.length) bulk(after(manned[0], { unit: { type: manned[0].unit.type, lvl: manned[0].unit.lvl + 1 } }), 'Strelci', manned, w => uUpCost(w.unit), w => { const c = uUpCost(w.unit); st.gold -= c; w.unit.spent += c; w.unit.lvl++; }, 'up', true);
       }
     } else if (st.sel) {
       const b = st.sel, d = BUILD[b.kind];
@@ -3421,7 +3439,7 @@
       if (d.hp) stats += (stats ? ' · ' : '') + 'zdravie ' + Math.ceil(b.hp) + '/' + bMaxHp(b);
       if (b.spikes) stats += ' · ' + (b.spikeType ? SPIKE_TYPES[b.spikeType].name.toLowerCase() : 'ostne') + ' ' + spikeDmg(b);
       if (b.kind === 'wall' && b.nb) stats += ' · spojenie +' + Math.round(WALL_LINK * b.nb * 100) + ' %';
-      if (b.unit) stats += ' · ' + WUNIT[b.unit.type].name.toLowerCase() + ' úr. ' + b.unit.lvl + ' (poškodenie ' + Math.round(uDmg(b.unit)) + ')';
+      if (b.unit) stats += ' · ' + WUNIT[b.unit.type].name.toLowerCase() + ' (poškodenie ' + Math.round(uDmg(b.unit)) + ')';
       if (b.spec) stats += ' · ' + SPECS[b.spec].name;
       if (b.gate) stats += ' · rytieri cez ňu prejdú';
       if ((UNIT_HOME[b.kind] || b.kind === 'range') && knightsBlocked(b)) stats = '<span class="warn">⚠ vojaci sa nedostanú von</span> · ' + stats;
@@ -3444,7 +3462,6 @@
       if (b.kind === 'wall') {
         const u = b.unit;
         if (u) {
-          upAct(u.lvl, lvlCap(), uUpCost(u), () => { const c = uUpCost(u); st.gold -= c; u.spent += c; u.lvl++; }, 'Strelec', after(b, { unit: { type: u.type, lvl: u.lvl + 1 } }));
           const ur = Math.floor(u.spent / 2);
           act(I.actDown, 'Odvolať', '+' + ur, true, () => { st.gold += ur; b.unit = null; }, 'sell', true);
         } else if (!b.gate && has('wallArcher')) for (const type in WUNIT) {
@@ -4440,5 +4457,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, HEROES, switchHero, setActiveHero, ownedHeroes, heroDef, heroWalkHome,
-    enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, uUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, buyUnit, knightsBlocked, get isAttack() { return isAttack(); } };
+    enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, buyUnit, knightsBlocked, get isAttack() { return isAttack(); } };
 })();
