@@ -38,13 +38,20 @@ function catmull(p0, p1, p2, p3, t) {
   return { x: f(p0.x, p1.x, p2.x, p3.x), y: f(p0.y, p1.y, p2.y, p3.y) };
 }
 
-function mapPaths(nodes) {
+// cesta medzi hradmi: plynulá krivka, ktorá sa navyše prirodzene kľukatí (bočný posun zo šumu, pri hradoch nulový)
+function mapPaths(nodes, seed) {
   const segs = [];
   for (let i = 0; i < nodes.length - 1; i++) {
     const p0 = nodes[Math.max(0, i - 1)], p1 = nodes[i], p2 = nodes[i + 1], p3 = nodes[Math.min(nodes.length - 1, i + 2)];
-    const n = Math.ceil(Math.hypot(p2.x - p1.x, p2.y - p1.y) * 1.6);
-    const pts = [];
-    for (let k = 0; k <= n; k++) pts.push(catmull(p0, p1, p2, p3, k / n));
+    const n = Math.ceil(Math.hypot(p2.x - p1.x, p2.y - p1.y) * 2);
+    const base = [];
+    for (let k = 0; k <= n; k++) base.push(catmull(p0, p1, p2, p3, k / n));
+    const pts = base.map((p, k) => {
+      const a = base[Math.max(0, k - 1)], b = base[Math.min(n, k + 1)], len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const nx = -(b.y - a.y) / len, ny = (b.x - a.x) / len, taper = Math.sin(Math.PI * k / n);
+      const off = ((fbm(k * 0.045 + i * 7.3, i * 3.1, (seed || 0) + 61) - 0.5) * 16 + Math.sin(k * 0.11 + i) * 1.5) * taper;
+      return { x: p.x + nx * off, y: p.y + ny * off };
+    });
     segs.push(pts);
   }
   return segs;
@@ -52,7 +59,7 @@ function mapPaths(nodes) {
 
 function buildIsland(W, H, seed) {
   const L = mapLayout(W, H);
-  const segs = mapPaths(L.nodes);
+  const segs = mapPaths(L.nodes, seed);
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const cx = c.getContext('2d'), img = cx.createImageData(W, H), d = img.data;
   const set = (x, y, col) => {
@@ -73,6 +80,17 @@ function buildIsland(W, H, seed) {
   };
   for (const s of segs) for (let k = 0; k < s.length; k += 3) stamp(s[k].x, s[k].y, 16);
   for (const n of L.nodes) stamp(n.x, n.y, 26);
+  // presná vzdialenosť od cesty a od hradov (lesy smú až k chodníku, ale nie naň ani na hrad)
+  const pathD = new Float32Array(W * H).fill(99), nodeD = new Float32Array(W * H).fill(99);
+  const dist = (arr, px, py, r) => {
+    for (let y = Math.max(0, Math.floor(py - r)); y <= Math.min(H - 1, py + r); y++)
+      for (let x = Math.max(0, Math.floor(px - r)); x <= Math.min(W - 1, px + r); x++) {
+        const v = Math.hypot(x - px, y - py);
+        if (v < arr[y * W + x]) arr[y * W + x] = v;
+      }
+  };
+  for (const s of segs) for (let k = 0; k < s.length; k += 2) dist(pathD, s[k].x, s[k].y, 14);
+  for (const n of L.nodes) dist(nodeD, n.x, n.y - 5, 16);
 
   const icx = W / 2, icy = (L.top + L.bot) / 2, rx = W * 0.47, ry = (L.bot - L.top) / 2 + 18;
   const elev = (x, y) => fbm(x * 0.045, y * 0.045, seed + 3) + (1 - (y - L.top) / (L.bot - L.top)) * 0.28;
@@ -112,18 +130,12 @@ function buildIsland(W, H, seed) {
       } else {
         let v = 0.55 + (fbm(x * 0.06, y * 0.06, seed + 4) - 0.5) * 0.5 + (hash2(x, y, seed + 2) - 0.5) * 0.18;
         if (e > 0.72) v -= 0.12; // úpätie hôr
-        const forest = fbm(x * 0.07, y * 0.07, seed + 9) > 0.58 && nb < 0.15 && dd < 0.85;
-        if (forest) { v -= 0.2; if ((x % 5 === 0) && (y % 4 === 0) && hash2(x, y, seed + 10) > 0.3) trees.push({ x: x + Math.floor(hash2(x, y, 11) * 3), y }); }
+        // lesy: v krajine aj popri ceste (tam hustejšie), no s voľným pásom okolo chodníka a hradov
+        const pd = pathD[y * W + x], fn = fbm(x * 0.07, y * 0.07, seed + 9);
+        const nearPath = pd < 14, forest = dd < 0.85 && pd >= 4 && nodeD[y * W + x] >= 13 && (nearPath ? fn > 0.4 : fn > 0.58 && nb < 0.15);
+        if (forest) { v -= 0.2; if ((x % (nearPath ? 4 : 5) === 0) && (y % 4 === 0) && hash2(x, y, seed + 10) > (nearPath ? 0.15 : 0.3)) { const tx = x + Math.floor(hash2(x, y, 11) * 3); if (pathD[y * W + Math.min(W - 1, tx)] >= 5) trees.push({ x: tx, y }); } }
         set(x, y, pickRamp(RAMP.grass, v, x, y));
       }
-    }
-  }
-  // vychodený chodník pod cestičkou
-  for (const s of segs) for (const p of s) {
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      const edge = Math.abs(dx) + Math.abs(dy) === 2;
-      if (edge && hash2(Math.round(p.x) + dx, Math.round(p.y) + dy, 3) > 0.5) continue;
-      set(p.x + dx, p.y + dy, pickRamp(RAMP.dirt, edge ? 0.38 : 0.55, Math.round(p.x) + dx, Math.round(p.y) + dy));
     }
   }
   // stromy (zhora nadol kvôli prekrývaniu)
@@ -163,44 +175,42 @@ function buildIsland(W, H, seed) {
 
 // pevnosť orkov pri misii 10
 function makeOrcFort() {
-  // orkská drevená pevnosť (20x18): zahrotené koly s kostenými hrotmi, strážna veža so zástavou,
+  // orkská drevená pevnosť (15x14): zahrotené koly s kostenými hrotmi, strážna veža so zástavou,
   // chatrč za palisádou, lebka nad bránou a fakle po stranách
-  const p = painter(20, 18);
+  const p = painter(15, 14);
   const W = ORC_WOOD, HIDE = ['#2a1c12', '#4a3020', '#6a4a30', '#8a6a48'].map(hexRGB);
   // chatrč zo zvieracích koží (vľavo za palisádou)
-  for (let y = 4; y <= 9; y++) { const hw = (y - 3) * 0.95; for (let x = Math.floor(5 - hw); x <= Math.ceil(5 + hw); x++) p.shade(x, y, HIDE, 0.75 - (x - 5 + hw) / (2 * hw + 1) * 0.5 + (y % 2 ? 0 : -0.1)); }
-  p.set(5, 3, BONE); p.set(4, 2, BONE2); p.set(6, 2, BONE2);                                  // rohy na vrchole
+  for (let y = 3; y <= 7; y++) { const hw = (y - 2) * 0.8; for (let x = Math.floor(4 - hw); x <= Math.ceil(4 + hw); x++) p.shade(x, y, HIDE, 0.75 - (x - 4 + hw) / (2 * hw + 1) * 0.5 + (y % 2 ? 0 : -0.1)); }
+  p.set(4, 2, BONE); p.set(3, 1, BONE2); p.set(5, 1, BONE2);                                  // rohy na vrchole
   // strážna veža (vpravo): nohy, plošina s hrotmi, zástava
-  for (const lx of [12, 15]) for (let y = 4; y <= 11; y++) p.shade(lx, y, W, lx === 12 ? 0.85 : 0.5);
-  pLine(p, 12, 6, 15, 9, (x, y) => p.shade(x, y, W, 0.45));
-  for (let y = 2; y <= 4; y++) for (let x = 11; x <= 16; x++) p.shade(x, y, W, (y === 2 ? 0.98 : 0.65) - (x - 11) * 0.05);
-  for (const sx of [11, 14, 16]) p.set(sx, 1, BONE);
-  for (let y = 0; y <= 2; y++) p.set(16, y, W[1]);                                              // žrď
-  for (let y = 0; y <= 1; y++) for (let x = 17; x <= 19; x++) if (!(y === 1 && x === 19)) p.set(x, y, x === 17 ? BLOOD2 : BLOOD);
+  for (const lx of [9, 12]) for (let y = 3; y <= 8; y++) p.shade(lx, y, W, lx === 9 ? 0.85 : 0.5);
+  pLine(p, 9, 4, 12, 7, (x, y) => p.shade(x, y, W, 0.45));
+  for (let y = 1; y <= 2; y++) for (let x = 8; x <= 13; x++) p.shade(x, y, W, (y === 1 ? 0.98 : 0.65) - (x - 8) * 0.05);
+  for (const sx of [8, 11]) p.set(sx, 0, BONE);
+  p.set(13, 0, W[1]);                                                                            // žrď
+  p.set(14, 0, BLOOD); p.set(14, 1, BLOOD2);                                                     // zástava
   // palisáda vpredu: koly rôznej výšky so špicami a previazaním
-  for (let x = 0; x <= 19; x++) {
-    const log = Math.floor(x / 2), lx = x % 2, top = 8 + (log * 7 % 2), tip = lx ? top - 1 : top;
-    for (let y = tip; y <= 17; y++) {
+  for (let x = 0; x <= 14; x++) {
+    const log = Math.floor(x / 2), lx = x % 2, top = 7 + (log * 7 % 2), tip = lx ? top - 1 : top;
+    for (let y = tip; y <= 13; y++) {
       let v = [0.88, 0.5][lx] - (y - top) * 0.014;
       if (y === tip) v += 0.12;
-      if (y === 13) v = 0.12;                                                                    // previazanie
+      if (y === 10) v = 0.12;                                                                    // previazanie
       p.shade(x, y, W, v);
     }
     if (lx) p.set(x, tip - 1, BONE);                                                             // kostený hrot
   }
-  // brána: tmavý priechod, stĺpy, preklad, pootvorené vráta
-  for (let y = 12; y <= 17; y++) for (let x = 8; x <= 11; x++) p.set(x, y, hexRGB('#0a0604'));
-  for (const x of [7, 12]) for (let y = 11; y <= 17; y++) p.shade(x, y, W, x === 7 ? 0.95 : 0.55);
-  for (let x = 7; x <= 12; x++) p.shade(x, 11, W, 0.9);
-  for (let y = 13; y <= 17; y++) { p.shade(8, y, W, 0.55); p.shade(11, y, W, 0.4); }
+  // brána: tmavý priechod, stĺpy, preklad
+  for (let y = 10; y <= 13; y++) for (let x = 6; x <= 8; x++) p.set(x, y, hexRGB('#0a0604'));
+  for (const x of [5, 9]) for (let y = 9; y <= 13; y++) p.shade(x, y, W, x === 5 ? 0.95 : 0.55);
+  for (let x = 5; x <= 9; x++) p.shade(x, 9, W, 0.9);
   // lebka nad bránou
-  for (let y = 7; y <= 10; y++) for (let x = 8; x <= 11; x++) {
-    if ((y === 7 || y === 10) && (x === 8 || x === 11)) continue;
-    const eye = y === 8 && (x === 8 || x === 11), teeth = y === 10 && x % 2 === 0;
-    p.set(x, y, eye || teeth ? hexRGB('#1c140e') : x < 10 ? BONE : BONE2);
+  for (let y = 6; y <= 8; y++) for (let x = 6; x <= 8; x++) {
+    const eye = y === 7 && (x === 6 || x === 8), teeth = y === 8 && x === 7;
+    p.set(x, y, eye || teeth ? hexRGB('#1c140e') : x < 8 ? BONE : BONE2);
   }
   // fakle po stranách brány
-  for (const tx of [5, 14]) { p.set(tx, 11, W[2]); p.set(tx, 10, EMBER); p.set(tx, 9, hexRGB('#fff070')); }
+  for (const tx of [3, 11]) { p.set(tx, 9, W[2]); p.set(tx, 8, EMBER); p.set(tx, 7, hexRGB('#fff070')); }
   return p.finish();
 }
 
@@ -238,11 +248,11 @@ function unlockMissionOf(id) {
   return 1;
 }
 
-// ---- Malý hradík pre bod misie na mape (19x18) ----
+// ---- Malý hradík pre bod misie na mape (15x14) ----
 function makeMiniCastle(locked) {
-  // biela citadela (19x18): svetlý kameň, vysoká stredná veža so zlatým hrotom, nižšie krídla so zlatými lemami;
+  // biela citadela (15x14): svetlý kameň, vysoká stredná veža so zlatým hrotom, nižšie krídla so zlatými lemami;
   // zamknutá je stmavená, bez zlata a svetla
-  const p = painter(19, 18);
+  const p = painter(15, 14);
   const b = locked ? -0.45 : 0, st = STONE_WHITE;
   const roof = locked ? ['#14141a', '#1e1e28', '#2c2c38', '#3e3e4c', '#525262'].map(hexRGB) : ROOF_BLUE;
   const wall = (x0, x1, y0, y1, seed) => {
@@ -264,20 +274,20 @@ function makeMiniCastle(locked) {
   };
   const win = (x, y) => p.set(x, y, locked ? hexRGB('#1e1e28') : GLOW);
   // nižšie bočné krídla s kužeľovými strechami
-  for (const [x0, x1] of [[1, 6], [12, 17]]) { wall(x0, x1, 9, 17, 5); cone((x0 + x1) / 2, 4, 9, 3.6); win(Math.round((x0 + x1) / 2), 12); }
+  for (const [x0, x1] of [[1, 4], [10, 13]]) { wall(x0, x1, 7, 13, 5); cone((x0 + x1) / 2, 3, 7, 2.6); win(Math.round((x0 + x1) / 2), 10); }
   // vysoká stredná veža so zlatým hrotom
-  wall(7, 11, 5, 17, 7);
-  cone(9, 0, 6, 3.2);
+  wall(5, 9, 4, 13, 7);
+  cone(7, 0, 5, 2.6);
   if (!locked) {
-    p.set(9, 0, GOLD);
-    for (let x = 7; x <= 11; x++) p.set(x, 7, x % 2 ? GOLD : GOLD2);
-    for (const x0 of [1, 12]) for (let x = x0; x <= x0 + 5; x++) p.set(x, 10, x % 2 ? GOLD : GOLD2);
+    p.set(7, 0, GOLD);
+    for (let x = 5; x <= 9; x++) p.set(x, 6, x % 2 ? GOLD : GOLD2);
+    for (const x0 of [1, 10]) for (let x = x0; x <= x0 + 3; x++) p.set(x, 8, x % 2 ? GOLD : GOLD2);
   }
-  win(9, 9); win(9, 12);
+  win(7, 8);
   // brána
-  for (let y = 14; y <= 17; y++) for (let x = 8; x <= 10; x++) {
-    if (y === 14 && (x === 8 || x === 10)) continue;
-    p.set(x, y, locked ? hexRGB('#14100c') : (x === 8 || x === 10 ? WOOD[1] : WOOD[3]));
+  for (let y = 11; y <= 13; y++) for (let x = 6; x <= 8; x++) {
+    if (y === 11 && (x === 6 || x === 8)) continue;
+    p.set(x, y, locked ? hexRGB('#14100c') : (x === 6 || x === 8 ? WOOD[1] : WOOD[3]));
   }
   return p.finish();
 }

@@ -443,7 +443,14 @@
     const king = JSON.parse(get('king') || '{}') || {};
     return { race: race ? JSON.parse(race) : 'Ľudia', won: Math.min(MISSIONS.length, Math.max(0, (parseInt(unl || '1', 10) || 1) - 1)), stars, king: king.lvl || 1 };
   }
-  function clearSlot(n) { for (const k of ['stars', 'perks', 'king', 'unlocked', 'introSeen', 'race', 'stats', 'ach', 'achSeen']) try { localStorage.removeItem(slotKey(n, k)); } catch (e) { } }
+  // vymaže všetko, čo patrí pozícii (aj zvoleného hrdinu, skúsenosti a schopnosti paladina a čarodejky, videné novinky);
+  // gemy a kúpení hrdinovia patria hráčovi, nie pozícii, a ostanú
+  function clearSlot(n) {
+    try {
+      const pre = slotKey(n, '');
+      for (const k of Object.keys(localStorage)) if (k.startsWith(pre)) localStorage.removeItem(k);
+    } catch (e) { }
+  }
   let island = null;
 
   // ---------------- Mriežka ----------------
@@ -2967,9 +2974,9 @@
     const status = anim ? 'locked' : done ? 'done' : open ? 'open' : 'locked';
     // tieň
     g.fillStyle = 'rgba(10,8,6,0.4)';
-    for (let dx = -9; dx <= 9; dx++) g.fillRect(n.x + dx, n.y + 2, 1, Math.abs(dx) > 6 ? 1 : 2);
+    for (let dx = -7; dx <= 7; dx++) g.fillRect(n.x + dx, n.y + 2, 1, Math.abs(dx) > 5 ? 1 : 2);
     if (status === 'open') { // pulzujúci kruh pod hradom
-      const rr = 13 + Math.sin(time * 4) * 1.2, cnt = 36;
+      const rr = 10 + Math.sin(time * 4) * 1, cnt = 32;
       g.fillStyle = '#f8d048';
       for (let k = 0; k < cnt; k += 2) { const a = k / cnt * 6.283 + time; g.fillRect(Math.round(n.x + Math.cos(a) * rr), Math.round(n.y - 3 + Math.sin(a) * rr * 0.55), 1, 1); }
     }
@@ -2980,8 +2987,8 @@
       top = n.y - f.h + 2;
     } else {
       const c = status === 'locked' ? island.castleLocked : island.castle;
-      g.drawImage(c.c, n.x - 9, n.y - 16);
-      top = n.y - 16;
+      g.drawImage(c.c, n.x - Math.floor(c.w / 2), n.y - c.h + 2);
+      top = n.y - c.h + 2;
     }
     if (status === 'done') { // modrá zástava = dobyté
       const fx = n.x, fy = top - 6;
@@ -2995,18 +3002,15 @@
       for (let k = 0; k < 4; k++) { g.fillStyle = PAL.K; g.fillRect(n.x - k - 1, ay + k - 1, k * 2 + 3, 1); }
       for (let k = 0; k < 3; k++) { g.fillStyle = k === 0 ? '#fff070' : '#f8d048'; g.fillRect(n.x - (2 - k), ay + k, (2 - k) * 2 + 1, 1); }
     }
-    // tabuľka s číslom misie
-    const sn = String(num), tw = sn.length * 4 + 3, tx = n.x - Math.floor(tw / 2), ty = n.y + 3;
-    g.fillStyle = PAL.K; g.fillRect(tx - 1, ty - 1, tw + 2, 9);
-    g.fillStyle = status === 'done' ? '#b88420' : status === 'open' ? '#22337a' : '#2c2c38'; g.fillRect(tx, ty, tw, 7);
-    g.fillStyle = status === 'done' ? '#f8d048' : status === 'open' ? '#3c64c8' : '#3e3e4c'; g.fillRect(tx, ty, tw, 1);
-    pxText(g, sn, tx + 2, ty + 1, status === 'locked' ? '#848490' : '#ffffff');
+    // číslo misie: drobné číslice s obrysom, s medzerou pod hradom (zlaté = dobyté, biele = na rade, sivé = zamknuté)
+    const sn = String(num), tw = sn.length * 4 - 1, tx = n.x - Math.floor(tw / 2), ty = n.y + 5;
+    pxText(g, sn, tx, ty, status === 'done' ? '#f8d048' : status === 'open' ? '#ffffff' : '#848490');
     let bt = 2; while (bt > 0 && !starsOf(num, bt)) bt--;
     const ns = starsOf(num, bt);
-    if (ns) for (let k = 0; k < 3; k++) drawStar(n.x - 7 + k * 5, ty + 9, k < ns, bt);
+    if (ns) for (let k = 0; k < 3; k++) drawStar(n.x - 7 + k * 5, ty + 7, k < ns, bt);
     if (st.mapSel === num) {
       const col = Math.floor(time * 4) % 2 ? '#f8d048' : '#ffffff';
-      corners(n.x - 13, top - 3, n.x + 13, n.y + 12, col);
+      corners(n.x - 11, top - 3, n.x + 11, n.y + (ns ? 15 : 11), col);
     }
   }
 
@@ -3061,15 +3065,32 @@
     island.border = c; island.borderKey = key;
     return c;
   }
-  function drawProvince(i, state, time) {
-    const L = provLayers();
-    if (state === 'horde') { g.drawImage(L.red[i], 0, 0); return; }
-    g.drawImage(L.blue[i], 0, 0);
-    if (state === 'attacked') { g.globalAlpha = i + 1 === st.unlocked ? 0.35 + 0.3 * Math.sin(time * 3) : 0.35; g.drawImage(L.red[i], 0, 0); g.globalAlpha = 1; } // pulzuje len najbližšia misia
+  function drawProvince(i, state, time, ctx) {
+    const L = provLayers(), c = ctx || g;
+    if (state === 'horde') { c.drawImage(L.red[i], 0, 0); return; }
+    c.drawImage(L.blue[i], 0, 0);
+    if (state === 'attacked') { c.globalAlpha = i + 1 === st.unlocked ? 0.35 + 0.3 * Math.sin(time * 3) : 0.35; c.drawImage(L.red[i], 0, 0); c.globalAlpha = 1; } // pulzuje len najbližšia misia
+  }
+  // podklad mapy: ostrov, chodník a farby provincií, ktoré sa nehýbu, sa zložia raz do jedného obrázka
+  // a prepočítajú sa, len keď sa zmení vlastník provincie alebo sa chodník vyšliapava; živé (pulzujúca, práve dobytá) sa kreslia každý snímok
+  function mapBase(live) {
+    const n = island.nodes.length, ma = st.mapAnim;
+    const key = W + 'x' + H + ':' + st.unlocked + ':' + (ma ? ma.seg + '/' + Math.floor(Math.min(1, ma.t) * 400) : '-') + ':' + Array.from({ length: n }, (_, i) => live(i) ? 'L' : provState(i)).join(',');
+    if (island.baseKey === key) return island.base;
+    const c = island.base || document.createElement('canvas'); c.width = W; c.height = H;
+    const bx = c.getContext('2d');
+    bx.drawImage(island.bg, 0, 0);
+    drawMapPath(bx); // chodník leží na zemi pod farbou provincií
+    for (let i = 0; i < n; i++) if (!live(i)) drawProvince(i, provState(i), 0, bx);
+    island.base = c; island.baseKey = key;
+    return c;
   }
   function drawProvinces(time) {
     const n = island.nodes.length, pa = st.provAnim;
+    const live = i => (pa && pa.i === i) || (provState(i) === 'attacked' && i + 1 === st.unlocked);
+    g.drawImage(mapBase(live), 0, 0);
     for (let i = 0; i < n; i++) {
+      if (!live(i)) continue;
       if (pa && pa.i === i) { // práve dobytá: nová farba sa rozleje od hradu
         drawProvince(i, pa.from, time);
         const nd = island.nodes[i], r = Math.max(1, Math.min(1, pa.t) * 90);
@@ -3184,9 +3205,33 @@
       g.drawImage(island.shipSpr[kind][s.dir > 0 ? 0 : 1], x, y);
     }
   }
+  // chodník medzi hradmi: k dobytým hradom vyšliapaný (hlina 1–2 px, okraje s vychodenou trávou),
+  // k nedobytým zarastený (len občas presvitne hlina); po víťazstve sa nový úsek postupne vyšliape
+  function drawMapPath(c) {
+    const px = (x, y, col) => { c.fillStyle = 'rgb(' + col[0] + ',' + col[1] + ',' + col[2] + ')'; c.fillRect(x, y, 1, 1); };
+    island.segs.forEach((pts, k) => {
+      const done = k + 2 <= st.unlocked, anim = st.mapAnim && st.mapAnim.seg === k;
+      const upto = anim ? Math.floor(pts.length * Math.min(1, st.mapAnim.t)) : done ? pts.length : 0;
+      let lx = null, ly = null;
+      for (let j = 0; j < pts.length; j++) {
+        const x = Math.round(pts[j].x), y = Math.round(pts[j].y);
+        if (x === lx && y === ly) continue;
+        lx = x; ly = y;
+        const h = hash2(x, y, 71), worn = j < upto;
+        // smer chodníka: druhý pás hliny leží bokom (vodorovný chodník je široký nadol, zvislý doprava)
+        const q = pts[Math.min(pts.length - 1, j + 2)], vert = Math.abs(q.x - pts[j].x) < Math.abs(q.y - pts[j].y);
+        const sx = vert ? 1 : 0, sy = vert ? 0 : 1;
+        if (worn) {
+          px(x, y, pickRamp(RAMP.dirt, 0.62 + h * 0.18, x, y));                                   // svetlá vyšliapaná hlina
+          if (h > 0.2) px(x + sx, y + sy, pickRamp(RAMP.dirt, 0.48 + h * 0.15, x + sx, y + sy)); // druhý pás, tmavší okraj
+          if (h > 0.86) px(x - sx, y - sy, pickRamp(RAMP.dirt, 0.5, x - sx, y - sy));             // miestami ešte širší
+          else if (h < 0.12) px(x - sx, y - sy, pickRamp(RAMP.grass, 0.82, x - sx, y - sy));     // vychodená tráva pri kraji
+        } else if (h > 0.55) px(x, y, pickRamp(RAMP.dirt, 0.4 + h * 0.2, x, y));                 // zarastený chodník: len miestami hlina
+      }
+    });
+  }
   function renderMap(time) {
-    g.drawImage(island.bg, 0, 0);
-    drawProvinces(time);
+    drawProvinces(time); // ostrov s provinciami (podklad je v drawProvinces)
     // príboj
     g.fillStyle = 'rgba(240,250,255,0.85)';
     for (const f of island.foam) if (Math.sin(time * 1.8 + f.ph) > 0.55) g.fillRect(f.x, f.y, 1, 1);
@@ -3203,19 +3248,6 @@
     }
     drawShips(time);
     drawWarFx(time);
-    // cestička: dobyté úseky svetlé, zamknuté tmavé bodky
-    island.segs.forEach((pts, k) => {
-      const done = k + 2 <= st.unlocked;
-      const anim = st.mapAnim && st.mapAnim.seg === k;
-      const upto = anim ? Math.floor(pts.length * Math.min(1, st.mapAnim.t)) : done ? pts.length : 0;
-      for (let j = 0; j < pts.length; j++) {
-        const lit = j < upto;
-        if (lit ? j % 6 >= 3 : j % 5 !== 0) continue;
-        const x = Math.round(pts[j].x), y = Math.round(pts[j].y);
-        if (lit) { g.fillStyle = '#3e2614'; g.fillRect(x, y + 1, 2, 1); g.fillStyle = '#fff2c8'; g.fillRect(x, y, 2, 1); }
-        else { g.fillStyle = '#2e1e12'; g.fillRect(x, y, 1, 1); }
-      }
-    });
     island.nodes.forEach((n, i) => drawMapNode(i, n, time));
     for (const q of st.parts) {
       g.globalAlpha = Math.min(1, q.life / q.max * 2);
@@ -4588,7 +4620,9 @@
         ? '<b>' + info.race + '</b><small><span class="st">★ ' + info.stars + '</span><span class="kg"><img src="' + ICONS.king + '" alt="">úr. ' + info.king + '</span></small>'
         : '<b>Nová hra</b><small>Prázdna pozícia</small>') + '</div>' + (info ? '<button class="slotDel" title="Vymazať"><img src="' + TRASH + '" alt="Vymazať"></button>' : '<span class="slotGo"><img src="' + UI_ICONS.plus + '" alt="Nová hra"></span>');
       c.addEventListener('click', () => { // rozohraná pozícia rovno na ostrov, nová na výber rasy
-        AUDIO.play('build'); loadSlot(n);
+        AUDIO.play('build');
+        if (!info) clearSlot(n); // nová hra začína úplne načisto: kráľ, žiadne skúsenosti ani schopnosti (aj po starých zvyškoch)
+        loadSlot(n);
         if (info) { $('slots').hidden = true; showMap(); } else showTitle();
       });
       const del = c.querySelector('.slotDel');
