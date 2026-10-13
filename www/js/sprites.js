@@ -474,9 +474,145 @@ function buildSprite(rows, palOverride) {
   return { c, f, sil, w, h };
 }
 
+// ---- Postavičky rás (výber rasy, Nákupy): spredu, obrys sa dopočíta automaticky ----
+const RACE_ART = {
+  humans: [ // rytier s modrým chocholom, štítom a mečom
+    '.....cBn......',
+    '....cBBn......',
+    '...wmmmmM...w.',
+    '...mmmmmD...w.',
+    '...mKKKKD...w.',
+    '...mmgmmD...w.',
+    '....MMMD....m.',
+    'wmm.cBBBnn..m.',
+    'mgmcBBgBBnn.m.',
+    'mggcBgggBnnGgG',
+    'mgmcBBgBBnnKs.',
+    'MmMcBBgBBnn.L.',
+    '.M.KLLgLLLK.g.',
+    '...cBBnBBn....',
+    '...MMD.MMD....',
+    '...MMD.MMD....',
+    '...LLL.LLL....',
+  ],
+  orcs: [ // zelený surovec v rohatej prilbe, s klami
+    '..e........e..',
+    '..ee.MMMM.ee..',
+    '...eMmmmmMe...',
+    '...oooooooO...',
+    '...oroooorO...',
+    '...oooOOooO...',
+    '...oeKKKKeO...',
+    '....oooooO....',
+    '.mmMLLLLLLmmM.',
+    '.oOLLdLLdLLoO.',
+    '.oOLLLdLLLLoO.',
+    '.oOMMMgMMMMoO.',
+    '.oo.LLLLLL.oo.',
+    '....LLLdLL....',
+    '....oO..oO....',
+    '....oO..oO....',
+    '...ddd..ddd...',
+  ],
+  undead: [ // kostlivec v hrdzavej prilbe a roztrhanom plášti, žiariace očnice
+    '....DMMMMD....',
+    '...DMmmmmMD...',
+    '...eeeeeeeE...',
+    '...eKoeKoeE...',
+    '...eeeKeeeE...',
+    '....eKeKeK....',
+    '.....EeeE.....',
+    '..RReKeKeKRR..',
+    '.RrReeKeeKRrR.',
+    '.RrRKeKeKeRrR.',
+    '.Re.KeeeeK.eR.',
+    '.R...KeeK...R.',
+    '.R..eEKKEe..R.',
+    '....eK..Ke....',
+    '....e....e....',
+    '....E....E....',
+    '...eE....Ee...',
+  ],
+  elves: [ // lukostrelec v zelenej kapucni, špicaté uši
+    '.....fffF.....',
+    '....fffffF....',
+    '...ffhhhhFF...',
+    '.s.fhssssHF.s.',
+    '.ssfsKssKsFss.',
+    '...fhssssHF...',
+    '.l.fHhsshHF...',
+    'l.FfffgffffF..',
+    'l.FfFffffFfF..',
+    'l.sFffgfffFs..',
+    'l..FffgfffF...',
+    '.l.LLLgLLLL...',
+    '...FffFffF....',
+    '...FF..FF.....',
+    '...FF..FF.....',
+    '...LL..LL.....',
+    '..LLL..LLL....',
+  ],
+  demons: [ // červený démon s rohmi, tesákmi, krídlami a chvostom
+    '.M..........M.',
+    '.MD........DM.',
+    '..MD.rrrr.DM..',
+    '...DrrrrrrD...',
+    '...ryKrryKR...',
+    '...rrrRRrrR...',
+    '...rKWKKWKR...',
+    '.P..RrrrrR..P.',
+    'PP.DDrrrrDD.PP',
+    'PPPrDDMMDDrPPP',
+    '.PPrDMgMMDrPP.',
+    '..PrDDDDDDrP..',
+    '...KDDgDDDK.r.',
+    '....rR..rR..rR',
+    '....rR..rR..R.',
+    '....rR..rR....',
+    '...DDD..DDD...',
+  ],
+  swarm: [ // hmyzí bojovník s kosami, kusadlami a kyselinovými očami
+    '.e..........e.',
+    'eE..........Ee',
+    'E....uuuU....E',
+    'E...uuuuuU...E',
+    'eE.uaUuuaUU.Ee',
+    '.EeuUuuuuUUeE.',
+    '..Ue.UUUU.eU..',
+    '....eEUUEe....',
+    '...uuUuuUuU...',
+    '..uUuAuuAuUU..',
+    '..UuuuUUuuuU..',
+    '.e.UuAuuAuU.e.',
+    'e..UUuUUuUU..e',
+    '.e..UUuuUU..e.',
+    '..e.e.UU.e.e..',
+    '..e.e....e.e..',
+    '.E..E....E..E.',
+  ],
+};
+const RACE_PAL = {
+  undead: { R: '#3a2e48', r: '#5a4a6a', o: '#7cff6a' },             // roztrhaný plášť, zelená žiara v očniciach
+  elves:  { f: '#6cc048', F: '#2e7a30', h: '#f8e08a', H: '#c8a040' }, // lesná zelená, svetlé vlasy
+  demons: { P: '#4a2448' },                                          // tmavé krídla
+  swarm:  { u: '#9a6aa8', U: '#4e2e5a', a: '#9cff4a', A: '#4ca02a' }, // chitín, kyselina
+};
+// obkreslí postavičku tmavým obrysom (okraj o 1 bod väčší) a postaví z nej sprite
+function buildOutlined(rows, pal) {
+  const w = rows[0].length + 2, h = rows.length + 2;
+  const g = [...Array(h)].map((_, y) => [...Array(w)].map((_, x) => (rows[y - 1] || '')[x - 1] || '.')).map(r => r.map(c => c === undefined ? '.' : c));
+  const out = g.map(r => r.slice());
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (g[y][x] !== '.') continue;
+    if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => g[y + dy] && g[y + dy][x + dx] && g[y + dy][x + dx] !== '.')) out[y][x] = 'K';
+  }
+  return buildSprite(out.map(r => r.join('')), pal);
+}
+
 const SPR = {};
 function initSprites() {
   SPR.archer = [buildSprite(DEF_ARCHER)];
+  for (const k in RACE_ART) SPR['race_' + k] = [buildOutlined(RACE_ART[k], RACE_PAL[k])];
   // lukostrelec zo strelnice (pešia jednotka) – rovnaký vojak, druhá snímka s prekročenými nohami
   SPR.footArcher = [buildSprite(DEF_ARCHER), buildSprite(DEF_ARCHER.slice(0, 14).concat(['....KddK.KddK.', '....KKK...KKK.']))];
   SPR.knight = [buildSprite(DEF_KNIGHT)];

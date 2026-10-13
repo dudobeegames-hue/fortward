@@ -543,7 +543,7 @@
   .shine { position: relative; }
   .shine::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
     background: linear-gradient(110deg, transparent 25%, rgba(255,255,255,.85) 50%, transparent 75%) no-repeat;
-    background-size: 64px 100%; background-position: -64px 0; animation: shine var(--shine-dur, 4s) infinite; }
+    background-size: 64px 100%; background-position: -64px 0; animation: shine var(--shine-dur, 4s) var(--shine-delay, -1.6s) infinite; }
   /* prúžok najprv chvíľu čaká, potom sa pohne pomaly a zrýchľuje až za pravý okraj prvku;
      koniec dráhy a dĺžku podľa šírky prvku nastaví hra (fitShine), takže dlhší prvok prejde celý a rovnakým tempom */
   @keyframes shine {

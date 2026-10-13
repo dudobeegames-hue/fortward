@@ -418,7 +418,15 @@
     el.style.setProperty('--shine-end', (w + 64) + 'px');
     el.style.setProperty('--shine-dur', Math.max(3.5, move / 0.45).toFixed(2) + 's');
   }
-  for (const ev of ['animationstart', 'animationiteration']) document.addEventListener(ev, e => { if (e.animationName === 'shine') fitShine(e.target); }, true);
+  for (const ev of ['animationstart', 'animationiteration']) document.addEventListener(ev, e => {
+    if (e.animationName !== 'shine') return;
+    fitShine(e.target);
+    // prvok sa práve ukázal (napr. ťuk na záložku Nákupy): prvé čakanie sa preskočí, prúžok sa pohne do 0,5 s
+    if (e.type === 'animationstart') {
+      const dur = parseFloat(e.target.style.getPropertyValue('--shine-dur')) || 4;
+      e.target.style.setProperty('--shine-delay', -(dur * 0.55 - 0.5).toFixed(2) + 's');
+    }
+  }, true);
   // pridá lesk na kartu, kým na ňu hráč neťukne
   function shineIf(el, on, seen) {
     if (!el || !on) return el;
@@ -4430,7 +4438,7 @@
       lockedHeroes.length ? 'Odomknúť' : 'Odomknuté', lockedHeroes.length ? () => lockedHeroes.forEach(buyHero) : null);
     sec('Rasy');
     for (const r of RACES.filter(x => x.state !== 'open'))
-      item('', '<img src="' + spriteURL(SPR[r.spr][0], 4) + '" alt="">', r.name, 'Pripravujeme – zatiaľ nie je hrateľná', 'Čoskoro', null);
+      item('', '<img src="' + spriteURL(SPR[r.spr][0], 4) + '" alt="">', r.name, r.desc + ' Pripravujeme.', 'Čoskoro', null);
     sec('Hrdinovia');
     for (const id of HERO_IDS.filter(x => HEROES[x].price)) {
       const h = HEROES[id], own = ownsHero(id);
@@ -4614,12 +4622,12 @@
   $('gemBox').addEventListener('click', () => toast('Obchod s gemami pripravujeme'));
 
   const RACES = [
-    { name: 'Ľudia', spr: 'knight', state: 'open' },
-    { name: 'Orkovia', spr: 'orc', state: 'soon' },
-    { name: 'Skeletoni', spr: 'archer', state: 'soon' },
-    { name: 'Elfovia', spr: 'archer', state: 'gem', price: 500 },
-    { name: 'Zombie', spr: 'goblin', state: 'gem', price: 500 },
-    { name: 'Hmyzáci', spr: 'goblin', state: 'gem', price: 800 },
+    { name: 'Ľudia',   spr: 'race_humans', state: 'open',                desc: 'Rytieri, kamenné hradby a odvážni hrdinovia.' },
+    { name: 'Orkovia', spr: 'race_orcs',   state: 'soon',                desc: 'Surová sila a nekonečné hordy.' },
+    { name: 'Nemŕtvi', spr: 'race_undead', state: 'soon',                desc: 'Padlí kostlivci vstávajú znova do boja.' },
+    { name: 'Elfovia', spr: 'race_elves',  state: 'gem', price: 500,     desc: 'Presní lukostrelci a lesná mágia.' },
+    { name: 'Démoni',  spr: 'race_demons', state: 'gem', price: 500,     desc: 'Oheň, besnenie a temné obete.' },
+    { name: 'Roj',     spr: 'race_swarm',  state: 'gem', price: 800,     desc: 'Hmyzia ríša, ktorá sa rýchlo množí a zaplaví bojisko.' },
   ];
   // ---- menu: 4 pozície na uloženie ----
   // červený pixelový kôš na vymazanie pozície (14×16 bodov)
