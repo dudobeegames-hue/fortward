@@ -902,6 +902,7 @@ function buildHero8(spec) {
   const hammer = spec.weapon === 'hammer', staff = spec.weapon === 'staff';
   const hand = view => Object.assign({}, K8_HAND[view], spec.hand && spec.hand[view]);
   const ORB_T = 9.6; // stred ohnivej gule na palici (vzdialenosť od ruky)
+  const HEAD_T = 7.6; // stred hlavy kladiva (vzdialenosť od ruky)
   // ohnivá guľa: žltý stred s bielym leskom, oranžový okraj; ako zoznam pixelov okolo stredu
   const orb = (cx, cy, out, dim) => {
     for (let oy = -2; oy <= 2; oy++) for (let ox = -2; ox <= 2; ox++) {
@@ -929,9 +930,9 @@ function buildHero8(spec) {
       for (const [x, y, c] of o) { const i = sw.findIndex(q => q[0] === x && q[1] === y); if (i >= 0) sw[i][2] = c; else sw.push([x, y, c]); }
     } else if (hammer) { // bojové kladivo: dlhá drevená násada so zlatou hlavicou, na konci oceľová hlava naprieč
       add(hx - dx * 2, hy - dy * 2, col('g'));
-      for (let t = -1; t <= 7; t += 0.25) add(hx + dx * t, hy + dy * t, t > 6 ? col('G') : col('l'));
-      for (let t = 7.5; t <= 10; t += 0.25) for (let o = -2.2; o <= 2.2; o += 0.4)
-        add(hx + dx * t - dy * o, hy + dy * t + dx * o, t >= 9.5 ? col('M') : o < -1.2 ? col('w') : col('m'));
+      for (let t = -1; t <= 6; t += 0.25) add(hx + dx * t, hy + dy * t, t > 5 ? col('G') : col('l'));
+      for (let t = 6.5; t <= 8.75; t += 0.25) for (let o = -2.2; o <= 2.2; o += 0.4)
+        add(hx + dx * t - dy * o, hy + dy * t + dx * o, t >= 8.25 ? col('M') : o < -1.2 ? col('w') : col('m'));
     } else {
     sp(hx - dx * 2, hy - dy * 2, col('g'));                       // hlavica
     sp(hx - dx, hy - dy, col('L'));                               // rukoväť
@@ -971,7 +972,9 @@ function buildHero8(spec) {
     // palica je vystrčená dopredu a z gule na jej konci vyletí ohnivá strela (tip = miesto gule voči chodidlám)
     const slashAng = hammer ? atkAng[2] : staff ? atkAng[1] : null;
     const tip = flip => {
-      const x = h.x + Math.cos(atkAng[1]) * ORB_T, y = h.y + 1 + Math.sin(atkAng[1]) * ORB_T;
+      // palica: guľa pri výstrele; kladivo: hlava v momente dopadu (tam vznikne tlaková vlna)
+      const ta = hammer ? atkAng[2] : atkAng[1], tl = hammer ? HEAD_T : ORB_T;
+      const x = h.x + Math.cos(ta) * tl, y = h.y + 1 + Math.sin(ta) * tl;
       return { x: (flip ? K8_W - 1 - x : x) - K8_W / 2 + 0.5, y: y - (K8_H - K8_PB) };
     };
     const mk = flip => ({

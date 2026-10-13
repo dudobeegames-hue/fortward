@@ -2300,17 +2300,25 @@
   // úder paladinovho kladiva: pred ním sa po zemi rozbehne zlatý kruh, vyletí prach a iskry
   function drawSmash(u) {
     if (!(u.swing > 0)) { u.smashed = false; return; }
-    const a = u.face8 * Math.PI / 4, ix = u.x + Math.cos(a) * 10, iy = u.y + Math.sin(a) * 6 - 1, p = 1 - u.swing / 0.3;
+    const tip = hero8('paladin')[u.face8].tip, ix = u.x + tip.x, iy = u.y + tip.y, p = 1 - u.swing / 0.3; // náraz tam, kde dopadla hlava kladiva
     if (!u.smashed) {
       u.smashed = true;
-      for (let k = 0; k < 6; k++) part(ix + (Math.random() - 0.5) * 6, iy, (Math.random() - 0.5) * 40, -12 - Math.random() * 22, 0.4, k < 3 ? '#a08c6c' : '#fff070', 90);
+      for (let k = 0; k < 10; k++) part(ix + (Math.random() - 0.5) * 6, iy, (Math.random() - 0.5) * 50, -12 - Math.random() * 26, 0.45, k < 5 ? '#a08c6c' : '#fff070', 90);
     }
-    const r = 2 + p * 9, al = Math.max(0, 1 - p);
+    const r = 2 + p * 10, al = Math.max(0, 1 - p);
+    if (p < 0.35) { // záblesk v mieste dopadu hlavy kladiva
+      g.globalCompositeOperation = 'lighter';
+      const f = 1 - p / 0.35, gr = g.createRadialGradient(ix, iy, 0, ix, iy, 7);
+      gr.addColorStop(0, 'rgba(255,250,200,' + (0.9 * f) + ')'); gr.addColorStop(1, 'rgba(248,208,72,0)');
+      g.fillStyle = gr; g.beginPath(); g.ellipse(ix, iy, 7, 4, 0, 0, 6.29); g.fill();
+      g.globalCompositeOperation = 'source-over';
+    }
     g.globalAlpha = al;
-    for (let i = 0; i < 24; i++) {
-      const t = i / 24 * Math.PI * 2;
+    for (const [rr, w] of [[r, 1], [r * 0.6, 0.6]]) for (let i = 0; i < 28; i++) { // dva kruhy tlakovej vlny po zemi od hlavy kladiva
+      const t = i / 28 * Math.PI * 2;
       g.fillStyle = i % 3 ? '#f8d048' : '#ffffff';
-      g.fillRect(Math.round(ix + Math.cos(t) * r), Math.round(iy + Math.sin(t) * r * 0.45), 1, 1);
+      g.globalAlpha = al * w;
+      g.fillRect(Math.round(ix + Math.cos(t) * rr), Math.round(iy + Math.sin(t) * rr * 0.45), 1, 1);
     }
     g.globalAlpha = 1;
   }
