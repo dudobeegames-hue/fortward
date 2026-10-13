@@ -117,14 +117,12 @@ window.SIM = (() => {
     if (best) F.castSpell('volley', best.x, best.y - 5);
   }
 
-  // útok: dokupovanie strojov a posíl počas boja
+  // útok: obliehacie stroje sa objednajú počas stavby (2 baranidlá, 1 katapult) a vyrazia s útokom
   function aiSiege() {
     if (!attack() || s.fort.dead) return;
-    const n = k => s.soldiers.filter(u => u.siege === k && !u.dead).length;
-    if (F.has('siegeRam') && n('ram') < 2 && s.gold >= 90) { F.buyUnit('ram'); return; }
-    if (F.has('siegeCat') && n('cat') < 1 && s.gold >= 120) { F.buyUnit('cat'); return; }
-    const sieging = s.soldiers.some(u => !u.dead && !u.helper && u.y < 160);
-    if (sieging && s.gold >= 40 + (F.has('siegeRam') ? 90 : 0) && count('barracks')) F.buyUnit('knight');
+    const n = k => s.soldiers.filter(u => u.siege === k && !u.dead).length + ((s.siegeOrder || {})[k] || 0);
+    while (F.has('siegeRam') && n('ram') < 2 && F.orderSiege('ram')) {}
+    while (F.has('siegeCat') && n('cat') < 1 && F.orderSiege('cat')) {}
   }
 
   // kráľove schopnosti
@@ -157,10 +155,10 @@ window.SIM = (() => {
     F.startMission(m);
     const waves = [];
     for (;;) {
-      if (s.phase === 'build') { build(); F.startWave(); }
+      if (s.phase === 'build') { build(); aiSiege(); F.startWave(); }
       let steps = 0;
       const limit = 60 * (attack() ? 1500 : 400); // obliehanie môže trvať cez niekoľko vĺn
-      while (s.phase === 'battle' && steps < limit) { F.update(1 / 60); steps++; if (steps % 15 === 0) { aiVolley(opts.volley); aiAbilities(); if (steps % 60 === 0) aiSiege(); } }
+      while (s.phase === 'battle' && steps < limit) { F.update(1 / 60); steps++; if (steps % 15 === 0) { aiVolley(opts.volley); aiAbilities(); } }
       waves.push(Math.round(s.hallHp / F.hallMax() * 100));
       if (s.phase === 'pause') { fillSlots(); F.enterBuild(); continue; }
       const fort = s.fort ? { keep: Math.round(s.fort.hp / s.fort.max * 100), king: s.fort.kingE ? Math.round(Math.max(0, s.fort.kingE.hp) / s.fort.kingE.max * 100) : null } : null;

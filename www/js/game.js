@@ -837,7 +837,7 @@
       wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.15 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, shake: 0, soldierN: 0,
       blds: [], paving: {}, enemies: [], soldiers: [], proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
       cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, shieldCd: 0, healCd: 0, fwCd: 0, tpCd: 0, shields: [], fireWalls: [], heroDead: {},
-      spellSel: null, fallFx: [], blasts: [], bolts: [], hallHolyT: 0, siegeHold: false, siegeT: 0, introPan: null,
+      spellSel: null, siegeOrder: {}, fallFx: [], blasts: [], healFx: [], bolts: [], hallHolyT: 0, siegeHold: false, siegeT: 0, introPan: null,
     });
     rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
     st.fort = isAttack() ? makeFort() : null;
@@ -958,6 +958,7 @@
       st.spawnT = 1.2;
     }
     st.phase = 'battle';
+    launchSiege();
     st.tool = null; st.sel = null; st.moving = null; bdrag = null;
     AUDIO.play('horn'); AUDIO.music('battle');
     st.viewUp = Math.max(0, (st.viewUp || 0) - panelLow()); // rovnaký pohľad aj bez panela
@@ -1898,7 +1899,10 @@
     }
     if (id === 'heal') {
       k.hp = Math.min(kingMax(), k.hp + kingMax() * 0.5);
-      for (const s of st.soldiers) if (!s.dead && !s.siege && Math.hypot(s.x - k.x, s.y - k.y) < sp.R) s.hp = Math.min(s.max, s.hp + s.max * 0.6);
+      const fx = st.healFx || (st.healFx = []);
+      fx.push({ u: k, t: 0, max: 1.1, big: true });
+      for (const s of st.soldiers) if (!s.dead && !s.siege && !s.fly && Math.hypot(s.x - k.x, s.y - k.y) < sp.R) { s.hp = Math.min(s.max, s.hp + s.max * 0.6); fx.push({ u: s, t: -Math.hypot(s.x - k.x, s.y - k.y) / 120, max: 0.8 }); } // vlna dorazí k vzdialenejším neskôr
+      st.marks.push({ x: k.x, y: k.y, life: 0.7, max: 0.7, wave: sp.R * 0.8, heal: true });
       for (let q = 0; q < 30; q++) { const a = Math.random() * 6.28, r = Math.random() * sp.R * 0.6; part(k.x + Math.cos(a) * r, k.y + Math.sin(a) * r * 0.6, 0, -18 - Math.random() * 10, 0.7, q % 2 ? '#9cd45a' : '#e8ffd0', 0); }
       st.healCd = sp.cd; AUDIO.play('unlock'); banner('Uzdravenie!');
       return true;
@@ -2133,6 +2137,8 @@
     }
     st.fallFx = st.fallFx.filter(f => !f.done);
     for (const bl of st.blasts || []) bl.t += dt;
+    for (const h of st.healFx || []) h.t += dt;
+    st.healFx = (st.healFx || []).filter(h => h.t < h.max);
     st.blasts = (st.blasts || []).filter(bl => bl.t < bl.max);
     updateFx(dt);
     if (st.phase === 'battle' && !st.spawnQ.length && !st.enemies.length && (!st.fort || (st.orcWaveOn && !st.fort.dead))) endWave();
@@ -2519,6 +2525,7 @@
       if (b.gate) {
         const gh = BSPR.gatehouse[wl];
         g.drawImage(gh.c, x0, y0 - 15);
+        if (b.holyT > 0) holyGlow(gh, x0, y0 - 15, b.holyT, time); // brána prekrýva hradbu – leskne sa aj ona
         for (const fx of [x0 + 2, x0 + 12]) { // vlajočky na pilieroch
           const wv = Math.floor(time * 6 + fx * 0.7) % 2;
           g.fillStyle = '#4a4e60'; g.fillRect(fx, y0 - 20, 1, 5);
@@ -2840,6 +2847,28 @@
     const X = Math.round(fx), Y = Math.round(fy);
     for (const [r, col] of [[4.5, PAL.K], [3.6, '#a02810'], [2.8, '#f86818'], [1.8, '#f8d048'], [0.8, '#fff7c8']]) { g.fillStyle = col; g.beginPath(); g.arc(X, Y, r, 0, 6.29); g.fill(); }
   }
+  // uzdravenie: na vyliečeného zostúpi zelený stĺp svetla, pod ním sa rozžiari kruh a hore stúpajú zelené krížiky
+  function drawHealFx(h) {
+    const u = h.u, p = h.t / h.max, a = p < 0.2 ? p / 0.2 : 1 - (p - 0.2) / 0.8, x = Math.round(u.x), y = Math.round(u.y);
+    const w = h.big ? 7 : 4, top = y - (h.big ? 70 : 40) * Math.min(1, p * 4);
+    g.globalCompositeOperation = 'lighter';
+    const col = g.createLinearGradient(0, top, 0, y);
+    col.addColorStop(0, 'rgba(120,230,90,0)'); col.addColorStop(0.7, 'rgba(110,220,80,' + (0.28 * a) + ')'); col.addColorStop(1, 'rgba(160,240,120,' + (0.4 * a) + ')');
+    g.fillStyle = col; g.fillRect(x - w, top, w * 2, y - top);
+    g.fillStyle = 'rgba(200,255,180,' + (0.3 * a) + ')'; g.fillRect(x, top, 1, y - top - 14); // tenké jasné jadro stĺpa nad postavou
+    const gr = g.createRadialGradient(x, y, 1, x, y, w * 2);
+    gr.addColorStop(0, 'rgba(140,240,100,' + (0.6 * a) + ')'); gr.addColorStop(1, 'rgba(120,230,90,0)');
+    g.fillStyle = gr; g.beginPath(); g.ellipse(x, y, w * 2, w * 0.8, 0, 0, 6.29); g.fill();
+    g.globalCompositeOperation = 'source-over';
+    for (let i = 0; i < (h.big ? 4 : 2); i++) { // zelené krížiky stúpajú a blednú
+      const q = (p * 1.4 + i / (h.big ? 4 : 2)) % 1, cx = x + Math.round(Math.sin(i * 2.3 + p * 3) * (w + 2)), cy = Math.round(y - 6 - q * (h.big ? 26 : 18));
+      g.globalAlpha = a * (1 - q);
+      g.fillStyle = PAL.K; g.fillRect(cx - 2, cy - 1, 5, 3); g.fillRect(cx - 1, cy - 2, 3, 5);
+      g.fillStyle = '#62c040'; g.fillRect(cx - 1, cy, 3, 1); g.fillRect(cx, cy - 1, 1, 3);
+      g.fillStyle = '#e8ffd0'; g.fillRect(cx, cy, 1, 1);
+    }
+    g.globalAlpha = 1;
+  }
   // výbuch ohnivej gule: oslnivý záblesk, ohnivá guľa rozpínajúca sa do strán a rázová vlna po zemi
   function drawBlast(bl) {
     const p = bl.t / bl.max, e = 1 - Math.pow(1 - p, 3), R = bl.R;
@@ -2867,12 +2896,12 @@
     }
     if (m.wave) {
       const ease = 1 - Math.pow(1 - t, 2);
-      const inner = m.holy ? '248,208,72' : '168,104,232'; // svätý štít zlatý, teleport fialový
+      const inner = m.holy ? '248,208,72' : m.heal ? '120,230,90' : '168,104,232'; // svätý štít zlatý, uzdravenie zelené, teleport fialový
       for (const [rr, col, w] of [[m.wave * ease, 'rgba(255,255,255,' + (1 - t) + ')', 2], [m.wave * ease * 0.7, 'rgba(' + inner + ',' + (0.9 * (1 - t)) + ')', 2]]) {
         g.strokeStyle = col; g.lineWidth = w;
         g.beginPath(); g.ellipse(m.x, m.y, Math.max(1, rr), Math.max(1, rr * 0.7), 0, 0, 6.29); g.stroke();
       }
-      g.globalAlpha = 0.25 * (1 - t); g.fillStyle = m.holy ? '#fff0a0' : '#c8a0ff';
+      g.globalAlpha = 0.25 * (1 - t); g.fillStyle = m.holy ? '#fff0a0' : m.heal ? '#b0f090' : '#c8a0ff';
       g.beginPath(); g.ellipse(m.x, m.y, Math.max(1, m.wave * ease), Math.max(1, m.wave * ease * 0.7), 0, 0, 6.29); g.fill();
       g.globalAlpha = 1; g.lineWidth = 1;
       return;
@@ -3299,6 +3328,13 @@
       objs.push({ y: G.hallBot, f: () => drawHall(time) });
       for (const b of st.blds) if (!TRAPS[b.kind]) objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), x: b.c, f: () => drawBuilding(b, time) });
       for (const s of st.soldiers) objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: s.y, f: () => drawFighter(s, s.spr || 'soldier') });
+      if (st.phase === 'build') { // kúpené obliehacie stroje čakajú vedľa radnice, kým sa nezačne útok
+        let i = 0;
+        for (const key of ['ram', 'cat']) for (let q = 0; q < ((st.siegeOrder || {})[key] || 0); q++, i++) {
+          const sp = SPR[BUY[key].siege][0], x = G.hallCx + (i % 2 ? 1 : -1) * (30 + 14 * Math.floor(i / 2)), y = G.hallTop + 4;
+          objs.push({ y, f: () => { shadow(x, y, 8); g.drawImage(sp.c, Math.round(x - sp.w / 2), Math.round(y - sp.h)); } });
+        }
+      }
       if (st.king && !st.king.dead) objs.push({ y: st.king.y, f: () => drawFighter(st.king, heroDef().spr) });
       else if (st.king && kingLying(st.king)) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
     }
@@ -3336,6 +3372,7 @@
     for (const b of st.bolts) drawBolt(b);
     for (const f of st.fallFx) drawFallingFireball(f);
     for (const bl of st.blasts || []) drawBlast(bl);
+    for (const h of st.healFx || []) if (h.t >= 0) drawHealFx(h);
     for (const sh of st.shields || []) {
       const a = Math.min(1, sh.t / 0.4, (sh.max - sh.t) / 0.2 + 0.2);
       g.globalAlpha = 0.18 * a; g.fillStyle = '#fff070';
@@ -3384,16 +3421,6 @@
   }
 
   function hudTick() {
-    for (const [id, key] of [['buyKnight', 'knight'], ['buyArcher', 'archer']]) { // tlačidlá nákupu len keď stojí príslušná budova
-      const el = $(id), u = BUY[key], exists = st.blds.some(b => b.kind === u.kind);
-      el.hidden = !exists;
-      if (exists) el.disabled = st.gold < u.cost;
-    }
-    for (const [id, key] of [['buyRam', 'ram'], ['buyCat', 'cat']]) {
-      const el = $(id), ok = canSiege(key);
-      el.hidden = !ok;
-      if (ok) el.disabled = st.gold < BUY[key].cost || siegeCount(key) >= SIEGE_MAX;
-    }
     const k = st.king, kp = $('hud-king');
     if (k) {
       const r = k.dead ? 0 : Math.max(0, k.hp / kingMax());
@@ -3458,9 +3485,7 @@
     if (SPR.paladin8) ICONS.hero_paladin = portrait(SPR.paladin8, 11, 4, 20);
     if (SPR.sorc8) ICONS.hero_sorc = portrait(SPR.sorc8, 11, 3, 20);
     ICONS.u_knight = spriteURL(SPR.soldier[0], 3); ICONS.u_footArcher = spriteURL(SPR.footArcher[0], 3);
-    $('buyKnight').querySelector('img').src = ICONS.u_knight; $('buyArcher').querySelector('img').src = ICONS.u_footArcher;
     ICONS.u_siegeRam = spriteURL(SPR.siegeRam[0], 2); ICONS.u_siegeCat = spriteURL(SPR.siegeCat[0], 2);
-    $('buyRam').querySelector('img').src = ICONS.u_siegeRam; $('buyCat').querySelector('img').src = ICONS.u_siegeCat;
     $('icoHall').src = UI_ICONS.hall;
     syncHeroIcons(); updateGems();
     for (const k of ['orc', 'garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' ? 2 : 3);
@@ -3481,14 +3506,14 @@
     undoStack.push({
       gold: st.gold, hallLvl: st.hallLvl, hallHp: st.hallHp, volleyLvl: st.volleyLvl, kingDead: !!(st.king && st.king.dead),
       blds: st.blds.map(b => Object.assign({}, b, { unit: b.unit ? Object.assign({}, b.unit) : null })),
-      paving: Object.assign({}, st.paving),
+      paving: Object.assign({}, st.paving), siegeOrder: Object.assign({}, st.siegeOrder),
     });
     if (undoStack.length > 40) undoStack.shift();
   }
   function doUndo() {
     const sn = undoStack.pop();
     if (!sn || st.phase !== 'build') return;
-    Object.assign(st, { gold: sn.gold, hallLvl: sn.hallLvl, hallHp: sn.hallHp, volleyLvl: sn.volleyLvl, blds: sn.blds, paving: sn.paving });
+    Object.assign(st, { gold: sn.gold, hallLvl: sn.hallLvl, hallHp: sn.hallHp, volleyLvl: sn.volleyLvl, blds: sn.blds, paving: sn.paving, siegeOrder: sn.siegeOrder || {} });
     st.sel = null; st.selGroup = null; st.tool = null; st.moving = null;
     if (st.king) {
       if (sn.kingDead && !st.king.dead) Object.assign(st.king, { dead: true, deadT: 9, fadeT: null });
@@ -3693,7 +3718,7 @@
       const tab = BUILD_TABS.find(t => t.id === st.buildTab) || BUILD_TABS[0];
       for (const t of BUILD_TABS) {
         const tb = document.createElement('button');
-        const open = t.kinds.some(k => has(k));
+        const open = t.kinds.some(k => has(k)) || (t.id === 'siege' && isAttack() && (has('siegeRam') || has('siegeCat')));
         tb.className = 'btab' + (t === tab ? ' on' : '') + (open ? '' : ' locked') + (t.kinds.some(isNew) ? ' shine' : '');
         tb.title = t.name; tb.dataset.tab = t.id;
         tb.innerHTML = '<img src="' + UI_ICONS.tabs[t.id] + '" alt="' + t.name + '">';
@@ -3736,6 +3761,13 @@
           st.tool = kind; st.flip = null; st.sel = null; st.moving = null; renderBuild();
         });
         pal.appendChild(b);
+      }
+      if (tab.id === 'siege' && isAttack()) for (const key of ['ram', 'cat']) { // obliehacie stroje: vyrazia so začiatkom útoku
+        const u = BUY[key], icon = ICONS['u_' + u.siege];
+        if (!st.tech.has(u.siege)) { lockAct(icon, u.name, unlockMissionOf(u.siege), true); continue; }
+        const n = siegeCount(key), full = n >= SIEGE_MAX;
+        act(icon, u.name + ' ' + n + '/' + SIEGE_MAX, full ? 'plné' : coinTxt(u.cost), !full && st.gold >= u.cost,
+          full ? 'Naraz najviac ' + SIEGE_MAX + ' – ' + u.plural : () => orderSiege(key), 'unit', true);
       }
     }
     $('nextWave').textContent = !isAttack() ? 'Do boja' : st.wave >= MISSION_WAVES ? 'Zaútočiť' : 'Do útoku';
@@ -4044,34 +4076,26 @@
     for (const b of st.blds) if (BUILD[b.kind].hp) b.hp = bMaxHp(b);
     rebuildOcc(); renderBuild();
   });
-  // dokupovanie vojakov počas boja: vyjde hneď z kasární / strelnice, navyše k bežnému počtu
-  // obliehacie stroje (útočné misie): vyjdú od radnice, naraz najviac 2 z každého druhu
+  // obliehacie stroje (útočné misie): kupujú sa počas stavby v záložke Stroje, čakajú pri radnici
+  // a vyrazia so začiatkom útoku; naraz najviac 2 z každého druhu (aj s tými, čo už sú na bojisku)
   const BUY = {
-    knight: { cost: 40, kind: 'barracks', spawn: b => spawnKnight(b, true) }, archer: { cost: 50, kind: 'range', spawn: b => spawnArcher(b, true) },
-    ram: { cost: 90, siege: 'siegeRam', spawn: () => spawnSiege('ram') }, cat: { cost: 120, siege: 'siegeCat', spawn: () => spawnSiege('cat') },
+    ram: { cost: 90, siege: 'siegeRam', name: 'Baranidlo', plural: 'baranidlá' },
+    cat: { cost: 120, siege: 'siegeCat', name: 'Voz. katapult', plural: 'katapulty' },
   };
   const SIEGE_MAX = 2;
-  const siegeCount = kind => st.soldiers.filter(s => s.siege === kind && !s.dead).length;
+  const siegeCount = kind => st.soldiers.filter(s => s.siege === kind && !s.dead).length + ((st.siegeOrder || {})[kind] || 0);
   const canSiege = key => !!st.fort && !st.fort.dead && st.tech.has(BUY[key].siege);
-  function buyUnit(key) {
+  function orderSiege(key) {
     const u = BUY[key];
-    if (st.phase !== 'battle' || st.gold < u.cost) { AUDIO.play('deny'); return; }
-    if (u.siege) {
-      if (!canSiege(key) || siegeCount(key) >= SIEGE_MAX) { AUDIO.play('deny'); if (canSiege(key)) toast('Naraz najviac ' + SIEGE_MAX + ' – ' + (key === 'ram' ? 'baranidlá' : 'katapulty')); return; }
-      st.gold -= u.cost; u.spawn();
-      AUDIO.play('build'); updateHud();
-      return;
-    }
-    const homes = st.blds.filter(b => b.kind === u.kind);
-    if (!homes.length) { AUDIO.play('deny'); return; }
-    const free = homes.filter(b => !knightsBlocked(b)), b = (free.length ? free : homes)[Math.floor(Math.random() * (free.length || homes.length))];
-    st.gold -= u.cost; u.spawn(b);
-    AUDIO.play('build'); updateHud();
+    if (st.phase !== 'build' || !canSiege(key) || st.gold < u.cost || siegeCount(key) >= SIEGE_MAX) return false;
+    st.gold -= u.cost; st.siegeOrder = Object.assign({}, st.siegeOrder, { [key]: ((st.siegeOrder || {})[key] || 0) + 1 });
+    return true;
   }
-  $('buyKnight').addEventListener('click', () => buyUnit('knight'));
-  $('buyArcher').addEventListener('click', () => buyUnit('archer'));
-  $('buyRam').addEventListener('click', () => buyUnit('ram'));
-  $('buyCat').addEventListener('click', () => buyUnit('cat'));
+  // stroje kúpené počas stavby vyrazia so začiatkom útoku
+  function launchSiege() {
+    for (const key in st.siegeOrder || {}) for (let i = 0; i < st.siegeOrder[key]; i++) spawnSiege(key);
+    st.siegeOrder = {};
+  }
   $('speedBtn').addEventListener('click', () => {
     st.speed = st.speed >= 3 ? 1 : st.speed + 1;
     $('speedBtn').textContent = 'x' + st.speed;
@@ -4530,8 +4554,8 @@
     void p.offsetHeight;
     const h = p.scrollHeight, PXS = 3;
     const aw = Math.ceil(p.clientWidth / PXS), ah = Math.ceil(h / PXS);
+    if (!aw || !h) { requestAnimationFrame(() => unrollScroll(anim, screen)); return; } // ešte nemá rozmery (papier s nulovou šírkou sa nedá nakresliť)
     p.style.backgroundImage = 'url(' + UI_ICONS.scrollPaper(aw, ah) + ')'; p.style.backgroundSize = aw * PXS + 'px ' + ah * PXS + 'px';
-    if (!aw || !h) { requestAnimationFrame(() => unrollScroll(anim, screen)); return; } // ešte nemá rozmery
     $(screen).querySelectorAll('.rod').forEach(r => {
       const rw = Math.ceil(r.offsetWidth / PXS);
       r.style.backgroundImage = 'url(' + UI_ICONS.scrollRod(rw) + ')'; r.style.backgroundSize = rw * PXS + 'px 27px';
@@ -4662,5 +4686,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, HEROES, switchHero, setActiveHero, ownedHeroes, heroDef, heroWalkHome,
-    enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, buyUnit, knightsBlocked, get isAttack() { return isAttack(); } };
+    enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, orderSiege, knightsBlocked, get isAttack() { return isAttack(); } };
 })();

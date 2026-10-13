@@ -207,14 +207,18 @@ const UI_ICONS = (() => {
     put(c, c, '#ffffff');
   });
   // schopnosti paladina (roh, štít, uzdravenie) a čarodejky (ohnivá stena, teleport)
-  const spellHorn = outlined(15, 13, put => {
-    for (let x = 1; x <= 11; x++) { // roh sa rozširuje doprava
-      const h = 1 + Math.floor((x - 1) / 3);
-      for (let y = 6 - h; y <= 6 + h; y++) put(x, y, y === 6 - h ? '#fff2d0' : y >= 6 + h - 0 ? '#b88420' : '#e8c070');
+  // pokrik: dva skrížené meče (sila) a pod nimi fialová dvojitá šípka nahor (posilnenie, farba aury pokriku)
+  const spellHorn = outlined(15, 15, put => {
+    for (const m of [false, true]) {
+      const X = x => m ? 14 - x : x;
+      for (let t = 0; t <= 8; t++) { put(X(4 + t), 9 - t, '#e8ecf4'); put(X(5 + t), 9 - t, m ? '#e8ecf4' : '#a8b0c0'); } // čepeľ s leskom
+      put(X(13), 0, '#ffffff');
+      put(X(2), 8, '#f8d048'); put(X(3), 9, '#b88420'); put(X(4), 10, '#f8d048'); // záštita naprieč
+      put(X(2), 10, '#8a5a2a'); put(X(1), 11, '#8a5a2a'); put(X(0), 12, '#f8d048'); // rukoväť a hlavica
     }
-    for (let y = 1; y <= 11; y++) put(12, y, '#f8d048');
-    put(13, 3, '#ffffff'); put(14, 1, '#ffffff'); put(13, 9, '#ffffff'); put(14, 11, '#ffffff'); // zvuk
-    put(4, 4, '#8a5a2a'); put(4, 8, '#8a5a2a'); put(8, 3, '#8a5a2a'); put(8, 9, '#8a5a2a'); // pásiky
+    for (const [ay, col] of [[9, '#f4dcff'], [12, '#c878ff']]) { // dve šípky nahor
+      put(7, ay, col); put(6, ay + 1, col); put(8, ay + 1, col); put(5, ay + 2, col); put(9, ay + 2, col);
+    }
   });
   const spellShield = outlined(13, 15, put => {
     for (let y = 1; y <= 13; y++) {
