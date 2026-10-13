@@ -76,7 +76,7 @@
     lightning: { name: 'Blesk',        tech: 'lightning', cdKey: 'boltCd', cd: 18, reach: 34 },
     // paladin
     warcry:    { name: 'Pokrik',       cdKey: 'cryCd',    cd: 30, instant: true },
-    shield:    { name: 'Svätý štít',   cdKey: 'shieldCd', cd: 26, R: 30, dur: 4 },
+    shield:    { name: 'Svätý štít',   cdKey: 'shieldCd', cd: 26, R: 60, dur: 4, instant: true },
     heal:      { name: 'Uzdravenie',   cdKey: 'healCd',   cd: 24, instant: true, R: 60 },
     // čarodejka
     firewall:  { name: 'Ohnivá stena', cdKey: 'fwCd',     cd: 24, dur: 5, w: 44 },
@@ -310,7 +310,7 @@
     lightning: { name: 'Blesk',        desc: 'Silný úder do nepriateľa, preskočí na dvoch ďalších a všetkých na 2 s omráči.', icon: 'sp_bolt' },
     fireball:  { name: 'Ohnivá guľa',  desc: 'Výbuch zraní hordu v okolí a podpáli ju.',              icon: 'sp_fire' },
     warcry:    { name: 'Pokrik',       desc: 'Na chvíľu posilní a zrýchli hrdinu aj rytierov.',        icon: 'sp_warcry' },
-    shield:    { name: 'Svätý štít',   desc: 'Budovy aj radnica v okolí chvíľu neberú žiadne poškodenie.', icon: 'sp_shield' },
+    shield:    { name: 'Svätý štít',   desc: 'Vlna okolo paladina rozžiari budovy aj radnicu v dosahu – kým sa lesknú, sú nezraniteľné.', icon: 'sp_shield' },
     heal:      { name: 'Uzdravenie',   desc: 'Ihneď vylieči paladina a rytierov okolo neho.',           icon: 'sp_heal' },
     firewall:  { name: 'Ohnivá stena', desc: 'Pás ohňa na zvolenom mieste podpáli každého, kto ním prejde.', icon: 'sp_firewall' },
     teleport:  { name: 'Teleport',     desc: 'Čarodejka sa premiestni na zvolené miesto, zraní a omráči nepriateľov okolo a hneď sa vráti k radnici.', icon: 'sp_teleport' },
@@ -586,7 +586,7 @@
     st.heroDead[st.hero] = !!(st.king && st.king.dead);
     setActiveHero(id);
     st.king = makeHero();
-    if (st.heroDead[id]) Object.assign(st.king, { dead: true, deadT: 9, fadeT: KING_FADE });
+    if (st.heroDead[id]) Object.assign(st.king, { dead: true, deadT: 9, fadeT: null }); // porazený leží pred radnicou, kým ho hráč neoživí
     undoStack.length = 0; // späť by vrátilo stav s iným hrdinom
     for (let q = 0; q < 16; q++) part(st.king.x, st.king.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.6, ['#f8d048', '#ffffff'][q % 2], 40);
     AUDIO.play('upgrade'); renderBuild(); updateHud();
@@ -786,9 +786,9 @@
     u.flash = Math.max(0, u.flash - dt); u.cd = Math.max(0, u.cd - dt); u.swing = Math.max(0, (u.swing || 0) - dt);
     const o = fortTarget(u);
     if (!o) return;
-    const a = fortApproach(u, o), spd = (u.spd || 26) * (st.cryT > 0 ? 1.4 : 1) * waterMul(u) * (stakeAt(u) ? 0.5 : 1);
+    const a = fortApproach(u, o), spd = (u.spd || 26) * (st.cryT > 0 ? CRY_SPD : 1) * waterMul(u) * (stakeAt(u) ? 0.5 : 1);
     if (Math.hypot(a.x - u.x, a.y - u.y) > 5) { if (u.y < FORT.palY + 30) moveTo(u, a.x, a.y, spd, dt); else moveKnight(u, a.x, a.y, spd, dt); return; }
-    if (u.cd <= 0) { u.cd = 0.8; u.swing = 0.15; AUDIO.play('clang'); hitFort(o, u.dmg * (st.cryT > 0 ? 1.6 : 1)); }
+    if (u.cd <= 0) { u.cd = 0.8; u.swing = 0.15; AUDIO.play('clang'); hitFort(o, u.dmg * (st.cryT > 0 ? CRY_DMG : 1)); }
   }
   // orkské veže strieľajú na najbližšieho vojaka v dosahu
   function updateFort(dt) {
@@ -837,7 +837,7 @@
       wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.15 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, shake: 0, soldierN: 0,
       blds: [], paving: {}, enemies: [], soldiers: [], proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
       cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, shieldCd: 0, healCd: 0, fwCd: 0, tpCd: 0, shields: [], fireWalls: [], heroDead: {},
-      spellSel: null, fallFx: [], bolts: [], siegeHold: false, siegeT: 0, introPan: null,
+      spellSel: null, fallFx: [], blasts: [], bolts: [], hallHolyT: 0, siegeHold: false, siegeT: 0, introPan: null,
     });
     rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
     st.fort = isAttack() ? makeFort() : null;
@@ -909,8 +909,8 @@
     $('bottom').hidden = true;
     // rytieri a kráľ sa vrátia a vyliečia
     for (const s of st.soldiers) { s.hp = s.max; s.tgt = null; }
-    st.fireWalls = []; st.shields = []; // schopnosti hrdinu po vlne dohasnú
-    if (st.king && st.king.dead && st.king.fadeT == null) st.king.fadeT = 0; // padnutý kráľ sa po vlne vytratí
+    st.fireWalls = []; st.shields = []; st.hallHolyT = 0; for (const b of st.blds) b.holyT = 0; // schopnosti hrdinu po vlne dohasnú
+    if (st.king && st.king.dead) st.king.deadT = Math.max(st.king.deadT, 1); // padnutý hrdina ostane omráčený ležať aj počas stavby, kým ho hráč neoživí
     if (st.king && st.king.dead) later(() => { if (st.phase === 'build' && st.king.dead) hint(heroFell() + ' – ' + (heroDef().fem ? 'oživíš ju' : 'oživíš ho') + ' v radnici'); }, 900);
     if (st.king && !st.king.dead) { st.king.hp = kingMax(); st.king.down = 0; st.king.tgt = null; st.king.flash = 0; st.king.swing = 0; st.king.tpBack = 0; } // domov dôjde sám (heroWalkHome)
     for (const b of st.blds) b.flash = 0;
@@ -1108,7 +1108,7 @@
 
   const shieldAt = (x, y) => st.shields && st.shields.some(sh => Math.hypot(x - sh.x, (y - sh.y) / 0.7) < sh.R);
   function hitBuilding(b, dmg, attacker) {
-    if (shieldAt(tileX(b.c) + T / 2, tileY(b.r) + T / 2)) { if (Math.random() < 0.3) part(tileX(b.c) + T / 2, tileY(b.r) + 4, (Math.random() - 0.5) * 20, -10, 0.3, '#fff070', 0); return; }
+    if (b.holyT > 0 || shieldAt(tileX(b.c) + T / 2, tileY(b.r) + T / 2)) { if (Math.random() < 0.3) part(tileX(b.c) + T / 2, tileY(b.r) + 4, (Math.random() - 0.5) * 20, -10, 0.3, '#fff070', 0); return; }
     b.hp -= dmg; b.flash = 0.08;
     if (b.spikes && attacker && !attacker.dead) {
       damage(attacker, spikeDmg(b)); part(attacker.x, attacker.y - 6, 0, -10, 0.3, b.spikeType ? SPIKE_TYPES[b.spikeType].tip : '#f4f4f8', 60);
@@ -1144,7 +1144,7 @@
   }
 
   function hitHall(dmg, x) {
-    if (shieldAt(x, G.hallTop + 4)) { if (Math.random() < 0.3) part(x, G.hallTop + 2, (Math.random() - 0.5) * 20, -10, 0.3, '#fff070', 0); return; }
+    if (st.hallHolyT > 0 || shieldAt(x, G.hallTop + 4)) { if (Math.random() < 0.3) part(x, G.hallTop + 2, (Math.random() - 0.5) * 20, -10, 0.3, '#fff070', 0); return; }
     st.hallHp -= dmg;
     AUDIO.play('hallHit');
     for (let k = 0; k < 4; k++) part(x + (Math.random() - 0.5) * 6, G.hallTop + 2, (Math.random() - 0.5) * 30, -10 - Math.random() * 25, 0.45, Math.random() < 0.5 ? '#848490' : '#525262', 90);
@@ -1450,6 +1450,28 @@
   // alebo tesne pred ňou (napr. pri veži na okraji)
   const heroBandTop = () => tileY(zoneTopRow()) - T - 10 * tal('reach');
   const heroReaches = (e, aggro) => Math.hypot(e.x - st.king.hx, e.y - st.king.hy) <= aggro || e.y >= heroBandTop();
+  // stihne hrdina nepriateľa, kým ho zničia iní? Sčíta strely, ktoré už k nemu letia, a poškodenie,
+  // ktoré mu za čas cesty hrdinu dajú veže (strieľajú na toho, kto je najbližšie k radnici) a rytier, s ktorým bojuje
+  const TOWER_KINDS = { tower: 1, mage: 1, icetower: 1, ballista: 1, catapult: 1 };
+  function doomed(e, eta) {
+    let dmg = 0;
+    for (const p of st.proj) if (p.tgt === e) dmg += p.dmg || 0;
+    if (dmg >= e.hp) return true;
+    let dps = 0;
+    const tileDist = q => { const t = tileAt(q.x, q.y); return st.dist[t.r * G.cols + t.c] || 0; };
+    const de = tileDist(e);
+    for (const b of st.blds) {
+      if (!TOWER_KINDS[b.kind] || (b.hp != null && b.hp <= 0)) continue;
+      const c = bCenter(b), rng = bRange(b);
+      if (Math.hypot(e.x - c.x, e.y - c.y) > rng) continue;
+      if (st.enemies.some(o => o !== e && !o.dead && o.y >= 4 && Math.hypot(o.x - c.x, o.y - c.y) <= rng && tileDist(o) < de)) continue; // veža mieri na iného
+      dps += bDmg(b) / bCd(b);
+    }
+    if (e.foe && e.foe !== st.king && !e.foe.dead) dps += (e.foe.dmg || 0) / 0.8;
+    return dmg + dps * eta >= e.hp;
+  }
+  // čas, za ktorý hrdina dôjde k nepriateľovi na dosah úderu
+  const heroEta = (u, e, reach) => Math.max(0, Math.hypot(e.x - u.x, e.y - u.y) - reach) / Math.max(1, u.spd || 20);
   function nearestEnemyWhere(x, y, ok, preferFree, fly) {
     let best = null, bd = 1e9;
     for (const e of st.enemies) {
@@ -1547,7 +1569,7 @@
     // prednosť má ten, kto ju práve napadol zblízka; inak najbližší v dostrele alebo v stavebnej zóne – k tomu podíde
     const keep = k.aim && !k.aim.dead && Math.hypot(k.aim.x - k.x, k.aim.y - k.y) <= rng + 8 ? k.aim : null;
     const attacker = nearestEnemyWhere(k.x, k.y, e => e.foe === k && Math.hypot(e.x - k.x, e.y - k.y) < 16, false, true);
-    const t = attacker || keep || nearestEnemyWhere(k.x, k.y, e => Math.hypot(e.x - k.x, e.y - k.y) <= rng || heroReaches(e, 0), false, true);
+    const t = attacker || keep || nearestEnemyWhere(k.x, k.y, e => Math.hypot(e.x - k.x, e.y - k.y) <= rng || (heroReaches(e, 0) && !doomed(e, heroEta(k, e, rng))), false, true);
     const inRng = t && Math.hypot(t.x - k.x, t.y - k.y) <= rng + (t === keep ? 8 : 0);
     k.aim = inRng ? t : null;
     if (t && !inRng) { moveKnight(k, t.x, t.y, k.spd * waterMul(k), dt); k.anim += dt * 6; }
@@ -1572,10 +1594,11 @@
     // jazdec si vyberá strelcov, šamanov a podkopníkov; ostatní najbližšieho
     if (!u.tgt && u.ktype === 'rider') u.tgt = priorityEnemy(homeX, homeY, aggro, RIDER_PRIO);
     if (u.ktype === 'spear' && !(u.tgt && u.tgt.d.cav)) { const c = priorityEnemy(u.x, u.y, 90, e => e.d.cav); if (c) u.tgt = c; } // kopijník vyráža proti jazde
-    if (!u.tgt) u.tgt = u.isKing ? nearestEnemyWhere(u.x, u.y, e => heroReaches(e, aggro), true) : nearestEnemy(homeX, homeY, aggro, true);
+    // hrdina nevyráža po nepriateľovi, ktorého aj tak zničia iní skôr, než k nemu dôjde (inak by len poskakoval tam a späť)
+    if (!u.tgt) u.tgt = u.isKing ? nearestEnemyWhere(u.x, u.y, e => heroReaches(e, aggro) && !doomed(e, heroEta(u, e, 8)), true) : nearestEnemy(homeX, homeY, aggro, true);
     const t = u.tgt;
-    const cry = st.cryT > 0 ? 1 : 0, spd = (u.spd || 26) * (1 + 0.4 * cry) * waterMul(u);
-    if (cry) dmg *= 1.6;
+    const cry = st.cryT > 0 ? 1 : 0, spd = (u.spd || 26) * (1 + (CRY_SPD - 1) * cry) * waterMul(u);
+    if (cry) dmg *= CRY_DMG;
     if (t) {
       const d = Math.hypot(t.x - u.x, t.y - u.y);
       const spear = u.ktype === 'spear', reach = spear ? SPEAR_REACH : 8, off = spear ? 12 : 5; // kopijník bodá spoza rytiera
@@ -1740,13 +1763,15 @@
     for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
   }
   // lukostrelec: stojí kúsok za rytiermi a strieľa na najbližšiu hordu v dosahu; keď nikto nie je v dosahu, ide na svoje miesto
+  // pokrik: jednotky a hrdina sú rýchlejší a silnejší (lukostrelci strieľajú rýchlejšie a silnejšie)
+  const CRY_SPD = 1.5, CRY_DMG = 1.8;
   function updateArcher(u, dt, hx, hy) {
     u.flash = Math.max(0, u.flash - dt);
     u.cd = Math.max(0, u.cd - dt);
     let near = false;
     for (const e of st.enemies) if (!e.dead && e.y > 4 && Math.hypot(e.x - u.x, e.y - u.y) <= ARCHER_RANGE) { near = true; break; }
     if (near) {
-      if (u.cd <= 0 && shoot(u.x, u.y, u.x, u.y - 9, ARCHER_RANGE, 'arrow', 180, u.dmg, 0, ARCHER_PRIO)) { u.cd = ARCHER_CD; u.swing = 0.1; }
+      if (u.cd <= 0 && shoot(u.x, u.y, u.x, u.y - 9, ARCHER_RANGE, 'arrow', 180, u.dmg * (st.cryT > 0 ? CRY_DMG : 1), 0, ARCHER_PRIO)) { u.cd = ARCHER_CD / (st.cryT > 0 ? CRY_SPD : 1); u.swing = 0.1; }
       u.swing = Math.max(0, (u.swing || 0) - dt);
       return;
     }
@@ -1878,8 +1903,13 @@
       st.healCd = sp.cd; AUDIO.play('unlock'); banner('Uzdravenie!');
       return true;
     }
-    if (id === 'shield') {
-      st.shields.push({ x, y, R: sp.R, t: sp.dur + 1.5 * tal('bless'), max: sp.dur + 1.5 * tal('bless') });
+    if (id === 'shield') { // vlna od paladina: budovy a radnica v dosahu sa rozžiaria a kým sa lesknú, sú nezraniteľné
+      const dur = sp.dur + 1.5 * tal('bless'), inR = (px, py) => Math.hypot(px - k.x, (py - k.y) / 0.7) < sp.R;
+      for (const b of st.blds) { const c = bCenter(b); if (inR(c.x, c.y)) b.holyT = dur; }
+      const hr = hallRect(), hx = Math.max(hr.x0, Math.min(hr.x1, k.x)), hy = Math.max(hr.y0, Math.min(hr.y1, k.y));
+      if (inR(hx, hy)) st.hallHolyT = dur;
+      st.marks.push({ x: k.x, y: k.y, life: 0.6, max: 0.6, wave: sp.R, holy: true });
+      for (let q = 0; q < 30; q++) { const a = q / 30 * 6.28; part(k.x + Math.cos(a) * 4, k.y + Math.sin(a) * 3, Math.cos(a) * 75, Math.sin(a) * 52, 0.5, q % 2 ? '#fff7c8' : '#f8d048', 0); }
       st.shieldCd = sp.cd; AUDIO.play('upgrade');
       return true;
     }
@@ -1919,7 +1949,7 @@
       for (const e of st.enemies) if (!e.dead && Math.hypot(e.x - x, (e.y - y) / 0.7) < sp.R) e.frostT = Math.max(e.frostT || 0, dur);
       for (let k = 0; k < 40; k++) { const a = Math.random() * 6.28, r = Math.random() * sp.R; part(x + Math.cos(a) * r, y + Math.sin(a) * r * 0.7, (Math.random() - 0.5) * 10, -6 - Math.random() * 10, 0.9, ['#ffffff', '#e0f4ff', '#88c8ff'][k % 3], 0); }
       st.marks.push({ x, y, life: 0.6, max: 0.6, ice: true });
-      AUDIO.play('unlock'); banner('Mráz!');
+      AUDIO.play('unlock');
     } else if (id === 'lightning') { // zasiahne najbližšieho nepriateľa a preskočí na ďalších dvoch
       const near = (px, py, skip) => { let b = null, bd = sp.reach; for (const e of st.enemies) { if (e.dead || skip.includes(e)) continue; const d = Math.hypot(e.x - px, e.y - py); if (d < bd) { bd = d; b = e; } } return b; };
       const hit = [];
@@ -1928,6 +1958,7 @@
       const pts = [{ x: cur.x + 6, y: Math.max(0, cur.y - 120) }];
       for (let n = 0; n < 3 && cur; n++) { hit.push(cur); pts.push({ x: cur.x, y: cur.y - cur.h * 0.5 }); cur = near(cur.x, cur.y, hit); }
       hit.forEach((e, n) => { damage(e, (n ? 21 : 35) * pow); e.stunT = Math.max(e.stunT || 0, e.d.boss ? 0.8 : 2); }); // blesk omráči na 2 s (bossov kratšie)
+      for (const e of hit) st.marks.push({ x: e.x, y: e.y, life: 1.3, max: 1.3, bolt: true, seed: Math.random() * 6.28 }); // záblesk na zemi pod zasiahnutým
       st.bolts.push({ pts, life: 0.3, max: 0.3 });
       AUDIO.play('bolt'); AUDIO.play('boom'); st.shake = Math.max(st.shake, 0.15);
     }
@@ -1942,8 +1973,11 @@
       e.burnT = 3; e.burnDps = Math.max(e.burnDps || 0, 4 * pow * (1 + 0.3 * tal('pyro')));
       damage(e, 20 * pow * (1 + 0.3 * tal('pyro')));
     }
-    for (let k = 0; k < 46; k++) { const a = Math.random() * 6.28, v = 20 + Math.random() * 60; part(x, y - 3, Math.cos(a) * v, Math.sin(a) * v * 0.6 - 25, 0.35 + Math.random() * 0.4, ['#fff7c8', '#f8d048', '#f89838', '#d83818', '#3e2614'][k % 5], 60); }
-    AUDIO.play('boom'); st.shake = Math.max(st.shake, 0.3);
+    for (let k = 0; k < 80; k++) { const a = Math.random() * 6.28, v = 25 + Math.random() * 80; part(x, y - 3, Math.cos(a) * v, Math.sin(a) * v * 0.6 - 30, 0.35 + Math.random() * 0.5, ['#fff7c8', '#f8d048', '#f89838', '#d83818', '#3e2614'][k % 5], 70); }
+    for (let k = 0; k < 14; k++) part(x + (Math.random() - 0.5) * 14, y - 4 - Math.random() * 6, (Math.random() - 0.5) * 12, -10 - Math.random() * 10, 1.1 + Math.random() * 0.6, k % 2 ? '#4a3e38' : '#6a5c52', -4); // stĺp dymu
+    (st.blasts || (st.blasts = [])).push({ x, y, t: 0, max: 0.6, R: sp.R });
+    st.marks.push({ x, y, life: 4, max: 4, scorch: true, R: sp.R, seed: Math.random() * 6.28 });
+    AUDIO.play('boom'); st.shake = Math.max(st.shake, 0.45);
   }
 
   function volley(x, y) {
@@ -2021,6 +2055,8 @@
     }
     // svätý štít a ohnivá stena dohasínajú
     for (const sh of st.shields) sh.t -= dt;
+    for (const b of st.blds) if (b.holyT > 0) b.holyT -= dt; // svätý štít dohasína
+    if (st.hallHolyT > 0) st.hallHolyT -= dt;
     st.shields = st.shields.filter(sh => sh.t > 0);
     for (const fw of st.fireWalls) {
       fw.t -= dt;
@@ -2091,10 +2127,13 @@
     for (const f of st.fallFx) { // padajúca ohnivá guľa s chvostom iskier
       f.t -= dt;
       const fy = f.y - 90 * Math.max(0, f.t / f.max), fx = f.x + 30 * Math.max(0, f.t / f.max);
-      for (let k = 0; k < 4; k++) part(fx + (Math.random() - 0.5) * 3, fy + (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 8, -6, 0.3, ['#fff7c8', '#f8d048', '#f89838'][k % 3], 0);
+      for (let k = 0; k < 8; k++) part(fx + (Math.random() - 0.5) * 4, fy + (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 10 + 12, -14 - Math.random() * 10, 0.35, ['#fff7c8', '#f8d048', '#f89838', '#d83818'][k % 4], 0);
+      if (Math.random() < 0.6) part(fx + 3, fy - 2, 8, -10, 0.6, '#4a3e38', -6); // dym za guľou
       if (f.t <= 0) { f.done = true; fireballBlast(f.x, f.y); }
     }
     st.fallFx = st.fallFx.filter(f => !f.done);
+    for (const bl of st.blasts || []) bl.t += dt;
+    st.blasts = (st.blasts || []).filter(bl => bl.t < bl.max);
     updateFx(dt);
     if (st.phase === 'battle' && !st.spawnQ.length && !st.enemies.length && (!st.fort || (st.orcWaveOn && !st.fort.dead))) endWave();
   }
@@ -2233,6 +2272,25 @@
     }
     g.globalAlpha = 1;
   }
+  // pokrik: okolo hrdinu svieti fialová neónová žiara, okolo vlastných jednotiek neónovo modrá;
+  // behind = mäkká žiara a lem na zemi pod postavou, inak tenký pulzujúci obrys a iskry nad ňou
+  function cryAura(u, hero, behind) {
+    if (!(st.cryT > 0)) return;
+    const tm = performance.now() / 1000, f = Math.min(1, st.cryT / 0.5) * (0.8 + 0.2 * Math.sin(tm * 9 + u.x));
+    const rgb = hero ? '200,90,255' : '70,200,255', r = hero ? 15 : 10, cy = u.y - (hero ? 8 : 6);
+    if (behind) {
+      g.globalCompositeOperation = 'lighter';
+      const gr = g.createRadialGradient(u.x, cy, 1, u.x, cy, r);
+      gr.addColorStop(0, 'rgba(' + rgb + ',' + (0.9 * f) + ')'); gr.addColorStop(0.55, 'rgba(' + rgb + ',' + (0.45 * f) + ')'); gr.addColorStop(1, 'rgba(' + rgb + ',0)');
+      g.fillStyle = gr; g.beginPath(); g.ellipse(u.x, cy, r * 0.85, r, 0, 0, 6.29); g.fill();
+      const rx = hero ? 9 : 6.5, ry = hero ? 3.5 : 2.6;
+      for (const [k, al] of [[1, 1], [1.45, 0.45]]) { // neónový lem na zemi a slabší vonkajší kruh
+        g.strokeStyle = 'rgba(' + rgb + ',' + (al * f) + ')'; g.lineWidth = 1;
+        g.beginPath(); g.ellipse(u.x, u.y, rx * k, ry * k, 0, 0, 6.29); g.stroke();
+      }
+      g.globalCompositeOperation = 'source-over';
+    } else if (Math.random() < (hero ? 0.35 : 0.12)) part(u.x + (Math.random() - 0.5) * 10, u.y - 4 - Math.random() * 10, 0, -14, 0.45, hero ? (Math.random() < 0.5 ? '#e0a0ff' : '#ffffff') : (Math.random() < 0.5 ? '#80e0ff' : '#ffffff'), 0);
+  }
   // úder paladinovho kladiva: pred ním sa po zemi rozbehne zlatý kruh, vyletí prach a iskry
   function drawSmash(u) {
     if (!(u.swing > 0)) { u.smashed = false; return; }
@@ -2267,21 +2325,23 @@
     if (u.isKing && hero8(sprName)) {
       const fr = king8Frame(u, hero8(sprName));
       shadow(u.x, u.y, 5);
+      cryAura(u, true, true);
       g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), Math.round(u.y - fr.h) + K8_PB); // pod chodidlami je miesto na zbraň
       if (sprName === 'paladin') drawSmash(u);
       else if (sprName === 'sorc') drawCastFlare(u, hero8(sprName)[u.face8]);
       else if (u.swing > 0) drawSlash(u.x, u.y - 9, u.face8 * Math.PI / 4, 1 - u.swing / 0.3);
-      if (st.cryT > 0 && Math.random() < 0.15) part(u.x + (Math.random() - 0.5) * 8, u.y - 8, 0, -16, 0.4, '#f8d048', 0);
+      cryAura(u, true);
       return;
     }
     const frames = SPR[sprName];
     const fi = u.siege === 'cat' ? (u.fired > 0 ? 1 : 0) : Math.floor(u.anim) % 2, fr = frames[fi];
     const x = Math.round(u.x - fr.w / 2), y = Math.round(u.y - fr.h - (u.swing > 0 && !u.siege ? 1 : 0)) + (u.siege === 'ram' && u.swing > 0 ? -2 : 0);
     shadow(u.x, u.y, u.siege ? 8 : 4);
+    if (!u.siege) cryAura(u, !!u.isKing, true);
     g.drawImage(u.flash > 0 ? fr.f : fr.c, x, y);
     if (sprName === 'craft') drawHammer(u, x, y);
     if (sprName === 'sorc' && Math.random() < 0.25) part(x + 12, y + 1, (Math.random() - 0.5) * 4, -8 - Math.random() * 6, 0.35, Math.random() < 0.5 ? '#fff070' : '#f87830', 0); // plamienok na palici
-    if (st.cryT > 0 && Math.random() < 0.15) part(u.x + (Math.random() - 0.5) * 8, u.y - 8, 0, -16, 0.4, '#f8d048', 0); // pokrik
+    if (!u.siege) cryAura(u, !!u.isKing); // pokrik
     if (u.stunT > 0) { // hviezdičky nad omráčeným
       const t = performance.now() / 1000;
       for (let k = 0; k < 2; k++) { const a = t * 6 + k * 3.14; g.fillStyle = k ? '#fff070' : '#f8d048'; g.fillRect(Math.round(u.x + Math.cos(a) * 4), Math.round(y - 3 + Math.sin(a) * 1.5), 1, 1); }
@@ -2293,7 +2353,7 @@
   }
 
   // padnutý kráľ: klesne na kolená (nohy zmiznú pod ním), plášť sa zavlní, nad korunou krúžia hviezdičky;
-  // leží tak do konca vlny, potom sa vytratí (fadeT beží od konca vlny)
+  // leží tak aj počas stavby, kým ho hráč neoživí (fadeT = postupné vytratenie, ak sa niekedy nastaví)
   const KING_FADE = 0.6;
   const kingLying = k => k.fadeT == null || k.fadeT < KING_FADE;
   // pri páde kráľa sa boj na chvíľu spomalí na tretinu (v reálnom čase), aby si to hráč všimol
@@ -2413,6 +2473,27 @@
   // náhľad stavby po zmene (jej vlastnosti s prepísanými hodnotami)
   const after = (b, ch) => bPreview(Object.assign({ kind: b.kind, lvl: b.lvl, gate: b.gate, spikes: b.spikes, spikeType: b.spikeType, unit: b.unit, spec: b.spec }, ch));
 
+  // svätý štít: budova sa zlato leskne (pulzuje) a iskrí, kým je nezraniteľná
+  const goldCache = new WeakMap();
+  function goldOf(spr) {
+    const src = spr.f || spr.c;
+    let c = goldCache.get(src);
+    if (!c) {
+      c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+      const cx = c.getContext('2d'); cx.drawImage(src, 0, 0);
+      cx.globalCompositeOperation = 'source-in'; cx.fillStyle = '#ffd860'; cx.fillRect(0, 0, c.width, c.height);
+      goldCache.set(src, c);
+    }
+    return c;
+  }
+  function holyGlow(spr, x, y, t, time, sx, sy, sw, sh) {
+    const fade = Math.min(1, t / 0.5), gc = goldOf(spr);
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = fade * (0.32 + 0.18 * Math.sin(time * 7 + x * 0.3));
+    if (sw) g.drawImage(gc, sx, sy, sw, sh, x, y, sw, sh); else g.drawImage(gc, x, y);
+    g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+    if (Math.random() < 0.12 * fade) part(x + Math.random() * (sw || gc.width), y + Math.random() * (sh || gc.height) * 0.7, 0, -12, 0.5, Math.random() < 0.5 ? '#fff7c8' : '#f8d048', 0);
+  }
   function drawBuilding(b, time) {
     const x0 = tileX(b.c), y0 = tileY(b.r);
     let spr;
@@ -2423,6 +2504,7 @@
       const wl = Math.max(1, Math.min(5, b.lvl)) - 1;
       spr = BSPR.wall[wl][m];
       g.drawImage(spr.c, x0, y0 - 6);
+      if (b.holyT > 0) holyGlow(spr, x0, y0 - 6, b.holyT, time);
       // napojenie: kraje obrazovky a susedné budovy (veža, kasárne, mág)
       const flat = BSPR.wall[wl][m | 2 | 8].c;
       const slice = (dx, w) => { for (let k = 0; k < w; k += 4) { const ww = Math.min(4, w - k); g.drawImage(flat, 6, 0, ww, 24, dx + k, y0 - 6, ww, 24); } };
@@ -2451,6 +2533,7 @@
     } else {
       spr = bsprOf(b.kind, b.lvl);
       g.drawImage(spr.c, x0 + T / 2 - Math.floor(spr.w / 2) + hitJit(b.flash), y0 + T + 1 - spr.h);
+      if (b.holyT > 0) holyGlow(spr, x0 + T / 2 - Math.floor(spr.w / 2), y0 + T + 1 - spr.h, b.holyT, time);
       if (b.spec) { // vlajočka špecializácie na veži
         const fx = x0 + 13, fy = y0 + T + 1 - spr.h - 4, wv = Math.floor(time * 6 + b.c) % 2;
         g.fillStyle = '#4a4e60'; g.fillRect(fx, fy, 1, 6);
@@ -2481,6 +2564,7 @@
     const spr = bsprOf('hall', st.hallLvl);
     const x = Math.round(G.hallCx - spr.w / 2), y = G.hallBot + 1 - spr.h;
     g.drawImage(spr.c, x, y); // radnica sa pri zásahu netrasie
+    if (st.hallHolyT > 0) holyGlow(spr, x, y, st.hallHolyT, time);
     // vlajky
     for (const fx of [x + 7, x + 42]) {
       const wv = Math.floor(time * 6 + fx) % 2;
@@ -2742,17 +2826,73 @@
     }
     g.globalAlpha = 1;
   }
+  // ohnivá guľa: na zemi sa sťahuje cieľový kruh, z neba šikmo padá žeravá guľa so žiarou
+  function drawFallingFireball(f) {
+    const p = Math.max(0, f.t / f.max), fx = f.x + 30 * p, fy = f.y - 90 * p, R = SPELLS.fireball.R;
+    g.strokeStyle = 'rgba(248,120,48,' + (0.85 * (1 - p)) + ')'; g.lineWidth = 1;
+    g.beginPath(); g.ellipse(f.x, f.y, R * (0.35 + 0.65 * p) + 1, (R * (0.35 + 0.65 * p) + 1) * 0.7, 0, 0, 6.29); g.stroke();
+    g.fillStyle = 'rgba(20,10,4,' + (0.35 * (1 - p)) + ')'; g.beginPath(); g.ellipse(f.x, f.y, 6 * (1 - p) + 1, 3 * (1 - p) + 0.5, 0, 0, 6.29); g.fill(); // tieň gule
+    g.globalCompositeOperation = 'lighter';
+    const gr = g.createRadialGradient(fx, fy, 1, fx, fy, 11);
+    gr.addColorStop(0, 'rgba(255,200,90,0.8)'); gr.addColorStop(1, 'rgba(255,90,20,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(fx, fy, 11, 0, 6.29); g.fill();
+    g.globalCompositeOperation = 'source-over';
+    const X = Math.round(fx), Y = Math.round(fy);
+    for (const [r, col] of [[4.5, PAL.K], [3.6, '#a02810'], [2.8, '#f86818'], [1.8, '#f8d048'], [0.8, '#fff7c8']]) { g.fillStyle = col; g.beginPath(); g.arc(X, Y, r, 0, 6.29); g.fill(); }
+  }
+  // výbuch ohnivej gule: oslnivý záblesk, ohnivá guľa rozpínajúca sa do strán a rázová vlna po zemi
+  function drawBlast(bl) {
+    const p = bl.t / bl.max, e = 1 - Math.pow(1 - p, 3), R = bl.R;
+    g.globalCompositeOperation = 'lighter';
+    const fr = R * (0.5 + 0.7 * e), gr = g.createRadialGradient(bl.x, bl.y - 4, 1, bl.x, bl.y - 4, fr);
+    gr.addColorStop(0, 'rgba(255,250,210,' + (1 - p) + ')'); gr.addColorStop(0.4, 'rgba(255,170,60,' + (0.85 * (1 - p)) + ')'); gr.addColorStop(1, 'rgba(220,60,20,0)');
+    g.fillStyle = gr; g.beginPath(); g.ellipse(bl.x, bl.y - 4, fr, fr * 0.8, 0, 0, 6.29); g.fill();
+    g.globalCompositeOperation = 'source-over';
+    g.strokeStyle = 'rgba(255,200,110,' + (0.9 * (1 - p)) + ')'; g.lineWidth = 2; // rázová vlna
+    g.beginPath(); g.ellipse(bl.x, bl.y, R * 1.35 * e + 2, (R * 1.35 * e + 2) * 0.7, 0, 0, 6.29); g.stroke();
+    g.lineWidth = 1;
+  }
   function drawMark(m) {
     const t = 1 - m.life / m.max;
+    if (m.scorch) { // spálenisko po ohnivej guli: tmavá škvrna s uhlíkmi, pomaly bledne
+      const a = Math.min(1, (1 - t) * 1.5);
+      g.fillStyle = 'rgba(24,16,10,' + (0.45 * a) + ')'; g.beginPath(); g.ellipse(m.x, m.y, m.R * 0.6, m.R * 0.42, 0, 0, 6.29); g.fill();
+      g.fillStyle = 'rgba(24,16,10,' + (0.35 * a) + ')'; g.beginPath(); g.ellipse(m.x, m.y, m.R * 0.35, m.R * 0.25, 0, 0, 6.29); g.fill();
+      for (let k = 0; k < 7; k++) { // žeravé uhlíky, ktoré postupne zhasnú
+        const ang = m.seed + k * 0.9, rr = m.R * (0.15 + (k * 37 % 10) / 22);
+        g.fillStyle = t < 0.4 && k % 2 ? 'rgba(248,120,48,' + (1 - t / 0.4) + ')' : 'rgba(40,30,24,' + a + ')';
+        g.fillRect(Math.round(m.x + Math.cos(ang) * rr), Math.round(m.y + Math.sin(ang) * rr * 0.7), 1, 1);
+      }
+      return;
+    }
     if (m.wave) {
       const ease = 1 - Math.pow(1 - t, 2);
-      for (const [rr, col, w] of [[m.wave * ease, 'rgba(255,255,255,' + (1 - t) + ')', 2], [m.wave * ease * 0.7, 'rgba(168,104,232,' + (0.9 * (1 - t)) + ')', 2]]) {
+      const inner = m.holy ? '248,208,72' : '168,104,232'; // svätý štít zlatý, teleport fialový
+      for (const [rr, col, w] of [[m.wave * ease, 'rgba(255,255,255,' + (1 - t) + ')', 2], [m.wave * ease * 0.7, 'rgba(' + inner + ',' + (0.9 * (1 - t)) + ')', 2]]) {
         g.strokeStyle = col; g.lineWidth = w;
         g.beginPath(); g.ellipse(m.x, m.y, Math.max(1, rr), Math.max(1, rr * 0.7), 0, 0, 6.29); g.stroke();
       }
-      g.globalAlpha = 0.25 * (1 - t); g.fillStyle = '#c8a0ff';
+      g.globalAlpha = 0.25 * (1 - t); g.fillStyle = m.holy ? '#fff0a0' : '#c8a0ff';
       g.beginPath(); g.ellipse(m.x, m.y, Math.max(1, m.wave * ease), Math.max(1, m.wave * ease * 0.7), 0, 0, 6.29); g.fill();
       g.globalAlpha = 1; g.lineWidth = 1;
+      return;
+    }
+    if (m.bolt) { // záblesk blesku na zemi: oslnivé biele jadro so žltou žiarou rýchlo zhasne, iskry po zemi a pomaly blednúca spálenina
+      const x = Math.round(m.x), y = Math.round(m.y);
+      g.fillStyle = 'rgba(28,20,14,' + (0.4 * (1 - t)) + ')';
+      g.beginPath(); g.ellipse(x, y, 5, 2.5, 0, 0, 6.29); g.fill();
+      const f = Math.max(0, 1 - t / 0.45); // žiara zhasne za necelú polovicu života
+      if (f > 0) {
+        g.globalCompositeOperation = 'lighter';
+        g.fillStyle = 'rgba(255,230,120,' + (0.45 * f) + ')'; g.beginPath(); g.ellipse(x, y, 11 - 4 * t, 5 - 2 * t, 0, 0, 6.29); g.fill();
+        g.fillStyle = 'rgba(255,255,235,' + (0.9 * f) + ')'; g.beginPath(); g.ellipse(x, y, 5 * f + 1, 2.5 * f + 0.5, 0, 0, 6.29); g.fill();
+        g.globalCompositeOperation = 'source-over';
+      }
+      g.fillStyle = 'rgba(255,240,112,' + (1 - t) + ')'; // lomené iskry od miesta úderu
+      for (let k = 0; k < 6; k++) {
+        const a = m.seed + k * 1.05, len = 4 + (k * 7 % 5) + t * 6;
+        for (let q = 2; q < len; q += 1.5) g.fillRect(Math.round(x + Math.cos(a + Math.sin(q) * 0.3) * q), Math.round(y + Math.sin(a + Math.sin(q) * 0.3) * q * 0.5), 1, 1);
+      }
       return;
     }
     const r = m.no ? 4 : m.ice ? 8 + t * 18 : 6 + t * 10;
@@ -3194,6 +3334,8 @@
     for (const dr of st.drops) drawDrop(dr);
     drawFog(time);
     for (const b of st.bolts) drawBolt(b);
+    for (const f of st.fallFx) drawFallingFireball(f);
+    for (const bl of st.blasts || []) drawBlast(bl);
     for (const sh of st.shields || []) {
       const a = Math.min(1, sh.t / 0.4, (sh.max - sh.t) / 0.2 + 0.2);
       g.globalAlpha = 0.18 * a; g.fillStyle = '#fff070';
@@ -3349,7 +3491,7 @@
     Object.assign(st, { gold: sn.gold, hallLvl: sn.hallLvl, hallHp: sn.hallHp, volleyLvl: sn.volleyLvl, blds: sn.blds, paving: sn.paving });
     st.sel = null; st.selGroup = null; st.tool = null; st.moving = null;
     if (st.king) {
-      if (sn.kingDead && !st.king.dead) Object.assign(st.king, { dead: true, deadT: 9, fadeT: KING_FADE });
+      if (sn.kingDead && !st.king.dead) Object.assign(st.king, { dead: true, deadT: 9, fadeT: null });
       else if (!sn.kingDead) st.king.dead = false;
       st.king.hp = kingMax(); st.king.x = st.king.hx; st.king.y = st.king.hy;
     }

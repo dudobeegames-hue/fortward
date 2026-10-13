@@ -530,13 +530,14 @@
   /* karta Nákupy: zlatistá, raz za čas po nej prebehne svetelný lesk */
   .tabCard.shop { overflow: hidden; background: linear-gradient(#7a5a2a, #4a3418); }
   /* novinka (odomknutá stavba, vylepšenie, hrdina): rovnaký lesk ako na karte Nákupy, kým naň hráč neťukne */
-  /* jeden lesk pre celú hru (Nákupy, záložky, karty, balík): šikmý svetlý prúžok raz za 4 s prebehne cez prvok;
-     je to vrstva cez celý prvok s posúvaným pozadím, takže nič neorezáva (odznaky s číslom ostanú celé) */
+  /* jeden lesk pre celú hru (Nákupy, záložky, karty, balík): šikmý svetlý prúžok raz za čas prebehne cez prvok;
+     je to vrstva cez celý prvok s posúvaným pozadím, takže nič neorezáva (odznaky s číslom ostanú celé).
+     Prúžok má pevnú šírku a ide všade rovnakou rýchlosťou (120 px/s) – na dlhšom prvku je preto vidieť dlhšie */
   .shine { position: relative; }
   .shine::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
-    background: linear-gradient(110deg, transparent calc(50% - 16px), rgba(255,255,255,.85) 50%, transparent calc(50% + 16px)) no-repeat;
-    background-size: 300% 100%; background-position: 100% 0; animation: shine 4s ease-in-out infinite; }
-  @keyframes shine { 0%, 70% { background-position: 100% 0; } 100% { background-position: 0% 0; } }
+    background: linear-gradient(110deg, transparent 25%, rgba(255,255,255,.85) 50%, transparent 75%) no-repeat;
+    background-size: 64px 100%; background-position: -64px 0; animation: shine 6.5s linear infinite; }
+  @keyframes shine { 0%, 23% { background-position: -64px 0; } 100% { background-position: 536px 0; } }
   .tabCard .badge { z-index: 4; }
   /* karta novinky: jedno neónovo modré zablikanie vo vnútri rámu */
   .pcard.newFlash .face { animation: neonFlash 2.8s ease-in-out 1; }
