@@ -57,7 +57,7 @@
   const UNIT_HOME = { barracks: 'knight', stables: 'rider', armory: 'spear' };
   const UNIT_PLURAL = { knight: 'Rytieri', rider: 'Jazdci', spear: 'Kopijníci' };
   const SPIKE_COST = 25, SPIKE_TYPE_COST = 40;
-  const spikeDmg = b => 4 + 3 * (b.lvl - 1);
+  const spikeDmg = b => (4 + 3 * (b.lvl - 1)) * (1 + 0.06 * perk('traps'));
   // druhy ostňov (od misie 9): ohnivé zapália, ľadové spomalia útočníka
   const SPIKE_TYPES = {
     fire: { name: 'Ohnivé ostne', tip: '#f89838', body: '#d83818', desc: 'útočník horí' },
@@ -84,10 +84,10 @@
   };
   const spellMax = id => id === 'volley' ? volleyCd() : SPELLS[id].cd;
   const spellPow = () => 1 + 0.15 * (st.mission - 1); // kúzla silnejú s misiou, aby stačili na tuhšiu hordu
-  const mineGold = b => 20 + 12 * (b.lvl - 1);
-  const chapelHeal = b => 4 * (1 + 0.4 * (b.lvl - 1));
-  const trapStun = b => 2.5 + 0.5 * (b.lvl - 1);
-  const craftRate = b => 6 * (1 + 0.5 * (b.lvl - 1)); // remeselník opraví toľko zdravia za sekundu
+  const mineGold = b => (20 + 12 * (b.lvl - 1)) * (1 + 0.06 * perk('mines'));
+  const chapelHeal = b => 4 * (1 + 0.4 * (b.lvl - 1)) * (1 + 0.08 * perk('helpers'));
+  const trapStun = b => (2.5 + 0.5 * (b.lvl - 1)) * (1 + 0.06 * perk('traps'));
+  const craftRate = b => 6 * (1 + 0.5 * (b.lvl - 1)) * (1 + 0.08 * perk('helpers')); // remeselník opraví toľko zdravia za sekundu
   // pomocníci: z kaplnky mních (lieči rytierov a kráľa), z dielne remeselník (opravuje budovy);
   // z každej budovy vždy len jeden – ďalší vyjde až keď ho horda zabije
   const HELPERS = {
@@ -101,7 +101,7 @@
     archer:   { name: 'Lukostrelec', spr: 'archer', cost: 40, dmg: 5,  cd: 0.9, range: 72, proj: 'arrow', speed: 180, desc: 'rýchle šípy' },
     crossbow: { name: 'Kušník',      spr: 'knight', cost: 70, dmg: 16, cd: 1.8, range: 92, proj: 'bolt',  speed: 240, desc: 'silná strela, väčší dosah' },
   };
-  const uDmg = u => WUNIT[u.type].dmg * (1 + 0.4 * (u.lvl - 1)) * (1 + 0.1 * perk('fletching'));
+  const uDmg = u => WUNIT[u.type].dmg * (1 + 0.4 * (u.lvl - 1)) * (1 + 0.04 * perk('fletching'));
   const uCd = u => WUNIT[u.type].cd * Math.pow(0.92, u.lvl - 1);
   const uRange = u => WUNIT[u.type].range + 4 * (u.lvl - 1);
   const BUILD_ORDER = ['paving', 'tower', 'wall', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'catapult', 'mage', 'icetower', 'ballista', 'chapel', 'firepit', 'beartrap', 'workshop'];
@@ -121,43 +121,54 @@
   };
 
   const lvlMul = (b, k) => 1 + k * (b.lvl - 1);
-  const bDmg = b => BUILD[b.kind].dmg * lvlMul(b, 0.4) * (SHOOTERS[b.kind] ? 1 + 0.1 * perk('fletching') : 1) * (b.spec ? SPECS[b.spec].dmg : 1);
-  const bCd = b => BUILD[b.kind].cd * Math.pow(0.92, b.lvl - 1) * (b.spec ? SPECS[b.spec].cd : 1);
-  const bRange = b => BUILD[b.kind].range + 4 * (b.lvl - 1) + (b.spec ? SPECS[b.spec].range : 0);
-  const bMaxHp = b => Math.round((BUILD[b.kind].hp || 1) * lvlMul(b, 0.35) * (b.kind === 'wall' ? 1 + WALL_LINK * (b.nb || 0) : 1));
-  const bUpCost = b => Math.round(BUILD[b.kind].cost * 0.9 * Math.pow(1.6, b.lvl - 1));
+  const bDmg = b => BUILD[b.kind].dmg * lvlMul(b, 0.4) * (SHOOTERS[b.kind] ? 1 + 0.04 * perk('fletching') : 1) * (TRAPS[b.kind] ? 1 + 0.06 * perk('traps') : 1) * (b.spec ? SPECS[b.spec].dmg : 1);
+  const bCd = b => BUILD[b.kind].cd * Math.pow(0.92, b.lvl - 1) * (b.spec ? SPECS[b.spec].cd : 1) / (1 + 0.03 * perk('reload'));
+  const bRange = b => (BUILD[b.kind].range + 4 * (b.lvl - 1) + (b.spec ? SPECS[b.spec].range : 0)) * (1 + 0.02 * perk('lookouts'));
+  const bMaxHp = b => Math.round((BUILD[b.kind].hp || 1) * lvlMul(b, 0.35) * (b.kind === 'wall' ? 1 + WALL_LINK * (b.nb || 0) : 1) * (1 + 0.06 * perk('carpenters')));
+  const bUpCost = b => Math.round(BUILD[b.kind].cost * 0.9 * Math.pow(1.6, b.lvl - 1) * (1 - 0.04 * perk('architects')));
   const knightCap = b => 2 + b.lvl;
-  const knightEvery = b => Math.max(3, 7 - 0.8 * (b.lvl - 1));
+  const knightEvery = b => Math.max(3, 7 - 0.8 * (b.lvl - 1)) * (1 - 0.04 * perk('recruits'));
   // lukostrelci zo strelnice: menej zdravia, strieľajú z diaľky (aj na netopiere), držia sa za rytiermi
   const archerCap = b => 2 + b.lvl;
-  const archerEvery = b => Math.max(4, 8 - 0.8 * (b.lvl - 1));
-  const archerHp = b => 28 * lvlMul(b, 0.3) * (1 + 0.2 * perk('drill')) * (1 + 0.1 * tal('command'));
-  const archerDmg = b => 5 * lvlMul(b, 0.4) * (1 + 0.1 * perk('fletching')) * (1 + 0.1 * tal('command'));
+  const archerEvery = b => Math.max(4, 8 - 0.8 * (b.lvl - 1)) * (1 - 0.04 * perk('recruits'));
+  const archerHp = b => 28 * lvlMul(b, 0.3) * (1 + 0.05 * perk('drill')) * (1 + 0.1 * tal('command'));
+  const archerDmg = b => 5 * lvlMul(b, 0.4) * (1 + 0.04 * perk('fletching')) * (1 + 0.1 * tal('command'));
   const ARCHER_RANGE = 64, ARCHER_CD = 1.1;
   const ARCHER_PRIO = e => e.d.fly || e.d.heals || e.d.sapper;            // lukostrelci: najprv letci, šamani a podkopníci
   const RIDER_PRIO = e => e.d.ranged || e.d.heals || e.d.sapper;          // jazdci: strelci, šamani, podkopníci
   const SPEAR_REACH = 15, SPEAR_VS_CAV = 3, RIDER_CHARGE = 2, CHARGE_RUN = 30;
-  const knightHp = b => 40 * lvlMul(b, 0.3) * (1 + 0.2 * perk('drill')) * (1 + 0.1 * tal('command'));
-  const knightDmg = b => 6 * lvlMul(b, 0.35) * (1 + 0.2 * perk('drill')) * (1 + 0.1 * tal('command'));
-  const hallMax = () => Math.round((400 + 200 * (st.hallLvl - 1)) * (1 + 0.15 * perk('foundations')));
-  const hallUpCost = () => Math.round(110 * Math.pow(1.7, st.hallLvl - 1)); // lacnejšie – radnica odomyká aj úrovne stavieb
+  const knightHp = b => 40 * lvlMul(b, 0.3) * (1 + 0.05 * perk('drill')) * (1 + 0.1 * tal('command'));
+  const knightDmg = b => 6 * lvlMul(b, 0.35) * (1 + 0.05 * perk('drill')) * (1 + 0.1 * tal('command'));
+  const hallMax = () => Math.round((400 + 200 * (st.hallLvl - 1)) * (1 + 0.06 * perk('foundations')));
+  const hallUpCost = () => Math.round(110 * Math.pow(1.7, st.hallLvl - 1) * (1 - 0.04 * perk('architects'))); // lacnejšie – radnica odomyká aj úrovne stavieb
   const zoneRows = () => 5 + st.hallLvl;
   const kingMax = () => 120 * heroDef().hp * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.2 * tal('vit'));
   const kingDmg = () => 12 * heroDef().dmg * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.15 * tal('str'));
-  const volleyDmg = () => (6 + 4 * (st.volleyLvl - 1)) * (1 + 0.25 * perk('archery')) * (1 + 0.15 * tal('archers'));
-  const volleyCd = () => Math.max(2, 5 - 0.25 * (st.volleyLvl - 1) - 0.4 * perk('archery'));
+  const volleyDmg = () => (6 + 4 * (st.volleyLvl - 1)) * (1 + 0.15 * tal('archers'));
+  const volleyCd = () => Math.max(2, 5 - 0.25 * (st.volleyLvl - 1));
 
-  // ---- Kráľovská sieň: trvalé bonusy za hviezdy ----
+  // ---- Kráľovská sieň: trvalé bonusy za hviezdy (netýkajú sa hrdinov) ----
+  // každý bonus má 9 úrovní: 3 za medené hviezdy, potom 3 za strieborné a 3 za zlaté (1 úroveň = 1 hviezda);
+  // per = účinok jednej úrovne, sign = '+' / '−'
   const PERKS = [
-    { id: 'treasury',    name: 'Pokladnica',            desc: '+15 % štartovného zlata',                      icon: 'coin' },
-    { id: 'loot',        name: 'Korisť',                desc: '+10 % zlata za porazených nepriateľov',        icon: 'coin' },
-    { id: 'masons',      name: 'Kamenári',              desc: 'Hradby a brány o 20 % lacnejšie',              icon: 'wall' },
-    { id: 'foundations', name: 'Pevné základy',         desc: 'Radnica +15 % zdravia',                         icon: 'hall' },
-    { id: 'fletching',   name: 'Ostré hroty',           desc: 'Veže a strelci +10 % poškodenia',               icon: 'tower' },
-    { id: 'archery',     name: 'Kráľovskí lukostrelci', desc: 'Šípová salva +25 % poškodenia, rýchlejšie nabitie', icon: 'u_archer' },
-    { id: 'drill',       name: 'Výcvik rytierov',       desc: 'Rytieri +20 % zdravia a sily',                  icon: 'barracks' },
+    { id: 'treasury',    name: 'Pokladnica',        what: 'štartové zlato v misii',                      per: 5, sign: '+', icon: 'coin' },
+    { id: 'loot',        name: 'Korisť',            what: 'zlato za porazených nepriateľov',             per: 4, sign: '+', icon: 'coin' },
+    { id: 'mines',       name: 'Bohaté žily',       what: 'zlato zo zlatých baní',                       per: 6, sign: '+', icon: 'mine' },
+    { id: 'dealers',     name: 'Výkupcovia',        what: 'zlato z predaja stavieb (základ 50 %)',       per: 4, sign: '+', icon: 'coin' },
+    { id: 'masons',      name: 'Kamenári',          what: 'cena hradieb a brán',                         per: 5, sign: '−', icon: 'gate' },
+    { id: 'architects',  name: 'Stavitelia',        what: 'cena vylepšení stavieb a radnice',            per: 4, sign: '−', icon: 'workshop' },
+    { id: 'foundations', name: 'Pevné základy',     what: 'zdravie radnice',                             per: 6, sign: '+', icon: 'hall' },
+    { id: 'carpenters',  name: 'Tesári',            what: 'zdravie všetkých stavieb',                    per: 6, sign: '+', icon: 'wall' },
+    { id: 'fletching',   name: 'Ostré hroty',       what: 'poškodenie veží a strelcov',                  per: 4, sign: '+', icon: 'tower' },
+    { id: 'lookouts',    name: 'Vyhliadky',         what: 'dosah veží',                                  per: 2, sign: '+', icon: 'ballista' },
+    { id: 'reload',      name: 'Rýchle nabíjanie',  what: 'rýchlosť streľby veží',                       per: 3, sign: '+', icon: 'mage' },
+    { id: 'traps',       name: 'Majstri pascí',     what: 'poškodenie a omráčenie z jám, pascí a ostňov', per: 6, sign: '+', icon: 'pit' },
+    { id: 'drill',       name: 'Výcvik',            what: 'zdravie a sila vojakov a sokolov',            per: 5, sign: '+', icon: 'barracks' },
+    { id: 'recruits',    name: 'Nábor',             what: 'rýchlejšie vysielanie vojakov',               per: 4, sign: '+', icon: 'range' },
+    { id: 'helpers',     name: 'Pomocníci',         what: 'liečenie mníchov a opravy remeselníkov',      per: 8, sign: '+', icon: 'chapel' },
+    { id: 'siege',       name: 'Obliehací majstri', what: 'zdravie a sila baranidiel a katapultov',      per: 6, sign: '+', icon: 'u_siegeRam' },
   ];
-  const PERK_MAX = 3;
+  const PERK_MAX = 9, PERK_STEP = 3; // 3 úrovne na každý druh hviezd
   const loadJSON = (k, def) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? def : v; } catch (e) { return def; } };
   const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } };
   // ---- 4 pozície na uloženie: postup každej je pod vlastnou predponou (zvuk je spoločný) ----
@@ -340,11 +351,15 @@
   const tierOpen = (m, t) => t === 0 ? m <= st.unlocked : starsOf(m, t - 1) >= 3;
   const starSpan = (n, t) => '<span style="color:' + TIERS[t].col + '">' + '★'.repeat(n) + '</span><i>' + '★'.repeat(3 - n) + '</i>';
   const starsTotal = () => meta.stars.reduce((a, b) => a + (b || []).reduce((x, y) => x + (y || 0), 0), 0);
-  const starsSpent = () => Object.values(meta.perks).reduce((a, l) => a + l * (l + 1) / 2, 0); // úroveň n stojí 1+2+…+n
-  const starsFree = () => starsTotal() - starsSpent();
+  // hviezdy sa míňajú podľa druhu: úrovne 1–3 bonusu stoja medené, 4–6 strieborné, 7–9 zlaté (každá 1 hviezdu)
+  const tierStars = t => meta.stars.reduce((a, b) => a + ((b || [])[t] || 0), 0);
+  const tierSpent = t => Object.values(meta.perks).reduce((a, l) => a + Math.max(0, Math.min(PERK_STEP, l - PERK_STEP * t)), 0);
+  const tierFree = t => tierStars(t) - tierSpent(t);
+  const starsFree = () => [0, 1, 2].reduce((a, t) => a + Math.max(0, tierFree(t)), 0);
   const starsFor = ratio => ratio >= 0.8 ? 3 : ratio >= 0.4 ? 2 : 1;
-  const costOf = kind => kind === 'wall' ? Math.max(6, Math.round(BUILD.wall.cost * (1 - 0.2 * perk('masons')))) : BUILD[kind].cost;
-  const gateCost = () => Math.max(8, Math.round(GATE_COST * (1 - 0.2 * perk('masons'))));
+  const costOf = kind => kind === 'wall' ? Math.max(4, Math.round(BUILD.wall.cost * (1 - 0.05 * perk('masons')))) : BUILD[kind].cost;
+  const gateCost = () => Math.max(6, Math.round(GATE_COST * (1 - 0.05 * perk('masons'))));
+  const sellShare = () => 0.5 + 0.04 * perk('dealers'); // koľko z vloženého zlata vráti predaj
 
   const HALL = { hall: true };
   const st = {
@@ -394,6 +409,16 @@
     if (age < FLASH_MS) { el.classList.add('newFlash'); el.querySelector('.face').style.animationDelay = (-age) + 'ms'; }
     return el;
   }
+  // lesk (.shine): dráha prúžku siaha za pravý okraj prvku a dĺžka cyklu rastie so šírkou – každý prvok prejde celý
+  // a rovnakým tempom (na dlhšom ho vidieť dlhšie); prepočíta sa pri každom prebehnutí (prvok mohol zmeniť šírku)
+  function fitShine(el) {
+    const w = el.offsetWidth;
+    if (!w) return;
+    const travel = w + 128, move = travel / 150; // priemerne 150 px/s, pohyb zaberá 45 % cyklu
+    el.style.setProperty('--shine-end', (w + 64) + 'px');
+    el.style.setProperty('--shine-dur', Math.max(3.5, move / 0.45).toFixed(2) + 's');
+  }
+  for (const ev of ['animationstart', 'animationiteration']) document.addEventListener(ev, e => { if (e.animationName === 'shine') fitShine(e.target); }, true);
   // pridá lesk na kartu, kým na ňu hráč neťukne
   function shineIf(el, on, seen) {
     if (!el || !on) return el;
@@ -416,8 +441,8 @@
     SLOT = n;
     meta.stars = loadJSON(sk('stars'), []).map(v => Array.isArray(v) ? v : [v || 0, 0, 0]); // staré uloženie (číslo) = medená úroveň
     for (const k in meta.perks) delete meta.perks[k];
-    Object.assign(meta.perks, loadJSON(sk('perks'), {}));
-    if (meta.perks.armor) { delete meta.perks.armor; saveJSON(sk('perks'), meta.perks); } // zrušený bonus – hviezdy sa vrátia
+    Object.assign(meta.perks, loadJSON(sk('perks9'), {})); // sieň s 9 úrovňami; staré bonusy (sk 'perks') sa nepreberú – hviezdy sa vrátia
+    for (const k in meta.perks) if (!PERKS.some(p => p.id === k)) delete meta.perks[k];
     st.hero = null; setActiveHero(loadJSON(sk('hero'), 'king'));
     Object.assign(stats, { kills: 0, builds: 0, bosses: 0, orcKings: 0, perfect: 0, maxGold: 0 }, loadJSON(sk('stats'), {}));
     for (const k in ach) delete ach[k];
@@ -729,8 +754,8 @@
     cat: { hp: 170, spd: 13, dmg: 55, cd: 3.6, armor: 0.8, spr: 'siegeCat', range: 105 },  // hádže balvany na veže a hrad
   };
   function spawnSiege(kind) {
-    const d = SIEGE[kind], a = st.mission - HOME_PROVINCES - 1, hp = d.hp * (1 + 0.15 * a);
-    st.soldiers.push({ siege: kind, x: G.hallCx + (Math.random() - 0.5) * 10, y: G.hallTop - 4, hp, max: hp, dmg: d.dmg * (1 + 0.15 * a), spd: d.spd, armor: d.armor, spr: d.spr, cd: 0.5, fired: 0, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
+    const d = SIEGE[kind], a = st.mission - HOME_PROVINCES - 1, sm = 1 + 0.06 * perk('siege'), hp = d.hp * (1 + 0.15 * a) * sm;
+    st.soldiers.push({ siege: kind, x: G.hallCx + (Math.random() - 0.5) * 10, y: G.hallTop - 4, hp, max: hp, dmg: d.dmg * (1 + 0.15 * a) * sm, spd: d.spd, armor: d.armor, spr: d.spr, cd: 0.5, fired: 0, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
     for (let k = 0; k < 8; k++) part(G.hallCx, G.hallTop - 2, (Math.random() - 0.5) * 30, -Math.random() * 14, 0.4, '#c6a272', 40);
   }
   // cieľ baranidla: súvislé koly, potom brána, potom ľubovoľný úsek hradieb (ak brána padla) a nakoniec hrad
@@ -841,7 +866,7 @@
   function newGame() {
     undoStack = [];
     Object.assign(st, {
-      wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.15 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, shake: 0, soldierN: 0,
+      wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.05 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, shake: 0, soldierN: 0,
       blds: [], paving: {}, enemies: [], soldiers: [], proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
       cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, shieldCd: 0, healCd: 0, fwCd: 0, tpCd: 0, shields: [], fireWalls: [], heroDead: {},
       spellSel: null, siegeOrder: {}, fallFx: [], blasts: [], healFx: [], bolts: [], hallHolyT: 0, siegeHold: false, siegeT: 0, introPan: null,
@@ -1098,7 +1123,7 @@
   function kill(e) {
     e.dead = true;
     AUDIO.play('die'); AUDIO.play('coin');
-    const gain = Math.round(e.d.gold * goldMul() * (1 + 0.1 * perk('loot')));
+    const gain = Math.round(e.d.gold * goldMul() * (1 + 0.04 * perk('loot')));
     st.gold += gain;
     st.texts.push({ x: e.x, y: e.y - e.h, s: '+' + gain, life: 0.9, max: 0.9 });
     const cols = [e.d.blood, '#305c22', '#6e4422', '#1c140e'];
@@ -1529,29 +1554,52 @@
   }
   const blockedBarracks = () => st.blds.filter(b => (UNIT_HOME[b.kind] || b.kind === 'range') && knightsBlocked(b));
 
-  function knightStep(a, b) {
-    const n = G.cols * G.rows, dist = new Int16Array(n).fill(-1);
-    const q = [b.r * G.cols + b.c]; dist[q[0]] = 0;
-    const startI = a.r * G.cols + a.c;
-    for (let h = 0; h < q.length; h++) {
-      const i = q[h], c = i % G.cols, r = (i / G.cols) | 0;
-      if (i === startI) break;
+  // cesta jednotiek po políčkach: bránou a voľným priestorom, cez vlastné budovy (veže, bane…) len keď inak niet cesty –
+  // vstup do budovy stojí ako dlhá obchádzka. Pole vzdialeností k cieľu sa pamätá, kým sa rozostavenie nezmení.
+  const BLD_STEP = 25;
+  let kField = { pass: null, fields: new Map() };
+  function passField() { // 0 = neprejde, 1 = voľno / brána, 2 = cez budovu
+    const p = new Uint8Array(G.cols * G.rows);
+    for (let r = 0; r < G.rows; r++) for (let c = 0; c < G.cols; c++) {
+      if (!knightPass(c, r)) continue;
+      const o = occAt(c, r);
+      p[r * G.cols + c] = o && o !== HALL && o.kind !== 'wall' ? 2 : 1;
+    }
+    return p;
+  }
+  function distField(goal, pass) {
+    const n = pass.length, dist = new Float32Array(n).fill(Infinity), done = new Uint8Array(n);
+    dist[goal] = 0;
+    for (;;) { // Dijkstra (políčok je málo)
+      let i = -1, bd = Infinity;
+      for (let k = 0; k < n; k++) if (!done[k] && dist[k] < bd) { bd = dist[k]; i = k; }
+      if (i < 0) break;
+      done[i] = 1;
+      const c = i % G.cols, r = (i / G.cols) | 0;
       for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const nc = c + dc, nr = r + dr;
         if (nc < 0 || nr < 0 || nc >= G.cols || nr >= G.rows) continue;
-        const ni = nr * G.cols + nc;
-        if (dist[ni] >= 0 || (ni !== startI && !knightPass(nc, nr))) continue;
-        dist[ni] = dist[i] + 1; q.push(ni);
+        const ni = nr * G.cols + nc, pv = pass[ni];
+        if (!pv || done[ni]) continue;
+        const nd = bd + (pv === 2 ? BLD_STEP : 1);
+        if (nd < dist[ni]) dist[ni] = nd;
       }
     }
-    if (dist[startI] < 0) return null;
-    let best = null, bd = dist[startI];
+    return dist;
+  }
+  function knightStep(a, b) {
+    const pass = passField();
+    if (!kField.pass || kField.pass.length !== pass.length || kField.pass.some((v, i) => v !== pass[i])) kField = { pass, fields: new Map() };
+    const goal = b.r * G.cols + b.c, startI = a.r * G.cols + a.c;
+    let dist = kField.fields.get(goal);
+    if (!dist) { if (kField.fields.size > 80) kField.fields.clear(); dist = distField(goal, pass); kField.fields.set(goal, dist); }
+    let best = null, bd = dist[startI]; // stojí v budove (napr. pri kasárňach): vyberie najlepšieho suseda
     for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
       if (!dc && !dr) continue;
       const nc = a.c + dc, nr = a.r + dr;
       if (nc < 0 || nr < 0 || nc >= G.cols || nr >= G.rows) continue;
       const v = dist[nr * G.cols + nc];
-      if (v < 0) continue;
+      if (v === Infinity) continue;
       if (dc && dr && (!knightPass(a.c + dc, a.r) || !knightPass(a.c, a.r + dr))) continue;
       const score = v + (dc && dr ? 0.5 : 0);
       if (score < bd) { bd = score; best = { c: nc, r: nr }; }
@@ -1714,8 +1762,8 @@
   // ---- sokoly: lietajú ponad všetko, lovia letcov, šamanov a podkopníkov; pechota na ne nedosiahne ----
   const FALCON_PRIO = e => e.d.fly || e.d.heals || e.d.sapper;
   const falconCap = b => 1 + b.lvl;
-  const falconHp = b => 22 * lvlMul(b, 0.3) * (1 + 0.2 * perk('drill'));
-  const falconDmg = b => 5 * lvlMul(b, 0.35) * (1 + 0.2 * perk('drill'));
+  const falconHp = b => 22 * lvlMul(b, 0.3) * (1 + 0.05 * perk('drill'));
+  const falconDmg = b => 5 * lvlMul(b, 0.35) * (1 + 0.05 * perk('drill'));
   function updateFalconry(b, dt) {
     b.spawnT -= dt;
     if (b.spawnT > 0) return;
@@ -3008,10 +3056,6 @@
     let bt = 2; while (bt > 0 && !starsOf(num, bt)) bt--;
     const ns = starsOf(num, bt);
     if (ns) for (let k = 0; k < 3; k++) drawStar(n.x - 7 + k * 5, ty + 7, k < ns, bt);
-    if (st.mapSel === num) {
-      const col = Math.floor(time * 4) % 2 ? '#f8d048' : '#ffffff';
-      corners(n.x - 11, top - 3, n.x + 11, n.y + (ns ? 15 : 11), col);
-    }
   }
 
   // malá pixelová hviezdička 5x5
@@ -3673,7 +3717,7 @@
       }, 'up');
       else upAct(maxL, maxL, 0, null, null, bPreview({ kind, lvl: maxL + 1 }));
       if (d.hp) bulk(I.actRepair, 'Opraviť', grp.filter(w => bRepairCost(w) > 0), bRepairCost, w => { st.gold -= bRepairCost(w); w.hp = bMaxHp(w); }, '', true);
-      const refund = grp.reduce((t, w) => t + Math.floor(w.spent / 2) + (w.unit ? Math.floor(w.unit.spent / 2) : 0), 0);
+      const refund = grp.reduce((t, w) => t + Math.floor(w.spent * sellShare()) + (w.unit ? Math.floor(w.unit.spent * sellShare()) : 0), 0);
       act(ICONS.coin, 'Predať ' + grp.length + '×', '+' + refund, true, sellAll(grp, refund), 'sell', true);
       if (isWall) {
         const bare = grp.filter(w => !w.spikes), plain = grp.filter(w => w.spikes && !w.spikeType);
@@ -3722,7 +3766,7 @@
       }, null, after(b, { lvl: b.lvl + 1 }));
       const fc = bRepairCost(b);
       if (fc) act(I.actRepair, 'Opraviť', coinTxt(fc), st.gold >= fc, () => { st.gold -= fc; b.hp = bMaxHp(b); rebuildOcc(); }, '', true);
-      const refund = Math.floor(b.spent / 2) + (b.unit ? Math.floor(b.unit.spent / 2) : 0);
+      const refund = Math.floor(b.spent * sellShare()) + (b.unit ? Math.floor(b.unit.spent * sellShare()) : 0);
       act(ICONS.coin, 'Predať', '+' + refund, true, sellAll([b], refund), 'sell', true);
       if (b.kind === 'tower' && !b.spec) {
         if (!has('spec')) lockAct(I.actSpec.fire, 'Špecializácia', unlockMissionOf('spec'), true);
@@ -3732,7 +3776,7 @@
       if (b.kind === 'wall') {
         const u = b.unit;
         if (u) {
-          const ur = Math.floor(u.spent / 2);
+          const ur = Math.floor(u.spent * sellShare());
           act(I.actDown, 'Odvolať', '+' + ur, true, () => { st.gold += ur; b.unit = null; }, 'sell', true);
         } else if (!b.gate && has('wallArcher')) for (const type in WUNIT) {
           const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
@@ -4231,19 +4275,30 @@
     return xp + ' · ' + (taken.length ? taken.join(', ') : 'XP získava za každú vlnu, v ktorej bojuje');
   }
   function renderPerks() {
-    $('perkStars').textContent = starsFree() + ' / ' + starsTotal();
+    $('perkStars').innerHTML = [0, 1, 2].map(t => '<span style="color:' + TIERS[t].col + '">★ ' + Math.max(0, tierFree(t)) + '</span>').join('');
     const list = $('perkList'); list.innerHTML = '';
     for (const pk of PERKS) {
-      const lvl = perk(pk.id), cost = lvl + 1, max = lvl >= PERK_MAX, can = !max && starsFree() >= cost;
+      const lvl = perk(pk.id), max = lvl >= PERK_MAX, tier = Math.min(2, Math.floor(lvl / PERK_STEP)), can = !max && tierFree(tier) >= 1;
       const b = document.createElement('button');
       b.className = 'perkCard' + (max ? ' max' : can ? ' can' : '');
       let stars = '';
-      for (let k = 0; k < PERK_MAX; k++) stars += '<img class="' + (k < lvl ? 'on' : 'off') + '" src="' + UI_ICONS.star + '" alt="">';
-      b.innerHTML = (max ? '' : '<span class="price">★ ' + cost + '</span>') + '<img class="pic" src="' + ICONS[pk.icon] + '" alt=""><b>' + pk.name + '</b><small>' + pk.desc + '</small><span class="pstars">' + stars + '</span>';
+      for (let t = 0; t < 3; t++) {
+        stars += '<span class="pgroup">';
+        for (let k = 0; k < PERK_STEP; k++) stars += '<img class="' + (t * PERK_STEP + k < lvl ? 'on' : 'off') + '" src="' + UI_ICONS.tierStars[t] + '" alt="">';
+        stars += '</span>';
+      }
+      const now = pk.sign + pk.per * lvl + ' %', next = pk.sign + pk.per * (lvl + 1) + ' %';
+      b.innerHTML = (max ? '' : '<span class="price" style="color:' + (can ? TIERS[tier].col : '') + '">★ 1</span>') +
+        '<img class="pic" src="' + (ICONS[pk.icon] || ICONS.coin) + '" alt=""><b>' + pk.name + '</b><small>' + pk.what + '</small>' +
+        '<span class="pval">' + (lvl ? now : '0 %') + (max ? '' : ' → <em>' + next + '</em>') + '</span><span class="pstars">' + stars + '</span>';
       b.addEventListener('click', () => {
         if (max) return;
-        if (!can) { AUDIO.play('deny'); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); return; }
-        meta.perks[pk.id] = lvl + 1; saveJSON(sk('perks'), meta.perks);
+        if (!can) { // chýbajú hviezdy daného druhu
+          AUDIO.play('deny'); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake');
+          toast('Ďalšia úroveň stojí ' + ['medenú', 'striebornú', 'zlatú'][tier] + ' hviezdu – ' + ['medené', 'strieborné', 'zlaté'][tier] + ' hviezdy získaš na ' + ['medenej', 'striebornej', 'zlatej'][tier] + ' úrovni misií');
+          return;
+        }
+        meta.perks[pk.id] = lvl + 1; saveJSON(sk('perks9'), meta.perks);
         AUDIO.play('upgrade'); renderPerks(); renderMapBar();
       });
       list.appendChild(b);

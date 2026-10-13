@@ -114,7 +114,7 @@ const UI_ICONS = (() => {
     '...KOOOOOOK...',
     '...KKKKKKKK...',
   ], { K: '#1c140e', Y: '#f8d048', O: '#b88420', W: '#fff7c8' });
-  const star = fromMap([
+  const STAR_MAP = [
     '.....K.....',
     '....KYK....',
     '....KYK....',
@@ -126,7 +126,10 @@ const UI_ICONS = (() => {
     '.KYYK.KYYK.',
     '.KYK...KYK.',
     '.KK.....KK.',
-  ], PAL);
+  ];
+  const star = fromMap(STAR_MAP, PAL);
+  // hviezdy podľa úrovne misie: medená, strieborná, zlatá (Kráľovská sieň)
+  const tierStars = ['#e0905a', '#c8ccd8', '#f8d048'].map(c => fromMap(STAR_MAP, { K: PAL.K, Y: c }));
 
   // prekrížené meče (karta Boj): čepeľ 2 body široká, zlatá záštita, hnedá rukoväť, zlatá hlavica
   const swords = (() => {
@@ -572,5 +575,5 @@ const UI_ICONS = (() => {
   ];
 
   return { pix, music, sound, plus, home, hall, trophy, star, swords, chest, spellVolley, spellFire, spellFrost, spellBolt, spellHorn, spellShield, spellHeal, spellFirewall, spellTeleport, scrollPaper, scrollRod, scrollTag, flags, langs,
-    actDown, actRepair, actSpec, tabs, homeTab };
+    actDown, actRepair, actSpec, tabs, homeTab, tierStars };
 })();

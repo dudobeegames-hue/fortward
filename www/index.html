@@ -213,6 +213,9 @@
   @keyframes up { from { transform: translateY(100%); } }
   #palette { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; padding-bottom: 2px; scroll-snap-type: x mandatory; }
   #palette::-webkit-scrollbar { display: none; }
+  /* posuvníky sa nikde nezobrazujú – okná sa posúvajú ťahom prsta (alebo kolieskom myši) */
+  * { scrollbar-width: none; }
+  *::-webkit-scrollbar { display: none; }
   /* karta stavby: 1. ťuk = výber, 2. ťuk = otočí sa a vzadu je popis */
   .pcard {
     flex: 0 0 calc((100% - 18px) / 4); scroll-snap-align: start;
@@ -289,8 +292,12 @@
   .perkCard .pic { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; }
   .perkCard b { font-size: 14px; line-height: 1.15; }
   .perkCard small { color: var(--muted); font-size: 11.5px; line-height: 1.25; flex: 1; }
-  .perkCard .pstars { display: flex; gap: 4px; margin-top: 2px; }
-  .perkCard .pstars img { width: 22px; height: 22px; image-rendering: pixelated; }
+  .perkCard .pstars { display: flex; gap: 6px; margin-top: 2px; }
+  .perkCard .pgroup { display: flex; gap: 1px; }
+  .perkCard .pstars img { width: 14px; height: 14px; image-rendering: pixelated; }
+  .perkCard .pval { font-size: 12px; font-weight: 700; color: #e8dccb; }
+  .perkCard .pval em { font-style: normal; color: var(--gold); }
+  .perkTiers { display: flex; gap: 10px; font-weight: 700; }
   .perkCard .pstars img.off { filter: grayscale(1) brightness(.45); opacity: .7; }
   .perkCard .price { position: absolute; top: 5px; right: 6px; font-size: 11px; font-weight: 700; color: var(--muted); }
   .perkCard.can { border-color: #b88420; box-shadow: inset 0 0 0 1px rgba(248,208,72,.5), inset 0 -4px 0 rgba(0,0,0,.25); }
@@ -536,8 +543,13 @@
   .shine { position: relative; }
   .shine::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
     background: linear-gradient(110deg, transparent 25%, rgba(255,255,255,.85) 50%, transparent 75%) no-repeat;
-    background-size: 64px 100%; background-position: -64px 0; animation: shine 6.5s linear infinite; }
-  @keyframes shine { 0%, 23% { background-position: -64px 0; } 100% { background-position: 536px 0; } }
+    background-size: 64px 100%; background-position: -64px 0; animation: shine var(--shine-dur, 4s) infinite; }
+  /* prúžok najprv chvíľu čaká, potom sa pohne pomaly a zrýchľuje až za pravý okraj prvku;
+     koniec dráhy a dĺžku podľa šírky prvku nastaví hra (fitShine), takže dlhší prvok prejde celý a rovnakým tempom */
+  @keyframes shine {
+    0%, 55% { background-position: -64px 0; animation-timing-function: cubic-bezier(.5, 0, .9, .7); }
+    100% { background-position: var(--shine-end, 200px) 0; }
+  }
   .tabCard .badge { z-index: 4; }
   /* karta novinky: jedno neónovo modré zablikanie vo vnútri rámu */
   .pcard.newFlash .face { animation: neonFlash 2.8s ease-in-out 1; }
@@ -847,8 +859,8 @@
   </div>
 
   <div id="perks" class="screenOverlay perksScreen tabScreen" hidden>
-    <div class="perkHead"><b>Kráľovská sieň</b><span class="pill">★ <span id="perkStars">0</span></span></div>
-    <p class="perkNote">Hviezdy získavaš za dobyté hrady (1 až 3 podľa zdravia radnice). Ťukni na bonus a za hviezdy sa mu vyplní ďalšia hviezda – nákup je natrvalo, vyber si rozumne.</p>
+    <div class="perkHead"><b>Kráľovská sieň</b><span class="pill perkTiers" id="perkStars"></span></div>
+    <p class="perkNote">Za každú hviezdu vylepšíš jeden bonus o úroveň. Prvé 3 úrovne stoja medené hviezdy, ďalšie 3 strieborné a posledné 3 zlaté – tie získaš na vyšších úrovniach misií. Nákup je natrvalo, vyber si rozumne.</p>
     <div id="perkList"></div>
   </div>
 
