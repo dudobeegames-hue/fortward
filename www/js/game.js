@@ -875,7 +875,7 @@
     undoStack = [];
     Object.assign(st, {
       wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.05 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, shake: 0, soldierN: 0,
-      blds: [], paving: {}, enemies: [], soldiers: [], proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
+      blds: [], paving: {}, enemies: [], soldiers: [], form: null, proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
       cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, shieldCd: 0, healCd: 0, fwCd: 0, tpCd: 0, shields: [], fireWalls: [], heroDead: {},
       spellSel: null, siegeOrder: {}, fallFx: [], blasts: [], healFx: [], bolts: [], hallHolyT: 0, siegeHold: false, siegeT: 0, introPan: null,
     });
@@ -1462,6 +1462,19 @@
     }
   }
 
+  // vlastní pešiaci sa navzájom jemne odtláčajú, aby nestáli jeden v druhom
+  function separateSoldiers() {
+    const us = st.soldiers.filter(s => !s.fly && !s.dead);
+    for (let i = 0; i < us.length; i++) for (let j = i + 1; j < us.length; j++) {
+      const a = us[i], b = us[j];
+      const dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy, min = a.siege || b.siege ? 11 : 7;
+      if (d2 > min * min || d2 < 0.01) continue;
+      const d = Math.sqrt(d2), push = (min - d) * 0.2;
+      a.x -= dx / d * push; a.y -= dy / d * push * 0.6;
+      b.x += dx / d * push; b.y += dy / d * push * 0.6;
+    }
+  }
+
   function hitUnit(u, dmg) {
     if (u.isKing && u.tpBack > 0) return; // čarodejku počas teleportu nič nezraní
     u.hp -= dmg * (u.armor || 1); u.flash = 0.08;
@@ -1530,6 +1543,7 @@
       let d = Math.hypot(e.x - x, e.y - y);
       if (d > rad) continue;
       if (preferFree && e.foe) d += 25;
+      if (preferFree) d += 12 * (e.atkN || 0);
       if (d < bd) { bd = d; best = e; }
     }
     return best;
@@ -1666,7 +1680,8 @@
     if (t) {
       const d = Math.hypot(t.x - u.x, t.y - u.y);
       const spear = u.ktype === 'spear', reach = spear ? SPEAR_REACH : 8, off = spear ? 12 : 5; // kopijník bodá spoza rytiera
-      if (d > reach) { go(u, t.x + (u.x < t.x ? -off : off), t.y + 1, spd, dt); u.run = (u.run || 0) + spd * dt; }
+      // viacerí na jedného: obstúpia ho z bokov a mierne nad/pod sebou, nestoja v jednom bode
+      if (d > reach) { go(u, t.x + (u.x < t.x ? -off : off), t.y + 1 + (u.isKing ? 0 : ((u.slot || 0) % 3 - 1) * 4), spd, dt); u.run = (u.run || 0) + spd * dt; }
       else {
         if (!t.foe) t.foe = u;
         if (u.cd <= 0) {
@@ -1826,40 +1841,112 @@
     st.soldiers.push({ home: b, archer: true, extra, x: c.x + 1, y: tileY(b.r) + T + 1, hp, max: hp, dmg: archerDmg(b), spd: 24, spr: 'footArcher', cd: 0.3, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
     for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
   }
-  // lukostrelec: stojí kúsok za rytiermi a strieľa na najbližšiu hordu v dosahu; keď nikto nie je v dosahu, ide na svoje miesto
+  // ---- formácie: lukostrelci stoja v rade vedľa seba, pešiaci pochodujú v šíkoch –
+  // rytieri vpredu, kopijníci za nimi, jazdci na krídlach. Šík sa posúva plynulo za najbližšou hordou
+  // a pešiak vybehne z radu až keď má nepriateľa nablízku (alebo keď sa šík s hordou zrazil).
+  const FORM_GAP = 10, FORM_ROW = 9, FORM_MAX = 8, FORM_SPD = 20, ENGAGE = 36, CLASH = 70;
+  const formLeft = () => G.gx0 + 6, formRight = () => G.gx0 + G.cols * T - 6;
+  const formPer = () => Math.max(1, Math.min(FORM_MAX, Math.floor((formRight() - formLeft()) / FORM_GAP) + 1));
+  // n miest v radoch so stredom cx: predný rad na y, ďalšie rady za ním (k radnici), každý druhý posunutý o pol medzery
+  function formSlots(n, cx, y) {
+    const per = formPer(), out = [];
+    for (let i = 0; i < n; i++) {
+      const row = Math.floor(i / per), inRow = Math.min(per, n - row * per), k = i - row * per, half = (inRow - 1) / 2 * FORM_GAP;
+      const c = Math.max(formLeft() + half, Math.min(formRight() - half, cx));
+      out.push({ x: Math.max(formLeft(), Math.min(formRight(), c + (k - (inRow - 1) / 2) * FORM_GAP + (row % 2 ? FORM_GAP / 2 : 0))), y: y + row * FORM_ROW });
+    }
+    return out;
+  }
+  const formRows = n => Math.ceil(n / formPer());
+  // jednotky aj miesta zoradí zľava doprava a spáruje – nikto nekríži cestu susedovi
+  function assignSlots(us, slots) {
+    const a = us.slice().sort((p, q) => p.x - q.x || p.slot - q.slot), b = slots.slice().sort((p, q) => p.x - q.x || p.y - q.y);
+    a.forEach((u, i) => { u.fslot = b[i]; });
+  }
+  // plynulý posun bodu šíku k cieľu (šík pochoduje, neskáče)
+  function stepAnchor(a, tx, ty, dt) {
+    const dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy), s = Math.min(d, FORM_SPD * dt);
+    if (d > 0.01) { a.x += dx / d * s; a.y += dy / d * s; }
+  }
+  function nearestFoe(x, y, fly) {
+    let best = null, bd = 1e9;
+    for (const e of st.enemies) {
+      if (e.dead || e.y <= 4 || (e.d.fly && !fly)) continue;
+      const d = Math.hypot(e.x - x, e.y - y);
+      if (d < bd) { bd = d; best = e; }
+    }
+    return best;
+  }
+  // rozmiestni šíky obrany (pešiaci + lukostrelci) a útočných lukostrelcov; volá sa raz za snímku
+  function updateFormations(dt, musterY) {
+    const cx = G.gx0 + G.cols * T / 2;
+    if (!st.form) st.form = { inf: { x: cx, y: musterY }, arc: { x: cx, y: musterY + 16 }, contact: false };
+    const F = st.form;
+    const live = st.soldiers.filter(s => !s.dead && !s.fly && !s.helper && !s.siege);
+    const archers = live.filter(s => s.archer);
+    let infBack = musterY;
+    if (!st.fort) {
+      const knights = live.filter(s => s.ktype === 'knight'), spears = live.filter(s => s.ktype === 'spear'), riders = live.filter(s => s.ktype === 'rider');
+      // šík ide oproti najbližšej pozemnej horde, no nie hlbšie než k zhromaždisku pred zónou
+      const th = nearestFoe(F.inf.x, F.inf.y, false);
+      if (th) stepAnchor(F.inf, th.x, Math.max(G.gy0 + 24, Math.min(musterY, th.y + 18)), dt);
+      else stepAnchor(F.inf, cx, musterY, dt);
+      const front = formSlots(knights.length, F.inf.x, F.inf.y);
+      assignSlots(knights, front);
+      const kRows = formRows(knights.length);
+      assignSlots(spears, formSlots(spears.length, F.inf.x, F.inf.y + kRows * FORM_ROW));
+      // jazdci na krídlach predného radu
+      const xs = front.length ? front.map(p => p.x) : [F.inf.x];
+      const l = Math.min(...xs), r = Math.max(...xs), rs = riders.slice().sort((p, q) => p.x - q.x), nl = Math.ceil(rs.length / 2);
+      rs.forEach((u, i) => {
+        const left = i < nl, k = left ? nl - 1 - i : i - nl;
+        const x = left ? l - FORM_GAP * (k + 1) : r + FORM_GAP * (k + 1);
+        u.fslot = { x: Math.max(formLeft(), Math.min(formRight(), x)), y: F.inf.y + (k % 2) * 4 };
+      });
+      infBack = F.inf.y + (kRows + formRows(spears.length)) * FORM_ROW;
+      // zrazil sa šík s hordou? potom sa pešiaci pustia aj do nepriateľov o kus ďalej
+      F.contact = live.some(s => s.ktype && s.tgt && !s.tgt.dead && Math.hypot(s.tgt.x - s.x, s.tgt.y - s.y) < 14);
+    }
+    // lukostrelci: rad na dostrel od najbližšieho nepriateľa (aj letca), vždy za pešiakmi
+    if (archers.length) {
+      let tx = cx, ty = Math.max(musterY + 16, infBack + 10);
+      if (st.fort) {
+        const o = fortTarget(F.arc), fo = nearestFoe(F.arc.x, F.arc.y, true);
+        if (fo && Math.hypot(fo.x - F.arc.x, fo.y - F.arc.y) < ARCHER_RANGE + 30) { tx = fo.x; ty = fo.y + ARCHER_RANGE - 14; }
+        else if (o) { tx = o.x; ty = (o === st.fort ? st.fort.y - 16 : o.y - 8) + ARCHER_RANGE - 12; }
+      } else {
+        const th = nearestFoe(F.arc.x, F.arc.y, true);
+        if (th) { tx = th.x; ty = Math.max(G.gy0 + 30, Math.min(ty, Math.max(th.y + ARCHER_RANGE - 14, infBack + 10))); }
+      }
+      if (!F.arcInit && st.fort) { F.arc.x = archers[0].x; F.arc.y = archers[0].y; F.arcInit = true; }
+      stepAnchor(F.arc, tx, ty, dt);
+      assignSlots(archers, formSlots(archers.length, F.arc.x, F.arc.y));
+    }
+  }
+
+  // lukostrelec: drží svoje miesto v rade a strieľa na hordu v dosahu (aj počas presunu)
   // pokrik: jednotky a hrdina sú rýchlejší a silnejší (lukostrelci strieľajú rýchlejšie a silnejšie)
   const CRY_SPD = 1.5, CRY_DMG = 1.8;
-  function updateArcher(u, dt, hx, hy) {
+  function updateArcher(u, dt) {
     u.flash = Math.max(0, u.flash - dt);
     u.cd = Math.max(0, u.cd - dt);
+    u.swing = Math.max(0, (u.swing || 0) - dt);
     let near = false;
     for (const e of st.enemies) if (!e.dead && e.y > 4 && Math.hypot(e.x - u.x, e.y - u.y) <= ARCHER_RANGE) { near = true; break; }
     if (near) {
       if (u.cd <= 0 && shoot(u.x, u.y, u.x, u.y - 9, ARCHER_RANGE, 'arrow', 180, u.dmg * (st.cryT > 0 ? CRY_DMG : 1), 0, ARCHER_PRIO)) { u.cd = ARCHER_CD / (st.cryT > 0 ? CRY_SPD : 1); u.swing = 0.1; }
-      u.swing = Math.max(0, (u.swing || 0) - dt);
-      return;
-    }
-    if (st.fort) { // útočná misia: strieľa na stavby pevnosti, inak sa k nim priblíži
+    } else if (st.fort) { // útočná misia: strieľa na stavby pevnosti
       const o = fortTarget(u);
-      if (!o) return;
-      const ox = o.x, oy = o === st.fort ? st.fort.y - 16 : o.y - 8, d = Math.hypot(ox - u.x, oy - u.y);
-      if (d <= ARCHER_RANGE) {
-        if (u.cd <= 0) { u.cd = ARCHER_CD; st.proj.push({ k: 'arrow', x: u.x, y: u.y - 9, tgt: null, tx: ox + (Math.random() - 0.5) * 8, ty: oy, dmg: u.dmg, spd: 180, splash: 0, vx: 0, vy: -1, fortT: o }); AUDIO.play('arrow'); }
-        return;
+      if (o) {
+        const ox = o.x, oy = o === st.fort ? st.fort.y - 16 : o.y - 8;
+        if (Math.hypot(ox - u.x, oy - u.y) <= ARCHER_RANGE && u.cd <= 0) { u.cd = ARCHER_CD; u.swing = 0.1; st.proj.push({ k: 'arrow', x: u.x, y: u.y - 9, tgt: null, tx: ox + (Math.random() - 0.5) * 8, ty: oy, dmg: u.dmg, spd: 180, splash: 0, vx: 0, vy: -1, fortT: o }); AUDIO.play('arrow'); }
       }
-      const sp = (u.spd || 24) * waterMul(u);
-      if (u.y < FORT.palY + 40) moveTo(u, ox, oy + ARCHER_RANGE - 8, sp, dt); else moveKnight(u, ox, oy + ARCHER_RANGE - 8, sp, dt);
-      return;
     }
-    // obrana: nikto v dosahu – priblíž sa k najbližšej horde na dostrel, inak sa vráť na svoje miesto
-    let tg = null, td = 1e9;
-    for (const e of st.enemies) { if (e.dead || e.y <= 4) continue; const d = Math.hypot(e.x - u.x, e.y - u.y); if (d < td) { td = d; tg = e; } }
-    if (tg) {
-      const k = (ARCHER_RANGE - 10) / td;
-      moveKnight(u, tg.x + (u.x - tg.x) * k, tg.y + (u.y - tg.y) * k, (u.spd || 24) * waterMul(u), dt);
-      return;
-    }
-    moveKnight(u, hx, hy, (u.spd || 24) * waterMul(u), dt);
+    // ide na svoje miesto v rade (počas mierenia pomalšie)
+    const sl = u.fslot;
+    if (!sl || Math.hypot(sl.x - u.x, sl.y - u.y) < 1) return;
+    const sp = (u.spd || 24) * waterMul(u) * (u.swing > 0 ? 0.3 : 1);
+    if (st.fort && u.y < FORT.palY + 40) moveTo(u, sl.x, sl.y, sp, dt); else moveKnight(u, sl.x, sl.y, sp, dt);
   }
 
   // pomocník vyjde z budovy, keď žiadny jej pomocník nežije (prvý hneď na začiatku vlny)
@@ -2085,17 +2172,32 @@
     // rytieri
     // rytieri: pochodujú pred zónu a bijú sa s najbližšou hordou (kým bojujú, horda stojí)
     const musterY = musterYOf();
+    updateFormations(dt, musterY);
+    // koľko vojakov už mieri na ktorého nepriateľa – ďalší si radšej vyberú iného (nenahrnú sa všetci na jedného)
+    for (const e of st.enemies) e.atkN = 0;
+    for (const s of st.soldiers) if (!s.dead && s.tgt && !s.tgt.dead && s.tgt.atkN != null) s.tgt.atkN++;
+    const F = st.form;
     for (const s of st.soldiers) {
       if (s.dead) continue;
       if (s.stunT > 0) { s.stunT -= dt; s.flash = Math.max(0, s.flash - dt); continue; } // omráčený dupnutím veľkráľa
       if (s.helper) { updateHelper(s, dt); continue; }
       if (s.fly) { updateFalcon(s, dt); continue; }
-      if (s.archer) { updateArcher(s, dt, G.gx0 + ((s.slot * 37 + 18) % (G.cols * T - 16)) + 8, musterY + 16); continue; }
-      if (st.fort) { updateAssault(s, dt); continue; }
-      const mx = G.gx0 + ((s.slot * 37) % (G.cols * T - 16)) + 8;
-      updateFighter(s, dt, mx, musterY, 9999, s.dmg, false, moveKnight);
+      if (s.archer) { updateArcher(s, dt); continue; }
+      const prev = s.tgt;
+      if (st.fort) updateAssault(s, dt);
+      else {
+        // pešiak drží miesto v šíku a bije sa s tým, kto príde k jeho miestu; po zrážke šíku s hordou siaha ďalej,
+        // jazdec sa pohybuje voľne; kto prerazil za šík, toho prenasleduje ktokoľvek
+        const sl = s.fslot || { x: G.gx0 + G.cols * T / 2, y: musterY };
+        let aggro = s.ktype === 'rider' ? 9999 : F.contact ? CLASH : ENGAGE;
+        if (!s.tgt || s.tgt.dead) { const leak = nearestEnemyWhere(s.x, s.y, e => e.y > F.inf.y + 14 && e.y > 4, true); if (leak) s.tgt = leak; }
+        if (s.tgt && !s.tgt.dead && s.tgt.y > F.inf.y + 14) aggro = 9999;
+        updateFighter(s, dt, sl.x, sl.y, aggro, s.dmg, false, moveKnight);
+      }
+      if (s.tgt && s.tgt !== prev && !s.tgt.dead) s.tgt.atkN = (s.tgt.atkN || 0) + 1;
     }
     st.soldiers = st.soldiers.filter(s => !s.dead);
+    separateSoldiers();
     // kráľ
     const k = st.king;
     if (k.dead) k.deadT += dt;
@@ -4204,7 +4306,7 @@
   // keď hráč odíde z aplikácie (iné okno, zamknutý mobil), hra sa sama pozastaví
   document.addEventListener('visibilitychange', () => { if (document.hidden && canPause()) setPaused(true); });
   function clearBattle() {
-    st.enemies = []; st.proj = []; st.eproj = []; st.drops = []; st.soldiers = []; st.parts = []; st.texts = []; st.marks = []; st.spawnQ = [];
+    st.enemies = []; st.proj = []; st.eproj = []; st.drops = []; st.soldiers = []; st.form = null; st.parts = []; st.texts = []; st.marks = []; st.spawnQ = [];
     $('over').hidden = true; $('hud').hidden = true; $('bottom').hidden = true; $('build').hidden = true; $('hud-boss').hidden = true;
   }
 
