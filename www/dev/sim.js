@@ -12,8 +12,20 @@ window.SIM = (() => {
   }
 
   const attack = () => !!s.fort;
-  // rezerva zlata na obliehacie stroje a posily počas útoku
-  const reserve = () => !attack() ? 0 : F.has('siegeCat') ? 260 : F.has('siegeRam') ? 140 : 60;
+  // obliehacie stroje: v útoku baranidlá na bránu, katapult a veža na veže, ohnivý voz na palisádu;
+  // v obrane (stroje prežívajú medzi vlnami) katapult spoza šíku, veža k lukostrelcom, ohnivý voz so šíkom, neskôr baranidlo
+  const SIEGE_TECH = { ram: 'siegeRam', cat: 'siegeCat', fire: 'siegeFire', tower: 'siegeTower' };
+  function siegePlan() {
+    const w = s.wave + 1;
+    const want = attack()
+      ? [['ram', w >= 2 ? 2 : 1], ['cat', w >= 2 ? 1 : 0], ['tower', w >= 4 ? 1 : 0], ['fire', w >= 6 ? 1 : 0], ['cat', w >= 8 ? 2 : 0]]
+      : [['cat', w >= 3 ? 1 : 0], ['tower', w >= 4 ? 1 : 0], ['fire', w >= 5 ? 1 : 0], ['cat', w >= 7 ? 2 : 0], ['ram', w >= 8 ? 1 : 0]];
+    return want.filter(([k, n]) => n > 0 && F.has(SIEGE_TECH[k]));
+  }
+  const nSiege = k => s.soldiers.filter(u => u.siege === k && !u.dead).length + ((s.siegeOrder || {})[k] || 0);
+  const missingSiege = () => siegePlan().find(([k, n]) => nSiege(k) < n);
+  // rezerva zlata na najbližší chýbajúci stroj (a v útoku aj na posily)
+  const reserve = () => { const m = missingSiege(); return (m ? F.SIEGE_BUY[m[0]].cost : 0) + (attack() ? 60 : 0); };
   function placeAny(kind, rows, order) {
     for (const r of rows) for (const c of order) if (!F.inHall(c, r) && place(kind, c, r)) {
       const b = s.blds[s.blds.length - 1];
@@ -81,10 +93,6 @@ window.SIM = (() => {
         for (const r of [hr0 + 2, hr0 + 1]) for (const c of [G.hc0 - 2, G.hc0 + 4, G.hc0 - 1, G.hc0 + 3]) if (!acted && place('mine', c, r)) acted = true;
         if (acted) continue;
       }
-      if (F.has('catapult') && count('catapult') < (wave >= 6 ? 2 : 1)) {
-        for (const r of [hr0, hr0 + 1]) for (const c of order) if (!acted && !F.inHall(c, r) && place('catapult', c, r)) acted = true;
-        if (acted) continue;
-      }
       if (F.has('chapel') && count('chapel') < 1) { for (const r of [hr0, hr0 + 1]) for (const c of order) if (!acted && !F.inHall(c, r) && place('chapel', c, r)) acted = true; if (acted) continue; }
       if (F.has('workshop') && count('workshop') < 1) { for (const r of [hr0 + 2, hr0 + 1]) for (const c of order) if (!acted && !F.inHall(c, r) && place('workshop', c, r)) acted = true; if (acted) continue; }
       // pasce pred hradbami: jamy, oheň, medvedie pasce
@@ -96,7 +104,7 @@ window.SIM = (() => {
       if (F.has('spec')) { const t = s.blds.find(b => b.kind === 'tower' && b.lvl >= 3 && !b.spec); if (t && s.gold >= 80) { s.gold -= 80; t.spec = 'rapid'; acted = true; continue; } }
       const ups = [];
       for (const b of s.blds) {
-        if (['tower', 'mage', 'barracks', 'range', 'stables', 'armory', 'falconry', 'catapult', 'mine', 'chapel', 'workshop'].includes(b.kind) && b.lvl < F.bCap()) ups.push({ c: F.bUpCost(b), f: () => { b.spent += F.bUpCost(b); b.lvl++; b.hp = F.bMaxHp(b); } });
+        if (['tower', 'mage', 'barracks', 'range', 'stables', 'armory', 'falconry', 'mine', 'chapel', 'workshop'].includes(b.kind) && b.lvl < F.bCap()) ups.push({ c: F.bUpCost(b), f: () => { b.spent += F.bUpCost(b); b.lvl++; b.hp = F.bMaxHp(b); } });
         if (b.kind === 'wall' && b.lvl < Math.min(F.bCap(), 3) && s.wave >= 4) ups.push({ c: F.bUpCost(b) * 6, real: F.bUpCost(b), f: () => { b.lvl++; b.hp = F.bMaxHp(b); } });
       }
       if (F.has('volleyUp') && s.volleyLvl < 6) ups.push({ c: F.volleyUpCost(), f: () => { s.volleyLvl++; } });
@@ -117,12 +125,14 @@ window.SIM = (() => {
     if (best) F.castSpell('volley', best.x, best.y - 5);
   }
 
-  // útok: obliehacie stroje sa objednajú počas stavby (2 baranidlá, 1 katapult) a vyrazia s útokom
-  function aiSiege() {
-    if (!attack() || s.fort.dead) return;
-    const n = k => s.soldiers.filter(u => u.siege === k && !u.dead).length + ((s.siegeOrder || {})[k] || 0);
-    while (F.has('siegeRam') && n('ram') < 2 && F.orderSiege('ram')) {}
-    while (F.has('siegeCat') && n('cat') < 1 && F.orderSiege('cat')) {}
+  // obliehacie stroje sa objednajú počas stavby podľa plánu (v poradí dôležitosti) a vyrazia so začiatkom vlny;
+  // floor = koľko zlata musí po nákupe ostať (pred stavaním, aby nechýbalo na obranu radnice)
+  function aiSiege(floor) {
+    if (s.fort && s.fort.dead) return;
+    for (const [k, n] of siegePlan()) {
+      while (nSiege(k) < n && s.gold - F.SIEGE_BUY[k].cost >= floor && F.orderSiege(k)) {}
+      if (nSiege(k) < n) break; // na dôležitejší stroj nestačí zlato – lacnejšie ho nepredbehnú
+    }
   }
 
   // kráľove schopnosti
@@ -147,15 +157,15 @@ window.SIM = (() => {
   function fillSlots() {
     const k = F.kingMeta;
     k.slots = k.slots || [null, null, null];
-    k.slots.forEach((v, i) => { if (!v && k.lvl >= F.KING_SLOT_LVL[i]) k.slots[i] = F.KING_POWERS.find(p => !k.slots.includes(p)); });
+    k.slots.forEach((v, i) => { if (!v && k.lvl >= F.KING_SLOT_LVL[i]) k.slots[i] = F.heroDef().powers.find(p => !k.slots.includes(p)); }); // schopnosti nasadeného hrdinu
   }
   function mission(m, opts) {
-    opts = Object.assign({ volley: true }, opts);
+    opts = Object.assign({ volley: true, siege: true }, opts); // siege: false = hráč bez obliehacích strojov (na porovnanie)
     fillSlots();
     F.startMission(m);
     const waves = [];
     for (;;) {
-      if (s.phase === 'build') { build(); aiSiege(); F.startWave(); }
+      if (s.phase === 'build') { if (opts.siege) aiSiege(attack() ? 250 : 200); build(); if (opts.siege) aiSiege(0); F.startWave(); } // stroj sa kúpi pred stavbami, len ak ostane dosť zlata
       let steps = 0;
       const limit = 60 * (attack() ? 1500 : 400); // obliehanie môže trvať cez niekoľko vĺn
       while (s.phase === 'battle' && steps < limit) { F.update(1 / 60); steps++; if (steps % 15 === 0) { aiVolley(opts.volley); aiAbilities(); } }
