@@ -515,25 +515,6 @@ function pGable(p, cx, yTop, yBot, hwMax, ramp) {
   }
 }
 
-// ---- Katapult (18x20) ----
-function makeCatapult() {
-  const p = painter(18, 20);
-  // ramená a rám
-  pLine(p, 2, 14, 15, 14, (x, y) => { p.shade(x, y, WOOD, 0.55); p.shade(x, y + 1, WOOD, 0.3); });
-  for (const ux of [4, 13]) pLine(p, ux, 7, ux, 13, (x, y) => { p.shade(x, y, WOOD, ux === 4 ? 0.6 : 0.4); });
-  pLine(p, 4, 7, 13, 7, (x, y) => p.shade(x, y, WOOD, 0.65));
-  // vrhacie rameno a lyžica s balvanom
-  pLine(p, 6, 13, 13, 2, (x, y) => { p.shade(x, y, WOOD, 0.75); p.shade(x + 1, y, WOOD, 0.45); });
-  pDisk(p, 14, 2, 2.2, 1.6, (x, y, nx, ny) => p.shade(x, y, RAMP.stone, 0.6 - nx * 0.2 - ny * 0.2));
-  // kolesá
-  for (const wx of [3.5, 14.5]) pDisk(p, wx, 16, 3, 3, (x, y, nx, ny, q) => {
-    if (q > 0.55 || Math.abs(x - wx) < 0.6 || Math.abs(y - 16) < 0.6) p.shade(x, y, WOOD, 0.5 - nx * 0.15 - ny * 0.15);
-  });
-  // lano
-  pLine(p, 8, 8, 10, 13, (x, y) => p.set(x, y, hexRGB('#c4b89e')));
-  return p.finish();
-}
-
 // ---- Zlatá baňa (18x18) ----
 function makeMine() {
   const p = painter(18, 18);
@@ -896,6 +877,55 @@ function makeSiegeCat(loaded) {
   p.set(2, 0, hexRGB('#88b4ff')); p.set(1, 0, hexRGB('#5a86e8')); p.set(2, 1, hexRGB('#3c64c8'));                       // modrá zástavka
   return p.finish();
 }
+// ohnivý voz 16x16 (zozadu): drevený voz s okovaným sudom gréckeho ohňa, medený sifón mieri dopredu, pod ním žeravá pec;
+// f = fáza kolies a plamienka
+function makeSiegeFire(f) {
+  const p = painter(16, 16);
+  const COP = ['#3a1a0c', '#6a3418', '#a0582a', '#d08848', '#f0b878'].map(hexRGB);
+  for (let y = 0; y <= 3; y++) { p.shade(7, y, COP, 0.85 - y * 0.05); p.shade(8, y, COP, 0.45); } // sifón
+  p.set(7, 0, GLOW); p.set(8, 0, f ? GLOW : GLOW2);                                               // plamienok na ústí
+  for (let y = 3; y <= 9; y++) for (let x = 3; x <= 12; x++) {                                     // sud
+    const t = (x - 3) / 9, hoop = y === 4 || y === 8;
+    if ((y === 3 || y === 9) && (x === 3 || x === 12)) continue;
+    p.set(x, y, hoop ? (x === 5 || x === 10 ? RIVET : IRON) : pickRamp(WOOD, 0.82 - t * 0.55, x, y));
+  }
+  for (let x = 1; x <= 14; x++) { p.shade(x, 10, WOOD, 0.7 - x * 0.02); p.shade(x, 11, WOOD, 0.4); } // plošina voza
+  for (let y = 12; y <= 13; y++) for (let x = 5; x <= 10; x++) p.set(x, y, (x + y + f) % 3 === 0 ? GLOW : GLOW2); // žeravá pec pod sudom
+  for (const x of [4, 11]) for (let y = 12; y <= 14; y++) p.set(x, y, IRON);
+  for (const wx of [0, 14]) for (let y = 10; y <= 15; y++) for (let x = wx; x <= wx + 1; x++) {   // kolesá z boku
+    p.set(x, y, y === 10 || y === 15 ? IRON : (y + f) % 3 === 0 ? pickRamp(WOOD, 0.25, x, y) : pickRamp(WOOD, x === wx ? 0.7 : 0.45, x, y));
+  }
+  p.set(2, 2, hexRGB('#3e2614')); p.set(2, 3, hexRGB('#3e2614')); p.set(2, 4, hexRGB('#3e2614'));  // žrď s modrou zástavkou
+  p.set(1, 2, hexRGB('#88b4ff')); p.set(0, 2, hexRGB('#5a86e8')); p.set(1, 3, hexRGB('#3c64c8'));
+  return p.finish();
+}
+// obliehacia veža 16x28 (zozadu): drevená veža pokrytá modrými kožami, hore cimburie s dvoma lukostrelcami, dole kolesá;
+// f = fáza kolies, shot = lukostrelci práve napínajú luk (o pixel vyššie)
+function makeSiegeTower(f, shot) {
+  const p = painter(16, 28);
+  const by = shot ? 0 : 1;
+  for (const [hx, lit] of [[4, true], [10, false]]) {                                              // hlavy lukostrelcov s prilbou
+    p.set(hx, by, hexRGB(lit ? '#88b4ff' : '#5a86e8')); p.set(hx + 1, by, hexRGB(lit ? '#5a86e8' : '#3c64c8'));
+    p.set(hx, by + 1, hexRGB('#e8b890')); p.set(hx + 1, by + 1, hexRGB('#c08868'));
+    p.set(hx + 2, by - 1 < 0 ? 0 : by - 1, hexRGB('#8a5a2e')); p.set(hx + 2, by, hexRGB('#8a5a2e'));  // luk
+  }
+  for (let x = 1; x <= 14; x++) for (let y = 3; y <= 5; y++) {                                     // cimburie
+    if (y === 3 && x % 3 === 0) continue;
+    p.shade(x, y, WOOD, (y === 3 ? 0.85 : 0.65) - x * 0.025);
+  }
+  for (let y = 6; y <= 21; y++) for (let x = 2; x <= 13; x++) {                                     // telo pokryté kožami
+    const t = (x - 2) / 11, seam = y % 5 === 0;
+    p.shade(x, y, seam ? WOOD : ROOF_BLUE, seam ? 0.55 - t * 0.3 : 0.8 - t * 0.5 + ((x + y) % 4 === 0 ? -0.08 : 0));
+  }
+  for (const x of [2, 13]) for (let y = 6; y <= 22; y++) p.shade(x, y, WOOD, x === 2 ? 0.75 : 0.3); // rohové trámy
+  for (let x = 1; x <= 14; x++) { p.shade(x, 22, WOOD, 0.6 - x * 0.02); p.shade(x, 23, WOOD, 0.3); } // podvozok
+  for (const wx of [0, 14]) for (let y = 21; y <= 27; y++) for (let x = wx; x <= wx + 1; x++) {    // kolesá
+    p.set(x, y, y === 21 || y === 27 ? IRON : (y + f) % 3 === 0 ? pickRamp(WOOD, 0.25, x, y) : pickRamp(WOOD, x === wx ? 0.7 : 0.45, x, y));
+  }
+  for (let y = 24; y <= 26; y++) for (let x = 4; x <= 11; x++) p.set(x, y, hexRGB('#1e120a'));     // tmavé vnútro, nohy tlačiacich
+  for (const lx of [5, 9]) { const st = (lx === 5) === (f === 0) ? 1 : 0; for (let y = 24; y <= 26 - st; y++) { p.set(lx, y, hexRGB('#3c64c8')); p.set(lx + 1, y, hexRGB('#22337a')); } }
+  return p.finish();
+}
 // ---- Orkský veľkráľ (boss 10. misie) 26x30: koruna, kožušinový plášť, červená pelerína, obojručná sekera; step = krok nôh ----
 function makeOrcKing(step) {
   const p = painter(26, 30);
@@ -1141,7 +1171,6 @@ function initBuildingSprites() {
   BSPR.ballista = [1, 2, 3, 4, 5].map(l => makeBallistaTower(l));
   BSPR.barracks = makeBarracks();
   BSPR.pit = makePit();
-  BSPR.catapult = makeCatapult();
   BSPR.mine = makeMine();
   BSPR.chapel = makeChapel();
   BSPR.firepit = makeFirepit();
@@ -1159,6 +1188,8 @@ function initBuildingSprites() {
   BSPR.stakes = makeStakes();
   SPR.siegeRam = [makeSiegeRam(0), makeSiegeRam(1)];
   SPR.siegeCat = [makeSiegeCat(true), makeSiegeCat(false)];
+  SPR.siegeFire = [makeSiegeFire(0), makeSiegeFire(1)];
+  SPR.siegeTower = [makeSiegeTower(0, false), makeSiegeTower(1, false), makeSiegeTower(0, true)];
   SPR.orcKing = [makeOrcKing(0), makeOrcKing(1)];
   SPR.bear = [makeBearRider(0), makeBearRider(1)];
   SPR.wolf = [makeWolfRider(0), makeWolfRider(1)];
