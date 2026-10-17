@@ -3700,7 +3700,7 @@
     ICONS.u_siegeRam = spriteURL(SPR.siegeRam[0], 2); ICONS.u_siegeCat = spriteURL(SPR.siegeCat[0], 2); ICONS.u_siegeFire = spriteURL(SPR.siegeFire[0], 2); ICONS.u_siegeTower = spriteURL(SPR.siegeTower[0], 2);
     $('icoHall').src = UI_ICONS.hall;
     syncHeroIcons(); updateGems();
-    for (const k of ['orc', 'garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' ? 2 : 3);
+    for (const k of ['orc', 'garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf', 'giantRam', 'mammoth']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' || ENEMY[k].giant ? 2 : 3);
     ICONS.coin = spriteURL(SPR.coin[0], 4);
     ICONS.paving = spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3);
     Object.assign(ICONS, { sp_volley: UI_ICONS.spellVolley, sp_fire: UI_ICONS.spellFire, sp_frost: UI_ICONS.spellFrost, sp_bolt: UI_ICONS.spellBolt,
@@ -4412,8 +4412,8 @@
     $('mName').textContent = def.name;
     const diff = Math.ceil(m / 2);
     $('mMeta').innerHTML = MISSION_WAVES + ' vĺn · obtiažnosť <span class="stars">' + '●'.repeat(diff) + '<i>' + '●'.repeat(5 - diff) + '</i></span>' + (done ? ' · <span class="ok">splnená ✓</span>' : '');
-    const foe = ENEMY_INTRO[m];
-    $('mNew').innerHTML = (foe ? '<span>Nepriateľ:</span><em class="foe"><img src="' + ICONS['e_' + foe.id] + '">' + foe.name + '</em>' : '') +
+    const foes = [].concat(ENEMY_INTRO[m] || []);
+    $('mNew').innerHTML = (foes.length ? '<span>' + (foes.length > 1 ? 'Nepriatelia:' : 'Nepriateľ:') + '</span>' + foes.map(foe => '<em class="foe"><img src="' + ICONS['e_' + foe.id] + '">' + foe.name + '</em>').join('') : '') +
       '<span>' + (m === 1 ? 'Výbava:' : 'Novinka:') + '</span>' + UNLOCKS[m - 1].map(u => '<em><img src="' + ICONS[u.icon] + '">' + u.name + '</em>').join('');
     // úroveň misie: predvolene prvá otvorená bez plných 3 hviezd
     if (st.mapTierFor !== m) {
@@ -4661,8 +4661,7 @@
       tag: BUILD[u.id] ? 'Nová stavba' : ABIL[u.id] ? 'Kráľova schopnosť' : /^(volley|fireball|freeze|lightning)$/.test(u.id) ? 'Kúzlo' : 'Nové vylepšenie',
       desc: u.desc || (BUILD[u.id] ? BUILD[u.id].desc + '.' : ''),
     }));
-    const foe = ENEMY_INTRO[m];
-    if (foe) items.push({ icon: ICONS['e_' + foe.id], name: foe.name, tag: 'Pozor – nový nepriateľ', desc: foe.desc.charAt(0).toUpperCase() + foe.desc.slice(1) + '.', foe: true });
+    for (const foe of [].concat(ENEMY_INTRO[m] || [])) items.push({ icon: ICONS['e_' + foe.id], name: foe.name, tag: ENEMY[foe.id].giant ? 'Pozor – obor hordy' : 'Pozor – nový nepriateľ', desc: foe.desc.charAt(0).toUpperCase() + foe.desc.slice(1) + '.', foe: true });
     return items;
   }
   function showUnlockDeck(m) {

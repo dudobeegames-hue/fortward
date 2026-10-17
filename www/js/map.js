@@ -227,14 +227,16 @@ const UNLOCKS = [
   [{ id: 'falconry', name: 'Sokoliareň a sokoly', icon: 'falconry', desc: 'Sokoly letia ponad hradby a lovia netopiere, šamanov a podkopníkov. Pechota na ne nedosiahne, strelci ich však ľahko zostrelia.' }, { id: 'lvl5', name: 'Radnica a stavby úrovne 5', icon: 'hall', desc: 'Vylepši radnicu na kráľovský kameň – a s ňou všetky stavby.' }, { id: 'spec', name: 'Špecializácia veží', icon: 'tower', desc: 'Veža od úrovne 3 dostane ohnivé šípy, rýchlu streľbu alebo ostreľovača.' }, { id: 'workshop', name: 'Dielňa remeselníka', icon: 'workshop' }, { id: 'spikeTypes', name: 'Ohnivé a ľadové ostne', icon: 'wall', desc: 'Ostne na hradbách môžu útočníka podpáliť alebo spomaliť.' }],
   [{ id: 'siegeTower', name: 'Obliehacia veža', icon: 'u_siegeTower', desc: 'Obliehací stroj zo záložky Stroje. Dvaja lukostrelci strieľajú z výšky ďaleko, aj na netopiere. Sprevádza ostatné stroje k táboru hordy.' }],
 ];
-// noví nepriatelia – predstavia sa v danej misii
+// noví nepriatelia – predstavia sa v danej misii (jeden alebo zoznam)
 const ENEMY_INTRO = {
   3: { id: 'garcher', name: 'Goblin-lukostrelec', desc: 'strieľa na budovy z diaľky' },
   4: { id: 'bat', name: 'Netopiere', desc: 'preletia ponad hradby priamo k radnici' },
   5: { id: 'ram', name: 'Beranidlo', desc: 'rozbíja hradby a rytierov ignoruje' },
   6: { id: 'shaman', name: 'Šaman', desc: 'lieči ostatných – zabi ho ako prvého' },
-  7: { id: 'bear', name: 'Medvedí jazdec', desc: 'nápor zrazí rytiera aj jazdca – zastavia ho len kopijníci' },
-  8: { id: 'sapper', name: 'Podkopník', desc: 'beží k hradbám a vyhodí ich do vzduchu – zastreľ ho skôr' },
+  7: [{ id: 'bear', name: 'Medvedí jazdec', desc: 'nápor zrazí rytiera aj jazdca – zastavia ho len kopijníci' },
+      { id: 'giantRam', name: 'Obrí baran', desc: 'obor v hrubom pancieri ide rovno na hradby a radnicu – veže a jednotky ho len škrabnú, obliehacie stroje ho rozbijú' }],
+  8: [{ id: 'sapper', name: 'Podkopník', desc: 'beží k hradbám a vyhodí ich do vzduchu – zastreľ ho skôr' },
+      { id: 'mammoth', name: 'Vojnový mamut', desc: 'obor v hrubom pancieri – goblini z vežičky strieľajú za chôdze a mamut pošliape vojakov; proti nemu pošli obliehacie stroje' }],
   9: { id: 'wolf', name: 'Vlčí jazdci', desc: 'prebehnú cez rytierov a idú po lukostrelcoch – zastavia ich kopijníci' },
   10: { id: 'orcKing', name: 'Orkský veľkráľ', desc: 'vyjde z tábora v poslednej vlne – dupnutím omračuje a privoláva goblinov' },
 };
