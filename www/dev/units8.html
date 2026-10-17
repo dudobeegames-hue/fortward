@@ -18,7 +18,7 @@
 <script>
 initSprites();
 const U = new URLSearchParams(location.search).get('u') || 'soldier'; // napr. ?u=footArcher
-const Z = 4, set = SPR[U + '8'], W = U8_W, H = U8_H;
+const Z = 4, set = SPR[U + '8'], W = set[0].idle.w, H = set[0].idle.h;
 const sh = document.getElementById('sheet'), sx = sh.getContext('2d');
 sh.width = W * 8 * Z; sh.height = H * 8 * Z; sx.imageSmoothingEnabled = false;
 set.forEach((v, d) => [v.idle, ...v.walk, ...v.atk].forEach((f, i) => sx.drawImage(f.c, i * W * Z, d * H * Z, W * Z, H * Z)));
@@ -29,14 +29,14 @@ function loop(now) {
   const dt = Math.max(0, now - last) / 1000; last = now; // prvý snímok môže prísť s časom pred štartom dist += dt * 26;
   lx.fillStyle = '#4c5e34'; lx.fillRect(0, 0, lv.width, lv.height);
   set.forEach((v, d) => {
-    const f = v.walk[Math.floor(dist / 3.2) % 4];
+    const f = v.walk[Math.floor(dist / set.stride) % 4];
     lx.drawImage(f.c, 10 + d * 76, 10, W * 2, H * 2);
     lx.drawImage(v.atk[Math.floor(now / 300) % v.atk.length].c, 10 + d * 76, 70, W * 2, H * 2);
   });
   const o = SPR[U][Math.floor(dist / 9) % 2], r = SPR.race_humans[0];
   lx.drawImage(o.c, 20, 150, o.w * 4, o.h * 4);
-  lx.drawImage(set[6].walk[Math.floor(dist / 3.2) % 4].c, 90, 110, W * 4, H * 4);
-  lx.drawImage(set[2].walk[Math.floor(dist / 3.2) % 4].c, 230, 110, W * 4, H * 4);
+  lx.drawImage(set[6].walk[Math.floor(dist / set.stride) % 4].c, 90, 110, W * 4, H * 4);
+  lx.drawImage(set[2].walk[Math.floor(dist / set.stride) % 4].c, 230, 110, W * 4, H * 4);
   lx.drawImage(r.c, 380, 150, r.w * 4, r.h * 4);
   requestAnimationFrame(loop);
 }

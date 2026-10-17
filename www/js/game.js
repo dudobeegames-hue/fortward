@@ -49,7 +49,7 @@
   const KTYPES = {
     knight: { name: 'Rytier',      spr: 'soldier', hp: 1,   dmg: 1,    spd: 26, desc: 'vyvážený' },
     spear:  { name: 'Kopijník',    spr: 'spear',   hp: 1.2, dmg: 0.85, spd: 24, desc: 'útočí spoza rytierov, silný proti jazde' },
-    rider:  { name: 'Jazdec',      spr: 'rider',   hp: 0.9, dmg: 1.25, spd: 46, desc: 'rýchly, ide po strelcoch a šamanoch' },
+    rider:  { name: 'Jazdec',      spr: 'rider',   hp: 0.9, dmg: 1.25, spd: 34, desc: 'rýchly, ide po strelcoch a šamanoch' },
   };
   // každá pozemná jednotka má vlastnú budovu
   const UNIT_HOME = { barracks: 'knight', stables: 'rider', armory: 'spear' };
@@ -2519,15 +2519,15 @@
     }
     else if (u.swing > 0) return v.atk[u.swing > 0.075 ? 1 : 2]; // švih a dokončenie úderu
     else if (near && !moving && u.cd < 0.25) return v.atk[0];  // napriahnutie
-    if (moving) return v.walk[Math.floor(u._wd / 3.2) % 4];
+    if (moving) return v.walk[Math.floor(u._wd / set.stride) % 4];
     return v.idle;
   }
   function drawFighter(u, sprName) {
     if (!u.isKing && SPR[sprName + '8']) {
-      const fr = unit8Frame(u, SPR[sprName + '8']), y = Math.round(u.y - U8_H) + U8_PB;
+      const fr = unit8Frame(u, SPR[sprName + '8']), y = Math.round(u.y - fr.h) + U8_PB;
       shadow(u.x, u.y, 4);
       cryAura(u, false, true);
-      g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - U8_W / 2), y);
+      g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), y);
       cryAura(u, false);
       if (u.stunT > 0) { // hviezdičky nad omráčeným
         const t = performance.now() / 1000;
