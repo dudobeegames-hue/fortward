@@ -811,7 +811,7 @@
     const fm = st.form || { inf: { x: G.hallCx, y: musterYOf() }, arc: { x: G.hallCx, y: musterYOf() + 16 } };
     const side = (u.slot % 2 ? 1 : -1) * (14 + 10 * (Math.floor(u.slot / 2) % 3));
     const clampX = x => Math.max(G.gx0 + 8, Math.min(G.gx0 + G.cols * T - 8, x));
-    const spd = u.spd * 1.5 * waterMul(u), go = (x, y) => moveKnight(u, x, y, spd, dt); // po vlastnej ceste rýchlejšie, aby stačili šíku
+    const spd = u.spd * 1.5 * waterMul(u), go = (x, y) => moveKnight(u, x, y, spd * backMul(u, x, y), dt); // po vlastnej ceste rýchlejšie, aby stačili šíku
     const camp = armyAttacks() ? nearestCampPart(u.x, u.y) : null; // v obrane ostávajú pri šíku
     if (u.siege === 'ram') {
       if (camp) { // tábor má prednosť – hordy si nevšíma
@@ -1884,6 +1884,8 @@
     }
   }
 
+  // lukostrelci a obliehacie stroje cúvajú (smerom k radnici) o polovicu pomalšie, než idú dopredu
+  const backMul = (u, x, y) => { const dy = y - u.y, d = Math.hypot(x - u.x, dy); return d > 0.5 && dy > d * 0.3 ? 0.5 : 1; };
   // lukostrelec: drží svoje miesto v rade a strieľa na hordu v dosahu (aj počas presunu)
   // pokrik: jednotky a hrdina sú rýchlejší a silnejší (lukostrelci strieľajú rýchlejšie a silnejšie)
   const CRY_SPD = 1.5, CRY_DMG = 1.8;
@@ -1906,7 +1908,7 @@
     const sl = u.fslot;
     if (!sl || Math.hypot(sl.x - u.x, sl.y - u.y) < 1) return;
     const sp = (u.spd || 24) * waterMul(u) * (u.swing > 0 ? 0.3 : 1);
-    moveKnight(u, sl.x, sl.y, sp, dt);
+    moveKnight(u, sl.x, sl.y, sp * backMul(u, sl.x, sl.y), dt);
   }
 
   // pomocník vyjde z budovy, keď žiadny jej pomocník nežije (prvý hneď na začiatku vlny)
