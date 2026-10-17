@@ -38,7 +38,7 @@ const CAMP_PIECES = {
     stonewall:   { role: 'wall',    name: 'Kamenný múr',     spr: () => BSPR.orcWall, hp: 1.7 },
     stonegate:   { role: 'wall',    name: 'Kamenná brána',   spr: () => BSPR.orcWallGate, hp: 1.7 },
     stakes:      { role: 'wall',    name: 'Koly',            spr: () => BSPR.stakes, hp: 0.4 },
-    keep:        { role: 'keep',    name: 'Orkská pevnosť',  spr: () => BSPR.orcKeep, size: [3, 2] },
+    keep:        { role: 'keep',    name: 'Orkská pevnosť',  spr: () => BSPR.orcKeep, size: [3, 3] },
   },
   human: { // všetky stavby, ktoré má hráč za ľudí
     barracks: { role: 'spawn', unit: 'knight', name: 'Kasárne',    spr: () => BSPR.barracks },

@@ -961,7 +961,6 @@
     clearHeroFx();
     if (st.king && st.king.dead) st.king.deadT = Math.max(st.king.deadT, 1); // padnutý hrdina ostane omráčený ležať aj počas stavby, kým ho hráč neoživí
     if (st.king && st.king.dead && !reviveSeen()) st.sel = HALL; // hrdina padol prvý raz: stavanie začne s otvorenou radnicou
-    if (st.king && st.king.dead) later(() => { if (st.phase === 'build' && st.king.dead) hint(heroFell() + ' – ' + (heroDef().fem ? 'oživíš ju' : 'oživíš ho') + ' v radnici'); }, 900);
     if (st.king && !st.king.dead) { st.king.hp = kingMax(); st.king.down = 0; st.king.tgt = null; st.king.flash = 0; st.king.swing = 0; st.king.tpBack = 0; } // domov dôjde sám (heroWalkHome)
     for (const b of st.blds) b.flash = 0;
     $('build').hidden = false;
