@@ -1920,6 +1920,7 @@
     for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
   }
   // mních ide za najviac zraneným rytierom/kráľom, remeselník k najviac poškodenej budove; inak sa vráti domov
+  const HEAL_RANGE = 40; // mních lieči kúzlom z tejto vzdialenosti
   function updateHelper(u, dt) {
     u.flash = Math.max(0, u.flash - dt);
     u.swing = Math.max(0, (u.swing || 0) - dt);
@@ -1948,20 +1949,25 @@
     }
     const tgt = u.tgt;
     let tx = 0, ty = 0;
-    if (tgt && u.helper === 'chapel') { tx = tgt.x + (u.x < tgt.x ? -6 : 6); ty = tgt.y + 1; }
+    const monk = u.helper === 'chapel';
+    if (tgt && monk) { // mních lieči kúzlom na diaľku: zastaví v dosahu, z boku od cieľa
+      const d = Math.hypot(tgt.x - u.x, tgt.y - u.y);
+      if (d <= HEAL_RANGE) { tx = u.x; ty = u.y; } else { const k = (HEAL_RANGE - 6) / d; tx = tgt.x + (u.x - tgt.x) * k; ty = tgt.y + (u.y - tgt.y) * k; }
+    }
     else if (tgt) { tx = tileX(tgt.c) + T / 2; ty = tileY(tgt.r) + T + 3; }
+    const casting = u.working; // kto už lieči, prestane až o kus ďalej (na hranici dosahu neprepína tam a späť)
     u.working = false;
     const spd = u.spd * waterMul(u);
     if (!tgt) { // nikto nepotrebuje pomoc – späť k budove
       if (u.home) moveKnight(u, tileX(u.home.c) + T / 2 + 1, tileY(u.home.r) + T + 2, spd * 0.85, dt);
       return;
     }
-    if (Math.hypot(tx - u.x, ty - u.y) > 7) { moveKnight(u, tx, ty, spd, dt); return; }
+    if (monk ? Math.hypot(tgt.x - u.x, tgt.y - u.y) > HEAL_RANGE + (casting ? 6 : 0) : Math.hypot(tx - u.x, ty - u.y) > 7) { moveKnight(u, tx, ty, spd, dt); return; }
     // pri cieli: lieči / opravuje
     u.working = true;
-    if (u.helper === 'chapel') {
+    if (monk) {
       tgt.hp = Math.min(tgt.isKing ? kingMax() : tgt.max, tgt.hp + u.rate * dt);
-      if (Math.random() < 0.15) part(tgt.x + (Math.random() - 0.5) * 6, tgt.y - 6 - Math.random() * 6, 0, -12, 0.6, '#9cd45a', 0);
+      if (Math.random() < 0.25) part(tgt.x + (Math.random() - 0.5) * 8, tgt.y - 4 - Math.random() * 8, (Math.random() - 0.5) * 6, -14, 0.6, Math.random() < 0.5 ? '#9cd45a' : '#e8ffd0', 0);
     } else {
       tgt.hp = Math.min(bMaxHp(tgt), tgt.hp + u.rate * dt);
       const prev = u.cd; u.cd -= dt;
@@ -2800,6 +2806,27 @@
     if (BUILD[kind].range) drawRange(hx + T / 2, hy + T / 2, bRange({ kind, lvl: 1 }), time); // dosah už pri ukladaní
   }
 
+  // liečivé kúzlo mnícha: žiara na hlavici palice, pulzujúci kruh pod ním a prúd svetielok k liečenému
+  function drawHealSpell(u, t, time) {
+    const sx = u.x + 5, sy = u.y - 12, ex = t.x, ey = t.y - 7, dx = ex - sx, dy = ey - sy, d = Math.hypot(dx, dy) || 1, nx = -dy / d, ny = dx / d;
+    const pulse = 0.5 + 0.5 * Math.sin(time * 6 + u.x);
+    g.globalAlpha = 0.25 + 0.2 * pulse; g.strokeStyle = '#9cd45a'; g.lineWidth = 1;    // kruh pod mníchom
+    g.beginPath(); g.ellipse(Math.round(u.x) + 0.5, Math.round(u.y) + 0.5, 6 + pulse * 2, 2.5 + pulse, 0, 0, 6.29); g.stroke();
+    const n = Math.max(2, Math.round(d)); // slabý lúč od palice k cieľu
+    g.fillStyle = '#9cd45a'; g.globalAlpha = 0.22 + 0.12 * pulse;
+    for (let i = 0; i <= n; i += 1) g.fillRect(Math.round(sx + dx * i / n), Math.round(sy + dy * i / n), 1, 1);
+    g.globalAlpha = 1;
+    for (let k = 0; k < 10; k++) { // svetielka letia od palice k cieľu, mierne sa vlnia
+      const f = (time * 1.4 + k / 10) % 1, w = Math.sin(f * Math.PI) * Math.sin(time * 5 + k * 2) * 3;
+      const px = Math.round(sx + dx * f + nx * w), py = Math.round(sy + dy * f + ny * w);
+      g.globalAlpha = 0.45; g.fillStyle = '#9cd45a'; g.fillRect(px - 1, py - 1, 3, 3);
+      g.globalAlpha = 1; g.fillStyle = k % 2 ? '#ffffff' : '#e8ffd0'; g.fillRect(px, py, k % 3 ? 1 : 2, k % 3 ? 1 : 2);
+    }
+    g.globalAlpha = 0.5 + 0.4 * pulse; g.fillStyle = '#9cd45a'; g.fillRect(Math.round(sx) - 1, Math.round(sy) - 1, 3, 3); // žiara na palici
+    g.globalAlpha = 1; g.fillStyle = '#ffffff'; g.fillRect(Math.round(sx), Math.round(sy), 1, 1);
+    g.globalAlpha = 0.3 + 0.3 * pulse; g.fillStyle = '#c8ff9a'; g.fillRect(Math.round(ex) - 2, Math.round(ey) - 1, 5, 3); // jas na liečenom
+    g.globalAlpha = 1;
+  }
   // výber miesta pre obliehací stroj: povolený pás sa jemne rozsvieti, zdvihnutý stroj bliká
   function drawSiegePick(time) {
     const y0 = Math.max(0, Math.round(siegeMinY())), a = 0.10 + 0.05 * Math.sin(time * 5);
@@ -3496,6 +3523,7 @@
     for (const s of st.soldiers) if (s.hp < s.max) bar(s.x, Math.round(s.y - 17), 8, s.hp / s.max, '#88b4ff');
     for (const o of campLive()) if (o.hp < o.max) bar(o.x, o.y - o.skin.spr(o, 0).h - 4, 14, o.hp / o.max, '#e84838');
     if (st.king && !st.king.dead && st.king.hp < kingMax()) bar(st.king.x, Math.round(st.king.y - 19), 10, st.king.hp / kingMax(), '#f8d048');
+    for (const s of st.soldiers) if (s.helper === 'chapel' && s.working && s.tgt && !s.dead) drawHealSpell(s, s.tgt, time);
     for (const p of st.proj) drawProj(p);
     for (const p of st.eproj) { // šíp goblina (tmavý)
       const cols = ['#bcc0cc', '#3e2614', '#3e2614', '#3e2614', '#62a03a'];
