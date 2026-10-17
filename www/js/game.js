@@ -2807,13 +2807,17 @@
   }
 
   // liečivé kúzlo mnícha: na zdvihnutej palici bledomodré svetlo, liečeného obklopí bledomodrá svetelná aura
-  function drawHealSpell(u, t, time) {
-    const pulse = 0.5 + 0.5 * Math.sin(time * 6 + u.x);
-    const sx = Math.round(u.x + 5), sy = Math.round(u.y - 16);                                  // hlavica zdvihnutej palice
+  const healAuraH = t => (t.isKing ? 26 : 18) + 2;
+  function drawStaffGlow(u, time) { // hlavica zdvihnutej palice
+    const pulse = 0.5 + 0.5 * Math.sin(time * 6 + u.x), sx = Math.round(u.x + 5), sy = Math.round(u.y - 16);
     g.globalAlpha = 0.35 + 0.3 * pulse; g.fillStyle = '#a8d4ff'; g.fillRect(sx - 2, sy - 2, 5, 5);
     g.globalAlpha = 0.8; g.fillStyle = '#e0f2ff'; g.fillRect(sx - 1, sy - 1, 3, 3);
     g.globalAlpha = 1; g.fillStyle = '#ffffff'; g.fillRect(sx, sy, 1, 1);
-    const ax = Math.round(t.x), ay = Math.round(t.y), hh = (t.isKing ? 26 : 18) + 2;              // aura liečeného
+  }
+  // aura liečeného: kreslí sa podľa hĺbky za ním, takže jednotky stojace za liečeným ju prekryjú
+  function drawHealAura(u, t, time) {
+    const pulse = 0.5 + 0.5 * Math.sin(time * 6 + u.x);
+    const ax = Math.round(t.x), ay = Math.round(t.y), hh = healAuraH(t);
     for (let y = 0; y < hh; y++) {                                                                // svetelný stĺp, hore sa stráca
       const k = 1 - y / hh, w = 5 + Math.round(2 * Math.sin(time * 4 + y * 0.5));
       g.globalAlpha = (0.16 + 0.12 * pulse) * k; g.fillStyle = '#bfe3ff'; g.fillRect(ax - w, ay - y, w * 2 + 1, 1);
@@ -3500,7 +3504,11 @@
     if (playing) {
       objs.push({ y: G.hallBot, f: () => drawHall(time) });
       for (const b of st.blds) if (!TRAPS[b.kind]) objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), x: b.c, f: () => drawBuilding(b, time) });
-      for (const s of st.soldiers) objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: s.y, f: () => drawFighter(s, s.helper === 'chapel' && s.working ? 'monkCast' : s.spr || 'soldier') }); // mních pri liečení zdvihne palicu
+      for (const s of st.soldiers) {
+        const cast = s.helper === 'chapel' && s.working && s.tgt && !s.dead; // mních pri liečení zdvihne palicu
+        objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: s.y, f: () => { drawFighter(s, cast ? 'monkCast' : s.spr || 'soldier'); if (cast) drawStaffGlow(s, time); } });
+        if (cast) { const t = s.tgt; objs.push({ y: t.y - healAuraH(t) - 1, f: () => drawHealAura(s, t, time) }); }
+      }
       if (st.phase === 'build') for (const o of st.siegeOrder) { // kúpené obliehacie stroje čakajú na mieste, odkiaľ vyrazia
         const sp = SPR[BUY[o.key].siege][0];
         objs.push({ y: o.y, f: () => { shadow(o.x, o.y, 8); g.drawImage(sp.c, Math.round(o.x - sp.w / 2), Math.round(o.y - sp.h)); } });
@@ -3523,7 +3531,6 @@
     for (const s of st.soldiers) if (s.hp < s.max) bar(s.x, Math.round(s.y - 17), 8, s.hp / s.max, '#88b4ff');
     for (const o of campLive()) if (o.hp < o.max) bar(o.x, o.y - o.skin.spr(o, 0).h - 4, 14, o.hp / o.max, '#e84838');
     if (st.king && !st.king.dead && st.king.hp < kingMax()) bar(st.king.x, Math.round(st.king.y - 19), 10, st.king.hp / kingMax(), '#f8d048');
-    for (const s of st.soldiers) if (s.helper === 'chapel' && s.working && s.tgt && !s.dead) drawHealSpell(s, s.tgt, time);
     for (const p of st.proj) drawProj(p);
     for (const p of st.eproj) { // šíp goblina (tmavý)
       const cols = ['#bcc0cc', '#3e2614', '#3e2614', '#3e2614', '#62a03a'];
