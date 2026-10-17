@@ -702,7 +702,6 @@
     for (let k = 0; k < 26; k++) part(o.x + (Math.random() - 0.5) * 16, o.y - Math.random() * 18, (Math.random() - 0.5) * 60, -Math.random() * 50, 0.9, ['#3c3846', '#22202a', '#4a2e1a', '#f89838'][k % 4], 110);
     const gold = Math.round(CAMP_ROLES[o.role].gold * (1 + 0.1 * (st.mission - HOME_PROVINCES)));
     st.gold += gold; st.texts.push({ x: o.x, y: o.y - 22, s: '+' + gold, life: 1.4, max: 1.4 });
-    toast(o.skin.name + ' zničený · +' + gold + ' zlata');
     updateHud();
   }
   // medzi vlnami horda stojace stavby tábora čiastočne opraví (zbúrané už nepostaví)
@@ -1015,7 +1014,6 @@
     for (const sd of st.soldiers) if (!sd.siege) for (let k = 0; k < 5; k++) part(sd.x, sd.y - 5, (Math.random() - 0.5) * 20, -Math.random() * 20, 0.4, '#88b4ff', 30);
     st.soldiers = st.soldiers.filter(s => s.siege);
     if (st.wave >= MISSION_WAVES) { missionWon(); return; }
-    banner('Vlna prežitá! +' + bonus + ' zlata' + (st.lastXp ? ' · ' + heroName().toLowerCase() + ' +' + st.lastXp + ' XP' : ''));
     AUDIO.play('cleared');
     later(() => { if (st.phase === 'pause') enterBuild(); }, 1000);
     updateHud();
@@ -2069,7 +2067,7 @@
       const near = (px, py, skip) => { let b = null, bd = sp.reach; for (const e of st.enemies) { if (e.dead || skip.includes(e)) continue; const d = Math.hypot(e.x - px, e.y - py); if (d < bd) { bd = d; b = e; } } return b; };
       const hit = [];
       let cur = near(x, y, hit);
-      if (!cur) { hint('Blesk treba zoslať na nepriateľa'); AUDIO.play('deny'); return false; }
+      if (!cur) { AUDIO.play('deny'); return false; } // blesk treba zoslať na nepriateľa
       const pts = [{ x: cur.x + 6, y: Math.max(0, cur.y - 120) }];
       for (let n = 0; n < 3 && cur; n++) { hit.push(cur); pts.push({ x: cur.x, y: cur.y - cur.h * 0.5 }); cur = near(cur.x, cur.y, hit); }
       hit.forEach((e, n) => { damage(e, (n ? 21 : 35) * pow); e.stunT = Math.max(e.stunT || 0, e.d.boss ? 0.8 : 2); }); // blesk omráči na 2 s (bossov kratšie)
@@ -3905,7 +3903,7 @@
         const n = siegeCount(key), full = n >= SIEGE_MAX;
         const picked = !!(st.siegePick && st.siegePick.key === key);
         act(icon, u.name + ' ' + n + '/' + SIEGE_MAX, full ? 'plné' : coinTxt(u.cost), !full && st.gold >= u.cost,
-          full ? 'Naraz najviac ' + SIEGE_MAX + ' – ' + u.plural : () => { st.siegePick = picked ? null : { key }; st.tool = null; st.sel = null; st.moving = null; },
+          full ? null : () => { st.siegePick = picked ? null : { key }; st.tool = null; st.sel = null; st.moving = null; },
           'pick' + (picked ? ' sel' : ''), true);
       }
     }
@@ -3955,7 +3953,7 @@
     if (kind === 'paving') return placePaving(c, r);
     const dc = costOf(kind);
     if (!inZone(c, r)) { toast('Stavať sa dá len v zóne pri radnici'); AUDIO.play('deny'); return false; }
-    if (!canPlace(c, r)) { toast('Tu už niečo stojí – posuň stavbu na voľné políčko'); AUDIO.play('deny'); return false; }
+    if (!canPlace(c, r)) { AUDIO.play('deny'); return false; } // políčko je obsadené
     if (st.gold < dc) { toast('Nedostatok zlata'); AUDIO.play('deny'); return false; }
     snapshot();
     st.gold -= dc;
@@ -4021,7 +4019,7 @@
   const canMoveTo = (b, c, r) => inZone(c, r) && !inHall(c, r) && (!occAt(c, r) || occAt(c, r) === b);
   function moveBuilding(b, c, r) {
     if (b.c === c && b.r === r) return true;
-    if (!canMoveTo(b, c, r)) { toast('Sem sa stavba nedá presunúť'); AUDIO.play('deny'); return false; }
+    if (!canMoveTo(b, c, r)) { AUDIO.play('deny'); return false; } // sem sa stavba presunúť nedá
     snapshot();
     const ox = tileX(b.c) + T / 2, oy = tileY(b.r) + T / 2;
     b.c = c; b.r = r;
@@ -4179,7 +4177,6 @@
         lastTap = dbl ? null : { b: bd.b, t: now };
         st.sel = bd.b; st.selGroup = dbl ? (bd.b.kind === 'wall' ? wallRow(bd.b) : st.blds.filter(x => x.kind === bd.b.kind)) : null; st.tool = null; st.moving = null;
         AUDIO.play('click'); renderBuild();
-        if (!st.moveHint) { st.moveHint = true; hint('Stavbu presunieš: podrž na nej prst a potiahni ju'); }
       }
       else moveBuilding(bd.b, bd.hover.c, bd.hover.r);
       return;
@@ -4217,7 +4214,6 @@
     ev.stopPropagation();
     st.stance = armyAttacks() ? 'defend' : 'attack';
     AUDIO.play('click'); syncStance();
-    toast(armyAttacks() ? 'Útok – vojsko ide oproti horde a búra tábor' : 'Obrana – vojsko drží šík pred zónou');
   });
   $('undoBtn').addEventListener('click', doUndo);
   $('warcryBtn').addEventListener('click', () => ability('warcry'));
@@ -4278,7 +4274,7 @@
       st.siegePick = same ? null : on; AUDIO.play('click'); renderBuild(); return;
     }
     if (!pk) return;
-    if (!siegeSpotOk(x, y)) { toast('Stroj môže začať len pri tvojom území, nie na budove'); AUDIO.play('deny'); return; }
+    if (!siegeSpotOk(x, y)) { AUDIO.play('deny'); return; } // stroj začína len pri vlastnom území, nie na budove
     if (pk.key) {
       if (siegeCount(pk.key) >= SIEGE_MAX || st.gold < BUY[pk.key].cost) { st.siegePick = null; AUDIO.play('deny'); renderBuild(); return; }
       snapshot(); orderSiege(pk.key, x, y);
