@@ -1967,7 +1967,7 @@
     u.working = true;
     if (monk) {
       tgt.hp = Math.min(tgt.isKing ? kingMax() : tgt.max, tgt.hp + u.rate * dt);
-      if (Math.random() < 0.25) part(tgt.x + (Math.random() - 0.5) * 8, tgt.y - 4 - Math.random() * 8, (Math.random() - 0.5) * 6, -14, 0.6, Math.random() < 0.5 ? '#9cd45a' : '#e8ffd0', 0);
+      if (Math.random() < 0.2) part(tgt.x + (Math.random() - 0.5) * 8, tgt.y - 4 - Math.random() * 10, (Math.random() - 0.5) * 6, -14, 0.6, Math.random() < 0.5 ? '#bfe3ff' : '#ffffff', 0);
     } else {
       tgt.hp = Math.min(bMaxHp(tgt), tgt.hp + u.rate * dt);
       const prev = u.cd; u.cd -= dt;
@@ -2806,25 +2806,25 @@
     if (BUILD[kind].range) drawRange(hx + T / 2, hy + T / 2, bRange({ kind, lvl: 1 }), time); // dosah už pri ukladaní
   }
 
-  // liečivé kúzlo mnícha: žiara na hlavici palice, pulzujúci kruh pod ním a prúd svetielok k liečenému
+  // liečivé kúzlo mnícha: na zdvihnutej palici bledomodré svetlo, liečeného obklopí bledomodrá svetelná aura
   function drawHealSpell(u, t, time) {
-    const sx = u.x + 5, sy = u.y - 12, ex = t.x, ey = t.y - 7, dx = ex - sx, dy = ey - sy, d = Math.hypot(dx, dy) || 1, nx = -dy / d, ny = dx / d;
     const pulse = 0.5 + 0.5 * Math.sin(time * 6 + u.x);
-    g.globalAlpha = 0.25 + 0.2 * pulse; g.strokeStyle = '#9cd45a'; g.lineWidth = 1;    // kruh pod mníchom
-    g.beginPath(); g.ellipse(Math.round(u.x) + 0.5, Math.round(u.y) + 0.5, 6 + pulse * 2, 2.5 + pulse, 0, 0, 6.29); g.stroke();
-    const n = Math.max(2, Math.round(d)); // slabý lúč od palice k cieľu
-    g.fillStyle = '#9cd45a'; g.globalAlpha = 0.22 + 0.12 * pulse;
-    for (let i = 0; i <= n; i += 1) g.fillRect(Math.round(sx + dx * i / n), Math.round(sy + dy * i / n), 1, 1);
-    g.globalAlpha = 1;
-    for (let k = 0; k < 10; k++) { // svetielka letia od palice k cieľu, mierne sa vlnia
-      const f = (time * 1.4 + k / 10) % 1, w = Math.sin(f * Math.PI) * Math.sin(time * 5 + k * 2) * 3;
-      const px = Math.round(sx + dx * f + nx * w), py = Math.round(sy + dy * f + ny * w);
-      g.globalAlpha = 0.45; g.fillStyle = '#9cd45a'; g.fillRect(px - 1, py - 1, 3, 3);
-      g.globalAlpha = 1; g.fillStyle = k % 2 ? '#ffffff' : '#e8ffd0'; g.fillRect(px, py, k % 3 ? 1 : 2, k % 3 ? 1 : 2);
+    const sx = Math.round(u.x + 5), sy = Math.round(u.y - 16);                                  // hlavica zdvihnutej palice
+    g.globalAlpha = 0.35 + 0.3 * pulse; g.fillStyle = '#a8d4ff'; g.fillRect(sx - 2, sy - 2, 5, 5);
+    g.globalAlpha = 0.8; g.fillStyle = '#e0f2ff'; g.fillRect(sx - 1, sy - 1, 3, 3);
+    g.globalAlpha = 1; g.fillStyle = '#ffffff'; g.fillRect(sx, sy, 1, 1);
+    const ax = Math.round(t.x), ay = Math.round(t.y), hh = (t.isKing ? 26 : 18) + 2;              // aura liečeného
+    for (let y = 0; y < hh; y++) {                                                                // svetelný stĺp, hore sa stráca
+      const k = 1 - y / hh, w = 5 + Math.round(2 * Math.sin(time * 4 + y * 0.5));
+      g.globalAlpha = (0.16 + 0.12 * pulse) * k; g.fillStyle = '#bfe3ff'; g.fillRect(ax - w, ay - y, w * 2 + 1, 1);
     }
-    g.globalAlpha = 0.5 + 0.4 * pulse; g.fillStyle = '#9cd45a'; g.fillRect(Math.round(sx) - 1, Math.round(sy) - 1, 3, 3); // žiara na palici
-    g.globalAlpha = 1; g.fillStyle = '#ffffff'; g.fillRect(Math.round(sx), Math.round(sy), 1, 1);
-    g.globalAlpha = 0.3 + 0.3 * pulse; g.fillStyle = '#c8ff9a'; g.fillRect(Math.round(ex) - 2, Math.round(ey) - 1, 5, 3); // jas na liečenom
+    g.globalAlpha = 0.45 + 0.35 * pulse; g.strokeStyle = '#cfe9ff'; g.lineWidth = 1;               // žiariaci kruh pri nohách
+    g.beginPath(); g.ellipse(ax + 0.5, ay + 0.5, 7 + pulse, 2.5 + pulse * 0.5, 0, 0, 6.29); g.stroke();
+    g.globalAlpha = 1;
+    for (let k = 0; k < 4; k++) {                                                                 // iskričky stúpajú okolo
+      const f = (time * 0.9 + k / 4) % 1, px = ax + Math.round(Math.sin(time * 3 + k * 1.7) * 6), py = ay - Math.round(f * hh);
+      g.globalAlpha = 1 - f; g.fillStyle = k % 2 ? '#ffffff' : '#bfe3ff'; g.fillRect(px, py, 1, 1);
+    }
     g.globalAlpha = 1;
   }
   // výber miesta pre obliehací stroj: povolený pás sa jemne rozsvieti, zdvihnutý stroj bliká
@@ -3500,7 +3500,7 @@
     if (playing) {
       objs.push({ y: G.hallBot, f: () => drawHall(time) });
       for (const b of st.blds) if (!TRAPS[b.kind]) objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), x: b.c, f: () => drawBuilding(b, time) });
-      for (const s of st.soldiers) objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: s.y, f: () => drawFighter(s, s.spr || 'soldier') });
+      for (const s of st.soldiers) objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: s.y, f: () => drawFighter(s, s.helper === 'chapel' && s.working ? 'monkCast' : s.spr || 'soldier') }); // mních pri liečení zdvihne palicu
       if (st.phase === 'build') for (const o of st.siegeOrder) { // kúpené obliehacie stroje čakajú na mieste, odkiaľ vyrazia
         const sp = SPR[BUY[o.key].siege][0];
         objs.push({ y: o.y, f: () => { shadow(o.x, o.y, 8); g.drawImage(sp.c, Math.round(o.x - sp.w / 2), Math.round(o.y - sp.h)); } });

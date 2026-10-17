@@ -124,6 +124,26 @@ const MONK_LEGS = [
   ['.KdLLLLLLLdKlK',
    '...KKK.KKK..K.'],
 ];
+// mních pri liečení: palicu zdvihne nad hlavu (ruka hore, rukáv po palici)
+const MONK_CAST = [
+  '............K.',
+  '...........KgK',
+  '...........KlK',
+  '...........KlK',
+  '.....KK....KlK',
+  '....KlLK...KlK',
+  '...KlLLLK.KslK',
+  '...KlLLLdKLLlK',
+  '...KKdddKKLKlK',
+  '..KlLLLLLdLKlK',
+  '.KlLLLLLLLdKlK',
+  '.KlLLLLLLLdKlK',
+  '.KlLeeeeeLdKK.',
+  '.KlLLLeLLLdK..',
+  '.KlLLLLLLLdK..',
+  '.KdLLLLLLLdK..',
+  '..KKK..KKK....',
+];
 // Remeselník z dielne – čiapka, plátenná košeľa, kožená zástera (kladivo sa kreslí zvlášť, pohyblivé)
 const CRAFT_BODY = [
   '.....KKKK.....',
@@ -628,6 +648,7 @@ function initSprites() {
   SPR.shield = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l), { c: '#d0d4dc', B: '#80869a', n: '#44485a' }));
   SPR.rider = RIDER_FRAMES.map(f => buildSprite(f));
   SPR.monk = MONK_LEGS.map(l => buildSprite(MONK_BODY.concat(l)));
+  SPR.monkCast = [buildSprite(MONK_CAST), buildSprite(MONK_CAST)];
   SPR.craft = CRAFT_LEGS.map(l => buildSprite(CRAFT_BODY.concat(l)));
   SPR.garcher = GOBLIN_LEGS.map(l => buildSprite(GARCHER_BODY.concat(l)));
   SPR.bat = BAT_FRAMES.map(f => buildSprite(f, { P: '#4a3460', p: '#7a5aa0' }));
