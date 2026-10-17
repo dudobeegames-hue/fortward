@@ -255,6 +255,19 @@ const ENEMY_INTRO = {
   9: { id: 'wolf', name: 'Vlčí jazdci', desc: 'prebehnú cez rytierov a idú po lukostrelcoch – zastavia ich kopijníci' },
   10: { id: 'orcKing', name: 'Orkský veľkráľ', desc: 'vyjde z tábora v poslednej vlne – dupnutím omračuje a privoláva goblinov' },
 };
+// za orkov útočia ľudia: tie isté druhy nepriateľov (rovnaká mechanika) vo vzhľade ľudských jednotiek
+const ORC_ENEMY_INTRO = {
+  3: { id: 'garcher', name: 'Lukostrelci', desc: 'strieľajú na budovy z diaľky' },
+  4: { id: 'bat', name: 'Sokoly', desc: 'preletia ponad palisádu priamo k pevnosti' },
+  5: { id: 'ram', name: 'Baranidlo', desc: 'rozbíja palisádu a orkov ignoruje' },
+  6: { id: 'shaman', name: 'Mních', desc: 'lieči ostatných – zabi ho ako prvého' },
+  7: [{ id: 'bear', name: 'Ťažká jazda', desc: 'nápor zrazí orka aj vlčieho jazdca – zastavia ju len surovci' },
+      { id: 'giantRam', name: 'Veľké baranidlo', desc: 'obor v hrubom pancieri ide rovno na palisádu a pevnosť – veže a jednotky ho len škrabnú, obliehacie stroje ho rozbijú' }],
+  8: [{ id: 'sapper', name: 'Remeselník s prachom', desc: 'beží k palisáde a vyhodí ju do vzduchu – zastreľ ho skôr' },
+      { id: 'mammoth', name: 'Obliehacia veža', desc: 'obor v hrubom pancieri – lukostrelci z cimburia strieľajú za jazdy a veža prevalcuje vojakov; proti nej pošli obliehacie stroje' }],
+  9: { id: 'wolf', name: 'Jazdci', desc: 'prebehnú cez orkov a idú po goblinoch s lukmi – zastavia ich surovci' },
+  10: { id: 'orcKing', name: 'Ľudský kráľ', desc: 'vyjde z tábora v poslednej vlne – dupnutím omračuje a privoláva rytierov' },
+};
 function techFor(m) {
   const s = new Set();
   for (let i = 0; i < Math.min(m, UNLOCKS.length); i++) UNLOCKS[i].forEach(u => s.add(u.id));

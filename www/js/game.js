@@ -500,6 +500,13 @@
   const ORC_SPR = { soldier: 'orc', spear: 'brute', rider: 'wolf', footArcher: 'garcher', monk: 'shaman', monkCast: 'shaman', craft: 'goblin',
     archer: 'garcher', knight: 'orc', siegeRam: 'oSiegeRam', siegeCat: 'oSiegeCat', siegeFire: 'oSiegeFire', siegeTower: 'oSiegeTower' };
   const raceSpr = k => (isOrc() && ORC_SPR[k]) || k;
+  // za orkov útočia ľudia: rovnaké druhy nepriateľov, vzhľad ľudských jednotiek (goblin → rytier, ork → kopijník, …)
+  const FOE_SPR = { goblin: 'soldier', orc: 'spear', brute: 'paladin', warlord: 'king', orcKing: 'king', garcher: 'footArcher', bat: 'falcon',
+    shaman: 'monk', wolf: 'rider', bear: 'rider', sapper: 'craft', ram: 'siegeRam', giantRam: 'siegeRam', mammoth: 'siegeTower' };
+  const foeSpr = k => (isOrc() && FOE_SPR[k]) || k;
+  const enemyIntro = m => (isOrc() ? ORC_ENEMY_INTRO : ENEMY_INTRO)[m];
+  const bossName = d => isOrc() ? (d.king ? 'Kráľ' : d.giant ? (d.howdah ? 'Obliehacia veža' : 'Veľké baranidlo') : 'Kapitán')
+    : d.king ? 'Veľkráľ' : d.title || 'Vojvodca';
 
   // ---------------- Mriežka ----------------
   const tileX = c => G.gx0 + c * T;
@@ -2391,10 +2398,10 @@
     if (set.bow) { if (e.lunge > 0) return v.atk[1]; if (busy) return v.atk[0]; }
     else if (e.lunge > 0) return v.atk[e.lunge > 0.075 ? 1 : 2];
     else if (busy && e.atk < 0.3) return v.atk[0];
-    return moving ? v.walk[Math.floor(e._wd / set.stride) % 4] : v.idle;
+    return moving ? v.walk[Math.floor(e._wd / (set.stride || 3.2)) % 4] : v.idle; // sady hrdinov (kráľ, paladin ako nepriatelia) nemajú vlastný krok
   }
   function drawEnemy(e, time) {
-    const set8 = SPR[e.d.spr + '8'];
+    const set8 = SPR[foeSpr(e.d.spr) + '8'];
     if (set8 && !e.d.fly) {
       let fr, x, y;
       if (set8.vox) { // baran, obrí baran, mamut: 3D model, akcia = úder kmeňom či dupnutie
@@ -2421,7 +2428,7 @@
       if (e.stunT > 0) drawEnemyStun(e, Math.round(e.y - e.h), time);
       return;
     }
-    const frames = SPR[e.d.spr];
+    const frames = SPR[foeSpr(e.d.spr)];
     if (e.d.fly) { // netopier mávajúci krídlami, tieň na zemi
       const fr = frames[Math.floor(time * 8 + e.ph) % 2];
       shadow(e.x, e.y + 2, 3);
@@ -3775,7 +3782,7 @@
     if (B && !B.dead && st.phase === 'battle') {
       bb.hidden = false;
       $('bossFill').style.width = (Math.max(0, B.hp / B.max) * 100) + '%';
-      $('bossTxt').textContent = (B.d.king ? 'Veľkráľ' : B.d.title || 'Vojvodca') + ' ' + Math.max(0, Math.ceil(B.hp)) + ' / ' + Math.ceil(B.max);
+      $('bossTxt').textContent = bossName(B.d) + ' ' + Math.max(0, Math.ceil(B.hp)) + ' / ' + Math.ceil(B.max);
     } else bb.hidden = true;
   }
 
@@ -3848,6 +3855,11 @@
     ICONS.u_archer = spriteURL(sp('archer'), 3); ICONS.u_crossbow = spriteURL(sp('knight'), 3);
     for (const k of ['siegeRam', 'siegeCat', 'siegeFire', 'siegeTower']) ICONS['u_' + k] = spriteURL(trimmed(SPR[raceSpr(k) + '8'][1].idle), 2);
     ICONS.king = ICONS.hero_king = isOrc() ? heroPortrait(SPR.chief8, 12, 5, 18) : heroPortrait(SPR.king8, 12, 6, 18);
+    // ikony nepriateľov (novinky na mape, úspechy): za orkov ľudské jednotky
+    for (const k of ['orc', 'garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf', 'giantRam', 'mammoth']) {
+      const f = foeSpr(k), big = k === 'orcKing' || ENEMY[k].giant;
+      ICONS['e_' + k] = SPR[f] ? spriteURL(SPR[f][0], big && !isOrc() ? 2 : 3) : spriteURL(trimmed(SPR[f + '8'][1].idle), 2);
+    }
   }
   function initIcons() {
     buildingIcons();
@@ -3868,7 +3880,6 @@
     unitIcons(); // jednotky, obliehacie stroje a portrét hrdinu podľa rasy
     $('icoHall').src = UI_ICONS.hall;
     syncHeroIcons(); updateGems();
-    for (const k of ['orc', 'garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf', 'giantRam', 'mammoth']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' || ENEMY[k].giant ? 2 : 3);
     ICONS.coin = spriteURL(SPR.coin[0], 4);
     ICONS.paving = spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3);
     Object.assign(ICONS, { sp_volley: UI_ICONS.spellVolley, sp_fire: UI_ICONS.spellFire, sp_frost: UI_ICONS.spellFrost, sp_bolt: UI_ICONS.spellBolt,
@@ -4598,7 +4609,7 @@
     $('mName').textContent = def.name;
     const diff = Math.ceil(m / 2);
     $('mMeta').innerHTML = MISSION_WAVES + ' vĺn · obtiažnosť <span class="stars">' + '●'.repeat(diff) + '<i>' + '●'.repeat(5 - diff) + '</i></span>' + (done ? ' · <span class="ok">splnená ✓</span>' : '');
-    const foes = [].concat(ENEMY_INTRO[m] || []);
+    const foes = [].concat(enemyIntro(m) || []);
     $('mNew').innerHTML = (foes.length ? '<span>' + (foes.length > 1 ? 'Nepriatelia:' : 'Nepriateľ:') + '</span>' + foes.map(foe => '<em class="foe"><img src="' + ICONS['e_' + foe.id] + '">' + foe.name + '</em>').join('') : '') +
       '<span>' + (m === 1 ? 'Výbava:' : 'Novinka:') + '</span>' + UNLOCKS[m - 1].map(u => '<em><img src="' + ICONS[u.icon] + '">' + u.name + '</em>').join('');
     // úroveň misie: predvolene prvá otvorená bez plných 3 hviezd
@@ -4847,7 +4858,7 @@
       tag: BUILD[u.id] ? 'Nová stavba' : ABIL[u.id] ? 'Kráľova schopnosť' : /^(volley|fireball|freeze|lightning)$/.test(u.id) ? 'Kúzlo' : 'Nové vylepšenie',
       desc: u.desc || (BUILD[u.id] ? BUILD[u.id].desc + '.' : ''),
     }));
-    for (const foe of [].concat(ENEMY_INTRO[m] || [])) items.push({ icon: ICONS['e_' + foe.id], name: foe.name, tag: ENEMY[foe.id].giant ? 'Pozor – obor hordy' : 'Pozor – nový nepriateľ', desc: foe.desc.charAt(0).toUpperCase() + foe.desc.slice(1) + '.', foe: true });
+    for (const foe of [].concat(enemyIntro(m) || [])) items.push({ icon: ICONS['e_' + foe.id], name: foe.name, tag: ENEMY[foe.id].giant ? (isOrc() ? 'Pozor – obor ľudí' : 'Pozor – obor hordy') : 'Pozor – nový nepriateľ', desc: foe.desc.charAt(0).toUpperCase() + foe.desc.slice(1) + '.', foe: true });
     return items;
   }
   function showUnlockDeck(m) {

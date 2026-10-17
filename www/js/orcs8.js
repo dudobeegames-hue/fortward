@@ -455,4 +455,5 @@ function initOrcSprites() {
   SPR.wolf8 = buildUnit8({ W: 36, H: 28, body: WR8_BODY, mount: WOLF8, legs: WOLF8_LEGS, far: 'DK', hand: WR8_HAND, blade: 4, fist: 'o', stride: 3.5 });
   SPR.bear8 = buildUnit8({ W: 38, H: 30, body: BR8R_BODY, mount: BEAR8, legs: BEAR8_LEGS, hand: BR8R_HAND, axe: [6, 2.5], fist: 'o', stride: 4.5 });
   SPR.garcher8.bow = true;
+  SPR.footArcher8.bow = true; // ľudský lukostrelec ako nepriateľ (hra za orkov) napína luk ako goblin
 }
