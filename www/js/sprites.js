@@ -646,7 +646,8 @@ function initSprites() {
   SPR.sorc8 = buildSorc8(); // čarodejka v 8 smeroch s copom a ohnivou palicou
   SPR.paladin = PALADIN_LEGS.map(l => buildSprite(PALADIN_BODY.concat(l), PAL_PALADIN));
   SPR.sorc = SORC_LEGS.map(l => buildSprite(SORC_BODY.concat(l), PAL_SORC));
-  SPR.spear = SOLDIER_LEGS.map(l => buildSprite(SPEAR_BODY.concat(l), { c: '#f08868', B: '#b83c28', n: '#6c2018' }));
+  SPR.spear = SOLDIER_LEGS.map(l => buildSprite(SPEAR_BODY.concat(l))); // ľudia vždy v modrom
+  SPR.spear8 = buildSpear8(); // kopijník v 8 smeroch (kopija opretá o zem, pri útoku sklopená a bodne)
   SPR.shield = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l), { c: '#d0d4dc', B: '#80869a', n: '#44485a' }));
   SPR.rider = RIDER_FRAMES.map(f => buildSprite(f));
   SPR.monk = MONK_LEGS.map(l => buildSprite(MONK_BODY.concat(l)));
@@ -1336,7 +1337,8 @@ function buildUnit8(spec) {
     const sh = spec.shield && spec.shield[view], side = view === 'E'; // zboku sa štít kýve dopredu a dozadu, inak hore a dole
     const shield = sh && grid(sh.rows, U8_BX + sh.x + (side ? sw : 0), top + sh.y + (side ? 0 : sw));
     // luk: zvislý oblúk vypuklý k cieľu, tetiva od koncov k ruke, ktorá ju napína; spustený luk drží pri boku
-    const bw = spec.bow && spec.bow[view], aiming = bw && pose !== 'low';
+    const bw = spec.bow && spec.bow[view], thrust = typeof pose === 'object'; // kopija sklopená k útoku
+    const aiming = bw ? pose !== 'low' : thrust;
     let bowPts = null;
     const strPts = [], hands = [];
     if (bw) {
@@ -1360,6 +1362,21 @@ function buildUnit8(spec) {
     if (bw && front) drawBow();
     for (const [x, y] of hands) put(x, y, col('s'));
     if (bw) return px;
+    if (spec.spear) { // kopija: drevené ratište s tmavou pätkou a oceľovým hrotom; k = skrátenie, keď mieri k divákovi či od neho
+      const h = spec.hand[view], sp = thrust ? pose : { a: pose, k: 1, push: 0 }, k = sp.k;
+      const dx = Math.cos(sp.a) * k, dy = Math.sin(sp.a) * k;
+      const hx = U8_BX + (thrust ? h.ax : h.x) + dx * sp.push, hy = top + (thrust ? h.ay : h.y) + dy * sp.push;
+      const pts = [];
+      for (let t = -4; t <= spec.spear; t += 0.25) {
+        const x = Math.round(hx + dx * t), y = Math.round(hy + dy * t);
+        if (pts.some(q => q[0] === x && q[1] === y)) continue;
+        pts.push([x, y, col(t >= spec.spear - 0.25 ? 'W' : t >= spec.spear - 2 ? 'w' : t <= -3.5 ? 'd' : 'l')]);
+      }
+      layer(pts, false);
+      put(Math.round(hx), Math.round(hy), col('s')); // päsť
+      if (thrust) put(Math.round(hx + dx * 3), Math.round(hy + dy * 3), col('s')); // pri bodnutí drží ratište oboma rukami
+      return px;
+    }
     // meč: hlavica, rukoväť, záštita naprieč a čepeľ s lesklou hranou
     const ang = pose, h = spec.hand[view], hx = U8_BX + h.x, hy = top + h.y, dx = Math.cos(ang), dy = Math.sin(ang);
     const pts = [], add = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (!pts.some(q => q[0] === x && q[1] === y)) pts.push([x, y, c]); };
@@ -1389,6 +1406,7 @@ function buildUnit8(spec) {
       idle: toSprite(frame(view, L.idle, 1, spec.bow ? 'low' : h.idle, false, 0), flip),
       walk: L.walk.map((lr, i) => toSprite(frame(view, lr, i % 2 ? 0 : 1, spec.bow ? 'low' : h.idle + SWAY[i], false, SHIELD[i]), flip)),
       atk: spec.bow ? ['draw', 'loose'].map(p => toSprite(frame(view, L.idle, 1, p, false, 0), flip)) // napnutie, výstrel
+        : spec.spear ? [-1, 2, 0].map((push, i) => toSprite(frame(view, L.idle, 1, { a: h.aim, k: h.k, push }, i === 1, 0), flip)) // stiahnutie, bodnutie, návrat
         : h.atk.map((a, i) => toSprite(frame(view, L.idle, 1, a, i > 0, 0), flip)),
     });
     return { n: mk(false), m: mk(true) };
@@ -1473,3 +1491,72 @@ const legsCloth = L => {
   return { idle: L.idle.map(re), walk: L.walk.map(f => f.map(re)) };
 };
 const buildArcher8 = () => buildUnit8({ body: AR8_BODY, bow: AR8_BOW, hand: AR8_HAND, legs: { front: legsCloth(KN8_LEGS.front), side: legsCloth(KN8_LEGS.side) } });
+
+// kopijník: oceľový klobúk so širokou strechou, krúžkový golier, modrý prešívaný kabec s koženým opaskom
+const SP8_BODY = {
+  S: [
+    '.....wmmM.....',
+    '...wmmmmmmD...',
+    '....SsssSS....',
+    '....sKssKS....',
+    '..cBMmmMMDBn..',
+    '..cBcBcBnBBn..',
+    '..BnLLgLLLBn..',
+    '..s.cBcBBn.s..',
+    '....cBnBBn....',
+  ],
+  SE: [
+    '......wmmM....',
+    '....wmmmmmmD..',
+    '.....LSsssS...',
+    '.....LsKssK...',
+    '..cBMMmmMDBn..',
+    '..cBcBcBnBBn..',
+    '..BnLLLgLLBn..',
+    '..s.cBcBBn....',
+    '....cBnBBn....',
+  ],
+  E: [
+    '.....wmmM.....',
+    '...wmmmmmmD...',
+    '.....LLsssS...',
+    '.....LLsKs....',
+    '....cMmmMD....',
+    '....cBcBBn....',
+    '....LLLgLL....',
+    '.....sBcBn....',
+    '.....cBnBn....',
+  ],
+  NE: [
+    '.....wmmM.....',
+    '...wmmmmmmD...',
+    '....LLLLLLs...',
+    '....LLLLLSs...',
+    '..cBMmmMMDBn..',
+    '..cBcBcBnBBn..',
+    '..BnLLLLLLBn..',
+    '..s.cBcBBn.s..',
+    '....cBnBBn....',
+  ],
+  N: [
+    '.....wmmM.....',
+    '...wmmmmmmD...',
+    '....LLLLLL....',
+    '....LLLLLd....',
+    '..cBMmmMMDBn..',
+    '..cBcBcBnBBn..',
+    '..BnLLLLLLBn..',
+    '..s.cBcBBn.s..',
+    '....cBnBBn....',
+  ],
+};
+// ruka s kopijou: x, y v pokoji (ratište zvislo, pätka na zemi), ax, ay pri bodnutí (ruky pred hruďou),
+// aim = smer bodnutia, k = skrátenie kopije mieriacej k divákovi alebo od neho
+const SP8_HAND = {
+  N:  { x: 11, y: 7, idle: -1.5,  ax: 9, ay: 4, aim: -1.3,  k: 0.75, legs: 'front' },
+  NE: { x: 11, y: 7, idle: -1.45, ax: 9, ay: 5, aim: -0.7,  k: 0.75, legs: 'front' },
+  E:  { x: 5,  y: 7, idle: -1.4,  ax: 7, ay: 5, aim: 0.08,  k: 1,    legs: 'side' },
+  SE: { x: 2,  y: 7, idle: -1.7,  ax: 7, ay: 5, aim: 0.75,  k: 0.75, legs: 'front' },
+  S:  { x: 2,  y: 7, idle: -1.65, ax: 6, ay: 5, aim: 1.25,  k: 0.75, legs: 'front' },
+};
+const buildSpear8 = () => buildUnit8({ body: SP8_BODY, hand: SP8_HAND, spear: 10, legs: { front: legsCloth(KN8_LEGS.front), side: legsCloth(KN8_LEGS.side) } });

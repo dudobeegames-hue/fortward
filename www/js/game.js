@@ -2507,7 +2507,7 @@
     const d = Math.hypot(mvx, mvy), moving = d > 0.05;
     if (moving) u._wd = (u._wd || 0) + d;
     const t = u.archer ? (u.aimT && !u.aimT.dead ? u.aimT : null) : u.tgt && !u.tgt.dead ? u.tgt : null;
-    const near = t && (u.archer || Math.hypot(t.x - u.x, t.y - u.y) < 14);
+    const near = t && (u.archer || Math.hypot(t.x - u.x, t.y - u.y) < (u.ktype === 'spear' ? SPEAR_REACH + 5 : 14)); // kopijník bodá z diaľky
     if (near) u.face8 = dir8(t.x - u.x, t.y - u.y);
     else if (moving) u.face8 = dir8(mvx, mvy);
     else if (!t) u.face8 = 6;
