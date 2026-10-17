@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editor hradov – Fortward</title>
+<style>
+  :root { --bg: #1a120c; --panel: #2e2018; --panel2: #3e2c20; --ink: #120c08; --text: #f0e2c8; --dim: #b8a488; --gold: #f8d048; --red: #e84838; --blue: #88b4ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 14px; background: var(--panel); border-bottom: 2px solid var(--ink); position: sticky; top: 0; z-index: 5; }
+  h1 { font-size: 17px; margin: 0 12px 0 0; color: var(--gold); }
+  .grp { display: flex; gap: 4px; align-items: center; }
+  .grp > span { color: var(--dim); margin-right: 4px; }
+  button { font: inherit; color: var(--text); background: var(--panel2); border: 2px solid var(--ink); border-radius: 6px; padding: 5px 10px; cursor: pointer;
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.08); }
+  button:hover { filter: brightness(1.15); }
+  button.on { background: #6e4a10; color: #fff2d0; border-color: var(--gold); }
+  button.save { background: #2f6a2a; }
+  button.save.dirty { background: #3c8a34; box-shadow: 0 0 0 2px var(--gold); }
+  button.del { background: #6a2018; }
+  #status { color: var(--dim); min-width: 160px; }
+  main { display: flex; gap: 16px; padding: 14px; align-items: flex-start; flex-wrap: wrap; }
+  #wrap { position: relative; border: 2px solid var(--ink); background: #000; line-height: 0; }
+  canvas#field { image-rendering: pixelated; cursor: crosshair; display: block; }
+  aside { flex: 1; min-width: 300px; max-width: 520px; display: flex; flex-direction: column; gap: 12px; }
+  .box { background: var(--panel); border: 2px solid var(--ink); border-radius: 8px; padding: 10px; }
+  .box h2 { font-size: 14px; margin: 0 0 8px; color: var(--gold); }
+  #palette { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+  .pc { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; background: var(--panel2); border: 2px solid var(--ink); border-radius: 6px; cursor: pointer; text-align: center; }
+  .pc canvas { image-rendering: pixelated; height: 48px; width: auto; }
+  .pc b { font-size: 12px; }
+  .pc small { color: var(--dim); font-size: 10px; }
+  .pc.sel { border-color: var(--gold); background: #5a3e14; }
+  #info { color: var(--dim); }
+  #info b { color: var(--text); }
+  #list { display: flex; flex-direction: column; gap: 3px; max-height: 260px; overflow: auto; }
+  .row { display: flex; gap: 8px; align-items: center; padding: 3px 6px; border-radius: 4px; cursor: pointer; }
+  .row:hover, .row.sel { background: var(--panel2); }
+  .row .warn { color: var(--red); font-size: 12px; }
+  .row span:first-child { flex: 1; }
+  .help { color: var(--dim); font-size: 12px; }
+  .help kbd { background: var(--panel2); border: 1px solid var(--ink); border-radius: 3px; padding: 0 4px; color: var(--text); }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--dim); }
+  .legend i { display: inline-block; width: 12px; height: 12px; vertical-align: -2px; margin-right: 4px; border: 1px solid var(--ink); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Editor hradov</h1>
+  <div class="grp"><span>Misia</span><span id="missions"></span></div>
+  <div class="grp"><span>Protivník</span><button data-race="orc">Orkovia</button><button data-race="human">Ľudia</button></div>
+  <div class="grp">
+    <button id="copyBtn" title="Skopíruje hrad z inej misie do tejto">Kopírovať z misie…</button>
+    <button id="clearBtn" class="del">Vymazať hrad</button>
+  </div>
+  <div class="grp">
+    <button id="saveBtn" class="save">Uložiť do hry</button>
+    <button id="revertBtn">Vrátiť uložené</button>
+    <a href="../index.html" target="_blank"><button>Otvoriť hru</button></a>
+  </div>
+  <span id="status"></span>
+</header>
+<main>
+  <div id="wrap"><canvas id="field"></canvas></div>
+  <aside>
+    <div class="box"><h2>Stavby protivníka</h2><div id="palette"></div></div>
+    <div class="box"><h2>Vybraná stavba</h2><div id="info">Ťukni na stavbu v palete a potom na bojisko.</div></div>
+    <div class="box"><h2>Hrad misie <span id="mLabel"></span></h2><div id="list"></div><div id="sum" class="help" style="margin-top:6px"></div></div>
+    <div class="box help">
+      <div class="legend">
+        <span><i style="background:rgba(0,0,0,.45)"></i>pod panelom HUD (v hre zakryté)</span>
+        <span><i style="background:rgba(232,72,56,.35)"></i>zóna hráča (sem nestavaj)</span>
+        <span><i style="background:#f8d048"></i>približný dostrel veží hráča</span>
+      </div>
+      <p><b>Ovládanie:</b> klik na stavbu v palete → klik na bojisko ju postaví (stavba sa dá postaviť viackrát).
+      Klik na stavbu na bojisku ju vyberie, ťahom ju presunieš. <kbd>Delete</kbd> / pravé tlačidlo zmaže,
+      šípky posúvajú o 1 px (so <kbd>Shift</kbd> o 4 px), <kbd>Esc</kbd> zruší výber.</p>
+      <p>Stavby v dosahu veží hráča budú pod paľbou hneď od začiatku. Orkovia sú protivník v súčasnej hre;
+      ľudské hrady sa použijú, keď bude hra za orkov.</p>
+    </div>
+  </aside>
+</main>
+<script src="../js/sprites.js"></script>
+<script src="../js/scene.js"></script>
+<script src="../js/buildings.js"></script>
+<script src="../js/map.js"></script>
+<script src="../js/camp.js"></script>
+<script src="../js/castles.js"></script>
+<script>
+'use strict';
+(() => {
+  // bojisko v rovnakých rozmeroch ako na bežnom telefóne (11 stĺpcov mriežky, políčko 16 px)
+  const T = 16, W = 200, H = 430, GROUND_PAD = 10, MAX_LVL = 5, SCALE = 2;
+  const G = { T, cols: 11 };
+  G.gx0 = Math.floor((W - G.cols * T) / 2); G.rows = Math.floor((H - GROUND_PAD) / T); G.gy0 = H - GROUND_PAD - G.rows * T;
+  const tileX = c => G.gx0 + c * T, tileY = r => G.gy0 + r * T;
+  G.hc0 = Math.floor(G.cols / 2) - 1; G.hr0 = G.rows - 3;
+  G.hallCx = tileX(G.hc0) + 1.5 * T; G.hallTop = tileY(G.hr0); G.hallBot = G.hallTop + 3 * T;
+  G.zoneTopMax = tileY(G.rows - (5 + MAX_LVL));
+  const HUD_BAND = 20, TOWER_REACH = G.zoneTopMax - 96; // horný pás pod HUD; približný najďalší dostrel veží zo zóny
+
+  initSprites(); initBuildingSprites();
+  const cv = document.getElementById('field'), g = cv.getContext('2d');
+  cv.width = W * SCALE; cv.height = H * SCALE; g.imageSmoothingEnabled = false;
+  const buf = document.createElement('canvas'); buf.width = W; buf.height = H; const b = buf.getContext('2d');
+
+  // pracovná kópia hradov; uloží sa celá naraz
+  let data = JSON.parse(JSON.stringify(typeof CASTLES !== 'undefined' ? CASTLES : { orc: {}, human: {} }));
+  for (const r of Object.keys(CAMP_PIECES)) data[r] = data[r] || {};
+  let mission = 6, race = 'orc', tool = null, sel = null, drag = null, dirty = false, scene = null;
+  const lay = () => (data[race][mission] = data[race][mission] || []);
+  const $ = id => document.getElementById(id);
+  const sprOf = q => CAMP_PIECES[race][q.k] && CAMP_PIECES[race][q.k].spr({ fired: 0 }, 0);
+  const setDirty = v => { dirty = v; $('saveBtn').classList.toggle('dirty', v); status(v ? 'Neuložené zmeny' : ''); };
+  const status = t => { $('status').textContent = t; };
+
+  function buildField() { scene = buildScene(W, H, G, 7 + mission * 13, mission - 1); }
+
+  // ---- kreslenie ----
+  function draw() {
+    b.clearRect(0, 0, W, H);
+    b.drawImage(scene.bg, 0, 0);
+    b.fillStyle = 'rgba(232,72,56,0.22)'; b.fillRect(G.gx0, G.zoneTopMax, G.cols * T, G.hallBot - G.zoneTopMax); // zóna hráča
+    b.fillStyle = 'rgba(255,255,255,0.07)';
+    for (let c = 0; c <= G.cols; c++) b.fillRect(tileX(c), G.gy0, 1, G.rows * T);
+    for (let r = 0; r <= G.rows; r++) b.fillRect(G.gx0, tileY(r), G.cols * T, 1);
+    const hall = BSPR.hall[0];
+    b.drawImage(hall.c, Math.round(G.hallCx - hall.w / 2), G.hallBot - hall.h);
+    b.fillStyle = '#f8d048'; for (let x = G.gx0; x < G.gx0 + G.cols * T; x += 4) b.fillRect(x, TOWER_REACH, 2, 1); // dostrel veží
+    const items = lay().map((q, i) => ({ q, i })).sort((p, o) => p.q.y - o.q.y);
+    for (const { q } of items) {
+      const sp = sprOf(q); if (!sp) continue;
+      const x = Math.round(G.gx0 + q.x - sp.w / 2), y = Math.round(G.gy0 + q.y - sp.h);
+      b.fillStyle = 'rgba(0,0,0,0.25)'; b.beginPath(); b.ellipse(G.gx0 + q.x, G.gy0 + q.y, sp.w * 0.35, 2, 0, 0, 6.29); b.fill();
+      b.drawImage(sp.c, x, y);
+      if (q === sel) { b.strokeStyle = '#fff070'; b.lineWidth = 1; b.strokeRect(x - 1.5, y - 1.5, sp.w + 3, sp.h + 3); }
+      if (G.gy0 + q.y > TOWER_REACH) { b.fillStyle = '#e84838'; b.fillRect(G.gx0 + q.x - 1, G.gy0 + q.y + 2, 3, 1); }
+    }
+    b.fillStyle = 'rgba(0,0,0,0.45)'; b.fillRect(0, 0, W, G.gy0 + HUD_BAND); // pás pod HUD
+    if (tool && hover) { // náhľad stavby pod myšou
+      const sp = CAMP_PIECES[race][tool].spr({ fired: 0 }, 0);
+      b.globalAlpha = 0.6; b.drawImage(sp.c, Math.round(hover.x - sp.w / 2), Math.round(hover.y - sp.h)); b.globalAlpha = 1;
+    }
+    g.clearRect(0, 0, cv.width, cv.height);
+    g.drawImage(buf, 0, 0, W * SCALE, H * SCALE);
+  }
+
+  // ---- paleta, zoznam, info ----
+  const ROLE_NAME = { bombard: 'ostreľovač', tower: 'veža', totem: 'liečiteľ', drum: 'posilňovač', tent: 'posily', wall: 'opevnenie', keep: 'srdce tábora' };
+  function thumb(sp) { const c = document.createElement('canvas'); c.width = sp.w; c.height = sp.h; c.getContext('2d').drawImage(sp.c, 0, 0); return c; }
+  function renderPalette() {
+    const pal = $('palette'); pal.innerHTML = '';
+    for (const [k, pc] of Object.entries(CAMP_PIECES[race])) {
+      const d = document.createElement('div'); d.className = 'pc' + (tool === k ? ' sel' : '');
+      d.appendChild(thumb(pc.spr({ fired: 0 }, 0)));
+      d.insertAdjacentHTML('beforeend', '<b>' + pc.name + '</b><small>' + ROLE_NAME[pc.role] + '</small>');
+      d.title = CAMP_ROLES[pc.role].what;
+      d.onclick = () => { tool = tool === k ? null : k; sel = null; renderAll(); };
+      pal.appendChild(d);
+    }
+  }
+  function renderInfo() {
+    const k = sel ? sel.k : tool, pc = k && CAMP_PIECES[race][k];
+    if (!pc) { $('info').textContent = 'Ťukni na stavbu v palete a potom na bojisko.'; return; }
+    const r = CAMP_ROLES[pc.role];
+    $('info').innerHTML = '<b>' + pc.name + '</b> – ' + ROLE_NAME[pc.role] + '<br>' + r.what + '<br>zdravie ' + Math.round(r.hp * (pc.hp || 1)) + ' (+20 % za každú ďalšiu misiu) · zlato za zničenie ' + r.gold +
+      (sel ? '<br>poloha x ' + sel.x + ', y ' + sel.y + (G.gy0 + sel.y > TOWER_REACH ? ' · <span style="color:#e84838">v dosahu veží hráča</span>' : '') +
+        '<br><button class="del" id="delSel">Zmazať</button>' : '<br><i>Klikni na bojisko a postav ju.</i>');
+    if (sel) $('delSel').onclick = () => removeSel();
+  }
+  function renderList() {
+    $('mLabel').textContent = mission + ' – ' + MISSIONS[mission - 1].name + ' (' + (race === 'orc' ? 'orkovia' : 'ľudia') + ')';
+    const list = $('list'); list.innerHTML = '';
+    const L = lay();
+    if (!L.length) list.innerHTML = '<span class="help">Hrad je prázdny – v misii nebude tábor.</span>';
+    L.forEach(q => {
+      const pc = CAMP_PIECES[race][q.k], row = document.createElement('div');
+      row.className = 'row' + (q === sel ? ' sel' : '');
+      row.innerHTML = '<span>' + (pc ? pc.name : '? ' + q.k) + '</span><span class="help">x ' + q.x + ', y ' + q.y + '</span>' + (G.gy0 + q.y > TOWER_REACH ? '<span class="warn">v dosahu veží</span>' : '');
+      row.onclick = () => { sel = q; tool = null; renderAll(); };
+      list.appendChild(row);
+    });
+    const hp = L.reduce((s, q) => { const pc = CAMP_PIECES[race][q.k]; return s + (pc ? CAMP_ROLES[pc.role].hp * (pc.hp || 1) : 0); }, 0);
+    const roles = {}; for (const q of L) { const pc = CAMP_PIECES[race][q.k]; if (pc) roles[pc.role] = (roles[pc.role] || 0) + 1; }
+    $('sum').textContent = L.length ? L.length + ' stavieb · spolu ' + Math.round(hp) + ' zdravia (misia 6) · ' + Object.entries(roles).map(([r, n]) => ROLE_NAME[r] + ' ' + n).join(', ') : '';
+  }
+  function renderMissions() {
+    const box = $('missions'); box.innerHTML = '';
+    for (let m = HOME_PROVINCES + 1; m <= MISSIONS.length; m++) {
+      const bt = document.createElement('button'); bt.textContent = m; bt.title = MISSIONS[m - 1].name;
+      bt.className = m === mission ? 'on' : '';
+      bt.onclick = () => { mission = m; sel = null; buildField(); renderAll(); };
+      box.appendChild(bt);
+    }
+    for (const bt of document.querySelectorAll('[data-race]')) bt.className = bt.dataset.race === race ? 'on' : '';
+  }
+  function renderAll() { renderMissions(); renderPalette(); renderInfo(); renderList(); draw(); }
+
+  // ---- myš ----
+  let hover = null;
+  const pos = ev => { const r = cv.getBoundingClientRect(); return { x: (ev.clientX - r.left) / r.width * W, y: (ev.clientY - r.top) / r.height * H }; };
+  const snap = v => Math.round(v / 2) * 2;
+  function pieceAt(p) {
+    const L = lay().slice().sort((a, q) => q.y - a.y); // vpredu je tá nižšie
+    for (const q of L) { const sp = sprOf(q); if (!sp) continue; const x = G.gx0 + q.x, y = G.gy0 + q.y; if (p.x >= x - sp.w / 2 && p.x <= x + sp.w / 2 && p.y >= y - sp.h && p.y <= y + 1) return q; }
+    return null;
+  }
+  const clampPos = (x, y) => ({ x: Math.max(0, Math.min(G.cols * T, snap(x - G.gx0))), y: Math.max(HUD_BAND, Math.min(G.zoneTopMax - G.gy0 - 2, snap(y - G.gy0))) });
+  cv.addEventListener('mousedown', ev => {
+    const p = pos(ev);
+    if (ev.button === 2) { const q = pieceAt(p); if (q) { sel = q; removeSel(); } return; }
+    if (tool) {
+      const c = clampPos(p.x, p.y), q = { k: tool, x: c.x, y: c.y };
+      lay().push(q); sel = null; setDirty(true); renderAll(); return;
+    }
+    const q = pieceAt(p);
+    sel = q; if (q) drag = { q, dx: G.gx0 + q.x - p.x, dy: G.gy0 + q.y - p.y };
+    renderAll();
+  });
+  cv.addEventListener('contextmenu', ev => ev.preventDefault());
+  window.addEventListener('mousemove', ev => {
+    const p = pos(ev);
+    hover = p.x >= 0 && p.y >= 0 && p.x <= W && p.y <= H ? (() => { const c = clampPos(p.x, p.y); return { x: G.gx0 + c.x, y: G.gy0 + c.y }; })() : null;
+    if (drag) { const c = clampPos(p.x + drag.dx, p.y + drag.dy); if (c.x !== drag.q.x || c.y !== drag.q.y) { drag.q.x = c.x; drag.q.y = c.y; setDirty(true); renderInfo(); renderList(); } }
+    draw();
+  });
+  window.addEventListener('mouseup', () => { drag = null; });
+  function removeSel() { const L = lay(), i = L.indexOf(sel); if (i >= 0) { L.splice(i, 1); setDirty(true); } sel = null; renderAll(); }
+  window.addEventListener('keydown', ev => {
+    if (ev.target.tagName === 'INPUT') return;
+    if (ev.key === 'Escape') { tool = null; sel = null; renderAll(); return; }
+    if (!sel) return;
+    if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); removeSel(); return; }
+    const st = ev.shiftKey ? 4 : 1, mv = { ArrowLeft: [-st, 0], ArrowRight: [st, 0], ArrowUp: [0, -st], ArrowDown: [0, st] }[ev.key];
+    if (mv) { ev.preventDefault(); const c = clampPos(G.gx0 + sel.x + mv[0], G.gy0 + sel.y + mv[1]); sel.x = c.x; sel.y = c.y; setDirty(true); renderAll(); }
+  });
+
+  // ---- tlačidlá ----
+  for (const bt of document.querySelectorAll('[data-race]')) bt.onclick = () => { race = bt.dataset.race; tool = null; sel = null; renderAll(); };
+  $('clearBtn').onclick = () => { if (!lay().length || !confirm('Vymazať celý hrad misie ' + mission + '?')) return; data[race][mission] = []; sel = null; setDirty(true); renderAll(); };
+  $('copyBtn').onclick = () => {
+    const m = parseInt(prompt('Z ktorej misie skopírovať hrad (' + (HOME_PROVINCES + 1) + '–' + MISSIONS.length + ')?'), 10);
+    if (!(data[race][m] && data[race][m].length) || m === mission) { status('Misia ' + (m || '?') + ' nemá hrad'); return; }
+    data[race][mission] = data[race][m].map(q => Object.assign({}, q)); sel = null; setDirty(true); renderAll();
+  };
+  $('saveBtn').onclick = async () => {
+    try {
+      const r = await fetch('/castles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+      setDirty(false); status('Uložené do js/castles.js – obnov hru');
+    } catch (e) { status('Uloženie zlyhalo: ' + e.message + ' (beží tools/devserver.py?)'); }
+  };
+  $('revertBtn').onclick = async () => {
+    if (dirty && !confirm('Zahodiť neuložené zmeny?')) return;
+    try {
+      const txt = await (await fetch('../js/castles.js?' + Date.now(), { cache: 'no-store' })).text();
+      data = new Function(txt + '\nreturn CASTLES;')();
+      for (const r of Object.keys(CAMP_PIECES)) data[r] = data[r] || {};
+      sel = null; setDirty(false); status('Načítané uložené hrady'); renderAll();
+    } catch (e) { status('Načítanie zlyhalo: ' + e.message); }
+  };
+  window.addEventListener('beforeunload', ev => { if (dirty) { ev.preventDefault(); ev.returnValue = ''; } });
+
+  buildField(); renderAll();
+  setInterval(draw, 250); // animácie (totem, bubon) netreba – stačí občas prekresliť
+})();
+</script>
+</body>
+</html>

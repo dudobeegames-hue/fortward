@@ -1,5 +1,7 @@
-"""Fortward dev server: obsluhuje priečinok www a cez POST /snap?name=x uloží PNG snímku (na ladenie grafiky)."""
+"""Fortward dev server: obsluhuje priečinok www, cez POST /snap?name=x uloží PNG snímku (na ladenie grafiky)
+a cez POST /castles zapíše hrady z editora hradov do www/js/castles.js."""
 import base64
+import json
 import http.server
 import os
 import sys
@@ -23,8 +25,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         u = urllib.parse.urlparse(self.path)
-        if u.path != '/snap' or LAN:  # v sieťovom režime nikto zvonka nezapisuje na disk
+        if LAN or u.path not in ('/snap', '/castles'):  # v sieťovom režime nikto zvonka nezapisuje na disk
             self.send_error(404)
+            return
+        if u.path == '/castles':
+            self.save_castles()
             return
         name = urllib.parse.parse_qs(u.query).get('name', ['snap'])[0]
         name = ''.join(c for c in name if c.isalnum() or c in '-_') or 'snap'
@@ -33,6 +38,32 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         os.makedirs(SNAP_DIR, exist_ok=True)
         with open(os.path.join(SNAP_DIR, name + '.png'), 'wb') as f:
             f.write(png)
+        self.send_response(204)
+        self.end_headers()
+
+    def save_castles(self):
+        # hrady z editora: {rasa: {misia: [{k, x, y}]}} – overí tvar a zapíše čitateľný js súbor
+        try:
+            data = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+            lines = ["'use strict';",
+                     '// Fortward – hrady (tábory) protivníka pre misie 6–10. Súbor zapisuje editor hradov (www/dev/castle-editor.html).',
+                     '// Pre každú rasu protivníka a misiu zoznam stavieb: k = druh stavby rasy (CAMP_PIECES v js/camp.js),',
+                     '// x, y = spodok stavby v herných px od ľavého horného rohu mriežky bojiska.',
+                     'const CASTLES = {']
+            races = []
+            for race in sorted(data):
+                rows = []
+                for m in sorted(data[race], key=int):
+                    items = [{'k': str(q['k']), 'x': int(q['x']), 'y': int(q['y'])} for q in data[race][m]]
+                    rows.append('    ' + json.dumps(str(int(m))) + ': ' + json.dumps(items, ensure_ascii=False))
+                races.append('  ' + race + ': {\n' + ',\n'.join(rows) + ('\n' if rows else '') + '  }')
+            lines.append(',\n'.join(races))
+            lines.append('};')
+            with open(os.path.join(ROOT, 'js', 'castles.js'), 'w', encoding='utf-8', newline='\n') as f:
+                f.write('\n'.join(lines) + '\n')
+        except (ValueError, KeyError, TypeError) as e:
+            self.send_error(400, str(e))
+            return
         self.send_response(204)
         self.end_headers()
 

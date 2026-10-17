@@ -646,49 +646,22 @@
     banner('Misia ' + m + ': ' + MISSIONS[m - 1].name + (st.tier ? ' · ' + TIERS[st.tier].name : ''));
   }
 
-  // ---- tábor hordy (od misie 6): stavby nepriateľskej rasy na hornom okraji bojiska, mimo dostrelu veží ----
-  // Každá stavba má všeobecnú úlohu (ostreľovač, veža, liečiteľ, posilňovač, posily); meno a vzhľad jej dodá rasa
-  // protivníka (CAMP_SKIN). Keď bude hráč hrať za inú rasu, tábor sa poskladá z budov rasy, proti ktorej hrá.
-  const CAMP_ROLES = {
-    bombard: { hp: 260, gold: 40, what: 'z diaľky ostreľuje tvoje budovy' },
-    tower:   { hp: 300, gold: 30, what: 'strieľa na tvoje jednotky v okolí' },
-    totem:   { hp: 200, gold: 35, what: 'kým stojí, horda sa pomaly lieči' },
-    drum:    { hp: 180, gold: 30, what: 'kým stojí, horda je rýchlejšia' },
-    tent:    { hp: 240, gold: 35, what: 'počas vlny vysiela posily' },
-  };
-  const CAMP_SKIN = {
-    orc: {
-      bombard: { name: 'Orkský katapult', spr: o => BSPR.orcCatapult[o.fired > 0 ? 1 : 0] },
-      tower:   { name: 'Orkská veža',     spr: () => BSPR.orcTower },
-      totem:   { name: 'Šamanský totem',  spr: (o, t) => BSPR.orcTotem[Math.floor(t * 3) % 2] },
-      drum:    { name: 'Vojnový bubon',   spr: (o, t) => BSPR.orcDrum[Math.floor(t * 4) % 2] },
-      tent:    { name: 'Stan posíl',      spr: () => BSPR.orcTent },
-    },
-  };
+  // ---- tábor hordy (od misie 6): stavby protivníka hore na bojisku, mimo dostrelu veží (CAMP_ROLES a CAMP_PIECES sú v js/camp.js) ----
   const foeRace = () => 'orc'; // zatiaľ sa hrá len za ľudí, protivníkom je horda orkov
-  // rozloženie tábora podľa misie: [úloha, posun x od cesty, y spodku stavby pod pásom HUD (CAMP_TOP)]
-  const CAMP_LAYOUT = {
-    6:  [['bombard', -32, 46], ['tent', 34, 30]],
-    7:  [['bombard', -32, 46], ['tent', 34, 30], ['drum', 30, 66]],
-    8:  [['bombard', -34, 48], ['tent', 36, 28], ['drum', 32, 68], ['tower', -30, 82]],
-    9:  [['bombard', -36, 50], ['bombard', 38, 54], ['tent', 26, 24], ['totem', -24, 26], ['tower', -32, 86], ['tower', 34, 88]],
-    10: [['bombard', -38, 50], ['bombard', 40, 54], ['tent', 26, 22], ['totem', -24, 24], ['drum', -6, 40], ['tower', -32, 86], ['tower', 34, 88]],
-  };
-  const CAMP_TOP = 22; // horný pás bojiska zakrýva HUD – tábor začína pod ním
   const CAMP_DRUM = 1.2, CAMP_TOTEM = 0.015; // bubon: horda o 20 % rýchlejšia; totem: lieči 1,5 % zdravia za sekundu
   const campLive = () => st.camp ? st.camp.parts.filter(o => o.hp > 0) : [];
   const campHas = role => !!st.camp && st.camp.parts.some(o => o.role === role && o.hp > 0);
   const campPow = () => (1 + 0.2 * (st.mission - HOME_PROVINCES - 1)) * Math.sqrt(TIERS[st.tier || 0].hp);
+  // tábor misie z hradov editora (js/castles.js)
   function makeCamp() {
-    const lay = CAMP_LAYOUT[st.mission];
-    if (!lay) return null;
-    const skin = CAMP_SKIN[foeRace()], mm = (1 + 0.2 * (st.mission - HOME_PROVINCES - 1)) * TIERS[st.tier || 0].hp;
-    const left = G.gx0 + 10, right = G.gx0 + G.cols * T - 10;
+    const race = foeRace(), lay = typeof CASTLES !== 'undefined' && CASTLES[race] && CASTLES[race][st.mission];
+    if (!lay || !lay.length) return null;
+    const pieces = CAMP_PIECES[race], mm = (1 + 0.2 * (st.mission - HOME_PROVINCES - 1)) * TIERS[st.tier || 0].hp;
     return {
       rocks: [],
-      parts: lay.map(([role, dx, y], i) => {
-        const hp = CAMP_ROLES[role].hp * mm;
-        return { role, skin: skin[role], x: Math.max(left, Math.min(right, scene.fortX + dx)), y: G.gy0 + CAMP_TOP + y, hp, max: hp, cd: 3 + i * 1.5, flash: 0, fired: 0 };
+      parts: lay.filter(q => pieces[q.k]).map((q, i) => {
+        const pc = pieces[q.k], hp = CAMP_ROLES[pc.role].hp * (pc.hp || 1) * mm;
+        return { kind: q.k, role: pc.role, skin: pc, x: G.gx0 + q.x, y: G.gy0 + q.y, hp, max: hp, cd: 3 + i * 1.5, flash: 0, fired: 0 };
       }),
     };
   }
@@ -708,6 +681,7 @@
     for (let k = 0; k < 26; k++) part(o.x + (Math.random() - 0.5) * 16, o.y - Math.random() * 18, (Math.random() - 0.5) * 60, -Math.random() * 50, 0.9, ['#3c3846', '#22202a', '#4a2e1a', '#f89838'][k % 4], 110);
     const gold = Math.round(CAMP_ROLES[o.role].gold * (1 + 0.1 * (st.mission - HOME_PROVINCES)));
     st.gold += gold; st.texts.push({ x: o.x, y: o.y - 22, s: '+' + gold, life: 1.4, max: 1.4 });
+    if (o.role === 'keep') { st.shake = 0.6; for (const q of campLive()) hitCamp(q, q.hp + 1); } // srdce padlo – zrúti sa celý tábor
     updateHud();
   }
   // medzi vlnami horda stojace stavby tábora čiastočne opraví (zbúrané už nepostaví)
@@ -1105,7 +1079,7 @@
       w: spr.w, h: spr.h, dead: false, foe: null, trap: null, attacking: false, pow: Math.sqrt(item.hpMul),
     };
     if (d.king) { e.stompT = 3; e.summonT = 4; }
-    if (item.fromCamp && st.camp) { e.x = scene.fortX; e.y = G.gy0 + CAMP_TOP + 30; st.shake = 0.5; } // vyjde spomedzi stavieb tábora
+    if (item.fromCamp && st.camp) { const k = st.camp.parts.find(o => o.role === 'keep' && o.hp > 0); e.x = k ? k.x : scene.fortX; e.y = k ? k.y + 4 : G.gy0 + 52; st.shake = 0.5; } // vyjde z pevnosti tábora (alebo spomedzi stavieb)
     st.enemies.push(e);
     if (d.boss && !(st.boss && st.boss.d.king && !st.boss.dead)) { st.boss = e; AUDIO.play('boss'); }
     return e;

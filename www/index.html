@@ -928,7 +928,7 @@
 <script>
   // hra sa načíta až po vykreslení úvodnej obrazovky (inak by ťažké skripty zdržali jej prvé zobrazenie)
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    const list = ['audio', 'sprites', 'scene', 'buildings', 'map', 'icons', 'game'];
+    const list = ['audio', 'sprites', 'scene', 'buildings', 'map', 'camp', 'castles', 'icons', 'game'];
     list.forEach((n, i) => {
       const s = document.createElement('script'); s.src = 'js/' + n + '.js?v=__BUILD__'; s.async = false; // verziu doplní nasadenie, mobil tak nevezme starý skript z pamäte
       if (i === list.length - 1) s.onload = () => SPLASH.done();
