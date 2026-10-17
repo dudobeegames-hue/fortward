@@ -56,9 +56,28 @@ const CAMP_PIECES = {
     pit:      { role: 'trap',    name: 'Jama s ostňami',  spr: () => BSPR.pit },
     firepit:  { role: 'trap',    name: 'Ohnivá jama',     spr: () => BSPR.firepit },
     beartrap: { role: 'trap',    name: 'Medvedia pasca',  spr: () => BSPR.beartrap },
-    wall:     { role: 'wall',    name: 'Hradby',          spr: () => BSPR.wall[0][10], hp: 1.1 },
-    gatehouse:{ role: 'wall',    name: 'Brána',           spr: () => BSPR.gateIcon, hp: 1.5 },
+    wall:     { role: 'wall',    name: 'Hradby',          spr: o => BSPR.wall[0][o.mask != null ? o.mask : 10], hp: 1.1, dy: 2 },
+    gatehouse:{ role: 'wall',    name: 'Brána',           spr: o => gateSprite(o.mask != null ? o.mask : 10), hp: 1.5, dy: 2 },
     hall:     { role: 'keep',    name: 'Radnica',         spr: () => BSPR.hall[0], size: [3, 3] },
   },
 };
 const campSize = pc => pc.size || [1, 1];
+// hradby a brány ľudí sa spájajú ako v hre: so susednými hradbami, bránami a vežami (na radnicu len z boku)
+const CAMP_JOIN = { wall: 1, gatehouse: 1, tower: 1, mage: 1, icetower: 1, ballista: 1, hall: 1 };
+// list = stavby hradu ({k|kind, c, r}); vráti masku spojení 1 hore, 2 vpravo, 4 dole, 8 vľavo
+function campWallMask(list, q) {
+  const kindOf = o => o.k || o.kind;
+  const at = (c, r) => list.find(o => { const pc = CAMP_PIECES.human[kindOf(o)], [w, h] = pc ? campSize(pc) : [1, 1]; return c >= o.c && c < o.c + w && r >= o.r && r < o.r + h; });
+  const j = (c, r, vert) => { const o = at(c, r); return !!o && !!CAMP_JOIN[kindOf(o)] && !(vert && kindOf(o) === 'hall'); };
+  return (j(q.c, q.r - 1, true) ? 1 : 0) | (j(q.c + 1, q.r) ? 2 : 0) | (j(q.c, q.r + 1, true) ? 4 : 0) | (j(q.c - 1, q.r) ? 8 : 0);
+}
+// brána = úsek hradby so strážnicou nad ním (ako v hre), pre každé napojenie raz zložená
+const GATE_SPR = {};
+function gateSprite(m) {
+  if (!GATE_SPR[m]) {
+    const c = document.createElement('canvas'); c.width = 16; c.height = 33;
+    const x = c.getContext('2d'); x.drawImage(BSPR.wall[0][m].c, 0, 9); x.drawImage(BSPR.gatehouse[0].c, 0, 0);
+    GATE_SPR[m] = spriteFromCanvas(c);
+  }
+  return GATE_SPR[m];
+}

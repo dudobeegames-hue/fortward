@@ -671,7 +671,8 @@
       rocks: [],
       parts: lay.filter(q => pieces[q.k]).map((q, i) => {
         const pc = pieces[q.k], hp = CAMP_ROLES[pc.role].hp * (pc.hp || 1) * mm, [w, h] = campSize(pc);
-        return { kind: q.k, role: pc.role, skin: pc, c: q.c, r: q.r, x: tileX(q.c) + w * T / 2, y: tileY(q.r + h), hp, max: hp, cd: 3 + i * 1.5, flash: 0, fired: 0 };
+        return { kind: q.k, role: pc.role, skin: pc, c: q.c, r: q.r, x: tileX(q.c) + w * T / 2, y: tileY(q.r + h), hp, max: hp, cd: 3 + i * 1.5, flash: 0, fired: 0,
+          mask: race === 'human' && CAMP_JOIN[q.k] ? campWallMask(lay, q) : null }; // hradby ľudí sa spájajú ako v hre
       }),
     };
   }
@@ -3535,7 +3536,7 @@
     }
     for (const e of st.enemies) objs.push({ y: e.y, f: () => drawEnemy(e, time) });
     if (st.camp) {
-      for (const o of st.camp.parts) if (o.hp > 0) objs.push({ y: o.y, f: () => { const sp = o.skin.spr(o, time); shadow(o.x, o.y, 8); g.drawImage(sp.c, Math.round(o.x - sp.w / 2) + hitJit(o.flash), o.y - sp.h); } });
+      for (const o of st.camp.parts) if (o.hp > 0) objs.push({ y: o.y, f: () => { const sp = o.skin.spr(o, time); shadow(o.x, o.y, 8); g.drawImage(sp.c, Math.round(o.x - sp.w / 2) + hitJit(o.flash), o.y - sp.h + (o.skin.dy || 0)); } });
       for (const r of st.camp.rocks) objs.push({ y: 9999, f: () => drawRock(r) });
     }
     objs.sort((a, b) => a.y - b.y || (b.x || 0) - (a.x || 0)); // v rovnakom rade je ľavejšia budova vpredu

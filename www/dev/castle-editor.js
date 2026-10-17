@@ -50,8 +50,9 @@
   // ---- kreslenie ----
   function drawPiece(q, alpha) {
     const pc = pcOf(q); if (!pc) return;
-    const sp = pc.spr({ fired: 0 }, performance.now() / 1000), [w, h] = campSize(pc);
-    const x = Math.round(tileX(q.c) + w * T / 2 - sp.w / 2), y = tileY(q.r + h) - sp.h;
+    const o = { fired: 0, mask: race === 'human' && (q.k === 'wall' || q.k === 'gatehouse') ? campWallMask(lay(), q) : null };
+    const sp = pc.spr(o, performance.now() / 1000), [w, h] = campSize(pc);
+    const x = Math.round(tileX(q.c) + w * T / 2 - sp.w / 2), y = tileY(q.r + h) - sp.h + (pc.dy || 0);
     b.globalAlpha = alpha || 1;
     b.fillStyle = 'rgba(0,0,0,0.25)'; b.beginPath(); b.ellipse(tileX(q.c) + w * T / 2, tileY(q.r + h) - 1, Math.min(sp.w, w * T) * 0.4, 2, 0, 0, 6.29); b.fill();
     b.drawImage(sp.c, x, y);
