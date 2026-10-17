@@ -971,7 +971,6 @@
     if (kingMeta.pending) later(() => { if (st.phase === 'build') showTalentPick(); }, 600);
     st.viewUp = 0;
     if (st.wave > 0) repairCamp();
-    else if (st.camp) later(() => { if (st.phase === 'build') toast('Horda si rozložila tábor – zničíš ho obliehacími strojmi zo záložky Stroje'); }, 900);
   }
 
   function startWave() {
@@ -1328,7 +1327,7 @@
     // súboj s rytierom / kráľom (beranidlo a podkopník rytierov ignorujú)
     if (e.d.ram || e.d.sapper) e.foe = null;
     if (e.foe && (e.foe.dead || e.foe.down > 0)) e.foe = null;
-    if (!e.foe && !e.d.ram && !e.d.sapper) for (const s of st.soldiers) if ((s.helper || s.archer) && !s.fly && !s.dead && Math.hypot(s.x - e.x, s.y - e.y) < 9) { e.foe = s; break; }
+    if (!e.foe && !e.d.ram && !e.d.sapper) for (const s of st.soldiers) if ((s.helper || s.archer || s.siege) && !s.fly && !s.dead && Math.hypot(s.x - e.x, s.y - e.y) < (s.siege ? 12 : 9)) { e.foe = s; break; } // aj obliehací stroj, okolo ktorého ide
     // čarodejka nikoho nenapadne mečom, preto si ju horda nájde sama, keď je blízko
     const sk0 = st.king;
     if (!e.foe && !e.d.ram && !e.d.sapper && !e.d.fly && sk0 && !sk0.dead && heroDef().range && Math.hypot(sk0.x - e.x, sk0.y - e.y) < 14) e.foe = sk0;
@@ -1426,6 +1425,17 @@
     }
   }
 
+  // pešiak búra stavbu tábora: obstúpi ju z bokov (podľa poradia, aby nestáli v jednom bode) a bije do nej
+  function strikeCamp(u, o, dt) {
+    u.flash = Math.max(0, u.flash - dt); u.cd = Math.max(0, u.cd - dt); u.swing = Math.max(0, (u.swing || 0) - dt);
+    const cry = st.cryT > 0, spd = (u.spd || 26) * (cry ? CRY_SPD : 1) * waterMul(u);
+    const side = u.x < o.x ? -1 : 1, reach = u.ktype === 'spear' ? 12 : 7 + (u.slot % 3) * 2;
+    const tx = o.x + side * reach, ty = o.y + 2 + ((u.slot % 3) - 1) * 3;
+    if (Math.hypot(tx - u.x, ty - u.y) > 2) { moveKnight(u, tx, ty, spd, dt); u.run = (u.run || 0) + spd * dt; return; }
+    if (u.cd > 0) return;
+    u.cd = 0.8; u.swing = 0.15; u.run = 0; AUDIO.play('clang');
+    hitCamp(o, u.dmg * (cry ? CRY_DMG : 1));
+  }
   // vlastní pešiaci sa navzájom jemne odtláčajú, aby nestáli jeden v druhom
   function separateSoldiers() {
     const us = st.soldiers.filter(s => !s.fly && !s.dead);
@@ -1835,7 +1845,9 @@
       const knights = live.filter(s => s.ktype === 'knight'), spears = live.filter(s => s.ktype === 'spear'), riders = live.filter(s => s.ktype === 'rider');
       // šík ide oproti najbližšej pozemnej horde, no nie hlbšie než k zhromaždisku pred zónou
       const th = nearestFoe(F.inf.x, F.inf.y, false);
+      const cp = th ? null : nearestCampPart(F.inf.x, F.inf.y);
       if (th) stepAnchor(F.inf, th.x, Math.max(G.gy0 + 24, Math.min(musterY, th.y + 18)), dt);
+      else if (cp) stepAnchor(F.inf, cp.x, cp.y + 16, dt); // horda nikde – šík sa presunie k táboru
       else stepAnchor(F.inf, cx, musterY, dt);
       const front = formSlots(knights.length, F.inf.x, F.inf.y);
       assignSlots(knights, front);
@@ -1856,8 +1868,9 @@
     // lukostrelci: rad na dostrel od najbližšieho nepriateľa (aj letca), vždy za pešiakmi
     if (archers.length) {
       let tx = cx, ty = Math.max(musterY + 16, infBack + 10);
-      const th = nearestFoe(F.arc.x, F.arc.y, true);
+      const th = nearestFoe(F.arc.x, F.arc.y, true), cp = th ? null : nearestCampPart(F.arc.x, F.arc.y);
       if (th) { tx = th.x; ty = Math.max(G.gy0 + 30, Math.min(ty, Math.max(th.y + ARCHER_RANGE - 14, infBack + 10))); }
+      else if (cp) { tx = cp.x; ty = cp.y + ARCHER_RANGE - 12; } // horda nikde – rad lukostrelcov na dostrel od tábora
       stepAnchor(F.arc, tx, ty, dt);
       assignSlots(archers, formSlots(archers.length, F.arc.x, F.arc.y));
     }
@@ -1873,6 +1886,14 @@
     let near = false;
     for (const e of st.enemies) if (!e.dead && e.y > 4 && Math.hypot(e.x - u.x, e.y - u.y) <= ARCHER_RANGE) { near = true; break; }
     if (near && u.cd <= 0 && shoot(u.x, u.y, u.x, u.y - 9, ARCHER_RANGE, 'arrow', 180, u.dmg * (st.cryT > 0 ? CRY_DMG : 1), 0, ARCHER_PRIO)) { u.cd = ARCHER_CD / (st.cryT > 0 ? CRY_SPD : 1); u.swing = 0.1; }
+    else if (!near && u.cd <= 0) { // nikto z hordy v dosahu – strieľa na stavbu tábora, ak na ňu dostrelí
+      const o = nearestCampPart(u.x, u.y);
+      if (o && Math.hypot(o.x - u.x, o.y - u.y) <= ARCHER_RANGE) {
+        const a = campAim(o);
+        st.proj.push({ k: 'arrow', x: u.x, y: u.y - 9, tgt: null, tx: a.x + (Math.random() - 0.5) * 6, ty: a.y, dmg: u.dmg * (st.cryT > 0 ? CRY_DMG : 1), spd: 180, splash: 0, vx: 0, vy: -1, campT: o });
+        u.cd = ARCHER_CD / (st.cryT > 0 ? CRY_SPD : 1); u.swing = 0.1; AUDIO.play('arrow');
+      }
+    }
     // ide na svoje miesto v rade (počas mierenia pomalšie)
     const sl = u.fslot;
     if (!sl || Math.hypot(sl.x - u.x, sl.y - u.y) < 1) return;
@@ -2123,7 +2144,10 @@
         let aggro = s.ktype === 'rider' ? 9999 : F.contact ? CLASH : ENGAGE;
         if (!s.tgt || s.tgt.dead) { const leak = nearestEnemyWhere(s.x, s.y, e => e.y > F.inf.y + 14 && e.y > 4, true); if (leak) s.tgt = leak; }
         if (s.tgt && !s.tgt.dead && s.tgt.y > F.inf.y + 14) aggro = 9999;
-        updateFighter(s, dt, sl.x, sl.y, aggro, s.dmg, false, moveKnight);
+        // nikto z hordy na dosah zrážky a nikto neprerazil za šík – tlačí dopredu a búra tábor (hordu stretne cestou)
+        const cp = (!s.tgt || s.tgt.dead) && !nearestEnemy(s.x, s.y, ENGAGE) ? nearestCampPart(s.x, s.y) : null;
+        if (cp) { s.tgt = null; strikeCamp(s, cp, dt); }
+        else updateFighter(s, dt, sl.x, sl.y, aggro, s.dmg, false, moveKnight);
       }
       if (s.tgt && s.tgt !== prev && !s.tgt.dead) s.tgt.atkN = (s.tgt.atkN || 0) + 1;
     }
