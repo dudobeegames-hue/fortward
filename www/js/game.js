@@ -3748,7 +3748,15 @@
     if (SPR.paladin8) ICONS.hero_paladin = portrait(SPR.paladin8, 11, 4, 20);
     if (SPR.sorc8) ICONS.hero_sorc = portrait(SPR.sorc8, 11, 3, 20);
     ICONS.u_knight = spriteURL(SPR.soldier[0], 3); ICONS.u_footArcher = spriteURL(SPR.footArcher[0], 3);
-    ICONS.u_siegeRam = spriteURL(SPR.siegeRam[0], 2); ICONS.u_siegeCat = spriteURL(SPR.siegeCat[0], 2); ICONS.u_siegeFire = spriteURL(SPR.siegeFire[0], 2); ICONS.u_siegeTower = spriteURL(SPR.siegeTower[0], 2);
+    // obliehacie stroje: šikmý pohľad spredu (JV) z 3D modelu, orezaný na obrys stroja
+    const trimmed = spr => {
+      const { w, h } = spr, d = spr.c.getContext('2d').getImageData(0, 0, w, h).data;
+      let x0 = w, y0 = h, x1 = -1, y1 = -1;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      const cut = src => { const c = document.createElement('canvas'); c.width = x1 - x0 + 1; c.height = y1 - y0 + 1; c.getContext('2d').drawImage(src, -x0, -y0); return c; };
+      return { c: cut(spr.c), sil: cut(spr.sil), w: x1 - x0 + 1, h: y1 - y0 + 1 };
+    };
+    for (const k of ['siegeRam', 'siegeCat', 'siegeFire', 'siegeTower']) ICONS['u_' + k] = spriteURL(trimmed(SPR[k + '8'][1].idle), 2);
     $('icoHall').src = UI_ICONS.hall;
     syncHeroIcons(); updateGems();
     for (const k of ['orc', 'garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf', 'giantRam', 'mammoth']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' || ENEMY[k].giant ? 2 : 3);
