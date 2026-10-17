@@ -62,7 +62,8 @@ const TR = {
 for (const k in TR) TR[k] = TR[k].map(hexRGB);
 
 // G: { T, gx0, gy0, cols, rows, hallCx, hallTop, hallBot, zoneTopMax }
-function buildScene(W, H, G, seed, themeIdx) {
+// clear = obdĺžniky [x0, y0, x1, y1] bez stromov a skál (stavby tábora hordy)
+function buildScene(W, H, G, seed, themeIdx, clear) {
   const th = THEMES[((themeIdx || 0) % THEMES.length + THEMES.length) % THEMES.length];
   const bg = document.createElement('canvas'); bg.width = W; bg.height = H;
   const bx = bg.getContext('2d');
@@ -137,9 +138,9 @@ function buildScene(W, H, G, seed, themeIdx) {
 
   const rnd = (() => { let s = (seed * 9301 + 49297) % 233280; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
   const blocked = new Uint8Array(W * H); // miesta s vodou/skalou – bez dekorácií
-  // od misie 6: hore pri ceste si horda rozloží tábor – bez stromov a skál
+  // od misie 6: pod stavbami tábora hordy nerastú stromy ani neležia skaly
   const fortX = Math.round(roadCx(40));
-  if ((themeIdx || 0) >= HOME_PROVINCES) for (let y = 0; y < 116 && y < H; y++) for (let x = Math.max(0, fortX - 66); x < Math.min(W, fortX + 66); x++) blocked[y * W + x] = 1;
+  for (const [x0, y0, x1, y1] of clear || []) for (let y = Math.max(0, y0); y < Math.min(H, y1); y++) for (let x = Math.max(0, x0); x < Math.min(W, x1); x++) blocked[y * W + x] = 1;
   const free = (x, y, m) => roadD(x, y) > m && yardD(x, y) > m && !blocked[(Math.max(0, Math.min(H - 1, y | 0))) * W + Math.max(0, Math.min(W - 1, x | 0))];
 
   // ---- špeciálne prvky krajiny ----

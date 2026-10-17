@@ -2,9 +2,9 @@
 // Fortward – editor hradov: hrady protivníka pre misie 6–10 sa stavajú do mriežky bojiska ako budovy v hre
 // a ukladajú cez dev server (POST /castles) do js/castles.js.
 (() => {
-  // bojisko najnižšieho telefónu (11 stĺpcov mriežky, políčko 16 px): hrad je hore, na vyššom displeji je od zóny hráča ďalej,
-  // takže čo sa zmestí tu, nezasiahne do zóny nikde
-  const T = 16, W = 200, H = 360, GROUND_PAD = 10, MAX_LVL = 5, SCALE = 2;
+  // bojisko najnižšieho telefónu (11 stĺpcov mriežky, políčko 16 px), predĺžené ako v misiách s táborom: hrad je hore,
+  // na vyššom displeji je od zóny hráča ďalej, takže čo sa zmestí tu, nezasiahne do zóny nikde
+  const SCREEN_H = 360, T = 16, W = 200, H = SCREEN_H + Math.round(SCREEN_H * CAMP_EXTRA), GROUND_PAD = 10, MAX_LVL = 5, SCALE = 2;
   const G = { T, cols: 11 };
   G.gx0 = Math.floor((W - G.cols * T) / 2); G.rows = Math.floor((H - GROUND_PAD) / T); G.gy0 = H - GROUND_PAD - G.rows * T;
   const tileX = c => G.gx0 + c * T, tileY = r => G.gy0 + r * T;
@@ -28,11 +28,13 @@
   const $ = id => document.getElementById(id);
   const pcOf = q => CAMP_PIECES[race][q.k];
   const sizeOf = k => campSize(CAMP_PIECES[race][k]);
-  const setDirty = v => { dirty = v; $('saveBtn').classList.toggle('dirty', v); status(v ? 'Neuložené zmeny' : ''); };
+  const setDirty = v => { dirty = v; $('saveBtn').classList.toggle('dirty', v); status(v ? 'Neuložené zmeny' : ''); if (v) rebuildSoon(); };
   const status = t => { $('status').textContent = t; };
   const inReach = q => tileY(q.r + sizeOf(q.k)[1]) > TOWER_REACH;
 
-  function buildField() { scene = buildScene(W, H, G, 7 + mission * 13, mission - 1); }
+  function buildField() { scene = buildScene(W, H, G, 7 + mission * 13, mission - 1, campClearRects(lay(), G)); }
+  let sceneTimer = 0; // po zmene hradu sa krajina prekreslí (pod stavbami nebudú stromy ani skaly)
+  const rebuildSoon = () => { clearTimeout(sceneTimer); sceneTimer = setTimeout(() => { buildField(); draw(); }, 200); };
 
   // ---- mriežka: stavba zaberá w×h políčok, nesmie zasahovať do inej ani do zóny hráča ----
   function fits(k, c, r, skip) {
@@ -189,7 +191,7 @@
   });
 
   // ---- tlačidlá ----
-  for (const bt of document.querySelectorAll('[data-race]')) bt.onclick = () => { race = bt.dataset.race; tool = null; sel = null; renderAll(); };
+  for (const bt of document.querySelectorAll('[data-race]')) bt.onclick = () => { race = bt.dataset.race; tool = null; sel = null; buildField(); renderAll(); };
   $('clearBtn').onclick = () => { if (!lay().length || !confirm('Vymazať celý hrad misie ' + mission + '?')) return; data[race][mission] = []; sel = null; setDirty(true); renderAll(); };
   $('copyBtn').onclick = () => {
     const m = parseInt(prompt('Z ktorej misie skopírovať hrad (' + (HOME_PROVINCES + 1) + '–' + MISSIONS.length + ')?'), 10);
@@ -209,7 +211,7 @@
       const txt = await (await fetch('../js/castles.js?' + Date.now(), { cache: 'no-store' })).text();
       data = new Function(txt + '\nreturn CASTLES;')();
       for (const r of Object.keys(CAMP_PIECES)) data[r] = data[r] || {};
-      sel = null; setDirty(false); status('Načítané uložené hrady'); renderAll();
+      sel = null; setDirty(false); status('Načítané uložené hrady'); buildField(); renderAll();
     } catch (e) { status('Načítanie zlyhalo: ' + e.message); }
   };
   window.addEventListener('beforeunload', ev => { if (dirty) { ev.preventDefault(); ev.returnValue = ''; } });

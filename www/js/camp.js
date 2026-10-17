@@ -62,6 +62,16 @@ const CAMP_PIECES = {
   },
 };
 const campSize = pc => pc.size || [1, 1];
+const CAMP_EXTRA = 0.45; // misie s táborom majú bojisko o 45 % vyššie ako obrazovka (miesto na tábor aj na stavanie)
+// obdĺžniky pod stavbami hradu (aj kus nad políčkom, kam siaha obrázok) – tam scéna nekreslí stromy ani skaly
+function campClearRects(list, G) {
+  const out = [];
+  for (const q of list || []) {
+    const pc = CAMP_PIECES.orc[q.k] || CAMP_PIECES.human[q.k], [w, h] = pc ? campSize(pc) : [1, 1];
+    out.push([G.gx0 + q.c * G.T - 3, G.gy0 + (q.r + h) * G.T - 38, G.gx0 + (q.c + w) * G.T + 3, G.gy0 + (q.r + h) * G.T + 3]);
+  }
+  return out;
+}
 // hradby a brány ľudí sa spájajú ako v hre: so susednými hradbami, bránami a vežami (na radnicu len z boku)
 const CAMP_JOIN = { wall: 1, gatehouse: 1, tower: 1, mage: 1, icetower: 1, ballista: 1, hall: 1 };
 // list = stavby hradu ({k|kind, c, r}); vráti masku spojení 1 hore, 2 vpravo, 4 dole, 8 vľavo

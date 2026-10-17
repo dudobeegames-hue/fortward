@@ -557,7 +557,7 @@
   }
   // mriežka a krajina bojiska (výška závisí od misie)
   function layoutField() {
-    FH = H;
+    FH = H + (st.mission > HOME_PROVINCES ? Math.round(H * CAMP_EXTRA) : 0); // misie s táborom: dlhšie bojisko, posúva sa prstom
     buf.width = W; buf.height = FH;
     const oldHc = G.hc0, oldHr = G.hr0, had = !!scene;
     // pevný počet stĺpcov na každom zariadení (zmestí sa aj do najužšej plochy 180 px) – zmena okna tak mriežku neposúva
@@ -566,7 +566,8 @@
     G.hc0 = Math.floor(G.cols / 2) - 1; G.hr0 = G.rows - 3;
     G.hallCx = tileX(G.hc0) + 1.5 * T; G.hallTop = tileY(G.hr0); G.hallBot = G.hallTop + 3 * T;
     G.zoneTopMax = tileY(G.rows - (5 + MAX_LVL));
-    scene = buildScene(W, FH, G, 7 + st.mission * 13, st.mission - 1);
+    const lay = typeof CASTLES !== 'undefined' && CASTLES[foeRace()] && CASTLES[foeRace()][st.mission];
+    scene = buildScene(W, FH, G, 7 + st.mission * 13, st.mission - 1, campClearRects(lay, G));
     if (had) { // posuň stavby, ak sa zmenila mriežka
       const dc = G.hc0 - oldHc, dr = G.hr0 - oldHr;
       for (const b of st.blds) { b.c += dc; b.r += dr; }
@@ -647,7 +648,7 @@
   }
 
   // ---- tábor hordy (od misie 6): stavby protivníka hore na bojisku, mimo dostrelu veží (CAMP_ROLES a CAMP_PIECES sú v js/camp.js) ----
-  const foeRace = () => 'orc'; // zatiaľ sa hrá len za ľudí, protivníkom je horda orkov
+  function foeRace() { return 'orc'; } // zatiaľ sa hrá len za ľudí, protivníkom je horda orkov
   const CAMP_DRUM = 1.2, CAMP_TOTEM = 0.015; // bubon: horda o 20 % rýchlejšia; totem: lieči 1,5 % zdravia za sekundu
   const campLive = () => st.camp ? st.camp.parts.filter(o => o.hp > 0) : [];
   const campHas = role => !!st.camp && st.camp.parts.some(o => o.role === role && o.hp > 0);
@@ -875,7 +876,7 @@
       wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.05 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, shake: 0, soldierN: 0,
       blds: [], paving: {}, enemies: [], soldiers: [], form: null, proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
       cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, shieldCd: 0, healCd: 0, fwCd: 0, tpCd: 0, shields: [], fireWalls: [], heroDead: {},
-      spellSel: null, siegeOrder: [], siegePick: null, fallFx: [], blasts: [], healFx: [], bolts: [], hallHolyT: 0, stance: 'attack',
+      spellSel: null, siegeOrder: [], siegePick: null, fallFx: [], blasts: [], healFx: [], bolts: [], hallHolyT: 0, stance: 'attack', introPan: null,
     });
     rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
     st.camp = makeCamp(); // od misie 6 si horda hore na bojisku rozloží tábor
@@ -967,6 +968,7 @@
     if (kingMeta.pending) later(() => { if (st.phase === 'build') showTalentPick(); }, 600);
     st.viewUp = 0;
     if (st.wave > 0) repairCamp();
+    else if (st.camp) st.introPan = { t: 0 }; // začiatok misie: kamera najprv ukáže tábor hordy, potom sa zvezie k radnici
   }
 
   function startWave() {
@@ -3449,6 +3451,7 @@
   }
 
   const panelLow = () => $('build').offsetHeight * DPR / S;
+  const INTRO_PAN = [1.8, 1.6]; // s: pohľad na tábor, zvezenie k radnici
   function camTick(dt) {
     if (st.phase === 'title') { camY = 0; return; }
     if (st.phase === 'map') {
@@ -3461,6 +3464,14 @@
     const full = st.phase === 'build' && !$('build').hidden ? panelLow() : 0;
     st.viewUp = Math.max(0, Math.min(full + camBase(), st.viewUp || 0));
     let target = camBase() + full - st.viewUp;
+    if (st.introPan && (vscroll || st.phase !== 'build')) st.introPan = null; // ťuk/ťah alebo štart vlny prelet preruší
+    if (st.introPan) {
+      const P = INTRO_PAN, t = (st.introPan.t += dt), ease = x => x * x * (3 - 2 * x);
+      const k = t < P[0] ? 1 : ease(Math.max(0, 1 - (t - P[0]) / P[1]));
+      camY = target * (1 - k);
+      if (t >= P[0] + P[1]) st.introPan = null;
+      return;
+    }
     if (vscroll) camY = target;
     target = Math.min(target, Math.max(0, FH - 60));
     camY += (target - camY) * Math.min(1, dt * 10);
