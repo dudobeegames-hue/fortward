@@ -1,15 +1,15 @@
 'use strict';
 // Fortward – hrady (tábory) protivníka pre misie 6–10. Súbor zapisuje editor hradov (www/dev/castle-editor.html).
 // Pre každú rasu protivníka a misiu zoznam stavieb: k = druh stavby rasy (CAMP_PIECES v js/camp.js),
-// x, y = spodok stavby v herných px od ľavého horného rohu mriežky bojiska.
+// c, r = ľavé horné políčko stavby v mriežke bojiska (stĺpec 0–10, riadok od hornej hrany).
 const CASTLES = {
   human: {
   },
   orc: {
-    "6": [{"k": "catapult", "x": 46, "y": 68}, {"k": "tent", "x": 112, "y": 52}],
-    "7": [{"k": "catapult", "x": 51, "y": 68}, {"k": "tent", "x": 117, "y": 52}, {"k": "drum", "x": 113, "y": 88}],
-    "8": [{"k": "catapult", "x": 43, "y": 70}, {"k": "tent", "x": 113, "y": 50}, {"k": "drum", "x": 109, "y": 90}, {"k": "tower", "x": 47, "y": 104}],
-    "9": [{"k": "catapult", "x": 43, "y": 72}, {"k": "catapult", "x": 117, "y": 76}, {"k": "tent", "x": 105, "y": 46}, {"k": "totem", "x": 55, "y": 48}, {"k": "tower", "x": 47, "y": 108}, {"k": "tower", "x": 113, "y": 110}],
-    "10": [{"k": "catapult", "x": 46, "y": 72}, {"k": "catapult", "x": 124, "y": 76}, {"k": "tent", "x": 110, "y": 44}, {"k": "totem", "x": 60, "y": 46}, {"k": "drum", "x": 78, "y": 62}, {"k": "tower", "x": 52, "y": 108}, {"k": "tower", "x": 118, "y": 110}]
+    "6": [{"k": "catapult", "c": 2, "r": 4}, {"k": "goblinTent", "c": 7, "r": 3}],
+    "7": [{"k": "catapult", "c": 3, "r": 4}, {"k": "goblinTent", "c": 7, "r": 3}, {"k": "drum", "c": 7, "r": 5}],
+    "8": [{"k": "catapult", "c": 2, "r": 4}, {"k": "goblinTent", "c": 7, "r": 3}, {"k": "drum", "c": 6, "r": 5}, {"k": "tower", "c": 2, "r": 6}],
+    "9": [{"k": "catapult", "c": 2, "r": 4}, {"k": "catapult", "c": 7, "r": 4}, {"k": "goblinTent", "c": 6, "r": 2}, {"k": "totem", "c": 3, "r": 2}, {"k": "tower", "c": 2, "r": 6}, {"k": "tower", "c": 7, "r": 6}],
+    "10": [{"k": "catapult", "c": 2, "r": 4}, {"k": "catapult", "c": 7, "r": 4}, {"k": "goblinTent", "c": 6, "r": 2}, {"k": "totem", "c": 3, "r": 2}, {"k": "drum", "c": 4, "r": 3}, {"k": "tower", "c": 3, "r": 6}, {"k": "tower", "c": 7, "r": 6}]
   }
 };

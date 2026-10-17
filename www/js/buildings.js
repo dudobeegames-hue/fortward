@@ -909,6 +909,116 @@ function makeOrcTent() {
   for (let y = 6; y <= 8; y++) for (let x = 10; x <= 12; x++) p.set(x, y, (y === 7 && x !== 11) ? hexRGB('#1c140e') : x < 12 ? BONE : BONE2); // lebka
   return p.finish();
 }
+// ---- budovy tábora, z ktorých vychádzajú jednotky hordy (každá jednotka má svoju) ----
+const HIDE_R = ['#2a1c12', '#4a3020', '#6a4a30', '#8a6a48', '#a88a64'].map(hexRGB);
+const SKIN_G = ['#1e3a16', '#305c22', '#3e7a2a', '#62a03a', '#7cb848', '#9cd45a'].map(hexRGB);
+const DARK = hexRGB('#140c08');
+// sedlová strecha z koží (spoločná pre chatrče): od y0 po y1, šírka hw v strede
+function hideRoof(p, cx, y0, y1, hw0, hw1, ramp) {
+  for (let y = y0; y <= y1; y++) {
+    const hw = hw0 + (hw1 - hw0) * (y - y0) / Math.max(1, y1 - y0);
+    for (let x = Math.ceil(cx - hw); x <= Math.floor(cx + hw); x++) {
+      const t = (x - (cx - hw)) / (2 * hw + 0.01);
+      p.shade(x, y, ramp, (x - Math.round(cx)) % 4 === 0 ? 0.25 : 0.88 - t * 0.6);
+    }
+  }
+}
+// orkský barak 18x18: dlhý zrub so strechou z koží, dvere, štít so zástavou
+function makeOrcBarracks() {
+  const p = painter(18, 18);
+  for (let y = 9; y <= 17; y++) for (let x = 2; x <= 15; x++) p.shade(x, y, ORC_WOOD, (y % 3 === 0 ? 0.3 : 0.75) - (x - 2) * 0.03); // zrub
+  hideRoof(p, 8.5, 2, 9, 2, 8.5, HIDE_R);
+  for (let y = 12; y <= 17; y++) for (let x = 7; x <= 10; x++) p.set(x, y, DARK);                      // dvere
+  for (const x of [7, 10]) p.set(x, 11, BONE);
+  for (let y = 0; y <= 4; y++) p.shade(15, y, ORC_WOOD, 0.6); p.set(16, 0, BLOOD2); p.set(17, 0, BLOOD2); p.set(16, 1, BLOOD); // zástava
+  for (const x of [5, 12]) { p.set(x, 13, BONE); p.set(x, 14, BONE2); }                                // štíty s kosťou
+  return p.finish();
+}
+// jama surovcov 18x14: kruh z kolov okolo tmavej jamy, kosti a zabodnutý kyjak
+function makeBrutePit() {
+  const p = painter(18, 14);
+  pDisk(p, 9, 9, 8, 4.5, (x, y, nx, ny, q) => p.shade(x, y, ORC_STONE, q > 0.55 ? 0.55 - ny * 0.2 : 0.08));  // jama
+  for (const [x, y] of [[6, 9], [11, 10], [9, 8]]) p.set(x, y, BONE2);                                  // kosti na dne
+  for (let k = 0; k < 9; k++) { const a = Math.PI + k / 8 * Math.PI, x = Math.round(9 + Math.cos(a) * 8), y = Math.round(9 + Math.sin(a) * 4.5); // koly vzadu
+    for (let yy = y - 4; yy <= y; yy++) p.shade(x, yy, ORC_WOOD, 0.75); p.set(x, y - 5, BONE); }
+  for (const x of [2, 16]) for (let y = 7; y <= 12; y++) p.shade(x, y, ORC_WOOD, x === 2 ? 0.8 : 0.4);
+  pLine(p, 13, 13, 16, 3, (x, y) => p.shade(x, y, ORC_WOOD, 0.85));                                     // kyjak
+  for (let y = 1; y <= 3; y++) for (let x = 15; x <= 17; x++) p.shade(x, y, ORC_WOOD, 0.95 - (x - 15) * 0.2);
+  p.set(16, 1, BONE);
+  return p.finish();
+}
+// goblinská strelnica 18x16: slamený terč na stojane so šípmi, stojan s lukmi
+function makeGoblinRange() {
+  const p = painter(18, 16);
+  const STRAW = ['#2e200c', '#6a4e1e', '#a8843a', '#dcba68'].map(hexRGB);
+  for (const x of [3, 9]) for (let y = 8; y <= 15; y++) p.shade(x, y, ORC_WOOD, 0.6);                   // stojan terča
+  pDisk(p, 6, 6, 5, 5, (x, y, nx, ny, q) => p.shade(x, y, STRAW, 0.9 - nx * 0.3 - ny * 0.3));          // terč
+  pDisk(p, 6, 6, 2.6, 2.6, (x, y) => p.set(x, y, BLOOD)); p.set(6, 6, BLOOD2);
+  for (const [x, y] of [[4, 4], [8, 7], [5, 8]]) { p.set(x, y, ORC_WOOD[1]); p.set(x + 1, y - 1, BONE); } // zapichnuté šípy
+  for (let x = 12; x <= 17; x++) p.shade(x, 9, ORC_WOOD, 0.75);                                         // stojan s lukmi
+  for (const x of [12, 17]) for (let y = 9; y <= 15; y++) p.shade(x, y, ORC_WOOD, 0.5);
+  for (const x of [13, 15]) for (let y = 3; y <= 9; y++) p.set(x + (y === 3 || y === 9 ? 1 : 0), y, ORC_WOOD[5]);
+  return p.finish();
+}
+// netopierí brloh 18x16: kamenná kopa s tmavým otvorom, nad ňou netopiere
+function makeBatCave(f) {
+  const p = painter(18, 16);
+  pDisk(p, 9, 12, 9, 7, (x, y, nx, ny) => { if (y <= 15) p.shade(x, y, ORC_STONE, 0.7 - nx * 0.3 - ny * 0.2 + (hash2(x, y, 77) - 0.5) * 0.2); });
+  pDisk(p, 9, 14, 4, 4, (x, y) => { if (y <= 15) p.set(x, y, DARK); });                                // jaskyňa
+  p.set(7, 11, hexRGB('#f8d048')); p.set(10, 12, hexRGB('#f8d048'));                                    // oči v tme
+  const BAT = hexRGB('#4a3460');
+  for (const [bx, by] of [[4, 2 + f], [13, 1 + (1 - f)]]) { p.set(bx, by, BAT); p.set(bx - 1, by - f, BAT); p.set(bx + 1, by - f, BAT); p.set(bx - 2, by + 1 - f, BAT); p.set(bx + 2, by + 1 - f, BAT); }
+  return p.finish();
+}
+// šamanská chatrč 16x20: okrúhla chatrč z koží s lebkami, z vrcholu stúpa zelený dym; f = fáza dymu
+function makeShamanHut(f) {
+  const p = painter(16, 20);
+  for (let y = 8; y <= 19; y++) { const hw = Math.min(7, 1 + (y - 8) * 0.9); for (let x = Math.ceil(8 - hw); x <= Math.floor(8 + hw); x++) {
+    const t = (x - (8 - hw)) / (2 * hw + 0.01); p.shade(x, y, HIDE_R, (y % 4 === 0 ? 0.3 : 0.85 - t * 0.55)); } }
+  for (let y = 14; y <= 19; y++) for (let x = 6; x <= 9; x++) p.set(x, y, DARK);                        // vchod
+  for (const [x, y] of [[4, 13], [11, 13]]) { p.set(x, y, BONE); p.set(x + 1, y, BONE2); p.set(x, y + 1, DARK); } // lebky
+  const SMOKE = [hexRGB('#5aff8a'), hexRGB('#9cd45a'), hexRGB('#305c22')];
+  for (let k = 0; k < 6; k++) { const y = 7 - k, x = 8 + Math.round(Math.sin(k * 1.3 + f * 2) * 1.5); p.set(x, y, SMOKE[k % 3]); if (k < 3) p.set(x + 1, y, SMOKE[(k + 1) % 3]); }
+  return p.finish();
+}
+// medvedí brloh 20x16: hlinená kopa so zrubovým vchodom, škrabance od pazúrov, kosti pred vchodom
+function makeBearDen() {
+  const p = painter(20, 16);
+  const EARTH = ['#1e140c', '#3a2818', '#5a4028', '#7a5a3a', '#967048'].map(hexRGB);
+  pDisk(p, 10, 13, 10, 9, (x, y, nx, ny) => { if (y <= 15) p.shade(x, y, EARTH, 0.7 - nx * 0.3 - ny * 0.2 + (hash2(x, y, 41) - 0.5) * 0.18); });
+  for (let y = 9; y <= 15; y++) for (let x = 6; x <= 13; x++) p.set(x, y, DARK);                        // vchod
+  for (const x of [5, 14]) for (let y = 8; y <= 15; y++) p.shade(x, y, ORC_WOOD, x === 5 ? 0.8 : 0.45); // zrubový rám
+  for (let x = 5; x <= 14; x++) p.shade(x, 8, ORC_WOOD, 0.75);
+  for (const x of [15, 16, 17]) { p.set(x, 10 + (x - 15), EARTH[0]); p.set(x, 11 + (x - 15), EARTH[0]); } // škrabance
+  p.set(8, 13, hexRGB('#f8d048')); p.set(11, 13, hexRGB('#f8d048'));                                    // oči
+  p.set(3, 15, BONE); p.set(4, 14, BONE2); p.set(16, 15, BONE);
+  return p.finish();
+}
+// prachareň 18x16: kamenná chatka, pred ňou sudy s výbušninou a výstražná lebka
+function makePowderHut() {
+  const p = painter(18, 16);
+  for (let y = 5; y <= 15; y++) for (let x = 2; x <= 12; x++) p.shade(x, y, ORC_STONE, 0.75 - (x - 2) * 0.04 + ((x + y * 2) % 5 === 0 ? -0.2 : 0)); // kamenná chatka
+  for (let x = 1; x <= 13; x++) { p.shade(x, 3, ORC_WOOD, 0.8); p.shade(x, 4, ORC_WOOD, 0.5); }       // strieška
+  for (let y = 10; y <= 15; y++) for (let x = 6; x <= 8; x++) p.set(x, y, DARK);
+  for (const [bx, by] of [[13, 11], [15, 13], [12, 14]]) {                                               // sudy s červeným pásom
+    for (let y = by; y <= by + 2 && y <= 15; y++) for (let x = bx; x <= bx + 2; x++) p.shade(x, y, ORC_WOOD, y === by + 1 ? 0.2 : 0.75 - (x - bx) * 0.2);
+    p.set(bx + 1, by + 1, BLOOD2);
+  }
+  for (let y = 0; y <= 4; y++) p.shade(16, y + 4, ORC_WOOD, 0.6);                                        // výstražná lebka na kole
+  p.set(15, 3, BONE); p.set(16, 3, BONE); p.set(17, 3, BONE2); p.set(15, 4, DARK); p.set(17, 4, DARK); p.set(16, 2, BONE);
+  return p.finish();
+}
+// vlčia ohrada 20x14: plot z kolov s bránkou, búda a vlčia hlava nad ňou
+function makeWolfPen() {
+  const p = painter(20, 14);
+  const WOLF = ['#1c1c22', '#33333c', '#4e4e58', '#6e6e7a', '#9696a2'].map(hexRGB);
+  for (let x = 0; x <= 19; x += 2) for (let y = 5 + (x % 4 === 0 ? 0 : 1); y <= 13; y++) p.shade(x, y, ORC_WOOD, y === 13 ? 0.3 : 0.7 - x * 0.015); // koly plota
+  for (let x = 0; x <= 19; x++) { p.shade(x, 8, ORC_WOOD, 0.45); p.shade(x, 11, ORC_WOOD, 0.4); }    // priečky
+  for (let y = 7; y <= 13; y++) for (let x = 8; x <= 11; x++) p.shade(x, y, ORC_WOOD, (x + y) % 3 === 0 ? 0.3 : 0.6); // bránka
+  pDisk(p, 10, 3.5, 3, 2.5, (x, y, nx, ny) => p.shade(x, y, WOLF, 0.8 - nx * 0.3 - ny * 0.2));        // vlčia hlava nad bránkou
+  p.set(8, 1, WOLF[3]); p.set(12, 1, WOLF[2]); p.set(9, 3, hexRGB('#f8d048')); p.set(11, 3, hexRGB('#f8d048')); p.set(10, 5, DARK);
+  return p.finish();
+}
 // palisáda 16x18 zo zahrotených kolov; brána: vráta s kovaním a lebkou
 function makePalisade(gate) {
   const p = painter(16, 18);
@@ -1329,6 +1439,14 @@ function initBuildingSprites() {
   BSPR.orcTotem = [makeOrcTotem(false), makeOrcTotem(true)];
   BSPR.orcDrum = [makeOrcDrum(false), makeOrcDrum(true)];
   BSPR.orcTent = makeOrcTent();
+  BSPR.orcBarracks = makeOrcBarracks();
+  BSPR.brutePit = makeBrutePit();
+  BSPR.goblinRange = makeGoblinRange();
+  BSPR.batCave = [makeBatCave(0), makeBatCave(1)];
+  BSPR.shamanHut = [makeShamanHut(0), makeShamanHut(1)];
+  BSPR.bearDen = makeBearDen();
+  BSPR.powderHut = makePowderHut();
+  BSPR.wolfPen = makeWolfPen();
   SPR.siegeRam = [makeSiegeRam(0), makeSiegeRam(1)];
   SPR.siegeCat = [makeSiegeCat(true), makeSiegeCat(false)];
   SPR.siegeFire = [makeSiegeFire(0), makeSiegeFire(1)];

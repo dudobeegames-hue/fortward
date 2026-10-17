@@ -652,7 +652,17 @@
   const campLive = () => st.camp ? st.camp.parts.filter(o => o.hp > 0) : [];
   const campHas = role => !!st.camp && st.camp.parts.some(o => o.role === role && o.hp > 0);
   const campPow = () => (1 + 0.2 * (st.mission - HOME_PROVINCES - 1)) * Math.sqrt(TIERS[st.tier || 0].hp);
-  // tábor misie z hradov editora (js/castles.js)
+  // jednotka vlny vyjde z liahne svojho druhu v tábore; keď tábor také liahne mal a všetky padli, ten druh už nepríde
+  function spawnFromCamp(item) {
+    const all = st.camp ? st.camp.parts.filter(o => o.role === 'spawn' && o.skin.unit === item.type) : [];
+    if (!all.length) { spawnEnemy(item); return; }
+    const live = all.filter(o => o.hp > 0);
+    if (!live.length) return;
+    const o = live[Math.floor(Math.random() * live.length)], e = spawnEnemy(item);
+    e.x = o.x + (Math.random() - 0.5) * 6; e.y = o.y + 3;
+    for (let k = 0; k < 6; k++) part(o.x, o.y, (Math.random() - 0.5) * 24, -Math.random() * 12, 0.4, '#c6a272', 40);
+  }
+  // tábor misie z hradov editora (js/castles.js): stavby stoja v mriežke bojiska ako budovy hráča
   function makeCamp() {
     const race = foeRace(), lay = typeof CASTLES !== 'undefined' && CASTLES[race] && CASTLES[race][st.mission];
     if (!lay || !lay.length) return null;
@@ -660,8 +670,8 @@
     return {
       rocks: [],
       parts: lay.filter(q => pieces[q.k]).map((q, i) => {
-        const pc = pieces[q.k], hp = CAMP_ROLES[pc.role].hp * (pc.hp || 1) * mm;
-        return { kind: q.k, role: pc.role, skin: pc, x: G.gx0 + q.x, y: G.gy0 + q.y, hp, max: hp, cd: 3 + i * 1.5, flash: 0, fired: 0 };
+        const pc = pieces[q.k], hp = CAMP_ROLES[pc.role].hp * (pc.hp || 1) * mm, [w, h] = campSize(pc);
+        return { kind: q.k, role: pc.role, skin: pc, c: q.c, r: q.r, x: tileX(q.c) + w * T / 2, y: tileY(q.r + h), hp, max: hp, cd: 3 + i * 1.5, flash: 0, fired: 0 };
       }),
     };
   }
@@ -707,16 +717,6 @@
         if (!tg) { o.cd = 0.3; continue; }
         o.cd = 1.5;
         st.eproj.push({ x: o.x, y: o.y - 28, tx: tg.x, ty: tg.y - (tg.fly ? 16 : 6), tgt: tg, dmg: 5 * pw });
-      } else if (o.role === 'tent' && o.cd <= 0) { // posily vyjdú len kým horda ešte prichádza
-        if (!st.spawnQ.length) { o.cd = 1; continue; }
-        o.cd = Math.max(10, 17 - a);
-        const pool = buildWave(Math.max(1, st.wave)).filter(q => !ENEMY[q.type].boss && !ENEMY[q.type].fly);
-        for (let k = 0; k < 2 && pool.length; k++) {
-          const e = spawnEnemy(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
-          e.x = o.x + (Math.random() - 0.5) * 8; e.y = o.y + 2;
-        }
-        for (let k = 0; k < 10; k++) part(o.x, o.y - 4, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.5, '#c6a272', 40);
-        AUDIO.play('horn');
       } else if (o.role === 'totem') { // horda sa pomaly lieči
         for (const e of st.enemies) if (!e.dead && e.hp < e.max) {
           e.hp = Math.min(e.max, e.hp + e.max * CAMP_TOTEM * dt);
@@ -844,12 +844,12 @@
       const e = nearestFoe(u.x, u.y - 8, false);
       if (e && Math.hypot(e.x - u.x, e.y - u.y) <= SIEGE.fire.range) { if (u.cd <= 0) { u.cd = SIEGE.fire.cd; sprayFire(u, e.x, e.y - e.h * 0.4); } return; }
       if (giant) { go(giant.x, giant.y + SIEGE.fire.range - 8); return; } // podíde k obrovi na dosah plameňa
-      if (camp) { // podíde k stavbe tábora a podpáli ju (stan z koží horí najlepšie)
+      if (camp) { // podíde k stavbe tábora a podpáli ju (chatrče a stany horia najlepšie)
         const a = campAim(camp);
         if (Math.hypot(a.x - u.x, a.y - (u.y - 14)) > SIEGE.fire.range - 4) { go(clampX(camp.x + (u.x < camp.x ? -6 : 6)), camp.y + 18); return; }
         if (u.cd > 0) return;
         u.cd = SIEGE.fire.cd; sprayFire(u, a.x, a.y);
-        hitCamp(camp, u.dmg * 2.2 * (camp.role === 'tent' ? 1.5 : 1));
+        hitCamp(camp, u.dmg * 2.2 * (camp.role === 'spawn' ? 1.5 : 1)); // chatrče a stany horia najlepšie
         return;
       }
       if (e && Math.hypot(e.x - fm.inf.x, e.y - fm.inf.y) < 60) { go(e.x, e.y + SIEGE.fire.range - 8); return; } // horda pri šíku – podíde na dosah
@@ -2133,7 +2133,7 @@
   function update(dt) {
     if (st.spawnQ.length) {
       st.spawnT -= dt;
-      if (st.spawnT <= 0) { spawnEnemy(st.spawnQ.shift()); st.spawnT = st.spawnQ.length ? st.spawnQ[0].gap : 0; }
+      if (st.spawnT <= 0) { spawnFromCamp(st.spawnQ.shift()); st.spawnT = st.spawnQ.length ? st.spawnQ[0].gap : 0; }
     }
     for (const e of st.enemies) { if (!e.dead) updateEnemy(e, dt); if (st.phase !== 'battle') return; }
     updateCamp(dt);
