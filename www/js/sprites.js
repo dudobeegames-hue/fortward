@@ -644,6 +644,8 @@ function initSprites() {
   SPR.king8 = buildKing8(); // kráľ v 8 smeroch (chôdza, postoj, úder)
   SPR.paladin8 = buildPaladin8(); // paladin v 8 smeroch s bojovým kladivom
   SPR.sorc8 = buildSorc8(); // čarodejka v 8 smeroch s copom a ohnivou palicou
+  SPR.chief8 = buildChief8(); // náčelník orkov (hrdina za orkov)
+  SPR.chief = [SPR.chief8[2].idle];
   SPR.paladin = PALADIN_LEGS.map(l => buildSprite(PALADIN_BODY.concat(l), PAL_PALADIN));
   SPR.sorc = SORC_LEGS.map(l => buildSprite(SORC_BODY.concat(l), PAL_SORC));
   SPR.spear = SOLDIER_LEGS.map(l => buildSprite(SPEAR_BODY.concat(l))); // ľudia vždy v modrom
@@ -1060,7 +1062,8 @@ const buildPaladin8 = () => buildHero8({ body: PAL8_BODY, kneel: PAL8_KNEEL, wea
 function buildHero8(spec) {
   const K = hexRGB(PAL.K);
   const col = ch => hexRGB((spec.pal && spec.pal[ch]) || PAL[ch]);
-  const hammer = spec.weapon === 'hammer', staff = spec.weapon === 'staff';
+  // sekera (náčelník orkov) sa správa ako kladivo (po údere ostane vpredu, v kľaku stojí na zemi), len má čepeľ na jednu stranu
+  const axe = spec.weapon === 'axe', hammer = spec.weapon === 'hammer' || axe, staff = spec.weapon === 'staff';
   const hand = view => Object.assign({}, K8_HAND[view], spec.hand && spec.hand[view]);
   const ORB_T = 9.6; // stred ohnivej gule na palici (vzdialenosť od ruky)
   const HEAD_T = 7.6; // stred hlavy kladiva (vzdialenosť od ruky)
@@ -1089,6 +1092,10 @@ function buildHero8(spec) {
       for (let t = -4; t <= 8; t += 0.25) add(hx + dx * t, hy + dy * t, t > 7.5 ? col('G') : t < -3.5 ? col('L') : col('l'));
       const o = []; orb(hx + dx * ORB_T, hy + dy * ORB_T, o);
       for (const [x, y, c] of o) { const i = sw.findIndex(q => q[0] === x && q[1] === y); if (i >= 0) sw[i][2] = c; else sw.push([x, y, c]); }
+    } else if (axe) { // sekera: drevené porisko, na konci široká železná čepeľ s lesklým ostrím a kosteným hrotom
+      for (let t = -1; t <= 7; t += 0.25) add(hx + dx * t, hy + dy * t, t > 6.5 ? col('e') : col('l'));
+      for (let t = 4; t <= 7; t += 0.25) for (let o = 0.75; o <= 3.4 - Math.abs(t - 5.5) * 0.5; o += 0.4)
+        add(hx + dx * t - dy * o, hy + dy * t + dx * o, o > 2.6 - Math.abs(t - 5.5) * 0.5 ? col('w') : col('m'));
     } else if (hammer) { // bojové kladivo: dlhá drevená násada so zlatou hlavicou, na konci oceľová hlava naprieč
       add(hx - dx * 2, hy - dy * 2, col('g'));
       for (let t = -1; t <= 6; t += 0.25) add(hx + dx * t, hy + dy * t, t > 5 ? col('G') : col('l'));
@@ -1691,3 +1698,75 @@ const RD8_HAND = {
   S:  { x: 1,  y: 6, idle: -1.65, ax: 4,  ay: 6, aim: 1.25, k: 0.75, legs: 'front' },
 };
 const buildRider8 = () => buildUnit8({ W: 40, H: 30, body: RD8_BODY, mount: RD8_HORSE, shield: KN8_SHIELD, hand: RD8_HAND, legs: RD8_LEGS, spear: 12, stride: 5 });
+
+// ---- náčelník orkov (hrdina hráča za orkov): rohatá kostená prilba, kly, kožušina na pleciach, červená bedrová zástera, sekera ----
+// kresba bez obrysu (12 bodov), obrys sa dopočíta (14 bodov ako telá ostatných hrdinov)
+const CH8_ART = {
+  S: [
+    'e..mwmmM...e',
+    'Ee.mmmmMD.eE',
+    '.EeDDDDDDeE.',
+    '...oqrOrq...',
+    '...oOOOOq...',
+    '...owOOwq...',
+    '.lLLooOqLLd.',
+    'oLlLLLLLLLdq',
+    'o.rrRgRrrR.q',
+    '..rrRRRrrR..',
+    '..rRrrRrRR..',
+    '..dddddddd..',
+  ],
+  E: [
+    '...mwmmM.e..',
+    '..emmmmMDeE.',
+    '...DDDDDDD..',
+    '....oOOOrqO.',
+    '....ooOOOqOo',
+    '.....oOOwq..',
+    '...lLLoOqL..',
+    '..lLLoLLLd..',
+    '..LLLoLLd...',
+    '..rrRoRrR...',
+    '..rRrrRrR...',
+    '..ddddddd...',
+  ],
+  N: [
+    'e..mwmmM...e',
+    'Ee.mmmmMD.eE',
+    '.EeDDDDDDeE.',
+    '...oooooq...',
+    '...ooooOq...',
+    '....oOOq....',
+    '.lLLLLLLLLd.',
+    'oLlLLLLLLLdq',
+    'o.rRRRRRRR.q',
+    '..rRRRRRRR..',
+    '..rRrRRrRR..',
+    '..dddddddd..',
+  ],
+  kneel: [
+    'e..mwmmM...e',
+    'Ee.mmmmMD.eE',
+    '.EeDDDDDDeE.',
+    '...oOOOOq...',
+    '.lLLooOqLLd.',
+    'oLlLLLLLLLdq',
+    'o.rrRgRrrR.q',
+    '..rrRRRrrR..',
+    '..qOOqqOOq..',
+    '..dddddddd..',
+  ],
+};
+// obkreslí 12 bodov širokú kresbu tmavým obrysom (vznikne 14 bodov ako K8_BODY)
+function outlineRows(rows) {
+  const w = rows[0].length + 2, h = rows.length + 2;
+  const g = [...Array(h)].map((_, y) => [...Array(w)].map((_, x) => ((rows[y - 1] || '')[x - 1]) || '.'));
+  const out = g.map(r => r.slice());
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (g[y][x] === '.' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => g[y + dy] && g[y + dy][x + dx] && g[y + dy][x + dx] !== '.')) out[y][x] = 'K';
+  return out.map(r => r.join(''));
+}
+const turnHead8 = (rows, n) => rows.map((r, i) => i < n ? '.' + r.slice(0, -1) : r);
+const buildChief8 = () => {
+  const S = outlineRows(CH8_ART.S), E = outlineRows(CH8_ART.E), N = outlineRows(CH8_ART.N);
+  return buildHero8({ body: { S, SE: turnHead8(S, 7), E, NE: turnHead8(N, 7), N }, kneel: outlineRows(CH8_ART.kneel), weapon: 'axe' });
+};

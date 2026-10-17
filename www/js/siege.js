@@ -313,6 +313,12 @@ function voxMammoth(f, act) {
   md.box(4, 21, -7, 5, 23, -7, vEmit('#8c2018')); md.set(6, 22 - (f & 1), -7, vEmit('#e84838'));
   return md;
 }
+// stroje hráča za orkov: rovnaké modely, len surové drevo, kože namiesto modrých látok a zelená posádka
+function orcify(md) {
+  const swap = new Map([[ROOF_BLUE, R_HIDE], [WOOD, ORC_WOOD], [R_SKIN, R_ORC]]);
+  for (const v of md.m.values()) if (v.mat.r && swap.has(v.mat.r)) v.mat = vm(swap.get(v.mat.r), v.mat.v);
+  return md;
+}
 function initSiegeSprites() {
   SPR.siegeRam8 = buildSiege8(voxRam);
   SPR.siegeCat8 = buildSiege8(voxCat);
@@ -321,4 +327,8 @@ function initSiegeSprites() {
   SPR.ram8 = buildSiege8((f, act) => voxOrcRam(f, act, false));
   SPR.giantRam8 = buildSiege8((f, act) => voxOrcRam(f, act, true), 1.4);
   SPR.mammoth8 = buildSiege8(voxMammoth, 2.2);
+  SPR.oSiegeRam8 = SPR.ram8; // orkský baran
+  SPR.oSiegeCat8 = buildSiege8((f, act) => orcify(voxCat(f, act)));
+  SPR.oSiegeFire8 = buildSiege8((f, act) => orcify(voxFire(f, act)));
+  SPR.oSiegeTower8 = buildSiege8((f, act) => orcify(voxTower(f, act)));
 }

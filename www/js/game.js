@@ -253,6 +253,7 @@
       desc: 'Z diaľky strieľa ohnivé strely, aj na netopiere. Vydrží však málo.' },
   };
   const HERO_IDS = Object.keys(HEROES);
+  const heroIds = () => isOrc() ? ['king'] : HERO_IDS; // za orkov je zatiaľ len náčelník
   // talenty paladina a čarodejky (rovnaké id = rovnaký účinok ako u kráľa)
   const HERO_TALENTS = {
     king: TALENTS,
@@ -295,7 +296,7 @@
   // gemy a kúpení hrdinovia patria hráčovi (všetkým pozíciám)
   const GEMS_KEY = 'fortward.gems', HEROES_KEY = 'fortward.heroes';
   const gems = () => loadJSON(GEMS_KEY, 0) || 0;
-  const ownedHeroes = () => ['king'].concat((loadJSON(HEROES_KEY, []) || []).filter(id => HEROES[id] && id !== 'king'));
+  const ownedHeroes = () => isOrc() ? ['king'] : ['king'].concat((loadJSON(HEROES_KEY, []) || []).filter(id => HEROES[id] && id !== 'king'));
   const ownsHero = id => ownedHeroes().includes(id);
   // počas vývoja sa hrdinovia odomykajú ručne tlačidlom Odomknúť (zadarmo); cena v gemoch (price) sa zapojí, keď bude obchod
   function buyHero(id) {
@@ -495,6 +496,10 @@
   const nodeOf = m => isOrc() ? MISSIONS.length - m : m - 1;     // index uzla (provincie) mapy pre misiu m
   const missionAt = i => isOrc() ? MISSIONS.length - i : i + 1;  // misia na uzle i
   const missionDef = m => (isOrc() ? ORC_MISSIONS : MISSIONS)[m - 1];
+  // jednotky hráča za orkov: rovnaké roly, orkský vzhľad (rytier → ork, kopijník → surovec, jazdec → vlčí jazdec, …)
+  const ORC_SPR = { soldier: 'orc', spear: 'brute', rider: 'wolf', footArcher: 'garcher', monk: 'shaman', monkCast: 'shaman', craft: 'goblin',
+    archer: 'garcher', knight: 'orc', siegeRam: 'oSiegeRam', siegeCat: 'oSiegeCat', siegeFire: 'oSiegeFire', siegeTower: 'oSiegeTower' };
+  const raceSpr = k => (isOrc() && ORC_SPR[k]) || k;
 
   // ---------------- Mriežka ----------------
   const tileX = c => G.gx0 + c * T;
@@ -1812,7 +1817,7 @@
     moveTo(u, c.x + Math.cos(a) * 12, c.y - 10 + Math.sin(a) * 5, u.spd * 0.6, dt);
   }
   function drawFalcon(u, time) {
-    const fr = SPR.falcon[Math.floor(u.anim) % 2], bob = Math.sin(time * 5 + u.slot) * 1.5;
+    const fr = SPR[isOrc() ? 'bat' : 'falcon'][Math.floor(u.anim) % 2], bob = Math.sin(time * 5 + u.slot) * 1.5;
     shadow(u.x, u.y + 2, 3);
     g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), Math.round(u.y - 14 + bob - (u.swing > 0 ? -3 : 0)));
   }
@@ -2732,7 +2737,7 @@
       if (o.spikes) drawSpikes(x, 0, y0, o.spikeType);
       if (o.gate) x.drawImage(gatesOf()[lv - 1].c, 0, y0 - 15);
       else if (u) {
-        const us = SPR[WUNIT[u.type].spr][0];
+        const us = SPR[raceSpr(WUNIT[u.type].spr)][0];
         x.drawImage(us.c, 0, 0, us.w, 11, 1, y0 - 9, us.w, 11);
         if (u.lvl > 1) pxText(x, String(u.lvl), 1, y0 - 8, '#88b4ff');
       }
@@ -2803,7 +2808,7 @@
           g.fillStyle = '#f8d048'; g.fillRect(fx + 4, y0 - 19 - wv, 1, 1);
         }
       } else if (b.unit) {
-        const us = SPR[WUNIT[b.unit.type].spr][0];
+        const us = SPR[raceSpr(WUNIT[b.unit.type].spr)][0];
         g.drawImage(us.c, 0, 0, us.w, 11, x0 + 1, y0 - 9, us.w, 11);
       }
     } else {
@@ -3657,11 +3662,11 @@
       for (const b of st.blds) if (!TRAPS[b.kind]) objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), x: b.c, f: () => drawBuilding(b, time) });
       for (const s of st.soldiers) {
         const cast = s.helper === 'chapel' && s.working && s.tgt && !s.dead; // mních pri liečení zdvihne palicu
-        objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: s.y, f: () => { drawFighter(s, cast ? 'monkCast' : s.spr || 'soldier'); if (cast) drawStaffGlow(s, time); } });
+        objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: s.y, f: () => { drawFighter(s, raceSpr(cast ? 'monkCast' : s.spr || 'soldier')); if (cast) drawStaffGlow(s, time); } });
         if (cast) { const t = s.tgt; objs.push({ y: t.y - healAuraH(t) - 1, f: () => drawHealAura(s, t, time) }); }
       }
       if (st.phase === 'build') for (const o of st.siegeOrder) { // kúpené obliehacie stroje čakajú na mieste, odkiaľ vyrazia
-        const sp = SPR[BUY[o.key].siege + '8'][6].idle; // otočený k horde
+        const sp = SPR[raceSpr(BUY[o.key].siege) + '8'][6].idle; // otočený k horde
         objs.push({ y: o.y, f: () => { shadow(o.x, o.y, 9); g.drawImage(sp.c, Math.round(o.x - sp.ax), Math.round(o.y - sp.ay)); } });
       }
       if (st.king && !st.king.dead) objs.push({ y: st.king.y, f: () => drawFighter(st.king, heroDef().spr) });
@@ -3807,18 +3812,45 @@
     chapel:   { name: 'Šamanská chatrč',   short: 'Chatrč',    desc: 'Vyšle šamana, ktorý chodí za orkmi a náčelníkom a lieči ich' },
     workshop: { name: 'Goblinský stan',    short: 'Stan',      desc: 'Vyšle goblina, ktorý chodí opravovať poškodené budovy' },
   };
+  const HUMAN_UNITS = { king: { name: HEROES.king.name, spr: HEROES.king.spr, desc: HEROES.king.desc },
+    kt: Object.fromEntries(Object.entries(KTYPES).map(([k, v]) => [k, v.name])), plural: Object.assign({}, UNIT_PLURAL) };
+  const ORC_UNITS = { king: { name: 'Náčelník', spr: 'chief', desc: 'Surový vodca hordy, sekerou zasiahne celú skupinu.' },
+    kt: { knight: 'Ork', spear: 'Surovec', rider: 'Vlčí jazdec' }, plural: { knight: 'Orkovia', rider: 'Vlčí jazdci', spear: 'Surovci' } };
   let previewRace = null;
   function applyRace() {
     BUILD_RACE = isOrc() ? 'orc' : 'human';
+    const U = isOrc() ? ORC_UNITS : HUMAN_UNITS;
+    Object.assign(HEROES.king, U.king);
+    for (const k in KTYPES) KTYPES[k].name = U.kt[k];
+    Object.assign(UNIT_PLURAL, U.plural);
+    if (!ownsHero(st.hero)) setActiveHero('king');
     for (const k in BUILD) Object.assign(BUILD[k], HUMAN_NAMES[k], BUILD_RACE === 'orc' ? ORC_NAMES[k] : null);
     if (previewRace !== BUILD_RACE) { for (const k in previewCache) delete previewCache[k]; previewRace = BUILD_RACE; }
-    if (ICONS.tower) buildingIcons();
+    if (ICONS.tower) { buildingIcons(); unitIcons(); syncHeroIcons(); }
+  }
+  // sprite orezaný na obrys (ikony obliehacích strojov: šikmý pohľad spredu z 3D modelu)
+  function trimmed(spr) {
+    const { w, h } = spr, d = spr.c.getContext('2d').getImageData(0, 0, w, h).data;
+    let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const cut = src => { const c = document.createElement('canvas'); c.width = x1 - x0 + 1; c.height = y1 - y0 + 1; c.getContext('2d').drawImage(src, -x0, -y0); return c; };
+    return { c: cut(spr.c), sil: cut(spr.sil), w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  }
+  // ikony jednotiek a hrdinu podľa rasy (portrét = hlava a ramená zozadu, orezané z 8-smerovej sady)
+  function heroPortrait(set, x, y, n) {
+    const c = document.createElement('canvas'); c.width = n; c.height = n;
+    c.getContext('2d').drawImage(set[6].idle.c, x, y, n, n, 0, 0, n, n);
+    return spriteURL({ c, w: n, h: n }, 3);
+  }
+  function unitIcons() {
+    const sp = k => SPR[raceSpr(k)][0];
+    ICONS.u_knight = spriteURL(sp('soldier'), 3); ICONS.u_footArcher = spriteURL(sp('footArcher'), 3);
+    ICONS.u_archer = spriteURL(sp('archer'), 3); ICONS.u_crossbow = spriteURL(sp('knight'), 3);
+    for (const k of ['siegeRam', 'siegeCat', 'siegeFire', 'siegeTower']) ICONS['u_' + k] = spriteURL(trimmed(SPR[raceSpr(k) + '8'][1].idle), 2);
+    ICONS.king = ICONS.hero_king = isOrc() ? heroPortrait(SPR.chief8, 12, 5, 18) : heroPortrait(SPR.king8, 12, 6, 18);
   }
   function initIcons() {
     buildingIcons();
-
-    ICONS.pit = spriteURL(BSPR.pit, 3);
-
     ICONS.u_archer = spriteURL(SPR.archer[0], 3);
     ICONS.u_crossbow = spriteURL(SPR.knight[0], 3);
     ICONS.king = spriteURL(SPR.king[0], 3);
@@ -3833,15 +3865,7 @@
     if (SPR.paladin8) ICONS.hero_paladin = portrait(SPR.paladin8, 11, 4, 20);
     if (SPR.sorc8) ICONS.hero_sorc = portrait(SPR.sorc8, 11, 3, 20);
     ICONS.u_knight = spriteURL(SPR.soldier[0], 3); ICONS.u_footArcher = spriteURL(SPR.footArcher[0], 3);
-    // obliehacie stroje: šikmý pohľad spredu (JV) z 3D modelu, orezaný na obrys stroja
-    const trimmed = spr => {
-      const { w, h } = spr, d = spr.c.getContext('2d').getImageData(0, 0, w, h).data;
-      let x0 = w, y0 = h, x1 = -1, y1 = -1;
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-      const cut = src => { const c = document.createElement('canvas'); c.width = x1 - x0 + 1; c.height = y1 - y0 + 1; c.getContext('2d').drawImage(src, -x0, -y0); return c; };
-      return { c: cut(spr.c), sil: cut(spr.sil), w: x1 - x0 + 1, h: y1 - y0 + 1 };
-    };
-    for (const k of ['siegeRam', 'siegeCat', 'siegeFire', 'siegeTower']) ICONS['u_' + k] = spriteURL(trimmed(SPR[k + '8'][1].idle), 2);
+    unitIcons(); // jednotky, obliehacie stroje a portrét hrdinu podľa rasy
     $('icoHall').src = UI_ICONS.hall;
     syncHeroIcons(); updateGems();
     for (const k of ['orc', 'garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf', 'giantRam', 'mammoth']) ICONS['e_' + k] = spriteURL(SPR[k][0], k === 'orcKing' || ENEMY[k].giant ? 2 : 3);
@@ -4499,7 +4523,7 @@
   }
   // stroj na bojisku pod prstom (čakajúca objednávka alebo stroj, čo prežil vlnu)
   function siegeAt(x, y) {
-    const hit = (ox, oy, key) => { const sp = SPR[BUY[key].siege + '8'][6].idle; return Math.abs(x - ox) <= T / 2 + 2 && y <= oy + 4 && y >= oy - (sp.ay - 2); };
+    const hit = (ox, oy, key) => { const sp = SPR[raceSpr(BUY[key].siege) + '8'][6].idle; return Math.abs(x - ox) <= T / 2 + 2 && y <= oy + 4 && y >= oy - (sp.ay - 2); };
     for (const o of st.siegeOrder) if (hit(o.x, o.y, o.key)) return { order: o };
     for (const u of st.soldiers) if (u.siege && !u.dead && hit(u.x, u.y, u.siege)) return { unit: u };
     return null;
@@ -4603,7 +4627,7 @@
     $('hallBtnTxt').textContent = '★' + free; $('hallBtnTxt').hidden = !free;
     $('trophyTxt').textContent = fresh; $('trophyTxt').hidden = !fresh;
     const es = emptySlots(); $('heroTxt').textContent = es; $('heroTxt').hidden = !es; // voľný slot na schopnosť
-    document.querySelector('.tabCard[data-tab=heroes]').classList.toggle('shine', HERO_IDS.some(heroIsNew));
+    document.querySelector('.tabCard[data-tab=heroes]').classList.toggle('shine', heroIds().some(heroIsNew));
   }
   $('icoHome').src = UI_ICONS.homeTab; $('icoTrophy').src = UI_ICONS.trophy; $('icoSwords').src = UI_ICONS.swords; $('icoShop').src = UI_ICONS.chest;
   let boxDown = false; // položil sa prst/myš do okna misie od jeho otvorenia?
@@ -4656,7 +4680,7 @@
   // karta Hrdinovia: kúpení hrdinovia s úrovňou a schopnosťami (nasadený má zlatý rámik), ostatní s cenou v gemoch
   function renderHeroes() {
     const list = $('heroList'); list.innerHTML = '';
-    for (const id of HERO_IDS) {
+    for (const id of heroIds()) {
       const h = HEROES[id];
       if (!ownsHero(id)) {
         const c = document.createElement('div'); c.className = 'hero locked';
@@ -4772,14 +4796,14 @@
       if (onClick) b.addEventListener('click', onClick);
       r.appendChild(b); list.appendChild(r);
     };
-    const lockedHeroes = HERO_IDS.filter(x => !ownsHero(x));
+    const lockedHeroes = heroIds().filter(x => !ownsHero(x));
     item('bundle shine', '<img src="' + UI_ICONS.chest + '" alt="">', 'Kompletný balík', 'Odomkne všetkých hrdinov naraz (rasy pribudnú, keď budú hrateľné)',
       lockedHeroes.length ? 'Odomknúť' : 'Odomknuté', lockedHeroes.length ? () => lockedHeroes.forEach(buyHero) : null);
     sec('Rasy');
     for (const r of RACES.filter(x => x.state !== 'open'))
       item('', '<img src="' + spriteURL(SPR[r.spr][0], 4) + '" alt="">', r.name, r.desc + ' Pripravujeme.', 'Čoskoro', null);
     sec('Hrdinovia');
-    for (const id of HERO_IDS.filter(x => HEROES[x].price)) {
+    for (const id of heroIds().filter(x => HEROES[x].price)) {
       const h = HEROES[id], own = ownsHero(id);
       item('', '<img src="' + heroIcon(id) + '" alt="">', h.name, h.desc, own ? (h.fem ? 'Odomknutá' : 'Odomknutý') : 'Odomknúť', own ? null : () => buyHero(id));
     }
