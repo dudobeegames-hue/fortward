@@ -152,6 +152,24 @@ const UI_ICONS = (() => {
     return pix(N, N, (x, y) => out[y][x]);
   })();
 
+  // štít s krížom (prepínač armády: obrana)
+  const shieldDefend = fromMap([
+    '.KKKKKKKKKKKK.',
+    'KYYYYYYYYYYYYK',
+    'KYLLLLWLBBBBYK',
+    'KYLBBBWBBBBDYK',
+    'KYLBBBWBBBBDYK',
+    'KYWWWWWWWWWWYK',
+    'KYLBBBWBBBBDYK',
+    'KYLBBBWBBBDDYK',
+    '.KYBBBWBBBDYK.',
+    '.KYBBBWBBDDYK.',
+    '..KYBBWBDDYK..',
+    '...KYBWDDYK...',
+    '....KYYYYK....',
+    '.....KKKK.....',
+  ], { K: '#1c140e', Y: '#f8d048', L: '#88b4ff', B: '#3c64c8', D: '#22337a', W: '#fff2d0' });
+
   // truhlica s pokladom (karta Nákupy)
   const chest = fromMap([
     '..KKKKKKKKKK..',
@@ -574,6 +592,6 @@ const UI_ICONS = (() => {
     { id: 'zh', name: '中文' },
   ];
 
-  return { pix, music, sound, plus, home, hall, trophy, star, swords, chest, spellVolley, spellFire, spellFrost, spellBolt, spellHorn, spellShield, spellHeal, spellFirewall, spellTeleport, scrollPaper, scrollRod, scrollTag, flags, langs,
+  return { pix, music, sound, plus, home, hall, trophy, star, swords, shieldDefend, chest, spellVolley, spellFire, spellFrost, spellBolt, spellHorn, spellShield, spellHeal, spellFirewall, spellTeleport, scrollPaper, scrollRod, scrollTag, flags, langs,
     actDown, actRepair, actSpec, tabs, homeTab, tierStars };
 })();

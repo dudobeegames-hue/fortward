@@ -811,7 +811,7 @@
     const side = (u.slot % 2 ? 1 : -1) * (14 + 10 * (Math.floor(u.slot / 2) % 3));
     const clampX = x => Math.max(G.gx0 + 8, Math.min(G.gx0 + G.cols * T - 8, x));
     const spd = u.spd * 1.5 * waterMul(u), go = (x, y) => moveKnight(u, x, y, spd, dt); // po vlastnej ceste rýchlejšie, aby stačili šíku
-    const camp = nearestCampPart(u.x, u.y);
+    const camp = armyAttacks() ? nearestCampPart(u.x, u.y) : null; // v obrane ostávajú pri šíku
     if (u.siege === 'ram') {
       if (camp) { // tábor má prednosť – hordy si nevšíma
         if (Math.hypot(camp.x - u.x, camp.y + 6 - u.y) > 8) { go(camp.x, camp.y + 6); return; }
@@ -822,6 +822,7 @@
       }
       if (u.tgt && (u.tgt.dead || u.tgt.d.fly)) u.tgt = null;
       if (!u.tgt) u.tgt = nearestFoe(u.x, u.y, false);
+      if (u.tgt && !armyAttacks() && Math.hypot(u.tgt.x - fm.inf.x, u.tgt.y - fm.inf.y) > 70) u.tgt = null; // v obrane len horda pri šíku
       const t = u.tgt;
       if (!t) { go(clampX(fm.inf.x + side), fm.inf.y - 6); return; }
       if (Math.hypot(t.x - u.x, t.y - u.y) > 10) { go(t.x, t.y + 6); return; }
@@ -881,7 +882,7 @@
       wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.05 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, shake: 0, soldierN: 0,
       blds: [], paving: {}, enemies: [], soldiers: [], form: null, proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
       cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, shieldCd: 0, healCd: 0, fwCd: 0, tpCd: 0, shields: [], fireWalls: [], heroDead: {},
-      spellSel: null, siegeOrder: {}, fallFx: [], blasts: [], healFx: [], bolts: [], hallHolyT: 0,
+      spellSel: null, siegeOrder: {}, fallFx: [], blasts: [], healFx: [], bolts: [], hallHolyT: 0, stance: 'attack',
     });
     rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
     st.camp = makeCamp(); // od misie 6 si horda hore na bojisku rozloží tábor
@@ -988,6 +989,7 @@
     $('build').hidden = true; $('bottom').hidden = false;
     for (const b of st.blds) if (UNIT_HOME[b.kind] || b.kind === 'range' || b.kind === 'falconry' || HELPERS[b.kind]) b.spawnT = HELPERS[b.kind] ? 0.6 : 0.3;
     banner(st.wave === MISSION_WAVES ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + MISSION_WAVES);
+    syncStance();
     updateHud();
   }
 
@@ -1801,6 +1803,9 @@
   // rytieri vpredu, kopijníci za nimi, jazdci na krídlach. Šík sa posúva plynulo za najbližšou hordou
   // a pešiak vybehne z radu až keď má nepriateľa nablízku (alebo keď sa šík s hordou zrazil).
   const FORM_GAP = 10, FORM_ROW = 9, FORM_MAX = 8, FORM_SPD = 20, ENGAGE = 36, CLASH = 70;
+  // prepínač armády: útok = šík ide oproti horde a voľní vojaci búrajú tábor; obrana = šík drží miesto pred zónou
+  const armyAttacks = () => st.stance !== 'defend';
+  const RIDER_GUARD = 90; // v obrane jazdec vyráža len do tejto vzdialenosti od svojho miesta
   const formLeft = () => G.gx0 + 6, formRight = () => G.gx0 + G.cols * T - 6;
   const formPer = () => Math.max(1, Math.min(FORM_MAX, Math.floor((formRight() - formLeft()) / FORM_GAP) + 1));
   // n miest v radoch so stredom cx: predný rad na y, ďalšie rady za ním (k radnici), každý druhý posunutý o pol medzery
@@ -1845,8 +1850,9 @@
       const knights = live.filter(s => s.ktype === 'knight'), spears = live.filter(s => s.ktype === 'spear'), riders = live.filter(s => s.ktype === 'rider');
       // šík ide oproti najbližšej pozemnej horde, no nie hlbšie než k zhromaždisku pred zónou
       const th = nearestFoe(F.inf.x, F.inf.y, false);
-      const cp = th ? null : nearestCampPart(F.inf.x, F.inf.y);
-      if (th) stepAnchor(F.inf, th.x, Math.max(G.gy0 + 24, Math.min(musterY, th.y + 18)), dt);
+      const atk = armyAttacks(), cp = th || !atk ? null : nearestCampPart(F.inf.x, F.inf.y);
+      if (!atk) stepAnchor(F.inf, th ? th.x : cx, musterY, dt); // obrana: šík stojí pred zónou, len sa natočí k horde
+      else if (th) stepAnchor(F.inf, th.x, Math.max(G.gy0 + 24, Math.min(musterY, th.y + 18)), dt);
       else if (cp) stepAnchor(F.inf, cp.x, cp.y + 16, dt); // horda nikde – šík sa presunie k táboru
       else stepAnchor(F.inf, cx, musterY, dt);
       const front = formSlots(knights.length, F.inf.x, F.inf.y);
@@ -1868,8 +1874,9 @@
     // lukostrelci: rad na dostrel od najbližšieho nepriateľa (aj letca), vždy za pešiakmi
     if (archers.length) {
       let tx = cx, ty = Math.max(musterY + 16, infBack + 10);
-      const th = nearestFoe(F.arc.x, F.arc.y, true), cp = th ? null : nearestCampPart(F.arc.x, F.arc.y);
-      if (th) { tx = th.x; ty = Math.max(G.gy0 + 30, Math.min(ty, Math.max(th.y + ARCHER_RANGE - 14, infBack + 10))); }
+      const th = nearestFoe(F.arc.x, F.arc.y, true), cp = th || !armyAttacks() ? null : nearestCampPart(F.arc.x, F.arc.y);
+      if (!armyAttacks()) { if (th) tx = th.x; } // obrana: rad stojí za šíkom
+      else if (th) { tx = th.x; ty = Math.max(G.gy0 + 30, Math.min(ty, Math.max(th.y + ARCHER_RANGE - 14, infBack + 10))); }
       else if (cp) { tx = cp.x; ty = cp.y + ARCHER_RANGE - 12; } // horda nikde – rad lukostrelcov na dostrel od tábora
       stepAnchor(F.arc, tx, ty, dt);
       assignSlots(archers, formSlots(archers.length, F.arc.x, F.arc.y));
@@ -2141,11 +2148,12 @@
         // pešiak drží miesto v šíku a bije sa s tým, kto príde k jeho miestu; po zrážke šíku s hordou siaha ďalej,
         // jazdec sa pohybuje voľne; kto prerazil za šík, toho prenasleduje ktokoľvek
         const sl = s.fslot || { x: G.gx0 + G.cols * T / 2, y: musterY };
-        let aggro = s.ktype === 'rider' ? 9999 : F.contact ? CLASH : ENGAGE;
+        const atk = armyAttacks();
+        let aggro = s.ktype === 'rider' ? (atk ? 9999 : RIDER_GUARD) : F.contact ? CLASH : ENGAGE;
         if (!s.tgt || s.tgt.dead) { const leak = nearestEnemyWhere(s.x, s.y, e => e.y > F.inf.y + 14 && e.y > 4, true); if (leak) s.tgt = leak; }
         if (s.tgt && !s.tgt.dead && s.tgt.y > F.inf.y + 14) aggro = 9999;
         // nikto z hordy na dosah zrážky a nikto neprerazil za šík – tlačí dopredu a búra tábor (hordu stretne cestou)
-        const cp = (!s.tgt || s.tgt.dead) && !nearestEnemy(s.x, s.y, ENGAGE) ? nearestCampPart(s.x, s.y) : null;
+        const cp = atk && (!s.tgt || s.tgt.dead) && !nearestEnemy(s.x, s.y, ENGAGE) ? nearestCampPart(s.x, s.y) : null;
         if (cp) { s.tgt = null; strikeCamp(s, cp, dt); }
         else updateFighter(s, dt, sl.x, sl.y, aggro, s.dmg, false, moveKnight);
       }
@@ -4183,6 +4191,20 @@
   screen.addEventListener('pointercancel', endDrag);
 
   $('nextWave').addEventListener('click', startWave);
+  // prepínač armády útok / obrana (vidno ho v boji, keď má hráč vojsko)
+  function syncStance() {
+    const b = $('stanceBtn'), atk = armyAttacks();
+    b.hidden = !st.blds.some(q => UNIT_HOME[q.kind] || q.kind === 'range') && !st.soldiers.some(u => u.siege);
+    b.className = atk ? 'attack' : 'defend';
+    b.querySelector('img').src = atk ? UI_ICONS.swords : UI_ICONS.shieldDefend;
+    b.querySelector('span').textContent = atk ? 'ÚTOK' : 'OBRANA';
+  }
+  $('stanceBtn').addEventListener('click', ev => {
+    ev.stopPropagation();
+    st.stance = armyAttacks() ? 'defend' : 'attack';
+    AUDIO.play('click'); syncStance();
+    toast(armyAttacks() ? 'Útok – vojsko ide oproti horde a búra tábor' : 'Obrana – vojsko drží šík pred zónou');
+  });
   $('undoBtn').addEventListener('click', doUndo);
   $('warcryBtn').addEventListener('click', () => ability('warcry'));
   document.querySelectorAll('.spell').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); selectSpell(b.dataset.spell); }));
