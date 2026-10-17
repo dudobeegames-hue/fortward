@@ -949,6 +949,7 @@
     st.hallHolyT = 0; for (const b of st.blds) b.holyT = 0;
     for (const s of st.soldiers) s.stunT = 0;
   }
+  const reviveSeen = () => !!loadJSON(sk('reviveSeen'), false); // hráč už videl, kde sa oživuje padnutý hrdina
   function enterBuild() {
     st.phase = 'build';
     st.moving = null;
@@ -959,6 +960,7 @@
     for (const s of st.soldiers) { s.hp = s.max; s.tgt = null; }
     clearHeroFx();
     if (st.king && st.king.dead) st.king.deadT = Math.max(st.king.deadT, 1); // padnutý hrdina ostane omráčený ležať aj počas stavby, kým ho hráč neoživí
+    if (st.king && st.king.dead && !reviveSeen()) st.sel = HALL; // hrdina padol prvý raz: stavanie začne s otvorenou radnicou
     if (st.king && st.king.dead) later(() => { if (st.phase === 'build' && st.king.dead) hint(heroFell() + ' – ' + (heroDef().fem ? 'oživíš ju' : 'oživíš ho') + ' v radnici'); }, 900);
     if (st.king && !st.king.dead) { st.king.hp = kingMax(); st.king.down = 0; st.king.tgt = null; st.king.flash = 0; st.king.swing = 0; st.king.tpBack = 0; } // domov dôjde sám (heroWalkHome)
     for (const b of st.blds) b.flash = 0;
@@ -3809,7 +3811,7 @@
       const k = st.king;
       selRow(ICONS.hall, 'Radnica · úr. ' + st.hallLvl + ' (' + LVL_NAME[st.hallLvl] + ')', 'zdravie ' + Math.ceil(st.hallHp) + '/' + hallMax() + ' · ' + heroName().toLowerCase() + ' úr. ' + kingMeta.lvl + (k && k.dead ? (heroDef().fem ? ' · padla' : ' · padol') : '') + ' · vylepšenie rozšíri územie a dovolí vyššie stavby');
       upAct(st.hallLvl, hallCap(), hallUpCost(), () => { const c = hallUpCost(); st.gold -= c; st.hallLvl++; st.hallHp += 200; st.king.hp = kingMax(); }, null, bPreview({ kind: 'hall', lvl: st.hallLvl + 1 }), 'lvl' + (st.hallLvl + 1));
-      if (k && k.dead) { const c = reviveCost(); act(heroIcon(st.hero), 'Oživiť', coinTxt(c), st.gold >= c, reviveKing, 'up'); }
+      if (k && k.dead) { const c = reviveCost(); flashIf(act(heroIcon(st.hero), 'Oživiť', coinTxt(c), st.gold >= c, reviveKing, 'up'), !reviveSeen(), 'revive', () => saveJSON(sk('reviveSeen'), true)); } // prvý pád: karta oživenia preblikne
     } else if (selGroup()) {
       // hromadné akcie pre označenú skupinu (rad hradieb alebo všetky stavby jedného druhu)
       const grp = st.selGroup, kind = grp[0].kind, d = BUILD[kind], isWall = kind === 'wall', cap = bCap();
@@ -4030,12 +4032,17 @@
     return true;
   }
 
+  // ťuk na radnicu: jej políčka, a strecha nad ňou len keď nie je vybraná stavba a políčko nad radnicou je voľné
+  // (inak by sa tesne nad radnicu nedalo stavať ani vybrať stavbu, ktorá tam stojí)
+  function hallHit(x, y) {
+    const c = Math.floor((x - G.gx0) / T), r = Math.floor((y - G.gy0) / T), hr = hallRect();
+    if (inHall(c, r)) return true;
+    return !st.tool && x >= hr.x0 && x < hr.x1 && y >= hr.y0 - 8 && y < hr.y0 && !occAt(c, r);
+  }
   function tapBuild(x, y) {
     const c = Math.floor((x - G.gx0) / T), r = Math.floor((y - G.gy0) / T);
     if (c < 0 || c >= G.cols || r < 0 || r >= G.rows) return;
-    // radnica (aj jej strecha nad základňou)
-    const hr = hallRect();
-    if (x >= hr.x0 && x < hr.x1 && y >= hr.y0 - 8 && y < hr.y1) { st.sel = HALL; st.tool = null; renderBuild(); return; }
+    if (hallHit(x, y)) { st.sel = HALL; st.tool = null; renderBuild(); return; }
     if (st.tool === 'paving') { placeAt('paving', c, r); return; } // dlažba ide aj pod budovy
     const o = occAt(c, r);
     if (o && o !== HALL) { st.sel = o; st.tool = null; renderBuild(); return; }
@@ -4135,7 +4142,7 @@
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
       return;
     }
-    const hr = hallRect(), onHall = p.x >= hr.x0 && p.x < hr.x1 && p.y >= hr.y0 - 8 && p.y < hr.y1;
+    const onHall = hallHit(p.x, p.y);
     if (st.tool && st.tool !== 'wall' && !onHall) { // prst po mape: náhľad, postaví sa po pustení
       pdrag = { kind: st.tool, t };
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
