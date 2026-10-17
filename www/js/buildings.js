@@ -770,6 +770,75 @@ function makeOrcTower() {
   for (let y = 1; y <= 9; y++) p.set(12, y, ORC_WOOD[5]); p.set(13, 1, BONE); p.set(13, 9, BONE); // luk
   return p.finish();
 }
+// ---- obrí bossovia hordy (spredu – idú dolu k radnici) ----
+// obrí baran 28x26: kožená strecha s kostenými hrotmi na veľkých kolesách, vpredu železná lebka s rohmi,
+// pod strechou tlačia orkovia; step = fáza kolies a krokov
+function makeGiantRam(step) {
+  const p = painter(28, 26);
+  const HIDE = ['#1e120a', '#3a2214', '#5a3420', '#7a4a2c', '#9a6440'].map(hexRGB);
+  const MET = ['#16161c', '#26262e', '#3a3a44', '#5a5a68', '#8a8a9a', '#c8c8d4'].map(hexRGB);
+  const SKIN = ['#1e3a16', '#305c22', '#3e7a2a', '#62a03a'].map(hexRGB);
+  for (const wx of [0, 24]) for (let y = 12; y <= 25; y++) for (let x = wx; x <= wx + 3; x++) {   // veľké kolesá z boku
+    const rim = y === 12 || y === 25, spoke = (y + step * 2) % 4 === 0;
+    p.shade(x, y, ORC_WOOD, rim ? 0.15 : spoke ? 0.25 : x === wx ? 0.85 : x === wx + 3 ? 0.35 : 0.6);
+  }
+  for (const wx of [1, 25]) p.set(wx + 1, 18, BONE);                                              // kostený náboj
+  for (let y = 2; y <= 17; y++) {                                                                  // strecha z koží
+    const hw = 4 + (y - 2) * 0.62;
+    for (let x = Math.ceil(13.5 - hw); x <= Math.floor(13.5 + hw); x++) {
+      const t = (x - (13.5 - hw)) / (2 * hw), rib = (x + 1) % 5 === 0;
+      p.shade(x, y, HIDE, (rib ? 0.2 : 0.9 - t * 0.6) + (y % 4 === 0 ? -0.06 : 0));
+    }
+  }
+  for (let x = 10; x <= 17; x++) p.shade(x, 1, ORC_WOOD, 0.7);                                      // hrebeň
+  for (const x of [10, 13, 16]) { p.set(x, 0, BONE); p.set(x + 1, 0, BONE2); }                      // kostené hroty
+  for (let x = 3; x <= 24; x++) { p.shade(x, 18, ORC_WOOD, 0.75 - x * 0.015); p.shade(x, 19, ORC_WOOD, 0.35); } // spodný trám
+  for (let y = 20; y <= 25; y++) for (let x = 4; x <= 23; x++) p.set(x, y, hexRGB('#140c08'));    // tmavé vnútro
+  for (const [lx, up] of [[5, step], [8, 1 - step], [19, step], [22, 1 - step]])                   // nohy tlačiacich orkov
+    for (let y = 21; y <= 25 - up; y++) { p.shade(lx, y, SKIN, 0.75); p.shade(lx + 1, y, SKIN, 0.4); }
+  pDisk(p, 13.5, 20.5, 5, 4.5, (x, y, nx, ny) => p.shade(x, y, MET, 0.75 - nx * 0.3 - ny * 0.25));  // železná lebka
+  for (const ex of [11, 15]) { p.set(ex, 20, hexRGB('#0a0606')); p.set(ex + 1, 20, hexRGB('#0a0606')); p.set(ex, 19, BLOOD2); } // očnice so žiarou
+  for (const tx of [11, 13, 15]) p.set(tx + 1, 24, MET[5]);                                        // zuby
+  pLine(p, 9, 18, 6, 15, (x, y) => p.set(x, y, BONE)); pLine(p, 18, 18, 21, 15, (x, y) => p.set(x, y, BONE)); // rohy
+  p.set(6, 14, BONE2); p.set(21, 14, BONE2);
+  return p.finish();
+}
+// vojnový mamut 32x30: huňatý mamut s klmi a chobotom, na chrbte drevená vežička s dvoma goblinmi-lukostrelcami
+function makeMammoth(step) {
+  const p = painter(32, 30);
+  const FUR = ['#1a100a', '#2e1c10', '#4a2e1a', '#6a4426', '#8a5c34', '#a8764a'].map(hexRGB);
+  const SKIN = ['#1e3a16', '#305c22', '#3e7a2a', '#62a03a', '#7cb848', '#9cd45a'].map(hexRGB);
+  for (const [lx, up] of [[3, step], [25, 1 - step]]) for (let y = 19; y <= 26 - up; y++) for (let x = lx; x <= lx + 3; x++) // zadné nohy
+    p.shade(x, y, FUR, (y >= 25 - up ? 0.15 : 0.4) + (x === lx ? 0.12 : 0));
+  pDisk(p, 16, 15, 14, 9, (x, y, nx, ny) => p.shade(x, y, FUR, 0.62 - nx * 0.22 - ny * 0.2 + (hash2(x, y, 517) - 0.5) * 0.2)); // trup
+  for (const [lx, up] of [[8, 1 - step], [20, step]]) {                                           // predné nohy s nechtami
+    for (let y = 23; y <= 29 - up; y++) for (let x = lx; x <= lx + 3; x++) p.shade(x, y, FUR, (y >= 29 - up ? 0.15 : 0.5) - (x - lx) * 0.1);
+    for (let x = lx; x <= lx + 3; x += 2) p.set(x, 29 - up, BONE2);
+  }
+  pDisk(p, 16, 20, 8, 6, (x, y, nx, ny, q) =>                                                       // hlava, tmavý okraj ju oddelí od trupu
+    p.shade(x, y, FUR, q > 0.7 && ny < 0.2 ? 0.18 : 0.78 - nx * 0.25 - ny * 0.1 + (hash2(x, y, 911) - 0.5) * 0.12));
+  for (const [x, y] of [[14, 13], [16, 13], [18, 13], [15, 12], [17, 12]]) p.shade(x, y, FUR, 0.85);  // chumáč srsti na temene
+  p.set(12, 19, hexRGB('#0a0606')); p.set(13, 19, BLOOD2); p.set(19, 19, BLOOD2); p.set(20, 19, hexRGB('#0a0606')); // zlé oči
+  for (let y = 22; y <= 28; y++) { p.shade(15, y, FUR, 0.42); p.shade(16, y, FUR, 0.25); }         // chobot
+  p.shade(17, 28, FUR, 0.3); p.shade(17, 27, FUR, 0.3);                                             // stočený koniec
+  for (const dir of [-1, 1]) {                                                                       // veľké kly zahnuté do strán a hore
+    const bx = dir < 0 ? 13 : 18;
+    for (const [dx, dy] of [[0, 23], [0, 24], [1, 25], [2, 26], [3, 27], [4, 27], [5, 26], [5, 25]]) {
+      const x = bx + dir * dx;
+      p.set(x, dy, BONE); p.set(x - dir, dy, dy >= 26 ? BONE2 : BONE);
+    }
+  }
+  for (let x = 7; x <= 24; x++) { p.shade(x, 8, ORC_WOOD, 0.8 - (x - 7) * 0.025); p.shade(x, 9, ORC_WOOD, 0.4); } // plošina vežičky
+  for (const x of [7, 24]) for (let y = 3; y <= 9; y++) p.shade(x, y, ORC_WOOD, x === 7 ? 0.75 : 0.35); // stĺpiky
+  for (let x = 7; x <= 24; x++) p.shade(x, 3, ORC_WOOD, 0.65);                                        // zábradlie
+  for (const [hx, lit] of [[11, true], [18, false]]) for (let y = 4; y <= 7; y++) for (let x = hx; x <= hx + 2; x++) // dvaja goblini
+    p.shade(x, y, SKIN, (lit ? 0.85 : 0.6) - (x - hx) * 0.15 - (y === 7 ? 0.2 : 0));
+  p.set(11, 5, BLOOD2); p.set(18, 5, BLOOD2);
+  for (const bx of [14, 21]) for (let y = 2; y <= 7; y++) p.set(bx, y, ORC_WOOD[4]);                  // luky
+  for (let y = 0; y <= 8; y++) p.shade(27, y, ORC_WOOD, 0.6);                                          // žrď so zástavou
+  p.set(28, 0, BLOOD2); p.set(29, 0, BLOOD2); p.set(28, 1, BLOOD); p.set(29, 1, BLOOD); p.set(30, 1, BLOOD);
+  return p.finish();
+}
 // ---- stavby orkského tábora (od misie 6) ----
 // orkský katapult 18x18 (spredu, mieri na hráča): hrubý rám z kmeňov, rameno s kosteným hákom; loaded = rameno vzadu s balvanom
 function makeOrcCatapult(loaded) {
@@ -1266,6 +1335,8 @@ function initBuildingSprites() {
   SPR.siegeTower = [makeSiegeTower(0, false), makeSiegeTower(1, false), makeSiegeTower(0, true)];
   SPR.orcKing = [makeOrcKing(0), makeOrcKing(1)];
   SPR.bear = [makeBearRider(0), makeBearRider(1)];
+  SPR.giantRam = [makeGiantRam(0), makeGiantRam(1)];
+  SPR.mammoth = [makeMammoth(0), makeMammoth(1)];
   SPR.wolf = [makeWolfRider(0), makeWolfRider(1)];
   SPR.falcon = [makeFalcon(true), makeFalcon(false)];
   BSPR.falconry = makeFalconry();

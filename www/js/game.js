@@ -116,7 +116,13 @@
     wolf:    { spr: 'wolf',    hp: 30,  speed: 40, atk: 9,  atkCd: 0.7, gold: 7,  blood: '#62a03a', cav: true, flank: true },
     bear:    { spr: 'bear',    hp: 150, speed: 22, atk: 24, atkCd: 1.2, gold: 20, blood: '#62a03a', cav: true, charge: true },
     sapper:  { spr: 'sapper',  hp: 16,  speed: 22, atk: 90, atkCd: 0.5, gold: 8,  blood: '#62a03a', sapper: true },
+    // obrí bossovia: hrubé pancierovanie (veže, jednotky a kúzla ich len škrabnú), slabina sú obliehacie stroje
+    giantRam: { spr: 'giantRam', hp: 1400, speed: 6, atk: 150, atkCd: 2.0, gold: 120, blood: '#6e4422', ram: true, boss: true, giant: true, title: 'Obrí baran' },
+    mammoth:  { spr: 'mammoth',  hp: 1500, speed: 7, atk: 40,  atkCd: 1.4, gold: 150, blood: '#62a03a', boss: true, giant: true, howdah: true, title: 'Vojnový mamut' },
   };
+  const GIANT_ARMOR = 0.3, GIANT_SIEGE = 1.6; // násobok poškodenia obra: bežné zásahy / obliehacie stroje
+  // obri v misiách: { misia: { vlna: [druhy] } } – v 5. vlne nahradia vojvodcu, v 10. prídu popri ňom
+  const GIANTS = { 7: { 10: ['giantRam'] }, 8: { 5: ['giantRam'], 10: ['mammoth'] }, 9: { 5: ['mammoth'], 10: ['giantRam', 'mammoth'] }, 10: { 5: ['giantRam', 'mammoth'] } };
 
   const lvlMul = (b, k) => 1 + k * (b.lvl - 1);
   const bDmg = b => BUILD[b.kind].dmg * lvlMul(b, 0.4) * (SHOOTERS[b.kind] ? 1 + 0.04 * perk('fletching') : 1) * (TRAPS[b.kind] ? 1 + 0.06 * perk('traps') : 1) * (b.spec ? SPECS[b.spec].dmg : 1);
@@ -777,6 +783,12 @@
     const u = st.soldiers[st.soldiers.length - 1];
     for (let k = 0; k < 8; k++) part(u.x, u.y - 2, (Math.random() - 0.5) * 30, -Math.random() * 14, 0.4, '#c6a272', 40);
   }
+  const GIANT_HUNT = 140; // do tejto vzdialenosti idú obliehacie stroje po obrovi
+  function nearestGiant(x, y, rad) {
+    let best = null, bd = rad;
+    for (const e of st.enemies) if (!e.dead && e.d.giant) { const d = Math.hypot(e.x - x, e.y - y); if (d < bd) { bd = d; best = e; } }
+    return best;
+  }
   // ohnivý voz: prúd ohňa k bodu (tx, ty) – zraní a podpáli každého na zemi v úzkom kuželi pred vozom
   function sprayFire(u, tx, ty) {
     const ox = u.x, oy = u.y - 14, dx = tx - ox, dy = ty - oy, d = Math.hypot(dx, dy) || 1, rng = SIEGE.fire.range + 6;
@@ -784,7 +796,7 @@
       if (e.dead || e.d.fly) continue;
       const ex = e.x - ox, ey = e.y - e.h * 0.4 - oy, along = (ex * dx + ey * dy) / d, side = Math.abs(ex * dy - ey * dx) / d;
       if (along < -2 || along > rng || side > 5 + along * 0.25) continue;
-      damage(e, u.dmg * (st.cryT > 0 ? CRY_DMG : 1)); e.burnT = Math.max(e.burnT || 0, 2.5); e.burnDps = Math.max(e.burnDps || 0, u.dmg * 0.5);
+      damage(e, u.dmg * (st.cryT > 0 ? CRY_DMG : 1), true); e.burnT = Math.max(e.burnT || 0, 2.5); e.burnDps = Math.max(e.burnDps || 0, u.dmg * 0.5);
     }
     for (let k = 0; k < 10; k++) { const t = Math.random(), sp = (Math.random() - 0.5) * (4 + t * 10); part(ox + dx * t + dy / d * sp, oy + dy * t - dx / d * sp, dx / d * 30, dy / d * 30 - 10, 0.25 + Math.random() * 0.2, ['#fff7c8', '#f8d048', '#f89838', '#d83818'][k % 4], -20); }
     u.fired = 0.3; AUDIO.play('fire');
@@ -794,13 +806,14 @@
     const sy = u.y - 26, dmg = u.dmg * (st.cryT > 0 ? CRY_DMG : 1);
     if (o) { const a = campAim(o); st.proj.push({ k: 'arrow', x: u.x, y: sy, tgt: null, tx: a.x + (Math.random() - 0.5) * 6, ty: a.y, dmg, spd: 200, splash: 0, vx: 0, vy: -1, campT: o }); AUDIO.play('arrow'); }
     else if (!shoot(u.x, u.y, u.x, sy, SIEGE.tower.range, 'arrow', 200, dmg, 0, ARCHER_PRIO)) return false;
+    else st.proj[st.proj.length - 1].siege = true;
     u.fired = 0.2; u.cd = SIEGE.tower.cd;
     return true;
   }
   // katapult: balvan na bod; campT = stavba tábora, ktorú má zasiahnuť
   function catRock(u, tx, ty, dmg, campT) {
     const sx = u.x, sy = u.y - 14, dist = Math.hypot(tx - sx, ty - sy);
-    st.proj.push({ k: 'rock', arc: true, sx, sy, x: sx, y: sy, tx, ty, t: 0, dur: Math.max(0.5, dist / 120), h: 14 + dist * 0.25, dmg, splash: 20, campT });
+    st.proj.push({ k: 'rock', arc: true, sx, sy, x: sx, y: sy, tx, ty, t: 0, dur: Math.max(0.5, dist / 120), h: 14 + dist * 0.25, dmg, splash: 20, campT, siege: true });
     u.cd = SIEGE.cat.cd; u.fired = 1.0; AUDIO.play('bolt');
   }
   // baranidlo a ohnivý voz idú na tábor, katapult ho ostreľuje z dostrelu, obliehacia veža ich sprevádza;
@@ -811,8 +824,10 @@
     const side = (u.slot % 2 ? 1 : -1) * (14 + 10 * (Math.floor(u.slot / 2) % 3));
     const clampX = x => Math.max(G.gx0 + 8, Math.min(G.gx0 + G.cols * T - 8, x));
     const spd = u.spd * 1.5 * waterMul(u), go = (x, y) => moveKnight(u, x, y, spd * backMul(u, x, y), dt); // po vlastnej ceste rýchlejšie, aby stačili šíku
-    const camp = armyAttacks() ? nearestCampPart(u.x, u.y) : null; // v obrane ostávajú pri šíku
+    const giant = nearestGiant(u.x, u.y, GIANT_HUNT); // obor nablízku má prednosť pred táborom aj pred šíkom
+    const camp = armyAttacks() && !giant ? nearestCampPart(u.x, u.y) : null; // v obrane ostávajú pri šíku
     if (u.siege === 'ram') {
+      if (giant) u.tgt = giant;
       if (camp) { // tábor má prednosť – hordy si nevšíma
         if (Math.hypot(camp.x - u.x, camp.y + 6 - u.y) > 8) { go(camp.x, camp.y + 6); return; }
         if (u.cd > 0) return;
@@ -822,14 +837,14 @@
       }
       if (u.tgt && (u.tgt.dead || u.tgt.d.fly)) u.tgt = null;
       if (!u.tgt) u.tgt = nearestFoe(u.x, u.y, false);
-      if (u.tgt && !armyAttacks() && Math.hypot(u.tgt.x - fm.inf.x, u.tgt.y - fm.inf.y) > 70) u.tgt = null; // v obrane len horda pri šíku
+      if (u.tgt && !u.tgt.d.giant && !armyAttacks() && Math.hypot(u.tgt.x - fm.inf.x, u.tgt.y - fm.inf.y) > 70) u.tgt = null; // v obrane len horda pri šíku
       const t = u.tgt;
       if (!t) { go(clampX(fm.inf.x + side), fm.inf.y - 6); return; }
       if (Math.hypot(t.x - u.x, t.y - u.y) > 10) { go(t.x, t.y + 6); return; }
       if (!t.foe) t.foe = u; // horda sa s ním pobije (má hrubé pancierovanie)
       if (u.cd > 0) return;
       u.cd = SIEGE.ram.cd; u.swing = 0.2; AUDIO.play('crumble'); st.shake = Math.max(st.shake, 0.06);
-      damage(t, u.dmg * 0.6);
+      damage(t, u.dmg * (t.d.giant ? 1 : 0.6), true);
       return;
     }
     if (u.siege === 'cat') {
@@ -842,16 +857,19 @@
           let n = 0; for (const o of st.enemies) if (!o.dead && Math.hypot(o.x - e.x, o.y - e.y) < 20) n++;
           if (n > bn) { bn = n; best = e; }
         }
-        if (best) catRock(u, best.x, best.y - 3, u.dmg * 0.5);
+        if (giant && Math.hypot(giant.x - u.x, giant.y - u.y) <= SIEGE.cat.range + 15) catRock(u, giant.x, giant.y - 4, u.dmg);
+        else if (best) catRock(u, best.x, best.y - 3, u.dmg * 0.5);
         else if (camp && Math.hypot(camp.x - u.x, camp.y - u.y) <= SIEGE.cat.range + 6) catRock(u, camp.x, camp.y - 4, u.dmg, camp);
       }
-      if (camp) go(clampX(camp.x + side * 0.5), camp.y + SIEGE.cat.range - 12);
+      if (giant) go(clampX(giant.x + side * 0.5), Math.max(giant.y + SIEGE.cat.range - 20, fm.inf.y - 20));
+      else if (camp) go(clampX(camp.x + side * 0.5), camp.y + SIEGE.cat.range - 12);
       else go(clampX(fm.arc.x + side * 1.4), fm.arc.y + 18);
       return;
     }
     if (u.siege === 'fire') {
       const e = nearestFoe(u.x, u.y - 8, false);
       if (e && Math.hypot(e.x - u.x, e.y - u.y) <= SIEGE.fire.range) { if (u.cd <= 0) { u.cd = SIEGE.fire.cd; sprayFire(u, e.x, e.y - e.h * 0.4); } return; }
+      if (giant) { go(giant.x, giant.y + SIEGE.fire.range - 8); return; } // podíde k obrovi na dosah plameňa
       if (camp) { // podíde k stavbe tábora a podpáli ju (stan z koží horí najlepšie)
         const a = campAim(camp);
         if (Math.hypot(a.x - u.x, a.y - (u.y - 14)) > SIEGE.fire.range - 4) { go(clampX(camp.x + (u.x < camp.x ? -6 : 6)), camp.y + 18); return; }
@@ -938,8 +956,10 @@
     }
     if (w % 5 === 0) { // boss v 5. a 10. vlne, v posledných misiách dvaja
       const bossMul = (w === MISSION_WAVES ? DIFF.bossLast : 1) * (DIFF.bossBase + DIFF.bossMission * (m - 1)) * tr.hp;
-      // vojvodca je pomalý – vyrazí už po prvej pätine hordy, aby dorazil spolu s ňou (nie dlho po nej)
-      q.splice(Math.floor(q.length * 0.2), 0, { type: 'warlord', gap: 1.2, hpMul: bossMul });
+      const giants = (GIANTS[m] || {})[w] || [];
+      for (const type of giants) q.splice(Math.floor(q.length * 0.15), 0, { type, gap: 2.5, hpMul: tr.hp * (1 + 0.15 * (m - 7)) }); // obri vyrážajú skoro – sú pomalí
+      // vojvodca je pomalý – vyrazí už po prvej pätine hordy, aby dorazil spolu s ňou (nie dlho po nej); v 5. vlne s obrom nejde
+      if (!(giants.length && w < MISSION_WAVES)) q.splice(Math.floor(q.length * 0.2), 0, { type: 'warlord', gap: 1.2, hpMul: bossMul });
       if (w === MISSION_WAVES && m >= 8) q.splice(Math.floor(q.length * 0.45), 0, { type: 'warlord', gap: 1.2, hpMul: bossMul });
       if (w === MISSION_WAVES && m === MISSIONS.length) q.splice(Math.floor(q.length * 0.6), 0, { type: 'orcKing', gap: 1.5, hpMul: tr.hp * 0.75, fromCamp: true }); // veľkráľ vyjde z tábora (popri dvoch vojvodcoch o štvrtinu slabší)
     }
@@ -1091,12 +1111,15 @@
     return e;
   }
 
-  function damage(e, dmg) {
+  // siege = zásah obliehacím strojom (obrom ublíži naplno, ostatné ich len škrabne)
+  function damage(e, dmg, siege) {
     if (e.dead) return;
+    if (e.d.giant) dmg *= siege ? GIANT_SIEGE : GIANT_ARMOR;
     e.hp -= dmg;
     e.flash = 0.08;
     AUDIO.play('hit');
-    for (let k = 0; k < 3; k++) part(e.x, e.y - e.h * 0.55, (Math.random() - 0.5) * 50, -Math.random() * 30, 0.35, e.d.blood, 120);
+    const armored = e.d.giant && !siege; // pancier: namiesto krvi odletia iskry
+    for (let k = 0; k < 3; k++) part(e.x + (Math.random() - 0.5) * e.w * 0.4, e.y - e.h * 0.55, (Math.random() - 0.5) * 50, -Math.random() * 30, 0.35, armored ? (k % 2 ? '#e0e0ea' : '#f8d048') : e.d.blood, 120);
     if (e.hp <= 0) kill(e);
   }
 
@@ -1216,6 +1239,25 @@
     return true;
   }
 
+  // vojnový mamut: goblini z vežičky strieľajú za chôdze na najbližšiu jednotku či budovu, mamut šliape po vojakoch pod sebou
+  function mammothAct(e, dt) {
+    e.bowT = (e.bowT == null ? 1 : e.bowT) - dt; e.stompT2 = (e.stompT2 || 0) - dt;
+    if (e.bowT <= 0) {
+      let tg = null, td = 76;
+      for (const u of st.soldiers) { if (u.dead || u.fly) continue; const d = Math.hypot(u.x - e.x, u.y - e.y); if (d < td) { td = d; tg = u; } }
+      if (!tg) for (const b of st.blds) { if (!BUILD[b.kind].block) continue; const c = bCenter(b), d = Math.hypot(c.x - e.x, c.y - e.y); if (d < td) { td = d; tg = b; } }
+      e.bowT = tg ? 0.9 : 0.3;
+      if (tg) {
+        const sx = e.x + (Math.random() < 0.5 ? -4 : 3), sy = e.y - e.h + 5;
+        const tx = tg.kind ? tileX(tg.c) + T / 2 : tg.x, ty = tg.kind ? tileY(tg.r) + 4 : tg.y - 6;
+        st.eproj.push({ x: sx, y: sy, tx, ty, tgt: tg, dmg: 6 * e.pow });
+      }
+    }
+    if (e.stompT2 <= 0) {
+      e.stompT2 = 0.8;
+      for (const u of st.soldiers) if (!u.dead && !u.fly && !u.helper && Math.hypot(u.x - e.x, u.y - e.y) < 11) { hitUnit(u, e.d.atk * 0.4 * e.pow); part(u.x, u.y - 2, (Math.random() - 0.5) * 20, -10, 0.3, '#967048', 60); }
+    }
+  }
   // medvedí jazdec: nápor do prvého vojaka (odhodí ho a omráči); kopijníci nablízku nápor zastavia
   function bearCharge(e, dt) {
     if (e.charged) { if (!e.foe && !e.attacking) { e.rechargeT = (e.rechargeT || 0) + dt; if (e.rechargeT > 3) e.charged = false; } else e.rechargeT = 0; return; }
@@ -1260,6 +1302,7 @@
     }
     if (e.d.king && updateOrcKing(e, dt)) return;
     if (e.d.charge) bearCharge(e, dt);
+    if (e.d.howdah) mammothAct(e, dt);
     if (e.chillT > 0) { e.chillT -= dt; if (Math.random() < 0.2) part(e.x + (Math.random() - 0.5) * e.w * 0.5, e.y - Math.random() * e.h, 0, -6, 0.4, '#e0f4ff', 0); }
     const slow = (e.chillT > 0 ? 0.5 : 1) * (campHas('drum') ? CAMP_DRUM : 1); // vojnový bubon tábora hordu zrýchli
     const attackFn = (fn) => {
@@ -2282,7 +2325,7 @@
     if (p.campT) { hitCamp(p.campT, p.dmg); if (p.k !== 'rock') return; } // šíp či balvan do stavby tábora (balvan zraní aj hordu okolo)
     if (p.k === 'rock') {
       AUDIO.play('boom');
-      for (const e of st.enemies) if (!e.dead && !e.d.fly && Math.hypot(e.x - p.tx, (e.y - 3) - p.ty) <= p.splash) damage(e, p.dmg);
+      for (const e of st.enemies) if (!e.dead && !e.d.fly && Math.hypot(e.x - p.tx, (e.y - 3) - p.ty) <= p.splash + (e.d.giant ? 8 : 0)) damage(e, p.dmg, p.siege);
       for (let k = 0; k < 18; k++) { const a = Math.random() * 6.28, sp = 15 + Math.random() * 40; part(p.tx, p.ty, Math.cos(a) * sp, Math.sin(a) * sp - 15, 0.4 + Math.random() * 0.3, ['#848490', '#525262', '#967048', '#1c140e'][k % 4], 90); }
       st.shake = Math.max(st.shake, 0.08);
       return;
@@ -2304,7 +2347,7 @@
       for (let k = 0; k < 8; k++) { const a = Math.random() * 6.28, v = 10 + Math.random() * 25; part(p.tx, p.ty, Math.cos(a) * v, Math.sin(a) * v - 6, 0.35, k % 2 ? '#e8f8ff' : '#88d0f0', 40); }
     } else if (p.tgt && !p.tgt.dead) {
       if (p.k === 'farrow') { p.tgt.burnT = 3; p.tgt.burnDps = Math.max(p.tgt.burnDps || 0, p.dmg * 0.5); }
-      damage(p.tgt, p.dmg);
+      damage(p.tgt, p.dmg, p.siege);
     } else part(p.tx, p.ty, 0, -10, 0.2, '#bcc0cc', 0);
   }
 
@@ -2345,7 +2388,7 @@
     shadow(e.x, e.y, Math.ceil(fr.w * 0.35));
     if (e.d.boss) {
       g.globalCompositeOperation = 'lighter';
-      g.fillStyle = 'rgba(200,40,20,' + (0.18 + Math.sin(time * 5) * 0.08) + ')';
+      g.fillStyle = 'rgba(200,40,20,' + ((e.d.giant ? 0.07 : 0.18) + Math.sin(time * 5) * (e.d.giant ? 0.04 : 0.08)) + ')'; // obra žiara nezakryje
       g.beginPath(); g.ellipse(e.x, e.y - fr.h / 2, fr.w * 0.75, fr.h * 0.7, 0, 0, 6.29); g.fill();
       g.globalCompositeOperation = 'source-over';
     }
@@ -3526,7 +3569,7 @@
     if (st.phase === 'build') drawPlaceGhost(time);
     if (st.phase === 'build' && st.siegePick) drawSiegePick(time);
     // ukazovatele zdravia
-    for (const e of st.enemies) if (e.hp < e.max && !e.d.boss) bar(e.x, Math.round(e.y - e.h - 3), Math.max(6, e.w - 4), e.hp / e.max, '#e84838');
+    for (const e of st.enemies) if (e.hp < e.max && (!e.d.boss || (e.d.giant && st.boss !== e))) bar(e.x, Math.round(e.y - e.h - 3), Math.max(6, e.w - 4), e.hp / e.max, '#e84838');
     for (const b of st.blds) if (BUILD[b.kind].hp && b.hp < bMaxHp(b)) bar(tileX(b.c) + T / 2, b.kind === 'wall' ? tileY(b.r) - 9 : tileY(b.r) + T - bsprOf(b.kind, b.lvl).h - 2, 12, b.hp / bMaxHp(b), '#9cd45a');
     for (const s of st.soldiers) if (s.hp < s.max) bar(s.x, Math.round(s.y - 17), 8, s.hp / s.max, '#88b4ff');
     for (const o of campLive()) if (o.hp < o.max) bar(o.x, o.y - o.skin.spr(o, 0).h - 4, 14, o.hp / o.max, '#e84838');
@@ -3619,7 +3662,7 @@
     if (B && !B.dead && st.phase === 'battle') {
       bb.hidden = false;
       $('bossFill').style.width = (Math.max(0, B.hp / B.max) * 100) + '%';
-      $('bossTxt').textContent = (B.d.king ? 'Veľkráľ' : 'Vojvodca') + ' ' + Math.max(0, Math.ceil(B.hp)) + ' / ' + Math.ceil(B.max);
+      $('bossTxt').textContent = (B.d.king ? 'Veľkráľ' : B.d.title || 'Vojvodca') + ' ' + Math.max(0, Math.ceil(B.hp)) + ' / ' + Math.ceil(B.max);
     } else bb.hidden = true;
   }
 
