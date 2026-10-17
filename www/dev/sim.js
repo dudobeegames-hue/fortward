@@ -22,7 +22,7 @@ window.SIM = (() => {
       : [['cat', w >= 3 ? 1 : 0], ['tower', w >= 4 ? 1 : 0], ['fire', w >= 5 ? 1 : 0], ['cat', w >= 7 ? 2 : 0], ['ram', w >= 8 ? 1 : 0]];
     return want.filter(([k, n]) => n > 0 && F.has(SIEGE_TECH[k]));
   }
-  const nSiege = k => s.soldiers.filter(u => u.siege === k && !u.dead).length + ((s.siegeOrder || {})[k] || 0);
+  const nSiege = k => s.soldiers.filter(u => u.siege === k && !u.dead).length + (s.siegeOrder || []).filter(o => o.key === k).length;
   const missingSiege = () => siegePlan().find(([k, n]) => nSiege(k) < n);
   // rezerva zlata na najbližší chýbajúci stroj
   const reserve = () => { const m = missingSiege(); return m ? F.SIEGE_BUY[m[0]].cost : 0; };

@@ -772,10 +772,11 @@
     fire:  { hp: 210, spd: 12, dmg: 12, cd: 0.6,  armor: 0.7, spr: 'siegeFire', range: 30 },   // strieka grécky oheň: podpáli hordu aj drevené stavby tábora
     tower: { hp: 420, spd: 9,  dmg: 8,  cd: 0.45, armor: 0.6, spr: 'siegeTower', range: 96 },  // dvaja lukostrelci z výšky – ďaleký dostrel, aj na letcov; sprevádza ostatné stroje
   };
-  function spawnSiege(kind) {
+  function spawnSiege(kind, x, y) {
     const d = SIEGE[kind], a = Math.max(0, st.mission - HOME_PROVINCES - 1), sm = 1 + 0.06 * perk('siege'), hp = d.hp * (1 + 0.15 * a) * sm;
-    st.soldiers.push({ siege: kind, x: G.hallCx + (Math.random() - 0.5) * 10, y: G.hallTop - 4, hp, max: hp, dmg: d.dmg * (1 + 0.15 * a) * sm, spd: d.spd, armor: d.armor, spr: d.spr, cd: 0.5, fired: 0, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
-    for (let k = 0; k < 8; k++) part(G.hallCx, G.hallTop - 2, (Math.random() - 0.5) * 30, -Math.random() * 14, 0.4, '#c6a272', 40);
+    st.soldiers.push({ siege: kind, x: x != null ? x : G.hallCx + (Math.random() - 0.5) * 10, y: y != null ? y : G.hallTop - 4, hp, max: hp, dmg: d.dmg * (1 + 0.15 * a) * sm, spd: d.spd, armor: d.armor, spr: d.spr, cd: 0.5, fired: 0, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
+    const u = st.soldiers[st.soldiers.length - 1];
+    for (let k = 0; k < 8; k++) part(u.x, u.y - 2, (Math.random() - 0.5) * 30, -Math.random() * 14, 0.4, '#c6a272', 40);
   }
   // ohnivý voz: prúd ohňa k bodu (tx, ty) – zraní a podpáli každého na zemi v úzkom kuželi pred vozom
   function sprayFire(u, tx, ty) {
@@ -882,7 +883,7 @@
       wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.05 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, shake: 0, soldierN: 0,
       blds: [], paving: {}, enemies: [], soldiers: [], form: null, proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
       cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, shieldCd: 0, healCd: 0, fwCd: 0, tpCd: 0, shields: [], fireWalls: [], heroDead: {},
-      spellSel: null, siegeOrder: {}, fallFx: [], blasts: [], healFx: [], bolts: [], hallHolyT: 0, stance: 'attack',
+      spellSel: null, siegeOrder: [], siegePick: null, fallFx: [], blasts: [], healFx: [], bolts: [], hallHolyT: 0, stance: 'attack',
     });
     rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
     st.camp = makeCamp(); // od misie 6 si horda hore na bojisku rozloží tábor
@@ -1990,7 +1991,6 @@
     if (st.spellSel === id) { st.spellSel = null; AUDIO.play('click'); return; }
     if (st[SPELLS[id].cdKey] > 0) { AUDIO.play('deny'); return; }
     st.spellSel = id; AUDIO.play('click');
-    if (!st.spellHint) { st.spellHint = true; hint('Ťukni na bojisko, kam má kúzlo dopadnúť'); }
   }
   // ťuk na bojisko počas boja: zvolené kúzlo sa zošle na to miesto
   function tapBattle(x, y) {
@@ -2800,6 +2800,16 @@
     if (BUILD[kind].range) drawRange(hx + T / 2, hy + T / 2, bRange({ kind, lvl: 1 }), time); // dosah už pri ukladaní
   }
 
+  // výber miesta pre obliehací stroj: povolený pás sa jemne rozsvieti, zdvihnutý stroj bliká
+  function drawSiegePick(time) {
+    const y0 = Math.max(0, Math.round(siegeMinY())), a = 0.10 + 0.05 * Math.sin(time * 5);
+    g.fillStyle = 'rgba(255,240,140,' + a.toFixed(3) + ')'; g.fillRect(G.gx0, y0, G.cols * T, G.hallBot - y0);
+    g.fillStyle = 'rgba(255,240,140,0.6)'; for (let x = G.gx0; x < G.gx0 + G.cols * T; x += 4) g.fillRect(x, y0, 2, 1);
+    const o = st.siegePick.order || st.siegePick.unit;
+    if (!o) return;
+    const key = st.siegePick.order ? o.key : o.siege, sp = SPR[BUY[key].siege][0];
+    if (Math.floor(time * 4) % 2) corners(Math.round(o.x - sp.w / 2) - 2, Math.round(o.y - sp.h) - 2, Math.round(o.x + sp.w / 2) + 1, Math.round(o.y) + 1, '#fff070');
+  }
   function drawBuildOverlay(time) {
     const zt = zoneTopRow();
     const blink = Math.floor(time * 4) % 2;
@@ -3464,12 +3474,9 @@
       objs.push({ y: G.hallBot, f: () => drawHall(time) });
       for (const b of st.blds) if (!TRAPS[b.kind]) objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), x: b.c, f: () => drawBuilding(b, time) });
       for (const s of st.soldiers) objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: s.y, f: () => drawFighter(s, s.spr || 'soldier') });
-      if (st.phase === 'build') { // kúpené obliehacie stroje čakajú vedľa radnice, kým sa nezačne útok
-        let i = 0;
-        for (const key in BUY) for (let q = 0; q < ((st.siegeOrder || {})[key] || 0); q++, i++) {
-          const sp = SPR[BUY[key].siege][0], x = G.hallCx + (i % 2 ? 1 : -1) * (30 + 14 * Math.floor(i / 2)), y = G.hallTop + 4;
-          objs.push({ y, f: () => { shadow(x, y, 8); g.drawImage(sp.c, Math.round(x - sp.w / 2), Math.round(y - sp.h)); } });
-        }
+      if (st.phase === 'build') for (const o of st.siegeOrder) { // kúpené obliehacie stroje čakajú na mieste, odkiaľ vyrazia
+        const sp = SPR[BUY[o.key].siege][0];
+        objs.push({ y: o.y, f: () => { shadow(o.x, o.y, 8); g.drawImage(sp.c, Math.round(o.x - sp.w / 2), Math.round(o.y - sp.h)); } });
       }
       if (st.king && !st.king.dead) objs.push({ y: st.king.y, f: () => drawFighter(st.king, heroDef().spr) });
       else if (st.king && kingLying(st.king)) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
@@ -3482,6 +3489,7 @@
     objs.sort((a, b) => a.y - b.y || (b.x || 0) - (a.x || 0)); // v rovnakom rade je ľavejšia budova vpredu
     for (const o of objs) o.f();
     if (st.phase === 'build') drawPlaceGhost(time);
+    if (st.phase === 'build' && st.siegePick) drawSiegePick(time);
     // ukazovatele zdravia
     for (const e of st.enemies) if (e.hp < e.max && !e.d.boss) bar(e.x, Math.round(e.y - e.h - 3), Math.max(6, e.w - 4), e.hp / e.max, '#e84838');
     for (const b of st.blds) if (BUILD[b.kind].hp && b.hp < bMaxHp(b)) bar(tileX(b.c) + T / 2, b.kind === 'wall' ? tileY(b.r) - 9 : tileY(b.r) + T - bsprOf(b.kind, b.lvl).h - 2, 12, b.hp / bMaxHp(b), '#9cd45a');
@@ -3632,14 +3640,15 @@
     undoStack.push({
       gold: st.gold, hallLvl: st.hallLvl, hallHp: st.hallHp, volleyLvl: st.volleyLvl, kingDead: !!(st.king && st.king.dead),
       blds: st.blds.map(b => Object.assign({}, b, { unit: b.unit ? Object.assign({}, b.unit) : null })),
-      paving: Object.assign({}, st.paving), siegeOrder: Object.assign({}, st.siegeOrder),
+      paving: Object.assign({}, st.paving), siegeOrder: st.siegeOrder.map(o => Object.assign({}, o)),
     });
     if (undoStack.length > 40) undoStack.shift();
   }
   function doUndo() {
     const sn = undoStack.pop();
     if (!sn || st.phase !== 'build') return;
-    Object.assign(st, { gold: sn.gold, hallLvl: sn.hallLvl, hallHp: sn.hallHp, volleyLvl: sn.volleyLvl, blds: sn.blds, paving: sn.paving, siegeOrder: sn.siegeOrder || {} });
+    Object.assign(st, { gold: sn.gold, hallLvl: sn.hallLvl, hallHp: sn.hallHp, volleyLvl: sn.volleyLvl, blds: sn.blds, paving: sn.paving, siegeOrder: sn.siegeOrder || [] });
+    st.siegePick = null;
     st.sel = null; st.selGroup = null; st.tool = null; st.moving = null;
     if (st.king) {
       if (sn.kingDead && !st.king.dead) Object.assign(st.king, { dead: true, deadT: 9, fadeT: null });
@@ -3884,7 +3893,7 @@
             b.classList.toggle('flipped', st.flip === kind);
             return;
           }
-          st.tool = kind; st.flip = null; st.sel = null; st.moving = null; renderBuild();
+          st.tool = kind; st.flip = null; st.sel = null; st.moving = null; st.siegePick = null; renderBuild();
         });
         pal.appendChild(b);
       }
@@ -3892,8 +3901,10 @@
         const u = BUY[key], icon = ICONS['u_' + u.siege];
         if (!st.tech.has(u.siege)) { lockAct(icon, u.name, unlockMissionOf(u.siege), true); continue; }
         const n = siegeCount(key), full = n >= SIEGE_MAX;
+        const picked = !!(st.siegePick && st.siegePick.key === key);
         act(icon, u.name + ' ' + n + '/' + SIEGE_MAX, full ? 'plné' : coinTxt(u.cost), !full && st.gold >= u.cost,
-          full ? 'Naraz najviac ' + SIEGE_MAX + ' – ' + u.plural : () => orderSiege(key), 'unit', true);
+          full ? 'Naraz najviac ' + SIEGE_MAX + ' – ' + u.plural : () => { st.siegePick = picked ? null : { key }; st.tool = null; st.sel = null; st.moving = null; },
+          'pick' + (picked ? ' sel' : ''), true);
       }
     }
     $('nextWave').textContent = 'Do boja';
@@ -4035,6 +4046,7 @@
       return;
     }
     if (st.phase !== 'build') return;
+    if (st.siegePick || (!st.tool && siegeAt(p.x, p.y))) { tapSiege(p.x, p.y); return; } // štartové miesto obliehacieho stroja
     const t = evTile(p);
     if (st.tool === 'paving' && inZone(t.c, t.r) && !inHall(t.c, t.r)) { // dlažba: ťuk = jedna (alebo zobrať), ťah = celá plocha
       drag = { kind: 'paving', path: paveFree(t.c, t.r) ? [t] : [], last: t, start: t, moved: false };
@@ -4225,18 +4237,57 @@
     tower: { cost: 150, siege: 'siegeTower', name: 'Obl. veža',     plural: 'obliehacie veže' },
   };
   const SIEGE_MAX = 2;
-  const siegeCount = kind => st.soldiers.filter(s => s.siege === kind && !s.dead).length + ((st.siegeOrder || {})[kind] || 0);
+  const siegeCount = kind => st.soldiers.filter(s => s.siege === kind && !s.dead).length + st.siegeOrder.filter(o => o.key === kind).length;
   const canSiege = key => st.tech.has(BUY[key].siege); // v každej misii, keď je stroj raz odomknutý
-  function orderSiege(key) {
+  // kúpa stroja na miesto (x, y); bez miesta postaví stroj vedľa radnice (simulácia)
+  function orderSiege(key, x, y) {
     const u = BUY[key];
     if (st.phase !== 'build' || !canSiege(key) || st.gold < u.cost || siegeCount(key) >= SIEGE_MAX) return false;
-    st.gold -= u.cost; st.siegeOrder = Object.assign({}, st.siegeOrder, { [key]: ((st.siegeOrder || {})[key] || 0) + 1 });
+    if (x == null) { const i = st.siegeOrder.length; x = G.hallCx + (i % 2 ? 1 : -1) * (30 + 14 * Math.floor(i / 2)); y = G.hallTop + 4; }
+    st.gold -= u.cost; st.siegeOrder.push({ key, x, y });
     return true;
   }
-  // stroje kúpené počas stavby vyrazia so začiatkom vlny
+  // stroje kúpené počas stavby vyrazia so začiatkom vlny z miesta, ktoré im hráč určil
   function launchSiege() {
-    for (const key in st.siegeOrder || {}) for (let i = 0; i < st.siegeOrder[key]; i++) spawnSiege(key);
-    st.siegeOrder = {};
+    for (const o of st.siegeOrder) spawnSiege(o.key, o.x, o.y);
+    st.siegeOrder = []; st.siegePick = null;
+  }
+  // ---- štartové miesto strojov: ťuk na kartu stroja ho vyberie, ťuk na bojisko ho tam postaví;
+  // ťuk na stroj na bojisku (kúpený alebo ten, čo prežil vlnu) ho zdvihne a ďalší ťuk ho presunie ----
+  const siegeMinY = () => musterYOf() - 10; // stroj začína pri vlastnom území: od zhromaždiska pred zónou k radnici
+  function siegeSpotOk(x, y) {
+    const c = Math.floor((x - G.gx0) / T), r = Math.floor((y - G.gy0) / T);
+    if (c < 0 || c >= G.cols || r < 0 || r >= G.rows || y < siegeMinY()) return false;
+    const hr = hallRect();
+    if (x >= hr.x0 - 4 && x < hr.x1 + 4 && y >= hr.y0 - 8 && y < hr.y1 + 4) return false;
+    return !occAt(c, r);
+  }
+  // stroj na bojisku pod prstom (čakajúca objednávka alebo stroj, čo prežil vlnu)
+  function siegeAt(x, y) {
+    const hit = (ox, oy, key) => { const sp = SPR[BUY[key].siege][0]; return Math.abs(x - ox) <= sp.w / 2 + 1 && y <= oy + 2 && y >= oy - sp.h; };
+    for (const o of st.siegeOrder) if (hit(o.x, o.y, o.key)) return { order: o };
+    for (const u of st.soldiers) if (u.siege && !u.dead && hit(u.x, u.y, u.siege)) return { unit: u };
+    return null;
+  }
+  function tapSiege(x, y) {
+    const pk = st.siegePick, on = siegeAt(x, y);
+    if (on && (!pk || !pk.key)) { // zdvihne (alebo pustí) stroj na bojisku
+      const same = pk && (pk.order === on.order && on.order || pk.unit === on.unit && on.unit);
+      st.siegePick = same ? null : on; AUDIO.play('click'); renderBuild(); return;
+    }
+    if (!pk) return;
+    if (!siegeSpotOk(x, y)) { toast('Stroj môže začať len pri tvojom území, nie na budove'); AUDIO.play('deny'); return; }
+    if (pk.key) {
+      if (siegeCount(pk.key) >= SIEGE_MAX || st.gold < BUY[pk.key].cost) { st.siegePick = null; AUDIO.play('deny'); renderBuild(); return; }
+      snapshot(); orderSiege(pk.key, x, y);
+      if (siegeCount(pk.key) >= SIEGE_MAX || st.gold < BUY[pk.key].cost) st.siegePick = null;
+    } else {
+      const o = pk.order || pk.unit; o.x = x; o.y = y;
+      st.siegePick = null;
+    }
+    AUDIO.play('build');
+    for (let k = 0; k < 8; k++) part(x + (Math.random() - 0.5) * 12, y, (Math.random() - 0.5) * 30, -Math.random() * 16, 0.4, '#c6a272', 50);
+    renderBuild(); updateHud();
   }
   $('speedBtn').addEventListener('click', () => {
     st.speed = st.speed >= 3 ? 1 : st.speed + 1;
