@@ -455,6 +455,7 @@
     for (const k in meta.perks) delete meta.perks[k];
     Object.assign(meta.perks, loadJSON(sk('perks9'), {})); // sieň s 9 úrovňami; staré bonusy (sk 'perks') sa nepreberú – hviezdy sa vrátia
     for (const k in meta.perks) if (!PERKS.some(p => p.id === k)) delete meta.perks[k];
+    st.race = loadJSON(sk('race'), 'Ľudia');
     st.hero = null; setActiveHero(loadJSON(sk('hero'), 'king'));
     Object.assign(stats, { kills: 0, builds: 0, bosses: 0, orcKings: 0, perfect: 0, maxGold: 0 }, loadJSON(sk('stats'), {}));
     for (const k in ach) delete ach[k];
@@ -489,6 +490,11 @@
     } catch (e) { }
   }
   let island = null;
+  // hra za orkov: kampaň ide po mape opačne (orkská misia 1 = pevnosť orkov hore, uzol 10)
+  const isOrc = () => st.race === 'Orkovia';
+  const nodeOf = m => isOrc() ? MISSIONS.length - m : m - 1;     // index uzla (provincie) mapy pre misiu m
+  const missionAt = i => isOrc() ? MISSIONS.length - i : i + 1;  // misia na uzle i
+  const missionDef = m => (isOrc() ? ORC_MISSIONS : MISSIONS)[m - 1];
 
   // ---------------- Mriežka ----------------
   const tileX = c => G.gx0 + c * T;
@@ -567,7 +573,7 @@
     G.hallCx = tileX(G.hc0) + 1.5 * T; G.hallTop = tileY(G.hr0); G.hallBot = G.hallTop + 3 * T;
     G.zoneTopMax = tileY(G.rows - (5 + MAX_LVL));
     const lay = typeof CASTLES !== 'undefined' && CASTLES[foeRace()] && CASTLES[foeRace()][st.mission];
-    scene = buildScene(W, FH, G, 7 + st.mission * 13, st.mission - 1, campClearRects(lay, G));
+    scene = buildScene(W, FH, G, 7 + (nodeOf(st.mission) + 1) * 13, nodeOf(st.mission), campClearRects(lay, G));
     if (had) { // posuň stavby, ak sa zmenila mriežka
       const dc = G.hc0 - oldHc, dr = G.hr0 - oldHr;
       for (const b of st.blds) { b.c += dc; b.r += dr; }
@@ -644,11 +650,11 @@
     layoutField(); // každá misia má vlastnú krajinu
     $('map').hidden = true;
     newGame();
-    banner('Misia ' + m + ': ' + MISSIONS[m - 1].name + (st.tier ? ' · ' + TIERS[st.tier].name : ''));
+    banner('Misia ' + m + ': ' + missionDef(m).name + (st.tier ? ' · ' + TIERS[st.tier].name : ''));
   }
 
   // ---- tábor hordy (od misie 6): stavby protivníka hore na bojisku, mimo dostrelu veží (CAMP_ROLES a CAMP_PIECES sú v js/camp.js) ----
-  function foeRace() { return 'orc'; } // zatiaľ sa hrá len za ľudí, protivníkom je horda orkov
+  function foeRace() { return isOrc() ? 'human' : 'orc'; } // za orkov stavajú tábory ľudia (zatiaľ bez rozloženia v editore)
   const CAMP_DRUM = 1.2, CAMP_TOTEM = 0.015; // bubon: horda o 20 % rýchlejšia; totem: lieči 1,5 % zdravia za sekundu
   const campLive = () => st.camp ? st.camp.parts.filter(o => o.hp > 0) : [];
   const campHas = role => !!st.camp && st.camp.parts.some(o => o.role === role && o.hp > 0);
@@ -1042,7 +1048,7 @@
     $('hud-boss').hidden = true; $('bottom').hidden = true;
     const first = t === 0 && m >= st.unlocked;
     if (first) {
-      st.provAnim = { i: m - 1, t: 0, from: m <= HOME_PROVINCES ? 'attacked' : 'horde' }; // provincia sa na mape prefarbí na modro
+      st.provAnim = { i: nodeOf(m), t: 0, from: m <= HOME_PROVINCES ? 'attacked' : 'horde' }; // provincia sa na mape prefarbí na modro
       st.unlocked = Math.min(11, m + 1); saveProgress(); st.mapAnim = { seg: m - 1, t: 0 };
     }
     banner('Misia splnená!');
@@ -1050,7 +1056,7 @@
     for (let k = 0; k < 80; k++) part(Math.random() * W, camY + H * 0.3 + Math.random() * 30, (Math.random() - 0.5) * 60, -30 - Math.random() * 60, 1.4, ['#f8d048', '#fff070', '#88b4ff', '#e84838'][k % 4], 60);
     const text = m === MISSIONS.length
       ? 'Porazil si poslednú hordu. <b>Ostrov je oslobodený!</b>'
-      : 'Misia ' + m + ' · ' + MISSIONS[m - 1].name + ' · ' + TIERS[t].name.toLowerCase() + ' úroveň<br>Všetkých ' + MISSION_WAVES + ' vĺn odrazených.' + (first ? '<br>Odomkla sa misia ' + (m + 1) + '.<br><span class="newTech">Nové: ' + UNLOCKS[m].map(u => u.name).join(', ') + '</span>' : '');
+      : 'Misia ' + m + ' · ' + missionDef(m).name + ' · ' + TIERS[t].name.toLowerCase() + ' úroveň<br>Všetkých ' + MISSION_WAVES + ' vĺn odrazených.' + (first ? '<br>Odomkla sa misia ' + (m + 1) + '.<br><span class="newTech">Nové: ' + UNLOCKS[m].map(u => u.name).join(', ') + '</span>' : '');
     const starLine = '<span class="bigStars">' + starSpan(stars, t) + '</span>' +
       (stars > prevStars ? '<br><span class="newTech">+' + (stars - prevStars) + ' ★ do Kráľovskej siene</span>' : '') + tierNote;
     const xpLine = st.lastXp ? '<br><span class="newTech">' + heroName() + ' +' + st.lastXp + ' XP' + (kingMeta.pending ? ' · nová úroveň ' + kingMeta.lvl + '!' : '') + '</span>' : '';
@@ -1071,7 +1077,7 @@
     }
     st.shake = 0.6;
     AUDIO.music(null); AUDIO.play('crumble'); setTimeout(() => AUDIO.play('lose'), 500);
-    later(() => showOver('Radnica padla!', 'Misia ' + st.mission + ' · ' + MISSIONS[st.mission - 1].name + (st.tier ? ' · ' + TIERS[st.tier].name.toLowerCase() + ' úroveň' : '') + '<br>Prežité vlny: <b>' + survived + ' / ' + MISSION_WAVES + '</b>', false), 1200);
+    later(() => showOver('Radnica padla!', 'Misia ' + st.mission + ' · ' + missionDef(st.mission).name + (st.tier ? ' · ' + TIERS[st.tier].name.toLowerCase() + ' úroveň' : '') + '<br>Prežité vlny: <b>' + survived + ' / ' + MISSION_WAVES + '</b>', false), 1200);
     updateHud();
   }
 
@@ -3251,8 +3257,8 @@
   }
 
   function drawMapNode(i, n, time) {
-    const num = i + 1, done = num < st.unlocked, open = num === st.unlocked;
-    const anim = st.mapAnim && st.mapAnim.seg === i - 1; // hrad práve odomykaný
+    const num = missionAt(i), done = num < st.unlocked, open = num === st.unlocked;
+    const anim = st.mapAnim && st.mapAnim.seg === num - 2; // hrad práve odomykaný
     const status = anim ? 'locked' : done ? 'done' : open ? 'open' : 'locked';
     // tieň
     g.fillStyle = 'rgba(10,8,6,0.4)';
@@ -3263,7 +3269,8 @@
       for (let k = 0; k < cnt; k += 2) { const a = k / cnt * 6.283 + time; g.fillRect(Math.round(n.x + Math.cos(a) * rr), Math.round(n.y - 3 + Math.sin(a) * rr * 0.55), 1, 1); }
     }
     let top;
-    if (num > HOME_PROVINCES && !done) { // hrad hordy = orkská pevnosť, kým ho hráč nedobyje
+    const foeLand = num > HOME_PROVINCES && !done;
+    if (foeLand !== isOrc()) { // orkská pevnosť: hrad hordy (za ľudí nedobytý, za orkov vlastný)
       const f = island.fort;
       g.drawImage(f.c, n.x - Math.floor(f.w / 2), n.y - f.h + 2);
       top = n.y - f.h + 2;
@@ -3276,8 +3283,8 @@
       const fx = n.x, fy = top - 6;
       g.fillStyle = '#4a4e60'; g.fillRect(fx, fy, 1, 7);
       const wv = Math.floor(time * 5 + i) % 2;
-      g.fillStyle = '#3c64c8'; g.fillRect(fx + 1, fy + wv, 5, 3);
-      g.fillStyle = '#88b4ff'; g.fillRect(fx + 1, fy + wv, 2, 1);
+      g.fillStyle = isOrc() ? '#8c2018' : '#3c64c8'; g.fillRect(fx + 1, fy + wv, 5, 3); // zástava hráča: modrá ľudia, červená orkovia
+      g.fillStyle = isOrc() ? '#e84838' : '#88b4ff'; g.fillRect(fx + 1, fy + wv, 2, 1);
       g.fillStyle = '#f8d048'; g.fillRect(fx + 5, fy + 1 - wv, 1, 1);
     } else if (status === 'open') { // skákajúca šípka
       const ay = top - 8 + Math.round(Math.abs(Math.sin(time * 4)) * -3);
@@ -3302,7 +3309,7 @@
   }
 
   // ---- provincie: juh (1–5) ľudia, sever (6–10) horda; neobránené južné sú napadnuté ----
-  const provState = i => { const num = i + 1, won = num < st.unlocked; return won ? 'ours' : num <= HOME_PROVINCES ? 'attacked' : 'horde'; };
+  const provState = i => { const num = missionAt(i), won = num < st.unlocked; return won ? 'ours' : num <= HOME_PROVINCES ? 'attacked' : 'horde'; };
   const PROV_COL = { blue: [70, 120, 230, 0.24], red: [210, 40, 30, 0.3] };
   function provLayers() { // farebné vrstvy jednotlivých provincií + hranice (počíta sa raz pre ostrov)
     if (island.layers) return island.layers;
@@ -3345,9 +3352,10 @@
   }
   function drawProvince(i, state, time, ctx) {
     const L = provLayers(), c = ctx || g;
-    if (state === 'horde') { c.drawImage(L.red[i], 0, 0); return; }
-    c.drawImage(L.blue[i], 0, 0);
-    if (state === 'attacked') { c.globalAlpha = i + 1 === st.unlocked ? 0.35 + 0.3 * Math.sin(time * 3) : 0.35; c.drawImage(L.red[i], 0, 0); c.globalAlpha = 1; } // pulzuje len najbližšia misia
+    const own = isOrc() ? L.red : L.blue, foe = isOrc() ? L.blue : L.red; // za orkov je územie hráča červené a ľudí modré
+    if (state === 'horde') { c.drawImage(foe[i], 0, 0); return; }
+    c.drawImage(own[i], 0, 0);
+    if (state === 'attacked') { c.globalAlpha = missionAt(i) === st.unlocked ? 0.35 + 0.3 * Math.sin(time * 3) : 0.35; c.drawImage(foe[i], 0, 0); c.globalAlpha = 1; } // pulzuje len najbližšia misia
   }
   // podklad mapy: ostrov, chodník a farby provincií, ktoré sa nehýbu, sa zložia raz do jedného obrázka
   // a prepočítajú sa, len keď sa zmení vlastník provincie alebo sa chodník vyšliapava; živé (pulzujúca, práve dobytá) sa kreslia každý snímok
@@ -3365,7 +3373,7 @@
   }
   function drawProvinces(time) {
     const n = island.nodes.length, pa = st.provAnim;
-    const live = i => (pa && pa.i === i) || (provState(i) === 'attacked' && i + 1 === st.unlocked);
+    const live = i => (pa && pa.i === i) || (provState(i) === 'attacked' && missionAt(i) === st.unlocked);
     g.drawImage(mapBase(live), 0, 0);
     for (let i = 0; i < n; i++) {
       if (!live(i)) continue;
@@ -3487,7 +3495,9 @@
   // k nedobytým zarastený (len občas presvitne hlina); po víťazstve sa nový úsek postupne vyšliape
   function drawMapPath(c) {
     const px = (x, y, col) => { c.fillStyle = 'rgb(' + col[0] + ',' + col[1] + ',' + col[2] + ')'; c.fillRect(x, y, 1, 1); };
-    island.segs.forEach((pts, k) => {
+    island.segs.forEach((pts, j) => {
+      // úsek j vedie z uzla j do j + 1; za orkov sa ide opačne (z misie k + 1 do k + 2 = uzly 9 - k → 8 - k)
+      const k = isOrc() ? MISSIONS.length - 2 - j : j, rev = isOrc();
       const done = k + 2 <= st.unlocked, anim = st.mapAnim && st.mapAnim.seg === k;
       const upto = anim ? Math.floor(pts.length * Math.min(1, st.mapAnim.t)) : done ? pts.length : 0;
       let lx = null, ly = null;
@@ -3495,7 +3505,7 @@
         const x = Math.round(pts[j].x), y = Math.round(pts[j].y);
         if (x === lx && y === ly) continue;
         lx = x; ly = y;
-        const h = hash2(x, y, 71), worn = j < upto;
+        const h = hash2(x, y, 71), worn = rev ? j >= pts.length - upto : j < upto;
         // smer chodníka: druhý pás hliny leží bokom (vodorovný chodník je široký nadol, zvislý doprava)
         const q = pts[Math.min(pts.length - 1, j + 2)], vert = Math.abs(q.x - pts[j].x) < Math.abs(q.y - pts[j].y);
         const sx = vert ? 1 : 0, sy = vert ? 0 : 1;
@@ -3554,7 +3564,7 @@
   }
   const clampMap = v => Math.max(0, Math.min(mapCamMax(), v));
   function focusMapNode(num, instant) {
-    const n = island && island.nodes[num - 1];
+    const n = island && island.nodes[nodeOf(num)];
     if (!n) return;
     const panelLow = $('mapBar').offsetHeight * DPR / S;
     const mid = MAP_HEAD + (H - panelLow - MAP_HEAD) / 2;
@@ -4510,6 +4520,7 @@
 
   function showMap() {
     st.run = (st.run || 0) + 1; // časovače rozohranej misie sa zrušia
+    if (island) island.baseKey = island.borderKey = null; // pozícia môže byť za inú rasu – farby provincií a chodník sa prekreslia
     clearBattle();
     st.phase = 'map';
     AUDIO.music('map');
@@ -4523,12 +4534,12 @@
     if (!st.mapAnim) afterDeck(); // pri odomykaní hradu príde výber až po kartičkách
     if (st.unlocked === 1 && !loadJSON(sk('introSeen'), false)) { // úplne nová hra
       saveJSON(sk('introSeen'), true);
-      setTimeout(() => { if (st.phase === 'map') banner('Horda napadla tvoje územie!'); }, 400);
+      setTimeout(() => { if (st.phase === 'map') banner(isOrc() ? 'Ľudia napadli územie hordy!' : 'Horda napadla tvoje územie!'); }, 400);
     }
   }
 
   function renderMapPanel() {
-    const m = st.mapSel, def = MISSIONS[m - 1];
+    const m = st.mapSel, def = missionDef(m);
     const done = m < st.unlocked;
     $('mNum').textContent = m;
     $('mNum').className = 'mnum' + (done ? ' done' : '');
@@ -4751,7 +4762,7 @@
     if (st.mapAnim) return;
     island.nodes.forEach((n, i) => {
       if (Math.hypot(n.x - x, n.y - 5 - y) > 14) return;
-      const num = i + 1;
+      const num = missionAt(i);
       if (num > st.unlocked) { toast('Najprv dobi misiu ' + (num - 1)); AUDIO.play('deny'); return; }
       st.mapSel = num; AUDIO.play('click'); openMission();
     });
@@ -4765,7 +4776,7 @@
     a.t += dt / 1.4;
     if (a.t >= 1) {
       st.mapAnim = null;
-      const n = island.nodes[a.seg + 1];
+      const n = island.nodes[nodeOf(a.seg + 2)];
       if (n) {
         for (let k = 0; k < 30; k++) part(n.x, n.y, (Math.random() - 0.5) * 70, -Math.random() * 70, 0.9, ['#f8d048', '#fff070', '#88b4ff'][k % 3], 90);
         st.mapSel = a.seg + 2; renderMapPanel();
@@ -4922,7 +4933,7 @@
 
   const RACES = [
     { name: 'Ľudia',   spr: 'race_humans', state: 'open',                desc: 'Rytieri, kamenné hradby a odvážni hrdinovia.' },
-    { name: 'Orkovia', spr: 'race_orcs',   state: 'soon',                desc: 'Surová sila a nekonečné hordy.' },
+    { name: 'Orkovia', spr: 'race_orcs',   state: 'open',                desc: 'Surová sila a nekonečné hordy.' },
     { name: 'Nemŕtvi', spr: 'race_undead', state: 'soon',                desc: 'Padlí kostlivci vstávajú znova do boja.' },
     { name: 'Elfovia', spr: 'race_elves',  state: 'gem', price: 500,     desc: 'Presní lukostrelci a lesná mágia.' },
     { name: 'Démoni',  spr: 'race_demons', state: 'gem', price: 500,     desc: 'Oheň, besnenie a temné obete.' },
@@ -5015,14 +5026,14 @@
     const box = $('races'); box.innerHTML = '';
     for (const r of RACES) {
       const c = document.createElement('button');
-      c.className = 'race ' + r.state + (r.state === 'open' ? ' sel' : '');
+      c.className = 'race ' + r.state + (r.name === (st.race || 'Ľudia') ? ' sel' : '');
       const img = spriteURL(SPR[r.spr][0], 4, r.state !== 'open');
       const tag = r.state === 'open' ? 'Hrať' : r.state === 'soon' ? 'Čoskoro' : '<img class="gem" src="' + ICONS.gem + '">' + r.price;
       c.innerHTML = '<img src="' + img + '"><b>' + r.name + '</b><span class="tag">' + tag + '</span>';
       c.addEventListener('click', () => {
         if (r.state === 'soon') toast(r.name + ' prídu v ďalšej verzii');
         else if (r.state === 'gem') toast('Odomykanie za gemy pripravujeme');
-        else { saveJSON(sk('race'), r.name); saveProgress(); showMap(); }
+        else { saveJSON(sk('race'), r.name); st.race = r.name; saveProgress(); showMap(); }
       });
       box.appendChild(c);
     }

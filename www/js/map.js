@@ -16,6 +16,21 @@ const MISSIONS = [
   { name: 'Pevnosť orkov',   desc: 'Rozhodujúca bitka o ostrov. Porazíš vojvodcov?' },
 ];
 
+// kampaň za orkov ide po mape opačne: orkská misia 1 je pevnosť orkov hore (uzol 10), misia 10 rybárska osada dole;
+// misie 1–5 bránia vlastné provincie, 6–10 útočia na tábory ľudí
+const ORC_MISSIONS = [
+  { name: 'Pevnosť orkov',   desc: 'Ľudia sa vylodili pod hradbami pevnosti. Ukáž im silu hordy.' },
+  { name: 'Popolavé svahy',  desc: 'Rytieri šplhajú po popole. Zhoď ich zo svahov.' },
+  { name: 'Staré ruiny',     desc: 'V ruinách sa skrývajú lukostrelci ľudí. Vyžeň ich.' },
+  { name: 'Vlčí priesmyk',   desc: 'Jazda ľudí chce prejsť priesmykom. Zavri ho.' },
+  { name: 'Hmlisté močiare', desc: 'Posledná obrana orkského územia. Za močiarmi začína juh.' },
+  { name: 'Strážny vrch',    desc: 'Ľudia si na vrchu postavili tábor. Zrovnaj ho so zemou.' },
+  { name: 'Kamenný brod',    desc: 'Pri brode stojí ľudská strážnica. Prebrodí sa horda?' },
+  { name: 'Brezový háj',     desc: 'V háji sa opevnili kopijníci. Vypáľ ich tábor.' },
+  { name: 'Mlynský potok',   desc: 'Mlyny živia ľudské vojsko. Bez nich padnú.' },
+  { name: 'Rybárska osada',  desc: 'Posledné útočisko ľudí na ostrove. Dobi ho.' },
+];
+
 // rozloženie bodov (0..1), had zdola nahor
 const MAP_NODES = [
   [0.26, 0.95], [0.62, 0.88], [0.84, 0.76], [0.54, 0.66], [0.18, 0.58],
