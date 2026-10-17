@@ -1912,12 +1912,21 @@
     u.flash = Math.max(0, u.flash - dt);
     u.cd = Math.max(0, u.cd - dt);
     u.swing = Math.max(0, (u.swing || 0) - dt);
-    let near = false;
-    for (const e of st.enemies) if (!e.dead && e.y > 4 && Math.hypot(e.x - u.x, e.y - u.y) <= ARCHER_RANGE) { near = true; break; }
-    if (near && u.cd <= 0 && shoot(u.x, u.y, u.x, u.y - 9, ARCHER_RANGE, 'arrow', 180, u.dmg * (st.cryT > 0 ? CRY_DMG : 1), 0, ARCHER_PRIO)) { u.cd = ARCHER_CD / (st.cryT > 0 ? CRY_SPD : 1); u.swing = 0.1; }
-    else if (!near && u.cd <= 0) { // nikto z hordy v dosahu – strieľa na stavbu tábora, ak na ňu dostrelí
+    let near = false, nd = 1e9;
+    u.aimT = null; // na koho mieri (natočí sa k nemu a napne luk)
+    for (const e of st.enemies) {
+      if (e.dead || e.y <= 4) continue;
+      const d = Math.hypot(e.x - u.x, e.y - u.y);
+      if (d <= ARCHER_RANGE) { near = true; if (d < nd) { nd = d; u.aimT = e; } }
+    }
+    if (near && u.cd <= 0 && shoot(u.x, u.y, u.x, u.y - 9, ARCHER_RANGE, 'arrow', 180, u.dmg * (st.cryT > 0 ? CRY_DMG : 1), 0, ARCHER_PRIO)) {
+      u.cd = ARCHER_CD / (st.cryT > 0 ? CRY_SPD : 1); u.swing = 0.1;
+      u.aimT = st.proj[st.proj.length - 1].tgt || u.aimT; // vystrelil na prednostný cieľ – k nemu sa otočí
+    }
+    else if (!near) { // nikto z hordy v dosahu – strieľa na stavbu tábora, ak na ňu dostrelí
       const o = nearestCampPart(u.x, u.y);
-      if (o && Math.hypot(o.x - u.x, o.y - u.y) <= ARCHER_RANGE) {
+      if (o && Math.hypot(o.x - u.x, o.y - u.y) <= ARCHER_RANGE) u.aimT = campAim(o);
+      if (u.cd <= 0 && o && Math.hypot(o.x - u.x, o.y - u.y) <= ARCHER_RANGE) {
         const a = campAim(o);
         st.proj.push({ k: 'arrow', x: u.x, y: u.y - 9, tgt: null, tx: a.x + (Math.random() - 0.5) * 6, ty: a.y, dmg: u.dmg * (st.cryT > 0 ? CRY_DMG : 1), spd: 180, splash: 0, vx: 0, vy: -1, campT: o });
         u.cd = ARCHER_CD / (st.cryT > 0 ? CRY_SPD : 1); u.swing = 0.1; AUDIO.play('arrow');
@@ -2497,14 +2506,19 @@
     u._lx = u.x; u._ly = u.y;
     const d = Math.hypot(mvx, mvy), moving = d > 0.05;
     if (moving) u._wd = (u._wd || 0) + d;
-    const t = u.tgt && !u.tgt.dead ? u.tgt : null, near = t && Math.hypot(t.x - u.x, t.y - u.y) < 14;
+    const t = u.archer ? (u.aimT && !u.aimT.dead ? u.aimT : null) : u.tgt && !u.tgt.dead ? u.tgt : null;
+    const near = t && (u.archer || Math.hypot(t.x - u.x, t.y - u.y) < 14);
     if (near) u.face8 = dir8(t.x - u.x, t.y - u.y);
     else if (moving) u.face8 = dir8(mvx, mvy);
     else if (!t) u.face8 = 6;
     if (u.face8 == null) u.face8 = 6;
     const v = set[u.face8];
-    if (u.swing > 0) return v.atk[u.swing > 0.075 ? 1 : 2]; // švih a dokončenie úderu
-    if (near && !moving && u.cd < 0.25) return v.atk[0];  // napriahnutie
+    if (u.archer) { // lukostrelec: po výstrele chvíľu povolená tetiva, potom znova napne; v behu luk spustí
+      if (u.swing > 0 || (near && !moving && u.cd > ARCHER_CD * 0.6)) return v.atk[1];
+      if (near && !moving) return v.atk[0];
+    }
+    else if (u.swing > 0) return v.atk[u.swing > 0.075 ? 1 : 2]; // švih a dokončenie úderu
+    else if (near && !moving && u.cd < 0.25) return v.atk[0];  // napriahnutie
     if (moving) return v.walk[Math.floor(u._wd / 3.2) % 4];
     return v.idle;
   }
@@ -2517,7 +2531,7 @@
       cryAura(u, false);
       if (u.stunT > 0) { // hviezdičky nad omráčeným
         const t = performance.now() / 1000;
-        for (let k = 0; k < 2; k++) { const a = t * 6 + k * 3.14; g.fillStyle = k ? '#fff070' : '#f8d048'; g.fillRect(Math.round(u.x + Math.cos(a) * 4), Math.round(u.y - 18 + Math.sin(a) * 1.5), 1, 1); }
+        for (let k = 0; k < 2; k++) { const a = t * 6 + k * 3.14; g.fillStyle = k ? '#fff070' : '#f8d048'; g.fillRect(Math.round(u.x + Math.cos(a) * 4), Math.round(u.y - 15 + Math.sin(a) * 1.5), 1, 1); }
       }
       return;
     }

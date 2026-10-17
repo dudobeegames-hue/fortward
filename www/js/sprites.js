@@ -635,6 +635,7 @@ function initSprites() {
   for (const k in RACE_ART) SPR['race_' + k] = [buildOutlined(RACE_ART[k], RACE_PAL[k])];
   // lukostrelec zo strelnice (pešia jednotka) – rovnaký vojak, druhá snímka s prekročenými nohami
   SPR.footArcher = [buildSprite(DEF_ARCHER), buildSprite(DEF_ARCHER.slice(0, 14).concat(['....KddK.KddK.', '....KKK...KKK.']))];
+  SPR.footArcher8 = buildArcher8(); // lukostrelec v 8 smeroch (luk pri boku, pri streľbe napnutá tetiva)
   SPR.knight = [buildSprite(DEF_KNIGHT)];
   SPR.mage = [buildSprite(DEF_MAGE)];
   SPR.soldier = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l)));
@@ -1208,73 +1209,58 @@ function spriteFromPixels(c) {
 // Chôdza má 4 snímky: v dvojopore (oba chodidlá na zemi) telo klesne o bod, v prekročení sa zdvihne;
 // meč a štít sa kývu proti krokom. Kreslí sa 5 pohľadov, ostatné 3 sú zrkadlové (ako pri hrdinoch).
 const U8_W = 32, U8_H = 26, U8_BX = 9, U8_PB = 4; // U8_PB = prázdne riadky pod chodidlami (miesto na meč pri údere)
-const KN8_BODY = { // 14×12 bez obrysu (dopočíta sa): modrý chochol, oceľová prilba, modrý tabard so zlatým opaskom
+const KN8_BODY = { // 14×9 bez obrysu (dopočíta sa): modrý chochol, oceľová prilba, modrý tabard so zlatým opaskom
   S: [ // spredu – priezor so štrbinou, zlatý nánosník
-    '......cB......',
     '.....cBBn.....',
     '....wmcBnM....',
-    '....mmmmMD....',
     '....mKKKKD....',
     '....mmgmMD....',
     '..wmMMDDMMmD..',
     '..mMcBBBBnMD..',
-    '..mDcBgBBnMD..',
     '..MDgggGGGMD..',
     '..s.cBgBBn.s..',
     '....cBBBBn....',
   ],
   SE: [ // šikmo spredu – priezor natočený doprava
-    '.......cB.....',
     '......cBBn....',
     '.....wmcBnM...',
-    '....wmmmmmD...',
     '....mmKKKKD...',
     '....mmmmgMD...',
     '..wmMMDDDMmD..',
     '..mMcBBBBnMD..',
-    '..mDcBBgBnMD..',
     '..MDggggGGMD..',
     '..s.cBBgBn....',
     '....cBBBBn....',
   ],
   E: [ // z boku – chochol veje dozadu, štrbina priezoru vpredu, ruka s mečom pri boku
-    '.....nBc......',
     '....nBBBc.....',
     '....nwmmmM....',
-    '.....mmmmmM...',
     '.....mmmKKK...',
     '.....MmmmmD...',
     '....wmMMMD....',
     '....mMcBBn....',
-    '....mDcBBn....',
     '....MDggGG....',
     '.....scBBn....',
     '.....cBBBn....',
   ],
   NE: [ // šikmo zozadu – chochol stečie po temene, vpravo kúsok líca prilby
-    '.......Bc.....',
     '......cBBn....',
     '.....wmcBnM...',
-    '....mmmcBnD...',
     '....mmmmmMm...',
     '....MMMMMDD...',
     '..wmMMMMDDmD..',
     '..mMcBBBBnMD..',
-    '..mDcBBBBnMD..',
     '..MDgggGGGMD..',
     '..m.cBBBBn.s..',
     '....cBBBBn....',
   ],
   N: [ // zozadu – chochol po strede prilby, tabard cez chrbát
-    '......Bc......',
     '.....cBBn.....',
     '....wmcBnM....',
-    '....mmcBnD....',
     '....mmmmMD....',
     '....MMMMDD....',
     '..wmMMMMDDmD..',
     '..mMcBBBBnMD..',
-    '..mDcBBBBnMD..',
     '..MDgggGGGMD..',
     '..m.cBBBBn.s..',
     '....cBBBBn....',
@@ -1282,41 +1268,41 @@ const KN8_BODY = { // 14×12 bez obrysu (dopočíta sa): modrý chochol, oceľov
 };
 // štít: x, y v súradniciach tela; front = pred telom (inak za ním); zboku drží štít pred sebou, spredu modrý so zlatým krížom, zozadu drevo s oceľovým lemom
 const KN8_SHIELD = {
-  S:  { x: 9, y: 6, front: true, rows: ['cBgBn', 'ggggG', 'cBgBn', 'cBgBn', '.BgB.', '..n..'] },
-  SE: { x: 10, y: 6, front: true, rows: ['cgBn', 'gggG', 'cgBn', 'cgBn', '.gB.', '..n.'] },
-  E:  { x: 9, y: 6, front: true, rows: ['cBn', 'gGn', 'cBn', 'cBn', '.Bn', '.n.'] },
-  NE: { x: 0, y: 6, front: true, rows: ['mLLM', 'mLlM', 'mLLM', 'mLlM', '.LM.', '..M.'] },
-  N:  { x: 0, y: 6, front: true, rows: ['mLLLM', 'mLlLM', 'mLLLM', 'mLlLM', '.MLM.', '..M..'] },
+  S:  { x: 9, y: 4, front: true, rows: ['cBgBn', 'ggggG', 'cBgBn', '.BgB.', '..n..'] },
+  SE: { x: 10, y: 4, front: true, rows: ['cgBn', 'gggG', 'cgBn', '.gB.', '..n.'] },
+  E:  { x: 9, y: 4, front: true, rows: ['cBn', 'gGn', 'cBn', '.Bn', '.n.'] },
+  NE: { x: 0, y: 4, front: true, rows: ['mLLM', 'mLlM', 'mLLM', '.LM.', '..M.'] },
+  N:  { x: 0, y: 4, front: true, rows: ['mLLLM', 'mLlLM', 'mLLLM', '.MLM.', '..M..'] },
 };
-// nohy (4 riadky pod telom, horný zakryje telo, keď klesne): postoj a 4 snímky chôdze –
+// nohy (3 riadky pod telom, horný zakryje telo, keď klesne): postoj a 4 snímky chôdze –
 // dvojopora, prekročenie (zdvihnutá noha o bod vyššie), dvojopora na druhú nohu, prekročenie
 const KN8_LEGS = {
   front: {
-    idle: ['....mD..mD....', '....mD..mD....', '....mD..mD....', '....lL..lL....'],
+    idle: ['....mD..mD....', '....mD..mD....', '....lL..lL....'],
     walk: [
-      ['....mD..mD....', '....mD..mD....', '....mD..mD....', '....lL..dL....'],
-      ['....mD..mD....', '....mD..mD....', '....mD..lL....', '....lL........'],
-      ['....mD..mD....', '....mD..mD....', '....mD..mD....', '....dL..lL....'],
-      ['....mD..mD....', '....mD..mD....', '....lL..mD....', '........lL....'],
+      ['....mD..mD....', '....mD..mD....', '....lL..dL....'],
+      ['....mD..mD....', '....mD..lL....', '....lL........'],
+      ['....mD..mD....', '....mD..mD....', '....dL..lL....'],
+      ['....mD..mD....', '....lL..mD....', '........lL....'],
     ],
   },
   side: { // bližšia noha svetlá (m), vzdialenejšia tmavšia (M); špička topánky smeruje doprava
-    idle: ['.....MmD......', '.....MmD......', '.....MmD......', '.....lLLL.....'],
+    idle: ['.....MmD......', '.....MmD......', '.....lLLL.....'],
     walk: [
-      ['.....MmD......', '....MD.mD.....', '....MD..mD....', '...dL....lLL..'],
-      ['.....mD.......', '.....mDMD.....', '.....mD.dL....', '.....lLL......'],
-      ['.....mMD......', '....mD.MD.....', '....mD..MD....', '...lL....dLL..'],
-      ['.....MD.......', '.....MDmD.....', '.....MD.lL....', '.....dLL......'],
+      ['.....MmD......', '....MD.mD.....', '...dL...lLL...'],
+      ['.....mDMD.....', '.....mD.dL....', '.....lLL......'],
+      ['.....mMD......', '....mD.MD.....', '...lL...dLL...'],
+      ['.....MDmD.....', '.....MD.lL....', '.....dLL......'],
     ],
   },
 };
 // ruka s mečom (súradnice v tele), uhol meča v postoji a pri údere (napriahnutie, švih, dokončenie)
 const KN8_HAND = {
-  N:  { x: 11, y: 10, idle: -1.15, atk: [-0.2, -1.5, -2.25], legs: 'front' },
-  NE: { x: 11, y: 10, idle: -1.0,  atk: [-1.95, -0.75, 0.05], legs: 'front' },
-  E:  { x: 5,  y: 10, idle: -2.1,  atk: [-2.5, -0.5, 0.5],    legs: 'side' }, // zboku má meč opretý o plece
-  SE: { x: 2,  y: 10, idle: -2.2,  atk: [-2.55, 3.1, 2.4],    legs: 'front' },
-  S:  { x: 2,  y: 10, idle: -2.05, atk: [-2.45, 3.0, 2.3],    legs: 'front' },
+  N:  { x: 11, y: 7,  idle: -1.15, atk: [-0.2, -1.5, -2.25], legs: 'front' },
+  NE: { x: 11, y: 7,  idle: -1.0,  atk: [-1.95, -0.75, 0.05], legs: 'front' },
+  E:  { x: 5,  y: 7,  idle: -2.1,  atk: [-2.5, -0.5, 0.5],    legs: 'side' }, // zboku má meč opretý o plece
+  SE: { x: 2,  y: 7,  idle: -2.2,  atk: [-2.55, 3.1, 2.4],    legs: 'front' },
+  S:  { x: 2,  y: 7,  idle: -2.05, atk: [-2.45, 3.0, 2.3],    legs: 'front' },
 };
 function buildUnit8(spec) {
   const W = U8_W, H = U8_H, K = hexRGB(PAL.K), feet = H - U8_PB - 1;
@@ -1327,8 +1313,9 @@ function buildUnit8(spec) {
     rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] !== '.') o.push([ox + i, oy + j, col(r[i])]); });
     return o;
   };
-  // jedna snímka; bob = telo nižšie o bod, sw = kývnutie štítu, lunge = výpad pri údere
-  function frame(view, legRows, bob, ang, lunge, sw) {
+  // jedna snímka; bob = telo nižšie o bod, sw = kývnutie štítu (luku), lunge = výpad pri údere;
+  // pose = uhol meča, pri luku stav: 'low' (spustený pri boku), 'draw' (napnutá tetiva so šípom), 'loose' (po výstrele)
+  function frame(view, legRows, bob, pose, lunge, sw) {
     const px = new Array(W * H).fill(null);
     const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < W && y < H) px[y * W + x] = c; };
     // vrstva s obrysom; over = obrys smie prekresliť to, čo je pod ním (oddelí štít od tela)
@@ -1340,15 +1327,41 @@ function buildUnit8(spec) {
       }
       for (const [x, y, c] of pts) put(x, y, c);
     };
-    const body = spec.body[view], top = feet - 3 - body.length + bob + (lunge ? 1 : 0);
-    layer(grid(legRows, U8_BX, feet - 3), false);
-    const sh = spec.shield[view], side = view === 'E'; // zboku sa štít kýve dopredu a dozadu, inak hore a dole
-    const shield = grid(sh.rows, U8_BX + sh.x + (side ? sw : 0), top + sh.y + (side ? 0 : sw));
-    if (!sh.front) layer(shield, false);
-    layer(grid(body, U8_BX, top), false);
-    if (sh.front) layer(shield, true);
+    const line = (x0, y0, x1, y1, c, out) => { // čiara bod po bode (tetiva, šíp)
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
+      for (let i = 0; i <= n; i++) out.push([Math.round(x0 + (x1 - x0) * i / n), Math.round(y0 + (y1 - y0) * i / n), typeof c === 'function' ? c(i, n) : c]);
+    };
+    const lt = feet - legRows.length + 1, body = spec.body[view], top = lt - 1 - body.length + bob + (lunge ? 1 : 0);
+    layer(grid(legRows, U8_BX, lt), false);
+    const sh = spec.shield && spec.shield[view], side = view === 'E'; // zboku sa štít kýve dopredu a dozadu, inak hore a dole
+    const shield = sh && grid(sh.rows, U8_BX + sh.x + (side ? sw : 0), top + sh.y + (side ? 0 : sw));
+    // luk: zvislý oblúk vypuklý k cieľu, tetiva od koncov k ruke, ktorá ju napína; spustený luk drží pri boku
+    const bw = spec.bow && spec.bow[view], aiming = bw && pose !== 'low';
+    let bowPts = null;
+    const strPts = [], hands = [];
+    if (bw) {
+      const g = aiming ? bw.aim : bw.low, gx = U8_BX + g.x, gy = top + g.y + (aiming ? 0 : sw), bend = aiming ? bw.bend : bw.lowBend;
+      bowPts = [];
+      for (let y = -4; y <= 4; y++) bowPts.push([gx + bend * Math.round(1.2 * (1 - (y / 4) ** 2)), gy + y, col(Math.abs(y) === 4 ? 'd' : y === 0 ? 'L' : 'l')]);
+      const px0 = U8_BX + bw.pull.x - (pose === 'loose' ? Math.sign(bw.pull.x - bw.aim.x) : 0), py0 = top + bw.pull.y;
+      if (pose === 'draw') { line(gx, gy - 3, px0, py0, col('e'), strPts); line(px0, py0, gx, gy + 3, col('e'), strPts); }
+      else if (bend) line(gx, gy - 3, gx, gy + 3, col('e'), strPts);
+      if (pose === 'draw' && bw.tip) line(px0, py0, U8_BX + bw.tip.x, top + bw.tip.y, (i, n) => col(i === n ? 'W' : i === 0 ? 'r' : 'l'), strPts);
+      hands.push([gx + bend, gy]);
+      if (aiming) hands.push([px0, py0]);
+    }
+    const front = bw ? (aiming ? bw.front : bw.lowFront) : true;
+    const drawBow = () => { layer(bowPts, true); for (const [x, y, c] of strPts) put(x, y, c); };
+    if (sh && !sh.front) layer(shield, false);
+    if (bw && !front) drawBow();
+    // pri mierení ruky nevisia pri boku (päste na konci rukávov zmiznú)
+    layer(grid(aiming ? body.map((r, j) => j === body.length - 2 ? r.replace(/s/g, '.') : r) : body, U8_BX, top), false);
+    if (sh && sh.front) layer(shield, true);
+    if (bw && front) drawBow();
+    for (const [x, y] of hands) put(x, y, col('s'));
+    if (bw) return px;
     // meč: hlavica, rukoväť, záštita naprieč a čepeľ s lesklou hranou
-    const h = spec.hand[view], hx = U8_BX + h.x, hy = top + h.y, dx = Math.cos(ang), dy = Math.sin(ang);
+    const ang = pose, h = spec.hand[view], hx = U8_BX + h.x, hy = top + h.y, dx = Math.cos(ang), dy = Math.sin(ang);
     const pts = [], add = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (!pts.some(q => q[0] === x && q[1] === y)) pts.push([x, y, c]); };
     add(hx - dx * 2, hy - dy * 2, col('g'));
     add(hx - dx, hy - dy, col('L'));
@@ -1373,9 +1386,10 @@ function buildUnit8(spec) {
   function views(view) {
     const h = spec.hand[view], L = spec.legs[h.legs];
     const mk = flip => ({
-      idle: toSprite(frame(view, L.idle, 1, h.idle, false, 0), flip),
-      walk: L.walk.map((lr, i) => toSprite(frame(view, lr, i % 2 ? 0 : 1, h.idle + SWAY[i], false, SHIELD[i]), flip)),
-      atk: h.atk.map((a, i) => toSprite(frame(view, L.idle, 1, a, i > 0, 0), flip)),
+      idle: toSprite(frame(view, L.idle, 1, spec.bow ? 'low' : h.idle, false, 0), flip),
+      walk: L.walk.map((lr, i) => toSprite(frame(view, lr, i % 2 ? 0 : 1, spec.bow ? 'low' : h.idle + SWAY[i], false, SHIELD[i]), flip)),
+      atk: spec.bow ? ['draw', 'loose'].map(p => toSprite(frame(view, L.idle, 1, p, false, 0), flip)) // napnutie, výstrel
+        : h.atk.map((a, i) => toSprite(frame(view, L.idle, 1, a, i > 0, 0), flip)),
     });
     return { n: mk(false), m: mk(true) };
   }
@@ -1383,4 +1397,79 @@ function buildUnit8(spec) {
   // 0 E, 1 SE, 2 S, 3 SW, 4 W, 5 NW, 6 N, 7 NE
   return [v.E.n, v.SE.n, v.S.n, v.SE.m, v.E.m, v.NE.m, v.N.n, v.NE.n];
 }
-const buildKnight8 = () => buildUnit8({ body: KN8_BODY, shield: KN8_SHIELD, legs: KN8_LEGS, hand: KN8_HAND, blade: 7 });
+const buildKnight8 = () => buildUnit8({ body: KN8_BODY, shield: KN8_SHIELD, legs: KN8_LEGS, hand: KN8_HAND, blade: 6 });
+
+// lukostrelec: kožená čiapka s červeným perom, modrá tunika, kožený opasok a remeň tulca; tulec so šípmi na chrbte
+const AR8_BODY = {
+  S: [
+    '.....lllLr....',
+    '....dlllLLd...',
+    '....sKssKS....',
+    '....ssssSS....',
+    '..cBBBSSBLBn..',
+    '..cBcBBBLnBn..',
+    '..BnLLLgLLBn..',
+    '..s.cBBBBn.s..',
+    '....cBBBBn....',
+  ],
+  SE: [
+    '......lllLr...',
+    '.....dlllLLd..',
+    '.....LsKssKS..',
+    '.....LssssSS..',
+    '..cBBBBSSBLn..',
+    '..cBcBBBBLBn..',
+    '..BnLLLLgLBn..',
+    '..s.cBBBBn....',
+    '....cBBBBn....',
+  ],
+  E: [
+    '....rllllL....',
+    '....dllllLLd..',
+    '.....LLsKsS...',
+    '.....LssssS...',
+    '...rwcBBBn....',
+    '...wlcBBBn....',
+    '....LLLgLL....',
+    '.....scBBn....',
+    '.....cBBBn....',
+  ],
+  NE: [
+    '.....rlllL....',
+    '....dlllLLd...',
+    '....LLLLLLsrw.',
+    '....SLLLLSlL..',
+    '..cBBBBBlLLn..',
+    '..cBBBBlLLBn..',
+    '..BnLLlLLLBn..',
+    '..s.cBBBBn.s..',
+    '....cBBBBn....',
+  ],
+  N: [
+    '.....rlllL....',
+    '....dlllLLd...',
+    '....LLLLLd.wr.',
+    '....SLLLdSlL..',
+    '..cBBBBBlLLn..',
+    '..cBBBBlLLBn..',
+    '..BnLLlLLLBn..',
+    '..s.cBBBBn.s..',
+    '....cBBBBn....',
+  ],
+};
+// luk: low = úchop spusteného luku (v ľavej ruke), aim = úchop zdvihnutého luku, pull = ruka napínajúca tetivu,
+// tip = hrot nasadeného šípu, bend = kam je luk vypuklý (k cieľu), front = luk pred telom
+const AR8_BOW = {
+  S:  { low: { x: 12, y: 6 }, lowBend: 0, lowFront: true, aim: { x: 10, y: 4 }, pull: { x: 8, y: 4 }, tip: { x: 10, y: 6 }, bend: 0, front: true },
+  SE: { low: { x: 12, y: 6 }, lowBend: 1, lowFront: true, aim: { x: 12, y: 4 }, pull: { x: 9, y: 4 }, tip: { x: 15, y: 5 }, bend: 1, front: true },
+  E:  { low: { x: 10, y: 6 }, lowBend: 1, lowFront: true, aim: { x: 12, y: 3 }, pull: { x: 8, y: 3 }, tip: { x: 15, y: 3 }, bend: 1, front: true },
+  NE: { low: { x: 1, y: 6 },  lowBend: 0, lowFront: true, aim: { x: 11, y: 1 }, pull: { x: 8, y: 3 }, tip: { x: 13, y: 0 }, bend: 1, front: false },
+  N:  { low: { x: 1, y: 6 },  lowBend: 0, lowFront: true, aim: { x: 5, y: 0 },  pull: { x: 10, y: 3 }, bend: 0, front: false },
+};
+const AR8_HAND = { N: { legs: 'front' }, NE: { legs: 'front' }, E: { legs: 'side' }, SE: { legs: 'front' }, S: { legs: 'front' } };
+// nohy ako rytier, len v modrých nohaviciach namiesto plátov
+const legsCloth = L => {
+  const re = r => r.replace(/m/g, 'B').replace(/[MD]/g, 'n');
+  return { idle: L.idle.map(re), walk: L.walk.map(f => f.map(re)) };
+};
+const buildArcher8 = () => buildUnit8({ body: AR8_BODY, bow: AR8_BOW, hand: AR8_HAND, legs: { front: legsCloth(KN8_LEGS.front), side: legsCloth(KN8_LEGS.side) } });
