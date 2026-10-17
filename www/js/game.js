@@ -4837,7 +4837,17 @@
     p.ontransitionend = () => { p.style.height = 'auto'; };
     setTimeout(() => AUDIO.play('paper'), 300); // zvuk spolu s rozvíjaním
   }
-  window.addEventListener('resize', () => { for (const sc of ['slots', 'title']) if (!$(sc).hidden) unrollScroll(false, sc); });
+  // papier a tyče sa kreslia na presnú šírku zvitku – keď sa zvitok rozšíri či zúži (zmena okna, otočenie mobilu),
+  // prekreslia sa nanovo; sleduje sa samotný papier, takže sa zmeria až nová šírka (nie stará pred úpravou hry)
+  const scrollRO = new ResizeObserver(entries => {
+    for (const en of entries) {
+      const p = en.target, w = Math.round(en.contentRect.width), sc = p.closest('.screenOverlay');
+      if (p._w === w) continue;
+      const had = p._w != null; p._w = w;
+      if (had && w && sc && !sc.hidden && p.style.height !== '0px') unrollScroll(false, sc.id);
+    }
+  });
+  for (const sc of ['slots', 'title']) scrollRO.observe($(sc).querySelector('.paper'));
   function showSlots(opts) {
     st.phase = 'title';
     $('title').hidden = true; $('map').hidden = true;
