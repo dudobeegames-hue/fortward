@@ -2490,7 +2490,37 @@
   }
   // zasiahnutá budova či hrad sa namiesto zafarbenia jemne otrasie o pixel do strán (úlomky pridá hitBuilding / hitCamp)
   const hitJit = f => f > 0 ? (Math.floor(performance.now() / 45) % 2 ? 1 : -1) : 0;
+  // jednotka v 8 smeroch (rytier): natočí sa k nepriateľovi, inak smerom chôdze, v pokoji pozerá na hordu;
+  // snímka chôdze sa ráta z prejdenej vzdialenosti, aby nohy nekĺzali (krok = 4 snímky na ~13 bodov)
+  function unit8Frame(u, set) {
+    const mvx = u.x - (u._lx == null ? u.x : u._lx), mvy = u.y - (u._ly == null ? u.y : u._ly);
+    u._lx = u.x; u._ly = u.y;
+    const d = Math.hypot(mvx, mvy), moving = d > 0.05;
+    if (moving) u._wd = (u._wd || 0) + d;
+    const t = u.tgt && !u.tgt.dead ? u.tgt : null, near = t && Math.hypot(t.x - u.x, t.y - u.y) < 14;
+    if (near) u.face8 = dir8(t.x - u.x, t.y - u.y);
+    else if (moving) u.face8 = dir8(mvx, mvy);
+    else if (!t) u.face8 = 6;
+    if (u.face8 == null) u.face8 = 6;
+    const v = set[u.face8];
+    if (u.swing > 0) return v.atk[u.swing > 0.075 ? 1 : 2]; // švih a dokončenie úderu
+    if (near && !moving && u.cd < 0.25) return v.atk[0];  // napriahnutie
+    if (moving) return v.walk[Math.floor(u._wd / 3.2) % 4];
+    return v.idle;
+  }
   function drawFighter(u, sprName) {
+    if (!u.isKing && SPR[sprName + '8']) {
+      const fr = unit8Frame(u, SPR[sprName + '8']), y = Math.round(u.y - U8_H) + U8_PB;
+      shadow(u.x, u.y, 4);
+      cryAura(u, false, true);
+      g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - U8_W / 2), y);
+      cryAura(u, false);
+      if (u.stunT > 0) { // hviezdičky nad omráčeným
+        const t = performance.now() / 1000;
+        for (let k = 0; k < 2; k++) { const a = t * 6 + k * 3.14; g.fillStyle = k ? '#fff070' : '#f8d048'; g.fillRect(Math.round(u.x + Math.cos(a) * 4), Math.round(u.y - 18 + Math.sin(a) * 1.5), 1, 1); }
+      }
+      return;
+    }
     if (u.isKing && hero8(sprName)) {
       const fr = king8Frame(u, hero8(sprName));
       shadow(u.x, u.y, 5);
