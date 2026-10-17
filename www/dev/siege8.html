@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Obliehacie stroje</title>
+<style>
+  body { margin: 0; padding: 16px; background: #3a4a2a; color: #eee; font: 14px sans-serif; }
+  canvas { image-rendering: pixelated; display: block; margin-bottom: 12px; max-width: 100%; }
+</style>
+</head>
+<body>
+<div>Riadky: baranidlo, katapult, ohnivý voz, veža · stĺpce: 8 smerov (V, JV, J, JZ, Z, SZ, S, SV), posledný = akcia</div>
+<canvas id="sheet"></canvas>
+<script src="../js/sprites.js"></script>
+<script src="../js/scene.js"></script>
+<script src="../js/buildings.js"></script>
+<script src="../js/siege.js"></script>
+<script>
+const t0 = performance.now();
+initSiegeSprites();
+window.buildMs = performance.now() - t0;
+const sets = [SPR.siegeRam8, SPR.siegeCat8, SPR.siegeFire8, SPR.siegeTower8];
+const cw = Math.max(...sets.map(s => s[0].idle.w)), ch = Math.max(...sets.map(s => s[0].idle.h)), Z = 3;
+const cv = document.getElementById('sheet'), x = cv.getContext('2d');
+cv.width = cw * 9 * Z; cv.height = ch * 4 * Z; x.imageSmoothingEnabled = false;
+let dist = 0, last = performance.now();
+function loop(now) {
+  dist += Math.max(0, now - last) / 1000 * 12; last = now;
+  x.fillStyle = '#4c5e34'; x.fillRect(0, 0, cv.width, cv.height);
+  sets.forEach((set, j) => {
+    set.forEach((v, d) => { const f = v.walk[Math.floor(dist / set.stride) % 4]; x.drawImage(f.c, d * cw * Z, j * ch * Z, f.w * Z, f.h * Z); });
+    const a = set[1].act; x.drawImage(a.c, 8 * cw * Z, j * ch * Z, a.w * Z, a.h * Z);
+  });
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+// statický hárok pre kontrolu: snap(name, dirs)
+window.snapSheet = async (name, Zs = 6, dirs = [6, 7, 0, 1, 2]) => {
+  const c = document.createElement('canvas'); c.width = cw * (dirs.length + 1) * Zs; c.height = ch * 4 * Zs;
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.fillStyle = '#4c5e34'; g.fillRect(0, 0, c.width, c.height);
+  sets.forEach((set, j) => { dirs.forEach((d, i) => { const f = set[d].idle; g.drawImage(f.c, i * cw * Zs, j * ch * Zs, f.w * Zs, f.h * Zs); }); const a = set[dirs[0]].act; g.drawImage(a.c, dirs.length * cw * Zs, j * ch * Zs, a.w * Zs, a.h * Zs); });
+  return (await fetch('/snap?name=' + name, { method: 'POST', body: c.toDataURL() })).status;
+};
+</script>
+</body>
+</html>

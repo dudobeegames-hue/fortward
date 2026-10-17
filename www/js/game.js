@@ -766,8 +766,11 @@
     return best;
   }
   // ohnivý voz: prúd ohňa k bodu (tx, ty) – zraní a podpáli každého na zemi v úzkom kuželi pred vozom
+  // ústie sifónu ohnivého voza voči stredu na zemi (model: 9,5 kocky vpredu, 9,5 kocky vysoko), podľa natočenia
+  const fireNozzle = u => { const a = (u.face8 == null ? 6 : u.face8) * Math.PI / 4; return { x: Math.cos(a) * 9.5, y: Math.sin(a) * 9.5 * VOX_DEPTH - 9.5 * VOX_UP }; };
   function sprayFire(u, tx, ty) {
-    const ox = u.x, oy = u.y - 14, dx = tx - ox, dy = ty - oy, d = Math.hypot(dx, dy) || 1, rng = SIEGE.fire.range + 6;
+    u.aimP = { x: tx, y: ty }; // natočí sa k cieľu
+    const nz = fireNozzle(u), ox = u.x + nz.x, oy = u.y + nz.y, dx = tx - ox, dy = ty - oy, d = Math.hypot(dx, dy) || 1, rng = SIEGE.fire.range + 6;
     for (const e of st.enemies) {
       if (e.dead || e.d.fly) continue;
       const ex = e.x - ox, ey = e.y - e.h * 0.4 - oy, along = (ex * dx + ey * dy) / d, side = Math.abs(ex * dy - ey * dx) / d;
@@ -779,7 +782,7 @@
   }
   // obliehacia veža: šíp z cimburia na nepriateľa v dosahu, alebo (o) na stavbu tábora
   function towerArrow(u, o) {
-    const sy = u.y - 26, dmg = u.dmg * (st.cryT > 0 ? CRY_DMG : 1);
+    const sy = u.y - 18, dmg = u.dmg * (st.cryT > 0 ? CRY_DMG : 1); // z cimburia veže
     if (o) { const a = campAim(o); st.proj.push({ k: 'arrow', x: u.x, y: sy, tgt: null, tx: a.x + (Math.random() - 0.5) * 6, ty: a.y, dmg, spd: 200, splash: 0, vx: 0, vy: -1, campT: o }); AUDIO.play('arrow'); }
     else if (!shoot(u.x, u.y, u.x, sy, SIEGE.tower.range, 'arrow', 200, dmg, 0, ARCHER_PRIO)) return false;
     else st.proj[st.proj.length - 1].siege = true;
@@ -788,7 +791,8 @@
   }
   // katapult: balvan na bod; campT = stavba tábora, ktorú má zasiahnuť
   function catRock(u, tx, ty, dmg, campT) {
-    const sx = u.x, sy = u.y - 14, dist = Math.hypot(tx - sx, ty - sy);
+    u.aimP = { x: tx, y: ty }; // natočí sa k cieľu
+    const sx = u.x, sy = u.y - 12, dist = Math.hypot(tx - sx, ty - sy);
     st.proj.push({ k: 'rock', arc: true, sx, sy, x: sx, y: sy, tx, ty, t: 0, dur: Math.max(0.5, dist / 120), h: 14 + dist * 0.25, dmg, splash: 20, campT, siege: true });
     u.cd = SIEGE.cat.cd; u.fired = 1.0; AUDIO.play('bolt');
   }
@@ -2522,7 +2526,23 @@
     if (moving) return v.walk[Math.floor(u._wd / set.stride) % 4];
     return v.idle;
   }
+  // obliehací stroj v 8 smeroch: natočí sa smerom jazdy, pri streľbe k cieľu; snímka jazdy podľa prejdenej cesty
+  // (pootočenie kolies), akcia = úder baranidla, výstrel katapultu či veže, šľahnutie plameňa
+  function drawSiege8(u, set) {
+    const mvx = u.x - (u._lx == null ? u.x : u._lx), mvy = u.y - (u._ly == null ? u.y : u._ly);
+    u._lx = u.x; u._ly = u.y;
+    const d = Math.hypot(mvx, mvy), moving = d > 0.03;
+    if (moving) { u._wd = (u._wd || 0) + d; u.face8 = dir8(mvx, mvy); }
+    else if (u.aimP && (u.fired > 0 || u.cd > 0)) u.face8 = dir8(u.aimP.x - u.x, u.aimP.y - u.y);
+    if (u.face8 == null) u.face8 = 6;
+    const v = set[u.face8], k = u.siege;
+    const act = k === 'ram' ? u.swing > 0 : k === 'cat' ? u.fired > 0.4 : k === 'tower' ? u.fired > 0 : u.cd > SIEGE.fire.cd - 0.25;
+    const fr = act ? v.act : moving ? v.walk[Math.floor(u._wd / set.stride) % 4] : v.idle;
+    shadow(u.x, u.y, 9);
+    g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.ax), Math.round(u.y - fr.ay));
+  }
   function drawFighter(u, sprName) {
+    if (u.siege && SPR[sprName + '8']) return drawSiege8(u, SPR[sprName + '8']);
     if (!u.isKing && SPR[sprName + '8']) {
       const fr = unit8Frame(u, SPR[sprName + '8']), y = Math.round(u.y - fr.h) + U8_PB;
       shadow(u.x, u.y, 4);
@@ -4976,6 +4996,7 @@
 
   initSprites();
   initBuildingSprites();
+  initSiegeSprites(); // obliehacie stroje v 8 smeroch (js/siege.js)
   initIcons();
   resize();
   window.addEventListener('resize', resize);
