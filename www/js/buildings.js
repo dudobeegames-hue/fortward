@@ -1074,107 +1074,6 @@ function makeStakes() {
   }
   return p.finish();
 }
-// ---- Obliehacie stroje hráča (pohľad zozadu – idú hore k pevnosti) ----
-// baranidlo 18x16: sedlová strecha z modrých koží, železná hlavica trčí dopredu, vojaci tlačia zvnútra; f = fáza kolies/krokov
-function makeSiegeRam(f) {
-  const p = painter(18, 16);
-  for (let y = 0; y <= 2; y++) for (let x = 8; x <= 9; x++) p.set(x, y, y === 0 ? RIVET : x === 8 ? hexRGB('#80869a') : IRON); // hlavica
-  for (let y = 3; y <= 8; y++) {                                                              // strecha – koža na rebrách
-    const hw = 1.5 + (y - 3) * 1.25;
-    for (let x = Math.ceil(8.5 - hw); x <= Math.floor(8.5 + hw); x++) {
-      const t = (x - (8.5 - hw)) / (2 * hw), rib = (x + y) % 4 === 0;
-      p.shade(x, y, ROOF_BLUE, (rib ? 0.25 : 0.82 - t * 0.55) + (y === 3 ? 0.1 : 0));
-    }
-  }
-  for (let x = 1; x <= 16; x++) p.shade(x, 9, WOOD, 0.62 - x * 0.015);                       // spodný trám strechy
-  for (let y = 10; y <= 13; y++) for (let x = 4; x <= 13; x++) p.set(x, y, hexRGB('#1e120a')); // tmavé vnútro
-  for (const lx of [5, 10]) for (let y = 10; y <= 13; y++) {                                  // nohy tlačiacich vojakov
-    const step = (lx === 5) === (f === 0) ? 1 : 0;
-    if (y < 13 - step || y === 13 && step === 0) { p.set(lx, y, hexRGB(y === 10 ? '#88b4ff' : '#3c64c8')); p.set(lx + 2, y, hexRGB(y === 10 ? '#3c64c8' : '#22337a')); }
-    if (y === 13 - step) { p.set(lx, y, hexRGB('#3e2614')); p.set(lx + 2, y, hexRGB('#3e2614')); }
-  }
-  for (const sx of [2, 14]) for (let y = 10; y <= 14; y++) p.shade(sx + (sx === 2 ? 1 : 0), y, WOOD, sx === 2 ? 0.55 : 0.35); // stĺpiky
-  for (const wx of [0, 15]) for (let y = 10; y <= 15; y++) for (let x = wx; x <= wx + 2; x++) {          // kolesá (z boku úzke)
-    const spoke = (y + f) % 3 === 0;
-    p.shade(x, y, WOOD, spoke ? 0.2 : x === wx ? 0.7 : x === wx + 1 ? 0.5 : 0.32);
-  }
-  for (const wx of [1, 16]) p.set(wx, 12 + f, RIVET);                                                     // náboj
-  return p.finish();
-}
-// pojazdný katapult 16x19: rám na kolesách, rameno s miskou; loaded = rameno dole s balvanom, inak vztýčené po výstrele
-function makeSiegeCat(loaded) {
-  const p = painter(16, 19);
-  const STONE = ['#22202a', '#3c3846', '#4e4858', '#625a6c', '#7a7286', '#9a92a6'].map(hexRGB);
-  for (let y = 11; y <= 14; y++) for (let x = 2; x <= 13; x++) p.shade(x, y, WOOD, (y === 11 ? 0.78 : 0.6) - (x - 2) * 0.025 + ((x - 2) % 4 === 3 ? -0.18 : 0)); // podlaha z dosiek
-  for (let x = 2; x <= 13; x++) { p.shade(x, 15, WOOD, 0.3); p.shade(x, 16, WOOD, 0.18); }                                  // predný trám
-  for (const [px, v] of [[3, 0.78], [12, 0.42]]) for (let y = 3; y <= 14; y++) { p.shade(px, y, WOOD, v); p.shade(px + (px === 3 ? 1 : -1), y, WOOD, v - 0.2); } // stĺpy
-  for (let x = 3; x <= 12; x++) { p.shade(x, 3, WOOD, 0.72 - x * 0.02); p.set(x, 4, x % 3 === 0 ? RIVET : IRON); }            // priečka s kovaním
-  for (const wx of [0, 14]) for (let y = 11; y <= 18; y++) for (let x = wx; x <= wx + 1; x++)                                   // kolesá z boku
-    p.set(x, y, y === 11 || y === 18 ? IRON : (y + x) % 3 === 0 ? pickRamp(WOOD, 0.25, x, y) : pickRamp(WOOD, x === wx ? 0.7 : 0.45, x, y));
-  if (loaded) {                                                                    // rameno stiahnuté k nám, miska s balvanom visí pred trámom
-    for (let y = 5; y <= 14; y++) { p.shade(7, y, WOOD, 0.8); p.shade(8, y, WOOD, 0.5); }
-    for (let x = 5; x <= 10; x++) { p.shade(x, 15, WOOD, 0.55); p.shade(x, 18, WOOD, 0.3); }
-    for (let y = 16; y <= 17; y++) { p.shade(5, y, WOOD, 0.55); p.shade(10, y, WOOD, 0.3); }
-    for (let y = 14; y <= 17; y++) for (let x = 6; x <= 9; x++) if (!((y === 14 || y === 17) && (x === 6 || x === 9))) p.shade(x, y, STONE, 0.98 - (x - 6) * 0.14 - (y - 14) * 0.1);
-    p.set(6, 15, STONE[5]);
-  } else {                                                                         // po výstrele: rameno opreté o priečku, prázdna miska hore
-    for (let y = 2; y <= 14; y++) { p.shade(7, y, WOOD, 0.8); p.shade(8, y, WOOD, 0.5); }
-    for (let x = 5; x <= 10; x++) p.shade(x, 0, WOOD, x < 8 ? 0.7 : 0.4);
-    for (let x = 5; x <= 10; x++) p.set(x, 1, x === 5 || x === 10 ? pickRamp(WOOD, 0.4, x, 1) : hexRGB('#1e120a'));
-  }
-  p.set(3, 0, hexRGB('#3e2614')); p.set(3, 1, hexRGB('#3e2614')); p.set(3, 2, hexRGB('#3e2614'));                         // žrď
-  p.set(2, 0, hexRGB('#88b4ff')); p.set(1, 0, hexRGB('#5a86e8')); p.set(2, 1, hexRGB('#3c64c8'));                       // modrá zástavka
-  return p.finish();
-}
-// ohnivý voz 16x16 (zozadu): drevený voz s okovaným sudom gréckeho ohňa, medený sifón mieri dopredu, pod ním žeravá pec;
-// f = fáza kolies a plamienka
-function makeSiegeFire(f) {
-  const p = painter(16, 16);
-  const COP = ['#3a1a0c', '#6a3418', '#a0582a', '#d08848', '#f0b878'].map(hexRGB);
-  for (let y = 0; y <= 3; y++) { p.shade(7, y, COP, 0.85 - y * 0.05); p.shade(8, y, COP, 0.45); } // sifón
-  p.set(7, 0, GLOW); p.set(8, 0, f ? GLOW : GLOW2);                                               // plamienok na ústí
-  for (let y = 3; y <= 9; y++) for (let x = 3; x <= 12; x++) {                                     // sud
-    const t = (x - 3) / 9, hoop = y === 4 || y === 8;
-    if ((y === 3 || y === 9) && (x === 3 || x === 12)) continue;
-    p.set(x, y, hoop ? (x === 5 || x === 10 ? RIVET : IRON) : pickRamp(WOOD, 0.82 - t * 0.55, x, y));
-  }
-  for (let x = 1; x <= 14; x++) { p.shade(x, 10, WOOD, 0.7 - x * 0.02); p.shade(x, 11, WOOD, 0.4); } // plošina voza
-  for (let y = 12; y <= 13; y++) for (let x = 5; x <= 10; x++) p.set(x, y, (x + y + f) % 3 === 0 ? GLOW : GLOW2); // žeravá pec pod sudom
-  for (const x of [4, 11]) for (let y = 12; y <= 14; y++) p.set(x, y, IRON);
-  for (const wx of [0, 14]) for (let y = 10; y <= 15; y++) for (let x = wx; x <= wx + 1; x++) {   // kolesá z boku
-    p.set(x, y, y === 10 || y === 15 ? IRON : (y + f) % 3 === 0 ? pickRamp(WOOD, 0.25, x, y) : pickRamp(WOOD, x === wx ? 0.7 : 0.45, x, y));
-  }
-  p.set(2, 2, hexRGB('#3e2614')); p.set(2, 3, hexRGB('#3e2614')); p.set(2, 4, hexRGB('#3e2614'));  // žrď s modrou zástavkou
-  p.set(1, 2, hexRGB('#88b4ff')); p.set(0, 2, hexRGB('#5a86e8')); p.set(1, 3, hexRGB('#3c64c8'));
-  return p.finish();
-}
-// obliehacia veža 16x28 (zozadu): drevená veža pokrytá modrými kožami, hore cimburie s dvoma lukostrelcami, dole kolesá;
-// f = fáza kolies, shot = lukostrelci práve napínajú luk (o pixel vyššie)
-function makeSiegeTower(f, shot) {
-  const p = painter(16, 28);
-  const by = shot ? 0 : 1;
-  for (const [hx, lit] of [[4, true], [10, false]]) {                                              // hlavy lukostrelcov s prilbou
-    p.set(hx, by, hexRGB(lit ? '#88b4ff' : '#5a86e8')); p.set(hx + 1, by, hexRGB(lit ? '#5a86e8' : '#3c64c8'));
-    p.set(hx, by + 1, hexRGB('#e8b890')); p.set(hx + 1, by + 1, hexRGB('#c08868'));
-    p.set(hx + 2, by - 1 < 0 ? 0 : by - 1, hexRGB('#8a5a2e')); p.set(hx + 2, by, hexRGB('#8a5a2e'));  // luk
-  }
-  for (let x = 1; x <= 14; x++) for (let y = 3; y <= 5; y++) {                                     // cimburie
-    if (y === 3 && x % 3 === 0) continue;
-    p.shade(x, y, WOOD, (y === 3 ? 0.85 : 0.65) - x * 0.025);
-  }
-  for (let y = 6; y <= 21; y++) for (let x = 2; x <= 13; x++) {                                     // telo pokryté kožami
-    const t = (x - 2) / 11, seam = y % 5 === 0;
-    p.shade(x, y, seam ? WOOD : ROOF_BLUE, seam ? 0.55 - t * 0.3 : 0.8 - t * 0.5 + ((x + y) % 4 === 0 ? -0.08 : 0));
-  }
-  for (const x of [2, 13]) for (let y = 6; y <= 22; y++) p.shade(x, y, WOOD, x === 2 ? 0.75 : 0.3); // rohové trámy
-  for (let x = 1; x <= 14; x++) { p.shade(x, 22, WOOD, 0.6 - x * 0.02); p.shade(x, 23, WOOD, 0.3); } // podvozok
-  for (const wx of [0, 14]) for (let y = 21; y <= 27; y++) for (let x = wx; x <= wx + 1; x++) {    // kolesá
-    p.set(x, y, y === 21 || y === 27 ? IRON : (y + f) % 3 === 0 ? pickRamp(WOOD, 0.25, x, y) : pickRamp(WOOD, x === wx ? 0.7 : 0.45, x, y));
-  }
-  for (let y = 24; y <= 26; y++) for (let x = 4; x <= 11; x++) p.set(x, y, hexRGB('#1e120a'));     // tmavé vnútro, nohy tlačiacich
-  for (const lx of [5, 9]) { const st = (lx === 5) === (f === 0) ? 1 : 0; for (let y = 24; y <= 26 - st; y++) { p.set(lx, y, hexRGB('#3c64c8')); p.set(lx + 1, y, hexRGB('#22337a')); } }
-  return p.finish();
-}
 // ---- Orkský veľkráľ (boss 10. misie) 26x30: koruna, kožušinový plášť, červená pelerína, obojručná sekera; step = krok nôh ----
 function makeOrcKing(step) {
   const p = painter(26, 30);
@@ -1447,10 +1346,6 @@ function initBuildingSprites() {
   BSPR.bearDen = makeBearDen();
   BSPR.powderHut = makePowderHut();
   BSPR.wolfPen = makeWolfPen();
-  SPR.siegeRam = [makeSiegeRam(0), makeSiegeRam(1)];
-  SPR.siegeCat = [makeSiegeCat(true), makeSiegeCat(false)];
-  SPR.siegeFire = [makeSiegeFire(0), makeSiegeFire(1)];
-  SPR.siegeTower = [makeSiegeTower(0, false), makeSiegeTower(1, false), makeSiegeTower(0, true)];
   SPR.orcKing = [makeOrcKing(0), makeOrcKing(1)];
   SPR.bear = [makeBearRider(0), makeBearRider(1)];
   SPR.giantRam = [makeGiantRam(0), makeGiantRam(1)];

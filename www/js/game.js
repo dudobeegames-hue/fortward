@@ -2542,7 +2542,7 @@
     g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.ax), Math.round(u.y - fr.ay));
   }
   function drawFighter(u, sprName) {
-    if (u.siege && SPR[sprName + '8']) return drawSiege8(u, SPR[sprName + '8']);
+    if (u.siege) return drawSiege8(u, SPR[sprName + '8']);
     if (!u.isKing && SPR[sprName + '8']) {
       const fr = unit8Frame(u, SPR[sprName + '8']), y = Math.round(u.y - fr.h) + U8_PB;
       shadow(u.x, u.y, 4);
@@ -2567,19 +2567,19 @@
       return;
     }
     const frames = SPR[sprName];
-    const fi = u.siege === 'cat' ? (u.fired > 0 ? 1 : 0) : u.siege === 'tower' && u.fired > 0 ? 2 : Math.floor(u.anim) % 2, fr = frames[fi];
-    const x = Math.round(u.x - fr.w / 2), y = Math.round(u.y - fr.h - (u.swing > 0 && !u.siege ? 1 : 0)) + (u.siege === 'ram' && u.swing > 0 ? -2 : 0);
-    shadow(u.x, u.y, u.siege ? 8 : 4);
-    if (!u.siege) cryAura(u, !!u.isKing, true);
+    const fr = frames[Math.floor(u.anim) % 2];
+    const x = Math.round(u.x - fr.w / 2), y = Math.round(u.y - fr.h - (u.swing > 0 ? 1 : 0));
+    shadow(u.x, u.y, 4);
+    cryAura(u, !!u.isKing, true);
     g.drawImage(u.flash > 0 ? fr.f : fr.c, x, y);
     if (sprName === 'craft') drawHammer(u, x, y);
     if (sprName === 'sorc' && Math.random() < 0.25) part(x + 12, y + 1, (Math.random() - 0.5) * 4, -8 - Math.random() * 6, 0.35, Math.random() < 0.5 ? '#fff070' : '#f87830', 0); // plamienok na palici
-    if (!u.siege) cryAura(u, !!u.isKing); // pokrik
+    cryAura(u, !!u.isKing); // pokrik
     if (u.stunT > 0) { // hviezdičky nad omráčeným
       const t = performance.now() / 1000;
       for (let k = 0; k < 2; k++) { const a = t * 6 + k * 3.14; g.fillStyle = k ? '#fff070' : '#f8d048'; g.fillRect(Math.round(u.x + Math.cos(a) * 4), Math.round(y - 3 + Math.sin(a) * 1.5), 1, 1); }
     }
-    if (u.swing > 0 && !u.siege) { // záblesk meča
+    if (u.swing > 0) { // záblesk meča
       g.fillStyle = '#ffffff';
       g.fillRect(x + fr.w - 1, y - 2, 1, 3); g.fillRect(x + fr.w, y - 3, 1, 2);
     }
@@ -2916,15 +2916,14 @@
     }
     g.globalAlpha = 1;
   }
-  // výber miesta pre obliehací stroj: povolený pás sa jemne rozsvieti, zdvihnutý stroj bliká
+  // výber miesta pre obliehací stroj: voľné políčka, kam sa dá postaviť, sa jemne rozsvietia; políčko zdvihnutého stroja bliká
   function drawSiegePick(time) {
-    const y0 = Math.max(0, Math.round(siegeMinY())), a = 0.10 + 0.05 * Math.sin(time * 5);
-    g.fillStyle = 'rgba(255,240,140,' + a.toFixed(3) + ')'; g.fillRect(G.gx0, y0, G.cols * T, G.hallBot - y0);
-    g.fillStyle = 'rgba(255,240,140,0.6)'; for (let x = G.gx0; x < G.gx0 + G.cols * T; x += 4) g.fillRect(x, y0, 2, 1);
-    const o = st.siegePick.order || st.siegePick.unit;
+    const o = st.siegePick.order || st.siegePick.unit, a = 0.2 + 0.06 * Math.sin(time * 5);
+    g.fillStyle = 'rgba(255,240,140,' + a.toFixed(3) + ')';
+    for (let r = 0; r < G.rows; r++) for (let c = 0; c < G.cols; c++) if (siegeSpotOk(c, r, o)) g.fillRect(tileX(c) + 1, tileY(r) + 1, T - 2, T - 2);
     if (!o) return;
-    const key = st.siegePick.order ? o.key : o.siege, sp = SPR[BUY[key].siege][0];
-    if (Math.floor(time * 4) % 2) corners(Math.round(o.x - sp.w / 2) - 2, Math.round(o.y - sp.h) - 2, Math.round(o.x + sp.w / 2) + 1, Math.round(o.y) + 1, '#fff070');
+    const { c, r } = siegeCell(o.x, o.y);
+    if (Math.floor(time * 4) % 2) corners(tileX(c), tileY(r), tileX(c) + T - 1, tileY(r) + T - 1, '#fff070');
   }
   function drawBuildOverlay(time) {
     const zt = zoneTopRow();
@@ -3604,8 +3603,8 @@
         if (cast) { const t = s.tgt; objs.push({ y: t.y - healAuraH(t) - 1, f: () => drawHealAura(s, t, time) }); }
       }
       if (st.phase === 'build') for (const o of st.siegeOrder) { // kúpené obliehacie stroje čakajú na mieste, odkiaľ vyrazia
-        const sp = SPR[BUY[o.key].siege][0];
-        objs.push({ y: o.y, f: () => { shadow(o.x, o.y, 8); g.drawImage(sp.c, Math.round(o.x - sp.w / 2), Math.round(o.y - sp.h)); } });
+        const sp = SPR[BUY[o.key].siege + '8'][6].idle; // otočený k horde
+        objs.push({ y: o.y, f: () => { shadow(o.x, o.y, 9); g.drawImage(sp.c, Math.round(o.x - sp.ax), Math.round(o.y - sp.ay)); } });
       }
       if (st.king && !st.king.dead) objs.push({ y: st.king.y, f: () => drawFighter(st.king, heroDef().spr) });
       else if (st.king && kingLying(st.king)) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
@@ -4383,7 +4382,11 @@
   function orderSiege(key, x, y) {
     const u = BUY[key];
     if (st.phase !== 'build' || !canSiege(key) || st.gold < u.cost || siegeCount(key) >= SIEGE_MAX) return false;
-    if (x == null) { const i = st.siegeOrder.length; x = G.hallCx + (i % 2 ? 1 : -1) * (30 + 14 * Math.floor(i / 2)); y = G.hallTop + 4; }
+    if (x == null) { // bez určeného miesta: prvé voľné políčko striedavo vľavo a vpravo od radnice
+      const r = siegeCell(G.hallCx, G.hallTop + 4).r, c0 = siegeCell(G.hallCx, 0).c;
+      for (let k = 2; k < G.cols && x == null; k++) for (const c of [c0 - k, c0 + k]) if (x == null && siegeSpotOk(c, r)) ({ x, y } = siegeCellPos(c, r));
+      if (x == null) return false;
+    }
     st.gold -= u.cost; st.siegeOrder.push({ key, x, y });
     return true;
   }
@@ -4395,16 +4398,22 @@
   // ---- štartové miesto strojov: ťuk na kartu stroja ho vyberie, ťuk na bojisko ho tam postaví;
   // ťuk na stroj na bojisku (kúpený alebo ten, čo prežil vlnu) ho zdvihne a ďalší ťuk ho presunie ----
   const siegeMinY = () => musterYOf() - 10; // stroj začína pri vlastnom území: od zhromaždiska pred zónou k radnici
-  function siegeSpotOk(x, y) {
-    const c = Math.floor((x - G.gx0) / T), r = Math.floor((y - G.gy0) / T);
-    if (c < 0 || c >= G.cols || r < 0 || r >= G.rows || y < siegeMinY()) return false;
+  // stroje stoja v mriežke ako budovy: jeden stroj na políčko, kotva (stred stroja na zemi) mierne pod stredom políčka
+  const siegeCell = (x, y) => ({ c: Math.floor((x - G.gx0) / T), r: Math.floor((y - G.gy0) / T) });
+  const siegeCellPos = (c, r) => ({ x: tileX(c) + T / 2, y: tileY(r) + T / 2 + 3 });
+  function siegeSpotOk(c, r, self) {
+    if (c < 0 || c >= G.cols || r < 0 || r >= G.rows) return false;
+    const p = siegeCellPos(c, r);
+    if (p.y < siegeMinY()) return false;
     const hr = hallRect();
-    if (x >= hr.x0 - 4 && x < hr.x1 + 4 && y >= hr.y0 - 8 && y < hr.y1 + 4) return false;
-    return !occAt(c, r);
+    if (p.x >= hr.x0 - 4 && p.x < hr.x1 + 4 && p.y >= hr.y0 - 8 && p.y < hr.y1 + 4) return false;
+    if (occAt(c, r)) return false;
+    const taken = o => o !== self && (o.siege ? !o.dead : true) && (q => q.c === c && q.r === r)(siegeCell(o.x, o.y));
+    return !st.siegeOrder.some(taken) && !st.soldiers.some(u => u.siege && taken(u));
   }
   // stroj na bojisku pod prstom (čakajúca objednávka alebo stroj, čo prežil vlnu)
   function siegeAt(x, y) {
-    const hit = (ox, oy, key) => { const sp = SPR[BUY[key].siege][0]; return Math.abs(x - ox) <= sp.w / 2 + 1 && y <= oy + 2 && y >= oy - sp.h; };
+    const hit = (ox, oy, key) => { const sp = SPR[BUY[key].siege + '8'][6].idle; return Math.abs(x - ox) <= T / 2 + 2 && y <= oy + 4 && y >= oy - (sp.ay - 2); };
     for (const o of st.siegeOrder) if (hit(o.x, o.y, o.key)) return { order: o };
     for (const u of st.soldiers) if (u.siege && !u.dead && hit(u.x, u.y, u.siege)) return { unit: u };
     return null;
@@ -4416,7 +4425,9 @@
       st.siegePick = same ? null : on; AUDIO.play('click'); renderBuild(); return;
     }
     if (!pk) return;
-    if (!siegeSpotOk(x, y)) { AUDIO.play('deny'); return; } // stroj začína len pri vlastnom území, nie na budove
+    const cell = siegeCell(x, y);
+    if (!siegeSpotOk(cell.c, cell.r, pk.order || pk.unit)) { AUDIO.play('deny'); return; } // len voľné políčko pri vlastnom území
+    ({ x, y } = siegeCellPos(cell.c, cell.r));
     if (pk.key) {
       if (siegeCount(pk.key) >= SIEGE_MAX || st.gold < BUY[pk.key].cost) { st.siegePick = null; AUDIO.play('deny'); renderBuild(); return; }
       snapshot(); orderSiege(pk.key, x, y);
