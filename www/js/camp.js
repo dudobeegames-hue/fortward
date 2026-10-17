@@ -12,6 +12,8 @@ const CAMP_ROLES = {
   spawn:   { hp: 260, gold: 35, what: 'vychádzajú z nej jednotky jej druhu – keď padne, ten druh už v misii nepríde' },
   wall:    { hp: 220, gold: 8,  what: 'kryje tábor – vojaci ho musia najprv prelomiť' },
   keep:    { hp: 900, gold: 80, what: 'srdce tábora – keď padne, zrúti sa celý tábor' },
+  trap:    { hp: 120, gold: 10, what: 'pasca – zraní alebo zastaví vojakov, ktorí cez ňu prejdú (ožije pri hre za orkov)' },
+  support: { hp: 200, gold: 30, what: 'pomocná stavba – zlato, opravy (ožije pri hre za orkov)' },
 };
 // stavby hradov podľa rasy protivníka: druh → úloha, meno, obrázok, veľkosť v políčkach mriežky (size, predvolene 1×1)
 // a pri liahni druh jednotky (unit). Hrady sa skladajú v editore hradov (www/dev/castle-editor.html)
@@ -38,17 +40,24 @@ const CAMP_PIECES = {
     stakes:      { role: 'wall',    name: 'Koly',            spr: () => BSPR.stakes, hp: 0.4 },
     keep:        { role: 'keep',    name: 'Orkská pevnosť',  spr: () => BSPR.orcKeep, size: [3, 2] },
   },
-  human: {
+  human: { // všetky stavby, ktoré má hráč za ľudí
     barracks: { role: 'spawn', unit: 'knight', name: 'Kasárne',    spr: () => BSPR.barracks },
     range:    { role: 'spawn', unit: 'archer', name: 'Strelnica',  spr: () => BSPR.range },
     stables:  { role: 'spawn', unit: 'rider',  name: 'Stajne',     spr: () => BSPR.stables },
     armory:   { role: 'spawn', unit: 'spear',  name: 'Zbrojnica',  spr: () => BSPR.armory },
+    falconry: { role: 'spawn', unit: 'falcon', name: 'Sokoliareň', spr: () => BSPR.falconry },
     tower:    { role: 'tower',   name: 'Strážna veža',    spr: () => BSPR.tower[0] },
     mage:     { role: 'tower',   name: 'Veža mága',       spr: () => BSPR.mage[0] },
     icetower: { role: 'tower',   name: 'Ľadová veža',     spr: () => BSPR.icetower[0] },
     ballista: { role: 'bombard', name: 'Balista',         spr: () => BSPR.ballista[0] },
     chapel:   { role: 'totem',   name: 'Kaplnka',         spr: () => BSPR.chapel },
-    gatehouse:{ role: 'wall',    name: 'Brána',           spr: () => BSPR.gatehouse[0], hp: 1.5 },
+    workshop: { role: 'support', name: 'Dielňa remeselníka', spr: () => BSPR.workshop },
+    mine:     { role: 'support', name: 'Zlatá baňa',      spr: () => BSPR.mine },
+    pit:      { role: 'trap',    name: 'Jama s ostňami',  spr: () => BSPR.pit },
+    firepit:  { role: 'trap',    name: 'Ohnivá jama',     spr: () => BSPR.firepit },
+    beartrap: { role: 'trap',    name: 'Medvedia pasca',  spr: () => BSPR.beartrap },
+    wall:     { role: 'wall',    name: 'Hradby',          spr: () => BSPR.wall[0][10], hp: 1.1 },
+    gatehouse:{ role: 'wall',    name: 'Brána',           spr: () => BSPR.gateIcon, hp: 1.5 },
     hall:     { role: 'keep',    name: 'Radnica',         spr: () => BSPR.hall[0], size: [3, 3] },
   },
 };

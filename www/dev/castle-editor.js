@@ -91,9 +91,9 @@
   }
 
   // ---- paleta, zoznam, info ----
-  const ROLE_NAME = { bombard: 'ostreľovač', tower: 'veža', totem: 'liečiteľ', drum: 'posilňovač', spawn: 'liaheň', wall: 'opevnenie', keep: 'srdce tábora' };
+  const ROLE_NAME = { bombard: 'ostreľovač', tower: 'veža', totem: 'liečiteľ', drum: 'posilňovač', spawn: 'liaheň', wall: 'opevnenie', keep: 'srdce tábora', trap: 'pasca', support: 'podpora' };
   const UNIT_NAME = { goblin: 'goblini', orc: 'orkovia', brute: 'surovci', garcher: 'goblin-lukostrelci', bat: 'netopiere', shaman: 'šamani', bear: 'medvedí jazdci',
-    sapper: 'podkopníci', wolf: 'vlčí jazdci', knight: 'rytieri', archer: 'lukostrelci', rider: 'jazdci', spear: 'kopijníci' };
+    sapper: 'podkopníci', wolf: 'vlčí jazdci', knight: 'rytieri', archer: 'lukostrelci', rider: 'jazdci', spear: 'kopijníci', falcon: 'sokoly' };
   const subOf = pc => pc.role === 'spawn' ? '→ ' + (UNIT_NAME[pc.unit] || pc.unit) : ROLE_NAME[pc.role];
   function thumb(sp) { const c = document.createElement('canvas'); c.width = sp.w; c.height = sp.h; c.getContext('2d').drawImage(sp.c, 0, 0); return c; }
   function renderPalette() {
