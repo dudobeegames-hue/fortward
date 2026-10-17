@@ -1308,7 +1308,8 @@ const KN8_HAND = {
 };
 function buildUnit8(spec) {
   // plátno: jazdec na koni potrebuje väčšie (W, H v spec); BX = ľavý okraj tela postavy (14 bodov) v strede plátna
-  const W = spec.W || U8_W, H = spec.H || U8_H, BX = (W - 14) >> 1, K = hexRGB(PAL.K), feet = H - U8_PB - 1;
+  const W = spec.W || U8_W, H = spec.H || U8_H, BX0 = (W - 14) >> 1, K = hexRGB(PAL.K), feet = H - U8_PB - 1;
+  const FIST = spec.fist || 's'; // farba päste (orkovia majú zelenú)
   const col = ch => hexRGB((spec.pal && spec.pal[ch]) || PAL[ch]);
   const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   const grid = (rows, ox, oy) => {
@@ -1319,6 +1320,7 @@ function buildUnit8(spec) {
   // jedna snímka; bob = telo nižšie o bod, sw = kývnutie štítu (luku), lunge = výpad pri údere;
   // pose = uhol meča, pri luku stav: 'low' (spustený pri boku), 'draw' (napnutá tetiva so šípom), 'loose' (po výstrele)
   function frame(view, legRows, bob, pose, lunge, sw) {
+    const BX = BX0 - ((spec.body[view][0].length - 14) >> 1); // širšia postava (surovec) ostane v strede plátna
     const px = new Array(W * H).fill(null);
     const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < W && y < H) px[y * W + x] = c; };
     // vrstva s obrysom; over = obrys smie prekresliť to, čo je pod ním (oddelí štít od tela)
@@ -1339,10 +1341,11 @@ function buildUnit8(spec) {
     if (mnt) { // kôň: vzdialenejšie nohy (L, K) ako samostatná vrstva vzadu, potom bližšie nohy, hlava za jazdcom a trup;
       // jazdec sedí tak, že jeho posledný riadok je na riadku seat trupu koňa
       const hx0 = BX + mnt.x, ht = lt - mnt.body.length + bob;
-      layer(grid(legRows.map(r => r.replace(/[^LK]/g, '.')), hx0, lt), false);
+      const far = spec.far || 'LK'; // znaky vzdialenejších nôh (vlk má šedé)
+      layer(grid(legRows.map(r => r.replace(new RegExp('[^' + far + ']', 'g'), '.')), hx0, lt), false);
       if (mnt.head) head = grid(mnt.head.rows, hx0 + mnt.head.x, ht + mnt.head.y);
       if (head && !mnt.head.front) layer(head, false);
-      layer(grid(legRows.map(r => r.replace(/[LK]/g, '.')), hx0, lt), false);
+      layer(grid(legRows.map(r => r.replace(new RegExp('[' + far + ']', 'g'), '.')), hx0, lt), false);
       layer(grid(mnt.body, hx0, ht), false);
       top = ht + mnt.seat - body.length + 1 + (lunge ? 1 : 0);
     } else layer(grid(legRows, BX, lt), false);
@@ -1373,8 +1376,8 @@ function buildUnit8(spec) {
     if (sh && sh.front) layer(shield, true);
     if (head && mnt.head.front) layer(head, true); // hlava koňa pred jazdcom (spredu)
     if (bw && front) drawBow();
-    for (const [x, y] of hands) put(x, y, col('s'));
-    if (bw) return px;
+    for (const [x, y] of hands) put(x, y, col(FIST));
+    if (bw || spec.noWeapon) return px; // podkopník nesie bombu v rukách (je v kresbe tela)
     if (spec.spear) { // kopija: drevené ratište s tmavou pätkou a oceľovým hrotom; k = skrátenie, keď mieri k divákovi či od neho
       const h = spec.hand[view], sp = thrust ? pose : { a: pose, k: 1, push: 0 }, k = sp.k;
       const dx = Math.cos(sp.a) * k, dy = Math.sin(sp.a) * k;
@@ -1383,22 +1386,32 @@ function buildUnit8(spec) {
       for (let t = -4; t <= spec.spear; t += 0.25) {
         const x = Math.round(hx + dx * t), y = Math.round(hy + dy * t);
         if (pts.some(q => q[0] === x && q[1] === y)) continue;
-        pts.push([x, y, col(t >= spec.spear - 0.25 ? 'W' : t >= spec.spear - 2 ? 'w' : t <= -3.5 ? 'd' : 'l')]);
+        const tp = spec.tip || ['W', 'w']; // hrot (pri šamanovej palici svietiaca guľa)
+        pts.push([x, y, col(t >= spec.spear - 0.25 ? tp[0] : t >= spec.spear - 2 ? tp[1] : t <= -3.5 ? 'd' : 'l')]);
       }
       layer(pts, false);
-      put(Math.round(hx), Math.round(hy), col('s')); // päsť
-      if (thrust) put(Math.round(hx + dx * 3), Math.round(hy + dy * 3), col('s')); // pri bodnutí drží ratište oboma rukami
+      put(Math.round(hx), Math.round(hy), col(FIST)); // päsť
+      if (thrust) put(Math.round(hx + dx * 3), Math.round(hy + dy * 3), col(FIST)); // pri bodnutí drží ratište oboma rukami
       return px;
     }
     // meč: hlavica, rukoväť, záštita naprieč a čepeľ s lesklou hranou
     const ang = pose, h = spec.hand[view], hx = BX + h.x, hy = top + h.y, dx = Math.cos(ang), dy = Math.sin(ang);
     const pts = [], add = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (!pts.some(q => q[0] === x && q[1] === y)) pts.push([x, y, c]); };
+    if (spec.axe) { // sekera: drevené porisko, na konci železná čepeľ na jednu stranu so svetlým ostrím
+      const [len, wd] = spec.axe;
+      for (let t = -1; t <= len; t += 0.25) add(hx + dx * t, hy + dy * t, col(t <= -0.75 ? 'd' : 'l'));
+      for (let t = len - 2.5; t <= len; t += 0.25) for (let o = 0.75; o <= wd; o += 0.25)
+        add(hx + dx * t - dy * o, hy + dy * t + dx * o, col(o > wd - 0.6 ? 'w' : t > len - 0.6 ? 'M' : 'm'));
+      layer(pts, false);
+      put(hx, hy, col(FIST));
+      return px;
+    }
     add(hx - dx * 2, hy - dy * 2, col('g'));
     add(hx - dx, hy - dy, col('L'));
     for (let k = -1; k <= 1; k++) add(hx + dx - dy * k, hy + dy + dx * k, k ? col('G') : col('g'));
     for (let t = 2; t <= spec.blade; t += 0.25) for (const o of [0, 0.5]) add(hx + dx * t - dy * o, hy + dy * t + dx * o, o ? col('m') : t >= spec.blade - 0.75 ? col('W') : col('w'));
     layer(pts, false);
-    put(hx, hy, col('s')); // päsť
+    put(hx, hy, col(FIST)); // päsť
     return px;
   }
   function toSprite(px, flip) {

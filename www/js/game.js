@@ -1376,6 +1376,7 @@
       for (const u of st.soldiers) { const d = Math.hypot(u.x - e.x, u.y - e.y); if (d < (u.fly ? R : td * 0.8)) { td = u.fly ? 0 : d; tgt = u; } } // sokoly zostrelí prednostne
       if (st.king && !st.king.dead && heroDef().range) { const d = Math.hypot(st.king.x - e.x, st.king.y - e.y); if (d < td * 0.8) { td = d; tgt = st.king; } } // aj na čarodejku
       if (tgt) {
+        e.aimP = tgt === HALL ? { x: Math.max(hrr.x0, Math.min(hrr.x1, e.x)), y: hrr.y0 } : tgt.kind ? { x: tileX(tgt.c) + T / 2, y: tileY(tgt.r) + T / 2 } : { x: tgt.x, y: tgt.y };
         attackFn(() => {
           let tx, ty;
           if (tgt === HALL) { tx = Math.max(hrr.x0 + 2, Math.min(hrr.x1 - 2, e.x)); ty = hrr.y0 + 4; }
@@ -1394,7 +1395,7 @@
       const d = Math.hypot(Math.max(x0 - e.x, 0, e.x - x0 - T), Math.max(y0 - e.y, 0, e.y - y0 - T));
       if (d < nd) { nd = d; nearB = b; }
     }
-    if (nearB) { attack(() => hitBuilding(nearB, e.d.atk, e)); return; }
+    if (nearB) { e.aimP = { x: tileX(nearB.c) + T / 2, y: tileY(nearB.r) + T / 2 }; attack(() => hitBuilding(nearB, e.d.atk, e)); return; }
     // podkopník beží rovno k najbližšej hradbe
     if (e.d.sapper && e.y > 4) {
       let tw = null, td = 1e9;
@@ -1409,7 +1410,7 @@
       let tx = qx, ty = qy;
       if (e.y < hr.y0) ty = hr.y0 - 1; // zhora
       else if (e.x < hr.x0) tx = hr.x0 - 3; else if (e.x > hr.x1) tx = hr.x1 + 3;
-      if (Math.hypot(tx - e.x, ty - e.y) <= 2.5) { attack(() => hitHall(e.d.atk, e.x)); return; }
+      if (Math.hypot(tx - e.x, ty - e.y) <= 2.5) { e.aimP = { x: qx, y: hr.y0 + 8 }; attack(() => hitHall(e.d.atk, e.x)); return; }
       moveTo(e, tx + e.jx * 0.5, ty, spd, dt);
       return;
     }
@@ -2363,7 +2364,52 @@
     for (let dx = -r; dx <= r; dx++) g.fillRect(Math.round(x) + dx, Math.round(y) - 1, 1, Math.abs(dx) >= r - 1 ? 1 : 2);
   }
 
+  // ork v 8 smeroch: natočí sa k protivníkovi či k tomu, čo búra, inak smerom chôdze (na začiatku k pevnosti);
+  // snímka chôdze podľa prejdenej cesty, úder = napriahnutie, švih a dokončenie, lukostrelec napne a pustí tetivu
+  function enemy8Frame(e, set) {
+    const mvx = e.x - (e._lx == null ? e.x : e._lx), mvy = e.y - (e._ly == null ? e.y : e._ly);
+    e._lx = e.x; e._ly = e.y;
+    const d = Math.hypot(mvx, mvy), moving = d > 0.03 && !e.attacking;
+    if (moving) e._wd = (e._wd || 0) + d;
+    const foe = e.foe && !e.foe.dead ? e.foe : null, busy = e.attacking || e.lunge > 0;
+    if (foe) e.face8 = dir8(foe.x - e.x, foe.y - e.y);
+    else if (busy && e.aimP) e.face8 = dir8(e.aimP.x - e.x, e.aimP.y - e.y);
+    else if (moving) e.face8 = dir8(mvx, mvy);
+    if (e.face8 == null) e.face8 = 2;
+    const v = set[e.face8];
+    if (set.bow) { if (e.lunge > 0) return v.atk[1]; if (busy) return v.atk[0]; }
+    else if (e.lunge > 0) return v.atk[e.lunge > 0.075 ? 1 : 2];
+    else if (busy && e.atk < 0.3) return v.atk[0];
+    return moving ? v.walk[Math.floor(e._wd / set.stride) % 4] : v.idle;
+  }
   function drawEnemy(e, time) {
+    const set8 = SPR[e.d.spr + '8'];
+    if (set8 && !e.d.fly) {
+      let fr, x, y;
+      if (set8.vox) { // baran, obrí baran, mamut: 3D model, akcia = úder kmeňom či dupnutie
+        const mvx = e.x - (e._lx == null ? e.x : e._lx), mvy = e.y - (e._ly == null ? e.y : e._ly), d = Math.hypot(mvx, mvy);
+        e._lx = e.x; e._ly = e.y;
+        const moving = d > 0.02 && !e.attacking;
+        if (moving) { e._wd = (e._wd || 0) + d; e.face8 = dir8(mvx, mvy); }
+        else if ((e.attacking || e.lunge > 0) && e.aimP) e.face8 = dir8(e.aimP.x - e.x, e.aimP.y - e.y);
+        if (e.face8 == null) e.face8 = 2;
+        const v = set8[e.face8];
+        fr = e.lunge > 0 ? v.act : moving ? v.walk[Math.floor(e._wd / set8.stride) % 4] : v.idle;
+        x = Math.round(e.x - fr.ax); y = Math.round(e.y - fr.ay);
+      } else {
+        fr = enemy8Frame(e, set8); x = Math.round(e.x - fr.w / 2); y = Math.round(e.y - fr.h) + U8_PB;
+      }
+      shadow(e.x, e.y, Math.ceil(e.w * 0.35));
+      if (e.d.boss) {
+        g.globalCompositeOperation = 'lighter';
+        g.fillStyle = 'rgba(200,40,20,' + ((e.d.giant ? 0.07 : 0.18) + Math.sin(time * 5) * (e.d.giant ? 0.04 : 0.08)) + ')';
+        g.beginPath(); g.ellipse(e.x, e.y - e.h / 2, e.w * 0.75, e.h * 0.7, 0, 0, 6.29); g.fill();
+        g.globalCompositeOperation = 'source-over';
+      }
+      g.drawImage(e.flash > 0 ? hitSpr(fr) : fr.c, x, y);
+      if (e.stunT > 0) drawEnemyStun(e, Math.round(e.y - e.h), time);
+      return;
+    }
     const frames = SPR[e.d.spr];
     if (e.d.fly) { // netopier mávajúci krídlami, tieň na zemi
       const fr = frames[Math.floor(time * 8 + e.ph) % 2];
@@ -2384,13 +2430,15 @@
       g.globalCompositeOperation = 'source-over';
     }
     g.drawImage(e.flash > 0 ? hitSpr(fr) : fr.c, x, y);
-    if (e.stunT > 0) { // omráčený: okolo hlavy krúžia hviezdičky
-      for (let i = 0; i < 3; i++) {
-        const a = time * 5 + i * 2.094, sx = Math.round(e.x + Math.cos(a) * (fr.w * 0.35 + 2)), sy = Math.round(y - 3 + Math.sin(a) * 2);
-        g.fillStyle = PAL.K; g.fillRect(sx - 2, sy - 1, 5, 3); g.fillRect(sx - 1, sy - 2, 3, 5);
-        g.fillStyle = '#f8d048'; g.fillRect(sx - 1, sy, 3, 1); g.fillRect(sx, sy - 1, 1, 3);
-        g.fillStyle = '#ffffff'; g.fillRect(sx, sy, 1, 1);
-      }
+    if (e.stunT > 0) drawEnemyStun(e, y, time);
+  }
+  // omráčený: okolo hlavy krúžia hviezdičky (top = vrch postavy)
+  function drawEnemyStun(e, top, time) {
+    for (let i = 0; i < 3; i++) {
+      const a = time * 5 + i * 2.094, sx = Math.round(e.x + Math.cos(a) * (e.w * 0.35 + 2)), sy = Math.round(top - 3 + Math.sin(a) * 2);
+      g.fillStyle = PAL.K; g.fillRect(sx - 2, sy - 1, 5, 3); g.fillRect(sx - 1, sy - 2, 3, 5);
+      g.fillStyle = '#f8d048'; g.fillRect(sx - 1, sy, 3, 1); g.fillRect(sx, sy - 1, 1, 3);
+      g.fillStyle = '#ffffff'; g.fillRect(sx, sy, 1, 1);
     }
   }
 
@@ -5014,6 +5062,7 @@
   }
 
   initSprites();
+  initOrcSprites(); // horda orkov v 8 smeroch (js/orcs8.js)
   initBuildingSprites();
   initSiegeSprites(); // obliehacie stroje v 8 smeroch (js/siege.js)
   initIcons();

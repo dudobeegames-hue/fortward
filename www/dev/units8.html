@@ -15,8 +15,9 @@
 <div>Živá chôdza (hore) a porovnanie so starým rytierom a kartou rasy</div>
 <canvas id="live"></canvas>
 <script src="../js/sprites.js"></script>
+<script src="../js/orcs8.js"></script>
 <script>
-initSprites();
+initSprites(); initOrcSprites();
 const U = new URLSearchParams(location.search).get('u') || 'soldier'; // napr. ?u=footArcher
 const Z = 4, set = SPR[U + '8'], W = set[0].idle.w, H = set[0].idle.h;
 const sh = document.getElementById('sheet'), sx = sh.getContext('2d');

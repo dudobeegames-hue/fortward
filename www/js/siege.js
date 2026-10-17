@@ -11,6 +11,9 @@ const R_COPPER = ['#3a1a0c', '#6a3418', '#a0582a', '#d08848', '#f0b878'].map(hex
 const R_ROCK = ['#22202a', '#3c3846', '#4e4858', '#625a6c', '#7a7286', '#9a92a6'].map(hexRGB);
 const R_SKIN = ['#5a3420', '#8a5434', '#b87850', '#d8986c', '#f0b888', '#ffd8b0'].map(hexRGB);
 const R_GOLD = ['#4a3008', '#6e4a10', '#b88420', '#f8d048', '#fff070'].map(hexRGB);
+const R_HIDE = ['#1e120a', '#3a2214', '#5a3420', '#7a4a2c', '#9a6440', '#b8804e'].map(hexRGB); // surové kože hordy
+const R_ORC = ['#1e3a16', '#305c22', '#3e7a2a', '#62a03a', '#7cb848', '#9cd45a'].map(hexRGB);
+const R_BONE = ['#6e6650', '#a8a088', '#d4ccb0', '#eee6cc', '#fffaf0'].map(hexRGB);
 const vm = (r, v) => ({ r, v });            // materiál s paletou a základným jasom
 const vEmit = c => ({ e: hexRGB(c) });       // svietiaci materiál (žeravé uhlíky, plameň) – bez tieňovania
 
@@ -49,16 +52,18 @@ function voxWheel(md, x0, x1, cy, cz, r, phase) {
   }
 }
 // vojak posádky (modrá kazajka, oceľová prilba) otočený dopredu; step = fáza kroku (-1, 0, 1), push = ruky natiahnuté dopredu
-function voxSoldier(md, x, z, step, push) {
+// orc = ork z hordy (zelená koža, kožená zbroj, bez prilby)
+function voxSoldier(md, x, z, step, push, orc) {
+  const cloth = orc ? vm(R_HIDE, 0.55) : vm(ROOF_BLUE, 0.62), skin = orc ? vm(R_ORC, 0.6) : vm(R_SKIN, 0.6);
   for (const [lx, s] of [[x, step], [x + 1, -step]]) { // nohy: chodidlo vpred / vzad, koleno v strede
     md.set(lx, 0, z + s, vm(WOOD, 0.3));
-    md.set(lx, 1, z, vm(ROOF_BLUE, 0.3));
+    md.set(lx, 1, z, orc ? vm(R_ORC, 0.4) : vm(ROOF_BLUE, 0.3));
   }
-  md.box(x, 2, z, x + 1, 4, z, vm(ROOF_BLUE, 0.62));          // trup
+  md.box(x, 2, z, x + 1, 4, z, cloth);                        // trup
   md.box(x, 3, z, x + 1, 3, z, vm(WOOD, 0.45));               // opasok
-  if (push) { md.set(x - 1, 4, z + 1, vm(R_SKIN, 0.6)); md.set(x + 2, 4, z + 1, vm(R_SKIN, 0.6)); } // ruky tlačia do stroja
-  md.box(x, 5, z, x + 1, 5, z, vm(R_SKIN, 0.65));             // hlava
-  md.box(x, 6, z, x + 1, 6, z, vm(R_STEEL, 0.62));            // prilba
+  if (push) { md.set(x - 1, 4, z + 1, skin); md.set(x + 2, 4, z + 1, skin); } // ruky tlačia do stroja
+  md.box(x, 5, z, x + 1, 5, z, skin);                         // hlava
+  md.box(x, 6, z, x + 1, 6, z, orc ? vm(R_ORC, 0.75) : vm(R_STEEL, 0.62)); // temeno / prilba
 }
 // zástavka kráľovstva na žrdi
 function voxFlag(md, x, z, y0, y1, f) {
@@ -220,7 +225,7 @@ function voxRender(md, dir, W, H, ox, oy) {
   return spr;
 }
 // celá sada stroja: pre každý z 8 smerov postoj, 4 snímky jazdy a snímka akcie (úder, výstrel, plameň)
-function buildSiege8(make) {
+function buildSiege8(make, stride) {
   const models = { walk: [0, 1, 2, 3].map(f => make(f, false)), act: make(0, true) };
   let R = 0, top = 0; // rozmery plátna podľa najvzdialenejšej kocky od stredu a najvyššej kocky
   for (const md of [...models.walk, models.act]) for (const { x, y, z } of md.m.values()) {
@@ -233,12 +238,87 @@ function buildSiege8(make) {
     const walk = models.walk.map(md => voxRender(md, d, W, H, ox, oy));
     set.push({ idle: walk[0], walk, act: voxRender(models.act, d, W, H, ox, oy) });
   }
-  set.stride = 1.05; // pootočenie kolesa o 22,5° = ~1 bod cesty
+  set.stride = stride || 1.05; // pootočenie kolesa o 22,5° = ~1 bod cesty (mamut: dĺžka kroku)
+  set.vox = true;
   return set;
+}
+// ---- horda: orkský baran, obrí baran, vojnový mamut (idú dopredu = k pevnosti) ----
+// orkský baran: kolesá z kmeňov, strecha zo surových koží s kostenými hrotmi, okovaná lebka na kmeni, tlačia ho orkovia
+function voxOrcRam(f, act, big) {
+  const md = voxModel(), ph = f * Math.PI / 8, s = big ? 1.4 : 1;
+  const X0 = Math.round(-4 * s), X1 = Math.round(3 * s), Z0 = Math.round(-6 * s), Z1 = Math.round(6 * s), r = big ? 3.6 : 2.7;
+  for (const x of [X0 - 1, X1 + 1]) for (const z of [Z0 + Math.round(2 * s), Z1 - Math.round(2 * s)]) {
+    const x2 = x + (big ? (x < 0 ? -1 : 1) : 0); // obrie kolesá sú dvojnásobne hrubé
+    voxWheel(md, Math.min(x, x2), Math.max(x, x2), r - 0.1, z, r, ph);
+    md.set(x + (x < 0 ? -1 : 1) * (big ? 2 : 1), Math.round(r - 0.6), z, vm(R_BONE, 0.7)); // kostený náboj
+  }
+  md.box(X0, Math.round(r), Z0, X0, Math.round(r), Z1, vm(ORC_WOOD, 0.6)); md.box(X1, Math.round(r), Z0, X1, Math.round(r), Z1, vm(ORC_WOOD, 0.6));
+  const y0 = Math.round(r) + 1, roofH = big ? 7 : 5;
+  for (const z of [Z0, 0, Z1]) { md.box(X0, y0, z, X0, y0 + 2, z, vm(ORC_WOOD, 0.55)); md.box(X1, y0, z, X1, y0 + 2, z, vm(ORC_WOOD, 0.55)); }
+  for (let k = 0; k < roofH; k++) { // strecha z koží, hore hrebeň s kostenými hrotmi
+    const y = y0 + 3 + k, a = Math.round(k * (X1 - X0) / 2 / roofH), x0 = X0 + a, x1 = X1 - a;
+    for (let x = x0; x <= x1; x++) for (let z = Z0; z <= Z1; z++) {
+      const gable = z === Z0 || z === Z1;
+      md.set(x, y, z, gable ? vm(ORC_WOOD, 0.3) : vm(R_HIDE, 0.55 + ((z + 40) % 4 === 0 ? -0.15 : 0)));
+    }
+  }
+  const ry = y0 + 3 + roofH;
+  for (let z = Z0 + 1; z < Z1; z += 3) md.set(Math.round((X0 + X1) / 2), ry, z, vm(R_BONE, 0.8));
+  const push = act ? 3 : 0, ly = y0 + 1;
+  md.box(-1, ly, Z0 + 1 + push, 0, ly + 1, Z1 + 2 + push, vm(ORC_WOOD, 0.5));      // kmeň
+  const hz = Z1 + 3 + push, hw = big ? 2 : 1;                                      // železná lebka na hlave kmeňa
+  md.box(-1 - hw, ly - hw + 1, hz, hw, ly + hw, hz + hw + 1, vm(R_STEEL, 0.55));
+  md.set(-1, ly + 1, hz + hw + 2, vEmit('#e84838')); md.set(0, ly + 1, hz + hw + 2, vEmit('#e84838')); // žeravé očnice
+  md.line([-2 - hw, ly + hw, hz], [-4 - hw, ly + hw + 3, hz - 1], 1, vm(R_BONE, 0.8)); // rohy
+  md.line([1 + hw, ly + hw, hz], [3 + hw, ly + hw + 3, hz - 1], 1, vm(R_BONE, 0.65));
+  const n = big ? [-4, -1, 2] : [-3, 1];
+  n.forEach((x, i) => voxSoldier(md, x, -1, (i % 2 ? -1 : 1) * STEPS[f], false, true)); // orkovia pod strechou
+  return md;
+}
+// vojnový mamut: huňatý trup, hlava s chobotom a klmi, štyri nohy v kroku (diagonálne páry), na chrbte vežička s goblinmi
+function voxMammoth(f, act) {
+  const md = voxModel(), st = STEPS[f];
+  const fur = (x, y, z) => vm(R_HIDE, 0.5 + ((x * 7 + y * 3 + z * 5) % 5 === 0 ? -0.12 : 0));
+  for (let x = -6; x <= 5; x++) for (let y = 5; y <= 14; y++) for (let z = -9; z <= 7; z++) { // trup ako elipsoid
+    if (((x + 0.5) / 6) ** 2 + ((y + 0.5 - 10) / 5) ** 2 + ((z + 0.5 + 1) / 8.5) ** 2 <= 1) md.set(x, y, z, fur(x, y, z));
+  }
+  for (let x = -4; x <= 3; x++) for (let y = 6; y <= 15; y++) for (let z = 6; z <= 12; z++) { // hlava s hrboľom
+    if (((x + 0.5) / 4.2) ** 2 + ((y + 0.5 - 11) / 4.5) ** 2 + ((z + 0.5 - 9) / 3.5) ** 2 <= 1) md.set(x, y, z, vm(R_HIDE, 0.6));
+  }
+  md.set(-3, 11, 12, vEmit('#e84838')); md.set(2, 11, 12, vEmit('#e84838'));     // zlé oči
+  const trunkUp = act ? 1 : 0; // pri dupnutí zdvihne chobot
+  md.line([-1, 9, 12], [-1, 5 + trunkUp * 5, 14], 2, vm(R_HIDE, 0.45));           // chobot
+  md.line([-1, 5 + trunkUp * 5, 14], [-1, 3 + trunkUp * 9, 15 + trunkUp], 2, vm(R_HIDE, 0.4));
+  for (const sx of [-1, 1]) {                                                     // kly zahnuté dopredu a hore
+    const bx = sx < 0 ? -3 : 2;
+    md.line([bx, 8, 11], [bx + sx, 4, 14], 1, vm(R_BONE, 0.85));
+    md.line([bx + sx, 4, 14], [bx + sx * 2, 6, 17], 1, vm(R_BONE, 0.9));
+  }
+  // nohy: stĺpy 3×3, chodidlo predného ľavého a zadného pravého sa posúva opačne ako druhý pár
+  for (const [lx, lz, sg] of [[-5, 4, 1], [2, 4, -1], [-5, -6, -1], [2, -6, 1]]) {
+    const sh = st * sg * 1.5;
+    for (let y = 0; y <= 6; y++) { const dz = Math.round(sh * (1 - y / 6)); md.box(lx, y, lz + dz, lx + 2, y, lz + 2 + dz, vm(R_HIDE, y === 0 ? 0.25 : 0.42)); }
+  }
+  md.line([0, 11, -10], [0, 7, -11], 1, vm(R_HIDE, 0.35));                         // chvost
+  md.box(-4, 15, -6, 3, 15, 3, vm(ORC_WOOD, 0.6));                                  // plošina vežičky
+  for (const x of [-4, 3]) for (const z of [-6, 3]) md.box(x, 16, z, x, 19, z, vm(ORC_WOOD, 0.5)); // stĺpiky
+  for (let x = -4; x <= 3; x++) { md.set(x, 19, -6, vm(ORC_WOOD, 0.62)); md.set(x, 19, 3, vm(ORC_WOOD, 0.62)); } // zábradlie
+  for (let z = -6; z <= 3; z++) { md.set(-4, 19, z, vm(ORC_WOOD, 0.62)); md.set(3, 19, z, vm(ORC_WOOD, 0.62)); }
+  for (const x of [-3, 1]) {                                                         // dvaja goblini s lukmi
+    md.box(x, 16, -1, x + 1, 17, -1, vm(R_HIDE, 0.6));
+    md.box(x, 18, -1, x + 1, 18, -1, vm(R_ORC, 0.7));
+    md.box(x + 1, 16, 0, x + 1, 19, 0, vm(ORC_WOOD, 0.75));
+  }
+  md.box(3, 16, -7, 3, 23, -7, vm(ORC_WOOD, 0.4));                                   // žrď s červenou zástavou
+  md.box(4, 21, -7, 5, 23, -7, vEmit('#8c2018')); md.set(6, 22 - (f & 1), -7, vEmit('#e84838'));
+  return md;
 }
 function initSiegeSprites() {
   SPR.siegeRam8 = buildSiege8(voxRam);
   SPR.siegeCat8 = buildSiege8(voxCat);
   SPR.siegeFire8 = buildSiege8(voxFire);
   SPR.siegeTower8 = buildSiege8(voxTower);
+  SPR.ram8 = buildSiege8((f, act) => voxOrcRam(f, act, false));
+  SPR.giantRam8 = buildSiege8((f, act) => voxOrcRam(f, act, true), 1.4);
+  SPR.mammoth8 = buildSiege8(voxMammoth, 2.2);
 }
