@@ -673,7 +673,7 @@
   const campPow = () => (1 + 0.2 * (st.mission - HOME_PROVINCES - 1)) * Math.sqrt(TIERS[st.tier || 0].hp);
   // jednotka vlny vyjde z liahne svojho druhu v tábore; keď tábor také liahne mal a všetky padli, ten druh už nepríde
   function spawnFromCamp(item) {
-    const all = st.camp ? st.camp.parts.filter(o => o.role === 'spawn' && o.skin.unit === item.type) : [];
+    const all = st.camp ? st.camp.parts.filter(o => o.role === 'spawn' && [].concat(o.skin.unit).includes(item.type)) : []; // liaheň môže vypúšťať aj viac druhov
     if (!all.length) { spawnEnemy(item); return; }
     const live = all.filter(o => o.hp > 0);
     if (!live.length) return;

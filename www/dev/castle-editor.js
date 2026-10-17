@@ -97,7 +97,7 @@
   const ROLE_NAME = { bombard: 'ostreľovač', tower: 'veža', totem: 'liečiteľ', drum: 'posilňovač', spawn: 'liaheň', wall: 'opevnenie', keep: 'srdce tábora', trap: 'pasca', support: 'podpora' };
   const UNIT_NAME = { goblin: 'goblini', orc: 'orkovia', brute: 'surovci', garcher: 'goblin-lukostrelci', bat: 'netopiere', shaman: 'šamani', bear: 'medvedí jazdci',
     sapper: 'podkopníci', wolf: 'vlčí jazdci', knight: 'rytieri', archer: 'lukostrelci', rider: 'jazdci', spear: 'kopijníci', falcon: 'sokoly' };
-  const subOf = pc => pc.role === 'spawn' ? '→ ' + (UNIT_NAME[pc.unit] || pc.unit) : ROLE_NAME[pc.role];
+  const subOf = pc => pc.role === 'spawn' ? '→ ' + (pc.label || UNIT_NAME[pc.unit] || pc.unit) : ROLE_NAME[pc.role];
   function thumb(sp) { const c = document.createElement('canvas'); c.width = sp.w; c.height = sp.h; c.getContext('2d').drawImage(sp.c, 0, 0); return c; }
   function renderPalette() {
     const pal = $('palette'); pal.innerHTML = '';
@@ -115,7 +115,7 @@
     const k = sel ? sel.k : tool, pc = k && CAMP_PIECES[race][k];
     if (!pc) { $('info').textContent = 'Ťukni na stavbu v palete a potom na políčko bojiska.'; return; }
     const r = CAMP_ROLES[pc.role], [w, h] = campSize(pc);
-    $('info').innerHTML = '<b>' + pc.name + '</b> – ' + ROLE_NAME[pc.role] + (pc.role === 'spawn' ? ' (' + (UNIT_NAME[pc.unit] || pc.unit) + ')' : '') + '<br>' + r.what +
+    $('info').innerHTML = '<b>' + pc.name + '</b> – ' + ROLE_NAME[pc.role] + (pc.role === 'spawn' ? ' (' + (pc.label || UNIT_NAME[pc.unit] || pc.unit) + ')' : '') + '<br>' + r.what +
       '<br>zdravie ' + Math.round(r.hp * (pc.hp || 1)) + ' (+20 % za každú ďalšiu misiu) · zlato za zničenie ' + r.gold + ' · veľkosť ' + w + '×' + h + ' políčok' +
       (sel ? '<br>políčko stĺpec ' + sel.c + ', riadok ' + sel.r + (inReach(sel) ? ' · <span style="color:#e84838">v dosahu veží hráča</span>' : '') +
         '<br><button class="del" id="delSel">Zmazať</button>' : '<br><i>Klikni na políčko bojiska a postav ju.</i>');
@@ -135,7 +135,7 @@
     });
     const hp = L.reduce((s, q) => { const pc = pcOf(q); return s + (pc ? CAMP_ROLES[pc.role].hp * (pc.hp || 1) : 0); }, 0);
     const roles = {}; for (const q of L) { const pc = pcOf(q); if (pc) roles[pc.role] = (roles[pc.role] || 0) + 1; }
-    const units = [...new Set(L.map(pcOf).filter(pc => pc && pc.role === 'spawn').map(pc => UNIT_NAME[pc.unit] || pc.unit))];
+    const units = [...new Set(L.map(pcOf).filter(pc => pc && pc.role === 'spawn').map(pc => pc.label || UNIT_NAME[pc.unit] || pc.unit))];
     $('sum').innerHTML = L.length ? L.length + ' stavieb · spolu ' + Math.round(hp) + ' zdravia (misia 6) · ' + Object.entries(roles).map(([r, n]) => ROLE_NAME[r] + ' ' + n).join(', ') +
       (units.length ? '<br>z tábora vychádzajú: ' + units.join(', ') + ' – ostatné druhy prichádzajú zhora' : '<br>tábor nemá liahne – všetky jednotky prichádzajú zhora') : '';
   }
