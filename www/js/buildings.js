@@ -770,6 +770,76 @@ function makeOrcTower() {
   for (let y = 1; y <= 9; y++) p.set(12, y, ORC_WOOD[5]); p.set(13, 1, BONE); p.set(13, 9, BONE); // luk
   return p.finish();
 }
+// ---- stavby orkského tábora (od misie 6) ----
+// orkský katapult 18x18 (spredu, mieri na hráča): hrubý rám z kmeňov, rameno s kosteným hákom; loaded = rameno vzadu s balvanom
+function makeOrcCatapult(loaded) {
+  const p = painter(18, 18);
+  const STONE = ['#22202a', '#3c3846', '#4e4858', '#625a6c', '#7a7286'].map(hexRGB);
+  for (let x = 1; x <= 16; x++) { p.shade(x, 13, ORC_WOOD, 0.75 - x * 0.02); p.shade(x, 14, ORC_WOOD, 0.4); } // spodný trám
+  for (const [px, v] of [[3, 0.8], [14, 0.4]]) pLine(p, px, 13, 9 + (px < 9 ? -1 : 1), 4, (x, y) => p.shade(x, y, ORC_WOOD, v)); // šikmé stĺpy do A
+  for (let x = 6; x <= 11; x++) p.shade(x, 4, ORC_WOOD, 0.7 - (x - 6) * 0.06);                    // priečka
+  p.set(8, 3, BONE); p.set(9, 3, BONE2);                                                              // kostené kovanie
+  if (loaded) {
+    pLine(p, 9, 12, 13, 2, (x, y) => { p.shade(x, y, ORC_WOOD, 0.85); p.shade(x + 1, y, ORC_WOOD, 0.45); });
+    for (let y = 0; y <= 2; y++) for (let x = 12; x <= 15; x++) if (!((y === 0 || y === 2) && (x === 12 || x === 15))) p.shade(x, y, STONE, 0.95 - (x - 12) * 0.15 - y * 0.1);
+  } else {
+    pLine(p, 9, 12, 5, 2, (x, y) => { p.shade(x, y, ORC_WOOD, 0.85); p.shade(x + 1, y, ORC_WOOD, 0.45); });
+    p.set(4, 1, BONE); p.set(5, 1, BONE2);                                                            // prázdny hák
+  }
+  for (const wx of [0, 15]) for (let y = 12; y <= 17; y++) for (let x = wx; x <= wx + 2; x++)        // hrubé kolesá z kmeňa
+    p.shade(x, y, ORC_WOOD, (y === 12 || y === 17) ? 0.2 : (x + y) % 3 === 0 ? 0.3 : x === wx ? 0.8 : 0.55);
+  p.set(1, 14, BONE); p.set(16, 14, BONE);
+  return p.finish();
+}
+// šamanský totem 12x26: vyrezávaný kmeň s tvárami, na vrchole lebka s rohmi, zelené svetlo v očiach; glow = fáza žiary
+function makeOrcTotem(glow) {
+  const p = painter(12, 26);
+  const EYE = hexRGB(glow ? '#c8ff7a' : '#5aff8a');
+  for (let y = 6; y <= 25; y++) for (let x = 3; x <= 8; x++) p.shade(x, y, ORC_WOOD, 0.85 - (x - 3) * 0.12 + (y % 6 === 0 ? -0.25 : 0)); // kmeň
+  for (const fy of [9, 15, 21]) { p.set(4, fy, EYE); p.set(7, fy, EYE); p.set(5, fy + 2, ORC_WOOD[0]); p.set(6, fy + 2, ORC_WOOD[0]); } // vyrezané tváre
+  for (let x = 1; x <= 10; x++) p.shade(x, 12, ORC_WOOD, 0.6 - x * 0.03);                            // rameno s pierkami
+  p.set(0, 13, BLOOD2); p.set(11, 13, BLOOD2); p.set(0, 14, BLOOD); p.set(11, 14, BLOOD);
+  for (let y = 1; y <= 5; y++) for (let x = 3; x <= 8; x++) {                                          // lebka
+    if ((y === 1 || y === 5) && (x === 3 || x === 8)) continue;
+    p.set(x, y, (y === 3 && (x === 4 || x === 7)) ? EYE : x < 6 ? BONE : BONE2);
+  }
+  p.set(2, 0, BONE2); p.set(1, 1, BONE); p.set(9, 0, BONE2); p.set(10, 1, BONE);                       // rohy
+  return p.finish();
+}
+// vojnový bubon 16x14: veľký bubon z kože na kostenej podstave, palice; hit = palica dole (úder)
+function makeOrcDrum(hit) {
+  const p = painter(16, 14);
+  const HIDE = ['#3a2a1a', '#5a4430', '#7e6448', '#a88a64', '#ccb08a'].map(hexRGB);
+  for (let y = 4; y <= 10; y++) for (let x = 2; x <= 13; x++) {                                         // telo bubna
+    const t = (x - 2) / 11;
+    p.shade(x, y, ORC_WOOD, (y === 4 || y === 10 ? 0.3 : 0.8 - t * 0.5) + ((x + y) % 4 === 0 && y > 4 && y < 10 ? -0.15 : 0));
+  }
+  for (let x = 2; x <= 13; x++) p.shade(x, 3, HIDE, 0.85 - (x - 2) * 0.04);                            // koža navrchu
+  for (const x of [3, 7, 12]) for (let y = 5; y <= 9; y++) p.set(x, y, y % 2 ? BONE2 : BONE);        // šnúrovanie z kostí
+  for (const lx of [3, 12]) for (let y = 11; y <= 13; y++) p.set(lx, y, BONE2);                        // nožičky
+  for (let y = 11; y <= 12; y++) for (let x = 4; x <= 11; x++) p.shade(x, y, ORC_WOOD, 0.3);
+  const sy = hit ? 2 : 0;                                                                               // palice s kosteným koncom
+  pLine(p, 1, sy, 4, sy + 2, (x, y) => p.shade(x, y, ORC_WOOD, 0.7)); p.set(0, sy, BONE);
+  pLine(p, 14, 2 - sy, 11, 2 - sy + 2, (x, y) => p.shade(x, y, ORC_WOOD, 0.5)); p.set(15, 2 - sy, BONE);
+  return p.finish();
+}
+// stan posíl 22x18: kožený stan na kôl so zástavou, tmavý vchod, lebka nad ním
+function makeOrcTent() {
+  const p = painter(22, 18);
+  const HIDE = ['#2a1c12', '#4a3020', '#6a4a30', '#8a6a48', '#a88a64'].map(hexRGB);
+  for (let y = 3; y <= 17; y++) {
+    const hw = (y - 2) * 0.72;
+    for (let x = Math.floor(11 - hw); x <= Math.ceil(11 + hw); x++) {
+      const t = (x - (11 - hw)) / (2 * hw + 1), seam = (x - 11) % 4 === 0;
+      p.shade(x, y, HIDE, (seam ? 0.3 : 0.85 - t * 0.6) + (y % 5 === 0 ? -0.08 : 0));
+    }
+  }
+  for (let y = 10; y <= 17; y++) { const hw = (y - 9) * 0.45; for (let x = Math.floor(11 - hw); x <= Math.ceil(11 + hw); x++) p.set(x, y, hexRGB('#140c08')); } // vchod
+  for (let y = 0; y <= 4; y++) p.shade(11, y, ORC_WOOD, 0.7);                                            // kôl
+  p.set(12, 0, BLOOD2); p.set(13, 0, BLOOD2); p.set(12, 1, BLOOD); p.set(13, 1, BLOOD); p.set(14, 1, BLOOD); // zástava
+  for (let y = 6; y <= 8; y++) for (let x = 10; x <= 12; x++) p.set(x, y, (y === 7 && x !== 11) ? hexRGB('#1c140e') : x < 12 ? BONE : BONE2); // lebka
+  return p.finish();
+}
 // palisáda 16x18 zo zahrotených kolov; brána: vráta s kovaním a lebkou
 function makePalisade(gate) {
   const p = painter(16, 18);
@@ -1186,6 +1256,10 @@ function initBuildingSprites() {
   BSPR.orcWall = makeOrcWall(false);
   BSPR.orcWallGate = makeOrcWall(true);
   BSPR.stakes = makeStakes();
+  BSPR.orcCatapult = [makeOrcCatapult(true), makeOrcCatapult(false)];
+  BSPR.orcTotem = [makeOrcTotem(false), makeOrcTotem(true)];
+  BSPR.orcDrum = [makeOrcDrum(false), makeOrcDrum(true)];
+  BSPR.orcTent = makeOrcTent();
   SPR.siegeRam = [makeSiegeRam(0), makeSiegeRam(1)];
   SPR.siegeCat = [makeSiegeCat(true), makeSiegeCat(false)];
   SPR.siegeFire = [makeSiegeFire(0), makeSiegeFire(1)];
