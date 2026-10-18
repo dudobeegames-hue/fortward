@@ -27,6 +27,8 @@
     icetower: { name: 'Ľadová veža',  short: 'Ľad',    cost: 90,  hp: 220, range: 72, dmg: 5,  cd: 1.3, proj: 'ice', speed: 150, chill: 2.2, block: true, desc: 'Ľadové strely spomalia zasiahnutého aj nepriateľov okolo neho' },
     ballista: { name: 'Balista',      short: 'Balista', cost: 140, hp: 260, range: 118, dmg: 34, cd: 3.2, proj: 'lance', speed: 250, block: true, desc: 'Ťažký šíp prestrelí celý rad nepriateľov na zemi' },
     wall:     { name: 'Hradby',       short: 'Hradby', cost: 12,  hp: 240, block: true, desc: 'Zatarasí cestu – horda ich musí rozbiť alebo obísť' },
+    // palisáda len za orkov: lacná, nevylepšuje sa (fixed), kto do nej udrie, ten sa napichne
+    stake:    { name: 'Palisáda',     short: 'Palisáda', cost: 6, hp: 110, block: true, fixed: true, orc: true, desc: 'Lacný plot zo zahrotených kolov – nevylepšuje sa a kto doň udrie, ten sa napichne' },
     pit:      { name: 'Jama s ostňami', short: 'Jama', cost: 30,  dmg: 12, block: false, desc: 'Zraní a spomalí každého, kto ňou prejde' },
     mine:     { name: 'Zlatá baňa',   short: 'Baňa',   cost: 100, hp: 180, block: true, desc: 'Po každej prežitej vlne prinesie zlato' },
     chapel:   { name: 'Kaplnka',      short: 'Kaplnka', cost: 120, hp: 200, block: true, desc: 'Vyšle mnícha, ktorý chodí za rytiermi a hrdinom a lieči ich' },
@@ -56,6 +58,7 @@
   const UNIT_PLURAL = { knight: 'Rytieri', rider: 'Jazdci', spear: 'Kopijníci' };
   const SPIKE_COST = 25, SPIKE_TYPE_COST = 40;
   const spikeDmg = b => (4 + 3 * (b.lvl - 1)) * (1 + 0.06 * perk('traps'));
+  const stakeDmg = () => (3 + 0.5 * (st.mission - 1)) * (1 + 0.06 * perk('traps')); // palisáda: rastie s misiou, nie s úrovňou
   // druhy ostňov (od misie 9): ohnivé zapália, ľadové spomalia útočníka
   const SPIKE_TYPES = {
     fire: { name: 'Ohnivé ostne', tip: '#f89838', body: '#d83818', desc: 'útočník horí' },
@@ -116,7 +119,7 @@
   const uDmg = u => WUNIT[u.type].dmg * (1 + 0.4 * (u.lvl - 1)) * (1 + 0.04 * perk('fletching'));
   const uCd = u => WUNIT[u.type].cd * Math.pow(0.92, u.lvl - 1);
   const uRange = u => WUNIT[u.type].range + 4 * (u.lvl - 1);
-  const BUILD_ORDER = ['paving', 'tower', 'wall', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'mage', 'icetower', 'ballista', 'chapel', 'firepit', 'beartrap', 'workshop'];
+  const BUILD_ORDER = ['paving', 'tower', 'wall', 'stake', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'mage', 'icetower', 'ballista', 'chapel', 'firepit', 'beartrap', 'workshop'];
   const ENEMY = {
     goblin:  { spr: 'goblin',  hp: 12,  speed: 24, atk: 4,  atkCd: 0.8, gold: 3,  blood: '#62a03a' },
     orc:     { spr: 'orc',     hp: 32,  speed: 16, atk: 9,  atkCd: 1.0, gold: 6,  blood: '#62a03a' },
@@ -191,7 +194,7 @@
   const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } };
   // ---- 4 pozície na uloženie: postup každej je pod vlastnou predponou (zvuk je spoločný) ----
   const SLOTS = 4;
-  let SLOT = 1;
+  let SLOT = 1, slotLoaded = false; // slotLoaded: údaje hrdinu v pamäti patria pozícii SLOT (pred prvým načítaním nie)
   const slotKey = (n, k) => 'fortward.s' + n + '.' + k;
   const sk = k => slotKey(SLOT, k);
   // jednorazový presun starého postupu (bez pozícií) do pozície 1
@@ -338,14 +341,16 @@
   // gemy a kúpení hrdinovia patria hráčovi (všetkým pozíciám)
   const GEMS_KEY = 'fortward.gems', HEROES_KEY = 'fortward.heroes';
   const gems = () => loadJSON(GEMS_KEY, 0) || 0;
-  const ownedHeroes = () => ['king'].concat((loadJSON(HEROES_KEY, []) || []).filter(id => HEROES[id] && id !== 'king' && heroIds().includes(id)));
+  // všetci kúpení hrdinovia (oboch rás) – ukladá sa vždy celý zoznam, nikdy len hrdinovia rasy práve hranej pozície
+  const boughtHeroes = () => (loadJSON(HEROES_KEY, []) || []).filter(id => typeof id === 'string' && id !== 'king');
+  const ownedHeroes = () => ['king'].concat(boughtHeroes().filter(id => HEROES[id] && heroIds().includes(id)));
   const ownsHero = id => ownedHeroes().includes(id);
   // počas vývoja sa hrdinovia odomykajú ručne tlačidlom Odomknúť (zadarmo); cena v gemoch (price) sa zapojí, keď bude obchod
   function buyHero(id) {
     const h = HEROES[id];
     if (!h || ownsHero(id)) return;
     heroesSeen(); // zapamätá doterajších, aby sa leskol len nový
-    saveJSON(HEROES_KEY, ownedHeroes().filter(x => x !== 'king').concat(id));
+    saveJSON(HEROES_KEY, boughtHeroes().concat(id)); // hrdinovia druhej rasy v zozname ostanú
     AUDIO.play('unlock'); toast(h.name + (h.fem ? ' sa pridala' : ' sa pridal') + ' k tvojim hrdinom');
     updateGems(); if (mapTab === 'heroes') renderHeroes(); if (mapTab === 'shop') renderShop();
   }
@@ -358,6 +363,8 @@
     const m = loadHeroMeta(id);
     for (const k in kingMeta) delete kingMeta[k];
     Object.assign(kingMeta, m);
+    const pw = heroDef().powers; // v slotoch smú byť len schopnosti tohto hrdinu (rasa pozície je už nastavená)
+    kingMeta.slots = kingMeta.slots.map(s => pw.includes(s) ? s : null);
     if (ICONS.king) syncHeroIcons();
   }
   // schopnosti hrdinu: 3 sloty, odomknú sa na úrovni 2, 5 a 9; hráč si do slotu vyberie jednu z ponuky
@@ -427,7 +434,7 @@
   };
   // postup na mape: unlocked = najvyššia odomknutá misia (11 = ostrov oslobodený)
   Object.assign(st, { mission: 1, unlocked: 1, mapSel: 1, mapAnim: null, tech: techFor(1) });
-  const has = id => st.tech.has(id);
+  const has = id => id === 'stake' ? isOrc() && st.tech.has('wall') : st.tech.has(id); // palisáda: len orkovia, spolu s hradbami
   // novinky: odomknutá stavba / vylepšenie / hrdina, na ktoré hráč ešte neťukol – jeho karta a záložka sa lesknú
   const SHINE_TECH = { gate: 1, spikes: 1, spikeTypes: 1, wallArcher: 1, wallCrossbow: 1, spec: 1, lvl2: 1, lvl3: 1, lvl4: 1, lvl5: 1 };
   let seenNew = [];
@@ -502,6 +509,8 @@
   const saveProgress = () => { try { localStorage.setItem(sk('unlocked'), String(st.unlocked)); } catch (e) { } };
   // načíta postup zvolenej pozície do hry
   function loadSlot(n) {
+    if (slotLoaded && st.hero) saveMetaOf(st.hero, kingMeta); // hrdina doterajšej pozície sa uloží do nej, nie do novej
+    st.hero = null;
     SLOT = n;
     meta.stars = loadJSON(sk('stars'), []).map(v => Array.isArray(v) ? v : [v || 0, 0, 0]); // staré uloženie (číslo) = medená úroveň
     for (const k in meta.perks) delete meta.perks[k];
@@ -523,6 +532,7 @@
     }
     if (fixed) saveJSON(sk('stars'), meta.stars);
     st.mapSel = null; st.mapTierFor = null; st.mapAnim = null; st.provAnim = null;
+    slotLoaded = true;
   }
   // súhrn pozície pre menu (bez prepnutia)
   function slotInfo(n) {
@@ -1229,6 +1239,7 @@
   function hitBuilding(b, dmg, attacker) {
     if (b.holyT > 0 || shieldAt(tileX(b.c) + T / 2, tileY(b.r) + T / 2)) { if (Math.random() < 0.3) part(tileX(b.c) + T / 2, tileY(b.r) + 4, (Math.random() - 0.5) * 20, -10, 0.3, '#fff070', 0); return; }
     b.hp -= dmg; b.flash = 0.08;
+    if (b.kind === 'stake' && attacker && !attacker.dead) { damage(attacker, stakeDmg()); part(attacker.x, attacker.y - 6, 0, -10, 0.3, '#c89a5a', 60); } // napichne sa na koly
     if (b.spikes && attacker && !attacker.dead) {
       damage(attacker, spikeDmg(b)); part(attacker.x, attacker.y - 6, 0, -10, 0.3, b.spikeType ? SPIKE_TYPES[b.spikeType].tip : '#f4f4f8', 60);
       if (b.spikeType === 'fire') { attacker.burnT = 3; attacker.burnDps = Math.max(attacker.burnDps || 0, spikeDmg(b) * 0.6); }
@@ -2743,19 +2754,21 @@
   function enemy8Frame(e, set) {
     const mvx = e.x - (e._lx == null ? e.x : e._lx), mvy = e.y - (e._ly == null ? e.y : e._ly);
     e._lx = e.x; e._ly = e.y;
-    const d = Math.hypot(mvx, mvy), moving = d > 0.03 && !e.attacking;
-    if (moving) e._wd = (e._wd || 0) + d;
+    const d = Math.hypot(mvx, mvy), moving = stillFor(e, d > 0.03) < 4 && !e.attacking;
+    if (d > 0.03) e._wd = (e._wd || 0) + d;
     const foe = e.foe && !e.foe.dead ? e.foe : null, busy = e.attacking || e.lunge > 0;
-    if (foe) e.face8 = dir8(foe.x - e.x, foe.y - e.y);
-    else if (busy && e.aimP) e.face8 = dir8(e.aimP.x - e.x, e.aimP.y - e.y);
-    else if (moving) e.face8 = dir8(mvx, mvy);
+    const sd = smoothDir(e, mvx, mvy);
+    if (foe) turn8(e, dir8(foe.x - e.x, foe.y - e.y), 3);
+    else if (busy && e.aimP) turn8(e, dir8(e.aimP.x - e.x, e.aimP.y - e.y), 3);
+    else if (moving) turn8(e, sd, 5);
     if (e.face8 == null) e.face8 = 2;
     const v = set[e.face8];
     if (set.bow) { if (e.lunge > 0) return v.atk[1]; if (busy) return v.atk[0]; }
     else if (e.lunge > 0) return v.atk[e.lunge > 0.075 ? 1 : 2];
     else if (busy && e.atk < 0.3) return v.atk[0];
-    return moving ? v.walk[Math.floor(e._wd / (set.stride || 3.2)) % 4] : v.idle; // sady hrdinov (kráľ, paladin ako nepriatelia) nemajú vlastný krok
+    return moving ? v.walk[Math.floor((e._wd || 0) / (set.stride || 3.2)) % 4] : v.idle; // sady hrdinov (kráľ, paladin ako nepriatelia) nemajú vlastný krok
   }
+  let enemyN = 0; // poradové číslo nepriateľa (stále poradie pri rovnakej hĺbke)
   function drawEnemy(e, time) {
     const set8 = SPR[foeSpr(e.d.spr) + '8'];
     if (set8 && !e.d.fly) {
@@ -2834,16 +2847,28 @@
   }
   // kráľ v 8 smeroch: natočí sa k nepriateľovi, inak smerom chôdze, doma pozerá na hordu; chôdza zo 4 snímok, úder z 3
   const dir8 = (dx, dy) => (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
+  // proti preblikovaniu: nový smer sa prijme, až keď vydrží niekoľko snímok (drobné odtlačenia v šíku či zákruta
+  // cez stred políčka postavu neotočia sem a tam), smer chôdze sa berie z vyhladeného pohybu
+  function turn8(u, nd, hold) {
+    if (u.face8 == null) { u.face8 = nd; return; }
+    if (nd === u.face8) { u._fn = null; return; }
+    if (u._fn === nd) { if (++u._fc >= hold) { u.face8 = nd; u._fn = null; } }
+    else { u._fn = nd; u._fc = 1; }
+  }
+  function smoothDir(u, mvx, mvy) { u._svx = (u._svx || 0) * 0.75 + mvx * 0.25; u._svy = (u._svy || 0) * 0.75 + mvy * 0.25; return dir8(u._svx, u._svy); }
+  // chôdza s dobehom: krátke zastavenie na snímku-dve nezmení chôdzu na státie
+  const stillFor = (u, moving) => (u._still = moving ? 0 : (u._still || 0) + 1);
   const hero8 = spr => SPR[spr + '8']; // hrdinovia prerobení do 8 smerov (kráľ, paladin, čarodejka)
   function king8Frame(u, set) {
     const mvx = u.x - (u._lx == null ? u.x : u._lx), mvy = u.y - (u._ly == null ? u.y : u._ly);
     u._lx = u.x; u._ly = u.y;
     const aim = u.aim && !u.aim.dead ? u.aim : null; // čarodejka mieri na diaľku
-    const moving = Math.hypot(mvx, mvy) > 0.02, t = aim || (u.tgt && !u.tgt.dead ? u.tgt : null);
+    const moving = stillFor(u, Math.hypot(mvx, mvy) > 0.02) < 4, t = aim || (u.tgt && !u.tgt.dead ? u.tgt : null);
     const near = t && (aim || Math.hypot(t.x - u.x, t.y - u.y) < 26);
-    if (near) u.face8 = dir8(t.x - u.x, t.y - u.y);
-    else if (moving) u.face8 = dir8(mvx, mvy);
-    else if (Math.hypot(u.hx - u.x, u.hy - u.y) < 3) u.face8 = 6;
+    const sd = smoothDir(u, mvx, mvy);
+    if (near) turn8(u, dir8(t.x - u.x, t.y - u.y), 3);
+    else if (moving) turn8(u, sd, 5);
+    else if (Math.hypot(u.hx - u.x, u.hy - u.y) < 3) turn8(u, 6, 5);
     if (u.face8 == null) u.face8 = 6;
     const v = set[u.face8];
     if (u.swing > 0) return v.slash; // meč nahradí svetelný oblúk švihu (kladivo ostane dopadnuté)
@@ -2930,13 +2955,14 @@
   function unit8Frame(u, set) {
     const mvx = u.x - (u._lx == null ? u.x : u._lx), mvy = u.y - (u._ly == null ? u.y : u._ly);
     u._lx = u.x; u._ly = u.y;
-    const d = Math.hypot(mvx, mvy), moving = d > 0.05;
-    if (moving) u._wd = (u._wd || 0) + d;
+    const d = Math.hypot(mvx, mvy), moving = stillFor(u, d > 0.05) < 4;
+    if (d > 0.05) u._wd = (u._wd || 0) + d;
     const t = u.archer ? (u.aimT && !u.aimT.dead ? u.aimT : null) : u.tgt && !u.tgt.dead ? u.tgt : null;
     const near = t && (u.archer || Math.hypot(t.x - u.x, t.y - u.y) < (u.ktype === 'spear' ? SPEAR_REACH + 5 : 14)); // kopijník bodá z diaľky
-    if (near) u.face8 = dir8(t.x - u.x, t.y - u.y);
-    else if (moving) u.face8 = dir8(mvx, mvy);
-    else if (!t) u.face8 = 6;
+    const sd = smoothDir(u, mvx, mvy);
+    if (near) turn8(u, dir8(t.x - u.x, t.y - u.y), 3);
+    else if (moving) turn8(u, sd, 5);
+    else if (!t) turn8(u, 6, 5);
     if (u.face8 == null) u.face8 = 6;
     const v = set[u.face8];
     if (u.archer) { // lukostrelec: po výstrele chvíľu povolená tetiva, potom znova napne; v behu luk spustí
@@ -2945,7 +2971,7 @@
     }
     else if (u.swing > 0) return v.atk[u.swing > 0.075 ? 1 : 2]; // švih a dokončenie úderu
     else if (near && !moving && u.cd < 0.25) return v.atk[0];  // napriahnutie
-    if (moving) return v.walk[Math.floor(u._wd / set.stride) % 4];
+    if (moving) return v.walk[Math.floor((u._wd || 0) / set.stride) % 4];
     return v.idle;
   }
   // obliehací stroj v 8 smeroch: natočí sa smerom jazdy, pri streľbe k cieľu; snímka jazdy podľa prejdenej cesty
@@ -3411,18 +3437,18 @@
         pxText(g, s, tx, ty, n < drag.path.length ? '#e84838' : '#f8d048');
       }
     } else if (drag) { // náhľad radu hradieb pred pustením prsta
-      const key = (c, r) => c + ',' + r, inPath = new Set(drag.path.map(q => key(q.c, q.r))), ok = wallsAfford();
+      const key = (c, r) => c + ',' + r, inPath = new Set(drag.path.map(q => key(q.c, q.r))), ok = dragAfford(), stake = drag.kind === 'stake';
       const j = (c, r) => inPath.has(key(c, r)) || joins(c, r), jv = (c, r) => inPath.has(key(c, r)) || joinsV(c, r);
       g.globalAlpha = 0.65;
       drag.path.forEach((q, i) => {
         const x = tileX(q.c), y = tileY(q.r);
         const m = (jv(q.c, q.r - 1) ? 1 : 0) | (j(q.c + 1, q.r) ? 2 : 0) | (jv(q.c, q.r + 1) ? 4 : 0) | (j(q.c - 1, q.r) ? 8 : 0);
-        g.drawImage(wallsOf()[0][m].c, x, y - 6);
+        if (stake) g.drawImage(BSPR.stake.c, x, y + T + 1 - BSPR.stake.h); else g.drawImage(wallsOf()[0][m].c, x, y - 6);
         if (i >= ok) { g.fillStyle = 'rgba(232,72,56,0.55)'; g.fillRect(x, y - 6, T, T + 6); }
       });
       g.globalAlpha = 1;
       const q = drag.path[drag.path.length - 1], n = Math.min(drag.path.length, ok);
-      const s = String(n * costOf('wall')), tx = Math.max(2, Math.min(W - s.length * 4 - 2, tileX(q.c) + T / 2 - s.length * 2)), ty = tileY(q.r) - 14;
+      const s = String(n * costOf(drag.kind)), tx = Math.max(2, Math.min(W - s.length * 4 - 2, tileX(q.c) + T / 2 - s.length * 2)), ty = tileY(q.r) - 14;
       pxText(g, s, tx, ty, n < drag.path.length ? '#e84838' : '#f8d048');
     }
     if (st.sel === HALL) { const h = hallRect(); corners(h.x0, h.y0 - 8, h.x1 - 1, h.y1 - 1, col); }
@@ -4015,6 +4041,8 @@
     for (const fw of st.fireWalls || []) drawFireGround(fw, time);
     // objekty zoradené podľa základne (hĺbka)
     const objs = [];
+    // hĺbka jednotky sa posunie až pri skutočnom pohybe o viac ako bod – susedia v rade sa pri drobnom odtlačení neprekreslia cez seba
+    const dpt = u => { if (u._dy == null || Math.abs(u.y - u._dy) > 1.5) u._dy = u.y; return u._dy; };
     for (const fw of st.fireWalls || []) { // nepriateľ za stenou je za plameňmi, pred ňou pred nimi; nízky predný rad zakryje nohy tomu, kto práve prechádza
       objs.push({ y: fw.y - 1, f: () => drawFireFlames(fw, time, false) });
       objs.push({ y: fw.y + 3, f: () => drawFireFlames(fw, time, true) });
@@ -4024,7 +4052,7 @@
       for (const b of st.blds) if (!TRAPS[b.kind]) objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), x: b.c, f: () => drawBuilding(b, time) });
       for (const s of st.soldiers) {
         const cast = s.helper === 'chapel' && s.working && s.tgt && !s.dead; // mních pri liečení zdvihne palicu
-        objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: s.y, f: () => { drawFighter(s, raceSpr(cast ? 'monkCast' : s.spr || 'soldier')); if (cast) drawStaffGlow(s, time); } });
+        objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: dpt(s), id: s.slot, f: () => { drawFighter(s, raceSpr(cast ? 'monkCast' : s.spr || 'soldier')); if (cast) drawStaffGlow(s, time); } });
         if (cast) { const t = s.tgt; objs.push({ y: t.y - healAuraH(t) - 1, f: () => drawHealAura(s, t, time) }); }
       }
       if (st.phase === 'build') for (const o of st.siegeOrder) { // kúpené obliehacie stroje čakajú na mieste, odkiaľ vyrazia
@@ -4034,13 +4062,13 @@
       if (st.king && !st.king.dead) objs.push({ y: st.king.y, f: () => drawFighter(st.king, heroDef().spr) });
       else if (st.king && kingLying(st.king)) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
     }
-    for (const e of st.enemies) objs.push({ y: e.y, f: () => drawEnemy(e, time) });
+    for (const e of st.enemies) objs.push({ y: dpt(e), id: 1e5 + (e._id || (e._id = ++enemyN)), f: () => drawEnemy(e, time) });
     for (const tm of st.totems || []) objs.push({ y: tm.y, f: () => drawTotem(tm, time) }); // totem duchov šamana
     if (st.camp) {
       for (const o of st.camp.parts) if (o.hp > 0) objs.push({ y: o.y, f: () => { const sp = o.skin.spr(o, time); shadow(o.x, o.y, 8); g.drawImage(sp.c, Math.round(o.x - sp.w / 2) + hitJit(o.flash), o.y - sp.h + (o.skin.dy || 0)); } });
       for (const r of st.camp.rocks) objs.push({ y: 9999, f: () => drawRock(r) });
     }
-    objs.sort((a, b) => a.y - b.y || (b.x || 0) - (a.x || 0)); // v rovnakom rade je ľavejšia budova vpredu
+    objs.sort((a, b) => a.y - b.y || (b.x || 0) - (a.x || 0) || (a.id || 0) - (b.id || 0)); // v rovnakom rade je ľavejšia budova vpredu, jednotky v stálom poradí
     for (const o of objs) o.f();
     if (st.phase === 'build') drawPlaceGhost(time);
     if (st.phase === 'build' && st.siegePick) drawSiegePick(time);
@@ -4155,6 +4183,7 @@
     for (const k of ['tower', 'barracks', 'mage', 'icetower', 'ballista', 'mine', 'chapel', 'workshop', 'range', 'stables', 'armory', 'falconry']) ICONS[k] = spriteURL(bsprOf(k, 1), 3);
     ICONS.pit = spriteURL(BSPR.pit, 3);
     for (const k of ['firepit', 'beartrap']) ICONS[k] = spriteURL(BSPR[k], 3);
+    ICONS.stake = spriteURL(BSPR.stake, 3);
     ICONS.wall = spriteURL(wallsOf()[0][10], 3);
     ICONS.gate = spriteURL(BUILD_RACE === 'orc' ? OBSPR.gateIcon : BSPR.gateIcon, 3);
     ICONS.hall = spriteURL(bsprOf('hall', 3), 2);
@@ -4163,6 +4192,7 @@
   const HUMAN_NAMES = {};
   for (const k in BUILD) HUMAN_NAMES[k] = { name: BUILD[k].name, short: BUILD[k].short, desc: BUILD[k].desc };
   const ORC_NAMES = {
+    wall:     { name: 'Drevená hradba',    short: 'Hradba',    desc: 'Zatarasí cestu – ľudia ju musia rozbiť alebo obísť. Vylepšením pribudnú kostené hroty a železné pláty' },
     paving:   { name: 'Doskový chodník',   short: 'Dosky',     desc: 'Hrubé dosky pribité železnými klincami – dajú sa položiť aj pod budovy. Ďalší ťuk ich zoberie späť' },
     tower:    { name: 'Orkská veža',       short: 'Veža',      desc: 'Goblin z veže strieľa na ľudí v dosahu' },
     barracks: { name: 'Orkský barak',      short: 'Barak',     desc: 'Posiela orkov proti ľuďom' },
@@ -4173,7 +4203,6 @@
     mage:     { name: 'Ohnivý totem',      short: 'Totem',     desc: 'Šamanský oheň zasiahne celú skupinu' },
     icetower: { name: 'Jedový kotol',      short: 'Kotol',     desc: 'Vrhá jed – otrávi a spomalí zasiahnutých, na zemi nechá jedovatú mláku' },
     ballista: { name: 'Orkský katapult',   short: 'Katapult',  desc: 'Ťažký balvan prerazí celý rad nepriateľov na zemi' },
-    wall:     { name: 'Palisáda',          short: 'Palisáda',  desc: 'Zatarasí cestu – ľudia ju musia rozbiť alebo obísť' },
     chapel:   { name: 'Šamanská chatrč',   short: 'Chatrč',    desc: 'Vyšle šamana, ktorý chodí za orkmi a náčelníkom a lieči ich' },
     workshop: { name: 'Goblinský stan',    short: 'Stan',      desc: 'Vyšle goblina, ktorý chodí opravovať poškodené budovy' },
   };
@@ -4188,9 +4217,7 @@
     Object.assign(HEROES.king, U.king);
     for (const k in KTYPES) KTYPES[k].name = U.kt[k];
     Object.assign(UNIT_PLURAL, U.plural);
-    if (!ownsHero(st.hero)) setActiveHero('king');
-    const pw = heroDef().powers; // schopnosti v slotoch musia patriť hrdinovi tejto rasy
-    kingMeta.slots = kingMeta.slots.map(s => pw.includes(s) ? s : null);
+    if (st.hero && !ownsHero(st.hero)) setActiveHero('king');
     for (const k in BUILD) Object.assign(BUILD[k], HUMAN_NAMES[k], BUILD_RACE === 'orc' ? ORC_NAMES[k] : null);
     if (previewRace !== BUILD_RACE) { for (const k in previewCache) delete previewCache[k]; previewRace = BUILD_RACE; }
     if (ICONS.tower) { buildingIcons(); unitIcons(); syncHeroIcons(); }
@@ -4320,7 +4347,7 @@
   // záložky stavebného panela (druhy stavieb); riadok záložiek a riadok označenej stavby majú rovnakú výšku, aby obrazovka neskákala
   const BUILD_TABS = [
     { id: 'towers',  name: 'Veže',    kinds: ['tower', 'mage', 'icetower', 'ballista'] },
-    { id: 'walls',   name: 'Hradby',  kinds: ['wall', 'pit', 'firepit', 'beartrap'] },
+    { id: 'walls',   name: 'Hradby',  kinds: ['wall', 'stake', 'pit', 'firepit', 'beartrap'] },
     { id: 'army',    name: 'Vojsko',  kinds: ['barracks', 'range', 'stables', 'armory', 'falconry'] },
     { id: 'siege',   name: 'Stroje',  kinds: [] },
     { id: 'support', name: 'Podpora', kinds: ['mine', 'chapel', 'workshop', 'paving'] },
@@ -4396,8 +4423,9 @@
         act(icon, name + ' ' + (all || !pick.length ? list.length + '×' : pick.length + '/' + list.length),
           coinTxt(pick.length ? sum : list.reduce((t, x) => t + costFn(x), 0)), pick.length > 0, () => { for (const x of pick) apply(x); rebuildOcc(); }, cls, px);
       };
-      const cand = grp.filter(w => w.lvl < cap).sort((a, b) => a.lvl - b.lvl);
-      if (cand.length) bulk(after(cand[0], { lvl: cand[0].lvl + 1, unit: null, gate: false, spikes: false, spec: null }), 'Vylepšiť', cand, bUpCost, w => {
+      const cand = d.fixed ? [] : grp.filter(w => w.lvl < cap).sort((a, b) => a.lvl - b.lvl);
+      if (d.fixed) { /* palisáda sa nevylepšuje */ }
+      else if (cand.length) bulk(after(cand[0], { lvl: cand[0].lvl + 1, unit: null, gate: false, spikes: false, spec: null }), 'Vylepšiť', cand, bUpCost, w => {
         const ratio = d.hp ? w.hp / bMaxHp(w) : 1, c = bUpCost(w);
         st.gold -= c; w.spent += c; w.lvl++;
         if (d.hp) w.hp = Math.ceil(bMaxHp(w) * ratio);
@@ -4438,14 +4466,15 @@
       else if (b.kind === 'range') stats = 'lukostrelci ' + archerCap(b) + ' · poškodenie ' + Math.round(archerDmg(b));
       else if (b.kind === 'pit') stats = 'poškodenie ' + Math.round(bDmg(b)) + ' · spomalí';
       if (d.hp) stats += (stats ? ' · ' : '') + 'zdravie ' + Math.ceil(b.hp) + '/' + bMaxHp(b);
+      if (b.kind === 'stake') stats += ' · útočník sa napichne za ' + Math.round(stakeDmg());
       if (b.spikes) stats += ' · ' + (b.spikeType ? SPIKE_TYPES[b.spikeType].name.toLowerCase() : 'ostne') + ' ' + spikeDmg(b);
       if (b.kind === 'wall' && b.nb) stats += ' · spojenie +' + Math.round(WALL_LINK * b.nb * 100) + ' %';
       if (b.unit) stats += ' · ' + WUNIT[b.unit.type].name.toLowerCase() + ' (poškodenie ' + Math.round(uDmg(b.unit)) + ')';
       if (b.spec) stats += ' · ' + SPECS[b.spec].name;
       if (b.gate) stats += ' · rytieri cez ňu prejdú';
       if ((UNIT_HOME[b.kind] || b.kind === 'range') && knightsBlocked(b)) stats = '<span class="warn">⚠ vojaci sa nedostanú von</span> · ' + stats;
-      selRow(after(b, {}), (b.gate ? 'Brána' : d.name) + ' · úr. ' + b.lvl, stats);
-      upAct(b.lvl, bCap(), bUpCost(b), () => {
+      selRow(after(b, {}), (b.gate ? 'Brána' : d.name) + (d.fixed ? '' : ' · úr. ' + b.lvl), stats);
+      if (!d.fixed) upAct(b.lvl, bCap(), bUpCost(b), () => {
         const ratio = d.hp ? b.hp / bMaxHp(b) : 1, c = bUpCost(b);
         st.gold -= c; b.spent += c; b.lvl++;
         if (d.hp) b.hp = Math.ceil(bMaxHp(b) * ratio);
@@ -4502,7 +4531,7 @@
         });
         row.appendChild(tb);
       }
-      for (const kind of BUILD_ORDER.filter(k => tab.kinds.includes(k))) {
+      for (const kind of BUILD_ORDER.filter(k => tab.kinds.includes(k) && (!BUILD[k].orc || isOrc()))) {
         const d = BUILD[kind];
         const b = document.createElement('button');
         if (!has(kind)) { // zamknutá stavba
@@ -4515,7 +4544,7 @@
         }
         if (st.flip && st.flip !== st.tool) st.flip = null;
         b.className = 'pcard' + (st.tool === kind ? ' sel' : '') + (st.flip === kind ? ' flipped' : '') + (st.gold < costOf(kind) ? ' poor' : '');
-        const tip = kind === 'wall' ? ' Ťahaj prstom pre celý rad.' : kind === 'paving' ? ' Ťahaj prstom pre celú plochu.' : '';
+        const tip = kind === 'wall' || kind === 'stake' ? ' Ťahaj prstom pre celý rad.' : kind === 'paving' ? ' Ťahaj prstom pre celú plochu.' : '';
         b.innerHTML = '<span class="pin">' +
           '<span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost"><img class="coin" src="' + ICONS.coin + '">' + costOf(kind) + '</span></span>' +
           '<span class="face back"><b>' + d.name + '</b><small>' + d.desc + '.' + tip + '</small></span></span>';
@@ -4651,11 +4680,12 @@
   const wallFree = (c, r) => inZone(c, r) && !inHall(c, r) && !occAt(c, r);
   const paveFree = (c, r) => inZone(c, r) && !inHall(c, r) && !st.paving[c + ',' + r]; // dlažba ide aj pod budovy
   const dragFree = (c, r) => (drag && drag.kind === 'paving' ? paveFree : wallFree)(c, r);
-  const dragAfford = () => Math.floor(st.gold / costOf(drag && drag.kind === 'paving' ? 'paving' : 'wall'));
+  const dragAfford = () => Math.floor(st.gold / costOf(drag ? drag.kind : 'wall'));
   const wallsAfford = () => Math.floor(st.gold / costOf('wall'));
-  function placeWall(c, r) {
-    st.gold -= costOf('wall');
-    addBuilding('wall', c, r); stats.builds++;
+  function placeWall(c, r, kind) { // hradba alebo palisáda
+    kind = kind || 'wall';
+    st.gold -= costOf(kind);
+    addBuilding(kind, c, r); stats.builds++;
     for (let k = 0; k < 5; k++) part(tileX(c) + 8 + (Math.random() - 0.5) * 12, tileY(r) + 12, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.4, '#c6a272', 60);
   }
   // ---- presúvanie stavieb (podržať prst na stavbe a potiahnuť) ----
@@ -4727,8 +4757,8 @@
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
       return;
     }
-    if (st.tool === 'wall' && wallFree(t.c, t.r)) {
-      drag = { kind: 'wall', path: [t], last: t };
+    if ((st.tool === 'wall' || st.tool === 'stake') && wallFree(t.c, t.r)) {
+      drag = { kind: st.tool, path: [t], last: t };
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
       return;
     }
@@ -4855,7 +4885,7 @@
         snapshot();
         for (const q of path.slice(0, n)) {
           if (dr.kind === 'paving') { st.paving[q.c + ',' + q.r] = 1; st.gold -= costOf('paving'); }
-          else placeWall(q.c, q.r);
+          else placeWall(q.c, q.r, dr.kind);
         }
         AUDIO.play('build');
       }
