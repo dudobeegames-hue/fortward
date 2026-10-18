@@ -4967,11 +4967,12 @@
     const p = $(screen).querySelector('.paper');
     if (p.dataset.rolling) return;
     p.dataset.rolling = '1';
-    p.ontransitionend = null; p.style.transition = 'none'; p.style.height = p.scrollHeight + 'px';
-    void p.offsetHeight;
-    p.style.transition = 'height .6s cubic-bezier(.6,0,.8,.4)'; p.style.height = '0px';
+    // zvinutie ako rozvinutie naopak: orez papiera a posun spodnej tyče, bez zmeny výšky (plynulé aj na slabých zariadeniach)
+    const h = p.offsetHeight, opt = { duration: 600, easing: 'cubic-bezier(.6,0,.8,.4)', fill: 'forwards' };
+    p.animate([{ clipPath: 'inset(0 0 0 0)' }, { clipPath: 'inset(0 0 100% 0)' }], opt);
+    for (const el of scrollFollowers(p)) el.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-h) + 'px)' }], opt);
     AUDIO.play('paper');
-    setTimeout(() => { delete p.dataset.rolling; done(); }, 650);
+    setTimeout(() => { delete p.dataset.rolling; done(); stopScrollAnims(p); }, 650);
   }
   $('slotsTag').addEventListener('click', () => rollUp('slots', showMenu));
   $('raceTag').addEventListener('click', () => rollUp('title', () => showSlots()));
@@ -5039,11 +5040,15 @@
     box.onclick = ev => { if (ev.target === box) close(); };
   }
   // rozvinutie zvitku s pozíciami (výška pergamenu z 0 na plnú, spodná tyč ide s ním)
+  // spodná tyč a štítok Späť idú pri rozvíjaní a zvíjaní s okrajom papiera
+  const scrollFollowers = p => { const sc = p.parentElement, rods = sc.querySelectorAll('.rod'); return [rods[rods.length - 1], sc.querySelector('.scrollTag')].filter(Boolean); };
+  const scrollAnims = p => [p, ...scrollFollowers(p)].flatMap(el => el.getAnimations().filter(a => a.effect && a.effect.getKeyframes().some(k => k.clipPath || (k.transform && k.transform.includes('translateY')))));
+  const stopScrollAnims = p => scrollAnims(p).forEach(a => a.cancel());
   function unrollScroll(anim, screen) {
     screen = screen || 'slots';
     const p = $(screen).querySelector('.paper');
-    p.ontransitionend = null; p.style.transition = 'none'; p.style.height = anim ? '0px' : 'auto';
-    void p.offsetHeight;
+    stopScrollAnims(p); // zruší dobehnuté zvinutie, ktoré by papier nechalo orezaný
+    p.style.transition = 'none'; p.style.height = 'auto'; // papier má hneď plnú výšku (rozloženie sa počíta raz)
     const h = p.scrollHeight, PXS = 3;
     const aw = Math.ceil(p.clientWidth / PXS), ah = Math.ceil(h / PXS);
     if (!aw || !h) { requestAnimationFrame(() => unrollScroll(anim, screen)); return; } // ešte nemá rozmery (papier s nulovou šírkou sa nedá nakresliť)
@@ -5053,9 +5058,11 @@
       r.style.backgroundImage = 'url(' + UI_ICONS.scrollRod(rw) + ')'; r.style.backgroundSize = rw * PXS + 'px 27px';
     });
     if (!anim) return;
-    p.style.transition = 'height .9s cubic-bezier(.3,.7,.3,1) .3s';
-    p.style.height = h + 'px';
-    p.ontransitionend = () => { p.style.height = 'auto'; };
+    // rozvinutie: papier sa odkrýva orezom zhora nadol a spodná tyč (aj so štítkom Späť) ide posunom s ním;
+    // nemení sa výška, takže prehliadač počas animácie neprepočítava rozloženie menu (predtým to na slabších zariadeniach sekalo)
+    const opt = { duration: 900, delay: 300, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'backwards' };
+    p.animate([{ clipPath: 'inset(0 0 100% 0)' }, { clipPath: 'inset(0 0 0 0)' }], opt);
+    for (const el of scrollFollowers(p)) el.animate([{ transform: 'translateY(' + (-h) + 'px)' }, { transform: 'translateY(0)' }], opt);
     setTimeout(() => AUDIO.play('paper'), 300); // zvuk spolu s rozvíjaním
   }
   // papier a tyče sa kreslia na presnú šírku zvitku – keď sa zvitok rozšíri či zúži (zmena okna, otočenie mobilu),
@@ -5065,7 +5072,7 @@
       const p = en.target, w = Math.round(en.contentRect.width), sc = p.closest('.screenOverlay');
       if (p._w === w) continue;
       const had = p._w != null; p._w = w;
-      if (had && w && sc && !sc.hidden && p.style.height !== '0px') unrollScroll(false, sc.id);
+      if (had && w && sc && !sc.hidden && !p.dataset.rolling && !scrollAnims(p).some(a => a.playState === 'running')) unrollScroll(false, sc.id); // počas rozvíjania nie (zrušilo by ho)
     }
   });
   for (const sc of ['slots', 'title']) scrollRO.observe($(sc).querySelector('.paper'));
