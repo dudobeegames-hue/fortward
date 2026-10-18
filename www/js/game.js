@@ -5565,6 +5565,25 @@
     moveKnight(k, k.hx, k.hy, (k.spd || 26) * 1.15, dt);
     if (!k.next) moveTo(k, k.hx, k.hy, (k.spd || 26) * 1.15, dt); // cesta zatarasená – ide priamo
   }
+  // ---- strážca plátien: mobilný prehliadač môže pri nedostatku pamäte (napr. po návrate z pozadia) zahodiť obsah
+  // plátien – ostrov, hrady, budovy a jednotky sa potom nevykreslia a ostane len to, čo sa kreslí priamo (čísla, hviezdy).
+  // Strážne plátno s farebným bodom a obrázok ostrova sa občas skontrolujú; keď obsah zmizol, hra sa načíta znova.
+  const guardCv = document.createElement('canvas'); guardCv.width = guardCv.height = 4;
+  const guardCx = guardCv.getContext('2d'); guardCx.fillStyle = '#ff00ff'; guardCx.fillRect(0, 0, 4, 4);
+  const lostCtx = (c, x, y) => (c.isContextLost && c.isContextLost()) || c.getImageData(x, y, 1, 1).data[3] === 0;
+  function canvasesLost() {
+    try {
+      if (lostCtx(guardCx, 1, 1)) return true;
+      if (island && island.bg && lostCtx(island.bg.getContext('2d'), island.bg.width >> 1, island.bg.height >> 1)) return true; // stred ostrova je vždy súš
+    } catch (e) { }
+    return false;
+  }
+  let reloading = false;
+  const reloadIfLost = () => { if (!reloading && !document.hidden && canvasesLost()) { reloading = true; location.reload(); } };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(reloadIfLost, 300); });
+  setInterval(reloadIfLost, 4000);
+  screen.addEventListener('contextrestored', () => { if (!reloading) { reloading = true; location.reload(); } }); // hlavné plátno prišlo o obsah
+
   // ---------------- Slučka ----------------
   let last = performance.now(), acc = 0;
   const DT = 1 / 60;
