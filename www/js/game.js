@@ -2240,6 +2240,7 @@
         kill(e, true); // premenený sa počíta ako porazený (zlato aj úspechy), len bez krvi
         st.soldiers.push({ hexbat: true, fly: true, x: e.x, y: e.y - 6, hp, max: hp, dmg: 4 * pow * m, spd: 46, cd: 0.6, tgt: null, anim: Math.random() * 2, flash: 0, dead: false, slot: st.soldierN++ });
       }
+      st.hexHold = 1.4; // ak to boli poslední nepriatelia, stavanie počká, kým sa netopiere ukážu
       st.hexCd = sp.cd; AUDIO.play('unlock');
       return true;
     }
@@ -2396,8 +2397,8 @@
   function drawClouds(time) {
     for (const c of st.clouds) {
       const a = Math.min(1, c.t / 0.6, (c.max - c.t) / 0.3 + 0.2), R = c.R, ry = Math.round(R * 0.62);
-      g.globalAlpha = 0.45 * a; pxDisc(c.x, c.y, R, ry, '#1e4a14');
-      g.globalAlpha = 0.9 * a; g.fillStyle = '#9cf060';
+      g.globalAlpha = 0.35 * a; pxDisc(c.x, c.y, R, ry, '#1e4a14');
+      g.globalAlpha = 0.75 * a; g.fillStyle = '#9cf060';
       for (let i = 0; i < 40; i++) { const t = i / 40 * 6.28 + time * 0.6; if (i % 2) g.fillRect(Math.round(c.x + Math.cos(t) * R), Math.round(c.y + Math.sin(t) * ry), 1, 1); }
       const puffs = [];
       for (let k = 0; k < 9; k++) { // chumáče krúžia a dýchajú, zoradené zozadu dopredu
@@ -2406,13 +2407,13 @@
       }
       puffs.sort((p, q) => p.y - q.y);
       for (const pf of puffs) {
-        g.globalAlpha = 0.85 * a;
+        g.globalAlpha = 0.68 * a;
         pxDisc(pf.x, pf.y, pf.r + 1, Math.round(pf.r * 0.75) + 1, '#24581a');
         pxDisc(pf.x, pf.y, pf.r, Math.round(pf.r * 0.75), '#4ca02a');
         pxDisc(pf.x - 1, pf.y - Math.round(pf.r * 0.35), Math.max(1, pf.r - 2), Math.max(1, Math.round(pf.r * 0.35)), '#7cd04a');
         g.fillStyle = '#c8ff8a'; g.fillRect(Math.round(pf.x - pf.r * 0.4), Math.round(pf.y - pf.r * 0.55), 2, 1);
       }
-      g.globalAlpha = a;
+      g.globalAlpha = 0.85 * a;
       for (let k = 0; k < 4; k++) { // bublinky stúpajú z mraku a prasknú
         const ph = (time * 0.8 + k * 0.27 + c.x * 0.01) % 1, bx = Math.round(c.x + Math.sin(k * 3.1 + c.y) * R * 0.6), by = Math.round(c.y - 6 - ph * 14);
         if (ph < 0.85) { g.fillStyle = '#24581a'; g.fillRect(bx - 1, by - 1, 3, 3); g.fillStyle = '#c8ff8a'; g.fillRect(bx, by, 1, 1); }
@@ -2673,7 +2674,8 @@
     st.healFx = (st.healFx || []).filter(h => h.t < h.max);
     st.blasts = (st.blasts || []).filter(bl => bl.t < bl.max);
     updateFx(dt);
-    if (st.phase === 'battle' && !st.spawnQ.length && !st.enemies.length) endWave();
+    if (st.hexHold > 0) st.hexHold -= dt;
+    if (st.phase === 'battle' && !st.spawnQ.length && !st.enemies.length && !(st.hexHold > 0)) endWave();
   }
 
   function impact(p) {
@@ -4009,6 +4011,7 @@
     if (st.phase === 'build') drawBuildOverlay(time);
     for (const m of st.marks) drawMark(m);
     drawPools(time);
+    drawClouds(time); // jedový mrak leží na zemi pod nohami jednotiek
     for (const fw of st.fireWalls || []) drawFireGround(fw, time);
     // objekty zoradené podľa základne (hĺbka)
     const objs = [];
@@ -4054,7 +4057,6 @@
     }
     for (const dr of st.drops) drawDrop(dr);
     drawAxes();
-    drawClouds(time);
     drawFog(time);
     for (const b of st.bolts) drawBolt(b);
     for (const f of st.fallFx) drawFallingFireball(f);
@@ -4591,7 +4593,7 @@
     return (paveCache[key] = c);
   }
   function placePaving(c, r) {
-    if (!inZone(c, r)) { toast('Stavať sa dá len v zóne pri radnici'); AUDIO.play('deny'); return false; }
+    if (!inZone(c, r)) { dropTool(); return false; }
     if (inHall(c, r)) { AUDIO.play('deny'); return false; }
     const key = c + ',' + r, dc = costOf('paving');
     if (st.paving[key]) { snapshot(); delete st.paving[key]; st.gold += dc; AUDIO.play('sell'); renderBuild(); return true; } // druhý ťuk dlažbu zoberie
@@ -4604,7 +4606,7 @@
   function placeAt(kind, c, r) {
     if (kind === 'paving') return placePaving(c, r);
     const dc = costOf(kind);
-    if (!inZone(c, r)) { toast('Stavať sa dá len v zóne pri radnici'); AUDIO.play('deny'); return false; }
+    if (!inZone(c, r)) { dropTool(); return false; }
     if (!canPlace(c, r)) { AUDIO.play('deny'); return false; } // políčko je obsadené
     if (st.gold < dc) { toast('Nedostatok zlata'); AUDIO.play('deny'); return false; }
     snapshot();
@@ -4625,9 +4627,11 @@
     if (inHall(c, r)) return true;
     return !st.tool && x >= hr.x0 && x < hr.x1 && y >= hr.y0 - 8 && y < hr.y0 && !occAt(c, r);
   }
+  // ťuk mimo stavebnej zóny so zvolenou stavbou: bez hlášky, stavba sa len odznačí
+  const dropTool = () => { st.tool = null; st.sel = null; st.moving = null; AUDIO.play('click'); renderBuild(); };
   function tapBuild(x, y) {
     const c = Math.floor((x - G.gx0) / T), r = Math.floor((y - G.gy0) / T);
-    if (c < 0 || c >= G.cols || r < 0 || r >= G.rows) return;
+    if (c < 0 || c >= G.cols || r < 0 || r >= G.rows) { if (st.tool) dropTool(); return; }
     if (hallHit(x, y)) { st.sel = HALL; st.tool = null; renderBuild(); return; }
     if (st.tool === 'paving') { placeAt('paving', c, r); return; } // dlažba ide aj pod budovy
     const o = occAt(c, r);
@@ -4765,7 +4769,11 @@
     const pd = pdrag; pdrag = null;
     if (st.phase !== 'build') return;
     const t = pdragTile(ev);
-    if (!t) { renderBuild(); return; } // pustené nad panelom alebo mimo mapy – nič sa nestavia
+    if (!t) { // pustené nad panelom – nič sa nestavia; vedľa mriežky na bojisku sa stavba odznačí
+      const sr = screen.getBoundingClientRect(), br = $('build').getBoundingClientRect();
+      if (ev.clientX >= sr.left && ev.clientX <= sr.right && ev.clientY >= sr.top && ev.clientY < (!$('build').hidden ? br.top : sr.bottom)) { dropTool(); return; }
+      renderBuild(); return;
+    }
     placeAt(pd.kind, t.c, t.r);
   });
   window.addEventListener('pointercancel', () => { cardPress = null; pdrag = null; });
