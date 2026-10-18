@@ -5135,15 +5135,41 @@
     requestAnimationFrame(frame);
   }
 
+  // ---- načítanie: veľké sady snímok (8 smerov) sa vyrábajú po kúskoch medzi snímkami obrazovky, takže úvod beží
+  // plynulo a pásik na úvodnom obrázku ukazuje postup; hra sa spustí, až keď je všetko hotové ----
   initSprites();
   initOrcSprites(); // horda orkov v 8 smeroch (js/orcs8.js)
   initBuildingSprites();
   initSiegeSprites(); // obliehacie stroje v 8 smeroch (js/siege.js)
-  initIcons();
-  resize();
-  window.addEventListener('resize', resize);
-  updateHud();
-  requestAnimationFrame(frame);
+  (async () => {
+    const keys = SPR_TASKS.slice();
+    for (let i = 0; i < keys.length; i++) {
+      void SPR[keys[i]]; // vyrobí sadu, ak ju už niečo nevyrobilo skôr
+      SPLASH.progress((i + 1) / keys.length);
+      await new Promise(r => setTimeout(r, 0));
+    }
+    initIcons();
+    resize();
+    window.addEventListener('resize', resize);
+    updateHud();
+    requestAnimationFrame(frame);
+    SPLASH.done();
+    prewarmHits(keys);
+  })();
+  // predpríprava zásahov na pozadí: biely záblesk (vlastné jednotky) a červený nádych (nepriatelia) sa inak vyrábali
+  // až pri prvom zásahu každej snímky a v boji to spôsobovalo drobné zaseknutia; robí sa po malých dávkach (najviac ~5 ms)
+  function prewarmHits(keys) {
+    const frames = [];
+    const collect = o => { if (!o) return; if (o.c) frames.push(o); else if (typeof o === 'object') for (const k in o) if (k !== 'tip') collect(o[k]); };
+    for (const k of keys) { const set = SPR[k]; if (Array.isArray(set)) set.forEach(collect); }
+    let i = 0;
+    const step = () => {
+      const t0 = performance.now();
+      while (i < frames.length && performance.now() - t0 < 5) { const fr = frames[i++]; void fr.f; hitSpr(fr); }
+      if (i < frames.length) setTimeout(step, 30);
+    };
+    setTimeout(step, 500);
+  }
   SPLASH.onPlay = () => showSlots(); // zelené tlačidlo Hrať na úvodnom obrázku otvorí pozície
 
   // ---------------- Ladenie ----------------

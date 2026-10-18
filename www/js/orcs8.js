@@ -443,17 +443,16 @@ function buildOrcKingBig() {
   set.stride = 4;
   return set;
 }
+// sady sa vyrobia po kúskoch počas načítavania (SPR_TASKS) alebo pri prvom použití
 function initOrcSprites() {
-  SPR.orcKing8 = buildOrcKingBig(); // boss: väčší, maľovaný štetcom
-  SPR.goblin8 = buildUnit8({ body: GB8, hand: GB8_HAND, legs: GOB_LEGS, blade: 4, fist: 'o' });
-  SPR.garcher8 = buildUnit8({ body: GA8, bow: GA8_BOW, hand: GB8_HAND, legs: GOB_LEGS, fist: 'o' });
-  SPR.sapper8 = buildUnit8({ body: SA8, hand: GB8_HAND, legs: GOB_LEGS, noWeapon: true, fist: 'o' });
-  SPR.orc8 = buildUnit8({ body: OR8, hand: OR8_HAND, legs: orcLegs('o', 'q', 'd'), axe: [6, 2.5], fist: 'o' });
-  SPR.brute8 = buildUnit8({ body: BR8, hand: BR8_HAND, legs: orcLegs('o', 'q', 'd', 1), axe: [8, 3.25], fist: 'o', H: 28 });
-  SPR.warlord8 = buildUnit8({ body: BR8, hand: BR8_HAND, legs: orcLegs('o', 'q', 'd', 1), axe: [8, 3.25], fist: 'o', H: 28, pal: PAL_WARLORD });
-  SPR.shaman8 = buildUnit8({ body: SH8, hand: SH8_HAND, legs: orcLegs('P', 'p', 'q'), spear: 9, tip: ['w', 'o'], fist: 'o' });
-  SPR.wolf8 = buildUnit8({ W: 36, H: 28, body: WR8_BODY, mount: WOLF8, legs: WOLF8_LEGS, far: 'DK', hand: WR8_HAND, blade: 4, fist: 'o', stride: 3.5 });
-  SPR.bear8 = buildUnit8({ W: 38, H: 30, body: BR8R_BODY, mount: BEAR8, legs: BEAR8_LEGS, hand: BR8R_HAND, axe: [6, 2.5], fist: 'o', stride: 4.5 });
-  SPR.garcher8.bow = true;
-  SPR.footArcher8.bow = true; // ľudský lukostrelec ako nepriateľ (hra za orkov) napína luk ako goblin
+  lazySpr('orcKing8', () => buildOrcKingBig()); // boss: väčší, maľovaný štetcom
+  lazySpr('goblin8', () => buildUnit8({ body: GB8, hand: GB8_HAND, legs: GOB_LEGS, blade: 4, fist: 'o' }));
+  lazySpr('garcher8', () => Object.assign(buildUnit8({ body: GA8, bow: GA8_BOW, hand: GB8_HAND, legs: GOB_LEGS, fist: 'o' }), { bow: true }));
+  lazySpr('sapper8', () => buildUnit8({ body: SA8, hand: GB8_HAND, legs: GOB_LEGS, noWeapon: true, fist: 'o' }));
+  lazySpr('orc8', () => buildUnit8({ body: OR8, hand: OR8_HAND, legs: orcLegs('o', 'q', 'd'), axe: [6, 2.5], fist: 'o' }));
+  lazySpr('brute8', () => buildUnit8({ body: BR8, hand: BR8_HAND, legs: orcLegs('o', 'q', 'd', 1), axe: [8, 3.25], fist: 'o', H: 28 }));
+  lazySpr('warlord8', () => buildUnit8({ body: BR8, hand: BR8_HAND, legs: orcLegs('o', 'q', 'd', 1), axe: [8, 3.25], fist: 'o', H: 28, pal: PAL_WARLORD }));
+  lazySpr('shaman8', () => buildUnit8({ body: SH8, hand: SH8_HAND, legs: orcLegs('P', 'p', 'q'), spear: 9, tip: ['w', 'o'], fist: 'o' }));
+  lazySpr('wolf8', () => buildUnit8({ W: 36, H: 28, body: WR8_BODY, mount: WOLF8, legs: WOLF8_LEGS, far: 'DK', hand: WR8_HAND, blade: 4, fist: 'o', stride: 3.5 }));
+  lazySpr('bear8', () => buildUnit8({ W: 38, H: 30, body: BR8R_BODY, mount: BEAR8, legs: BEAR8_LEGS, hand: BR8R_HAND, axe: [6, 2.5], fist: 'o', stride: 4.5 }));
 }

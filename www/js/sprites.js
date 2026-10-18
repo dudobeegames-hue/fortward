@@ -635,24 +635,24 @@ function initSprites() {
   for (const k in RACE_ART) SPR['race_' + k] = [buildOutlined(RACE_ART[k], RACE_PAL[k])];
   // lukostrelec zo strelnice (pešia jednotka) – rovnaký vojak, druhá snímka s prekročenými nohami
   SPR.footArcher = [buildSprite(DEF_ARCHER), buildSprite(DEF_ARCHER.slice(0, 14).concat(['....KddK.KddK.', '....KKK...KKK.']))];
-  SPR.footArcher8 = buildArcher8(); // lukostrelec v 8 smeroch (luk pri boku, pri streľbe napnutá tetiva)
+  lazySpr('footArcher8', () => Object.assign(buildArcher8(), { bow: true })); // lukostrelec v 8 smeroch (luk pri boku, pri streľbe napnutá tetiva); bow: ako nepriateľ napína luk
   SPR.knight = [buildSprite(DEF_KNIGHT)];
   SPR.mage = [buildSprite(DEF_MAGE)];
   SPR.soldier = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l)));
-  SPR.soldier8 = buildKnight8(); // rytier v 8 smeroch (chôdza s pohupom tela, úder mečom)
+  lazySpr('soldier8', buildKnight8); // rytier v 8 smeroch (chôdza s pohupom tela, úder mečom)
   SPR.king = KING_LEGS.map(l => buildSprite(KING_BODY.concat(l)));
-  SPR.king8 = buildKing8(); // kráľ v 8 smeroch (chôdza, postoj, úder)
-  SPR.paladin8 = buildPaladin8(); // paladin v 8 smeroch s bojovým kladivom
-  SPR.sorc8 = buildSorc8(); // čarodejka v 8 smeroch s copom a ohnivou palicou
-  SPR.chief8 = buildChief8(); // náčelník orkov (hrdina za orkov)
-  SPR.chief = [SPR.chief8[2].idle];
+  lazySpr('king8', buildKing8); // kráľ v 8 smeroch (chôdza, postoj, úder)
+  lazySpr('paladin8', buildPaladin8); // paladin v 8 smeroch s bojovým kladivom
+  lazySpr('sorc8', buildSorc8); // čarodejka v 8 smeroch s copom a ohnivou palicou
+  lazySpr('chief8', buildChief8); // náčelník orkov (hrdina za orkov)
+  Object.defineProperty(SPR, 'chief', { configurable: true, enumerable: true, get: () => [SPR.chief8[2].idle] });
   SPR.paladin = PALADIN_LEGS.map(l => buildSprite(PALADIN_BODY.concat(l), PAL_PALADIN));
   SPR.sorc = SORC_LEGS.map(l => buildSprite(SORC_BODY.concat(l), PAL_SORC));
   SPR.spear = SOLDIER_LEGS.map(l => buildSprite(SPEAR_BODY.concat(l))); // ľudia vždy v modrom
-  SPR.spear8 = buildSpear8(); // kopijník v 8 smeroch (kopija opretá o zem, pri útoku sklopená a bodne)
+  lazySpr('spear8', buildSpear8); // kopijník v 8 smeroch (kopija opretá o zem, pri útoku sklopená a bodne)
   SPR.shield = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l), { c: '#d0d4dc', B: '#80869a', n: '#44485a' }));
   SPR.rider = RIDER_FRAMES.map(f => buildSprite(f));
-  SPR.rider8 = buildRider8(); // jazdec na koni v 8 smeroch (klus, kopija sklopená k útoku)
+  lazySpr('rider8', buildRider8); // jazdec na koni v 8 smeroch (klus, kopija sklopená k útoku)
   SPR.monk = MONK_LEGS.map(l => buildSprite(MONK_BODY.concat(l)));
   SPR.monkCast = [buildSprite(MONK_CAST), buildSprite(MONK_CAST)];
   SPR.craft = CRAFT_LEGS.map(l => buildSprite(CRAFT_BODY.concat(l)));
@@ -1197,20 +1197,37 @@ function buildHero8(spec) {
   return all;
 }
 // sprite (s bielym zábleskom a siluetou) z hotového plátna
-function spriteFromPixels(c) {
-  const w = c.width, h = c.height, id = c.getContext('2d').getImageData(0, 0, w, h);
-  const K = hexRGB(PAL.K);
-  const mk = () => { const x = document.createElement('canvas'); x.width = w; x.height = h; return x; };
-  const f = mk(), sil = mk(), fd = new ImageData(w, h), sd = new ImageData(w, h);
-  for (let i = 0; i < id.data.length; i += 4) {
-    if (!id.data[i + 3]) continue;
-    const isK = id.data[i] === K[0] && id.data[i + 1] === K[1] && id.data[i + 2] === K[2];
-    const fc = isK ? K : [255, 255, 255], sc = isK ? K : [51, 51, 68];
-    fd.data[i] = fc[0]; fd.data[i + 1] = fc[1]; fd.data[i + 2] = fc[2]; fd.data[i + 3] = 255;
-    sd.data[i] = sc[0]; sd.data[i + 1] = sc[1]; sd.data[i + 2] = sc[2]; sd.data[i + 3] = 255;
+// sprite z hotového plátna; biely záblesk pri zásahu (obrys ostáva) a sivá silueta (zamknuté veci) sa vyrobia
+// až pri prvom použití – väčšina snímok ich nikdy nepotrebuje a ich výroba vopred spomaľovala štart hry
+function spriteFromPixels(c) { return lazyVariants({ c, w: c.width, h: c.height }); }
+function variantCanvas(src, col) {
+  const w = src.width, h = src.height, d = src.getContext('2d').getImageData(0, 0, w, h).data, K = hexRGB(PAL.K);
+  const x = document.createElement('canvas'); x.width = w; x.height = h;
+  const xc = x.getContext('2d'), od = xc.createImageData(w, h), o = od.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue;
+    const isK = d[i] === K[0] && d[i + 1] === K[1] && d[i + 2] === K[2];
+    o[i] = isK ? K[0] : col[0]; o[i + 1] = isK ? K[1] : col[1]; o[i + 2] = isK ? K[2] : col[2]; o[i + 3] = 255;
   }
-  f.getContext('2d').putImageData(fd, 0, 0); sil.getContext('2d').putImageData(sd, 0, 0);
-  return { c, f, sil, w, h };
+  xc.putImageData(od, 0, 0);
+  return x;
+}
+function lazyVariants(spr) {
+  let f = null, sil = null;
+  Object.defineProperty(spr, 'f', { get: () => f || (f = variantCanvas(spr.c, [255, 255, 255])), enumerable: true });
+  Object.defineProperty(spr, 'sil', { get: () => sil || (sil = variantCanvas(spr.c, [51, 51, 68])), enumerable: true });
+  return spr;
+}
+// veľké sady snímok (8 smerov) sa vyrobia až pri prvom použití alebo počas načítavania po kúskoch (SPR_TASKS),
+// aby sa štart nezasekol; build vráti hotovú sadu, ktorá sa potom uloží namiesto čakajúcej vlastnosti
+const SPR_TASKS = [];
+function lazySpr(key, build) {
+  Object.defineProperty(SPR, key, { configurable: true, enumerable: true, get() {
+    const v = build();
+    Object.defineProperty(SPR, key, { value: v, writable: true, configurable: true, enumerable: true });
+    return v;
+  } });
+  SPR_TASKS.push(key);
 }
 
 // ---- Jednotky v 8 smeroch (rytier) ----

@@ -1,6 +1,6 @@
 'use strict';
 // Fortward – úvod: najprv logo štúdia (DBee games) na čiernom pozadí 2,5 s, potom obrázok hry
-// (img/splash.jpg aj s názvom) počas načítania; keď je hra pripravená, plynulo prejde do menu.
+// (img/splash.jpg aj s názvom) s načítavacím pásikom; keď je hra pripravená, zjavia sa tlačidlá menu.
 const SPLASH = (() => {
   const LOGO_MS = 2500, LOGO_FADE_MS = 900, BLACK_MS = 250, FADE_MS = 700, ART_MIN_MS = 900;
   let artFrom = Infinity; // kedy sa začal ukazovať obrázok hry
@@ -24,14 +24,22 @@ const SPLASH = (() => {
 
   // hra je načítaná: na obrázku sa (najskôr chvíľu po zmiznutí loga) zjaví zelené Hrať a sivé Nastavenia
   // Menu (mapa) a Späť (pozície) sa sem vracajú cez SPLASH.show(), lebo len tu sú Nastavenia
-  const api = { onPlay: null, done, show };
+  const api = { onPlay: null, done, show, progress };
   let leaving = false, hideT = 0;
+  // postup načítania 0–1 (pásik na úvodnom obrázku)
+  function progress(p) {
+    const bar = document.querySelector('#loadBar i');
+    if (bar) bar.style.width = Math.round(Math.max(0, Math.min(1, p)) * 100) + '%';
+  }
   function done() {
     const el = document.getElementById('splash'), btns = document.getElementById('splashBtns'), btn = document.getElementById('splashPlay');
     if (!el || !btn) return;
+    progress(1);
     const tick = () => {
       const left = artFrom + ART_MIN_MS - performance.now();
       if (left > 0) { setTimeout(tick, Math.min(left, 300)); return; }
+      const bar = document.getElementById('loadBar');
+      if (bar) { bar.classList.add('hide'); setTimeout(() => bar.remove(), 450); } // pásik zmizne, namiesto neho sa zjavia tlačidlá
       btns.classList.add('show');
     };
     tick();

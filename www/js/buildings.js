@@ -22,24 +22,7 @@ const LVL_MAT = [null,
 const matBody = lvl => LVL_MAT[lvl].body || RAMP.stone;
 
 // Zo surového canvasu vyrobí sprite so zábleskom (biela) a siluetou.
-function spriteFromCanvas(c) {
-  const w = c.width, h = c.height;
-  const id = c.getContext('2d').getImageData(0, 0, w, h);
-  const K = hexRGB(PAL.K);
-  const mk = () => { const x = document.createElement('canvas'); x.width = w; x.height = h; return x; };
-  const f = mk(), sil = mk();
-  const fd = new ImageData(w, h), sd = new ImageData(w, h);
-  for (let i = 0; i < id.data.length; i += 4) {
-    if (id.data[i + 3] === 0) continue;
-    const isK = id.data[i] === K[0] && id.data[i + 1] === K[1] && id.data[i + 2] === K[2];
-    const fc = isK ? K : [255, 255, 255], sc = isK ? K : [51, 51, 68];
-    fd.data[i] = fc[0]; fd.data[i + 1] = fc[1]; fd.data[i + 2] = fc[2]; fd.data[i + 3] = 255;
-    sd.data[i] = sc[0]; sd.data[i + 1] = sc[1]; sd.data[i + 2] = sc[2]; sd.data[i + 3] = 255;
-  }
-  f.getContext('2d').putImageData(fd, 0, 0);
-  sil.getContext('2d').putImageData(sd, 0, 0);
-  return { c, f, sil, w, h };
-}
+function spriteFromCanvas(c) { return lazyVariants({ c, w: c.width, h: c.height }); } // záblesk a silueta až pri použití (sprites.js)
 
 // Maliar: vrstvy farieb do bufferu, na konci obrys K okolo siluety.
 function painter(w, h) {

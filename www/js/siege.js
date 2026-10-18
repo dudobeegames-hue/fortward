@@ -320,15 +320,15 @@ function orcify(md) {
   return md;
 }
 function initSiegeSprites() {
-  SPR.siegeRam8 = buildSiege8(voxRam);
-  SPR.siegeCat8 = buildSiege8(voxCat);
-  SPR.siegeFire8 = buildSiege8(voxFire);
-  SPR.siegeTower8 = buildSiege8(voxTower);
-  SPR.ram8 = buildSiege8((f, act) => voxOrcRam(f, act, false));
-  SPR.giantRam8 = buildSiege8((f, act) => voxOrcRam(f, act, true), 1.4);
-  SPR.mammoth8 = buildSiege8(voxMammoth, 2.2);
-  SPR.oSiegeRam8 = SPR.ram8; // orkský baran
-  SPR.oSiegeCat8 = buildSiege8((f, act) => orcify(voxCat(f, act)));
-  SPR.oSiegeFire8 = buildSiege8((f, act) => orcify(voxFire(f, act)));
-  SPR.oSiegeTower8 = buildSiege8((f, act) => orcify(voxTower(f, act)));
+  lazySpr('siegeRam8', () => buildSiege8(voxRam));
+  lazySpr('siegeCat8', () => buildSiege8(voxCat));
+  lazySpr('siegeFire8', () => buildSiege8(voxFire));
+  lazySpr('siegeTower8', () => buildSiege8(voxTower));
+  lazySpr('ram8', () => buildSiege8((f, act) => voxOrcRam(f, act, false)));
+  lazySpr('giantRam8', () => buildSiege8((f, act) => voxOrcRam(f, act, true), 1.4));
+  lazySpr('mammoth8', () => buildSiege8(voxMammoth, 2.2));
+  lazySpr('oSiegeRam8', () => SPR.ram8); // orkský baran
+  lazySpr('oSiegeCat8', () => buildSiege8((f, act) => orcify(voxCat(f, act))));
+  lazySpr('oSiegeFire8', () => buildSiege8((f, act) => orcify(voxFire(f, act))));
+  lazySpr('oSiegeTower8', () => buildSiege8((f, act) => orcify(voxTower(f, act))));
 }
