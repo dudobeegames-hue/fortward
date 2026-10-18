@@ -42,19 +42,26 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def save_castles(self):
-        # hrady z editora: {rasa: {misia: [{k, c, r}]}} – overí tvar a zapíše čitateľný js súbor
+        # hrady z editora: {rasa: {misia: [{k, c, r, l?}]}} – overí tvar a zapíše čitateľný js súbor
         try:
             data = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
             lines = ["'use strict';",
                      '// Fortward – hrady (tábory) protivníka pre misie 6–10. Súbor zapisuje editor hradov (www/dev/castle-editor.html).',
                      '// Pre každú rasu protivníka a misiu zoznam stavieb: k = druh stavby rasy (CAMP_PIECES v js/camp.js),',
-                     '// c, r = ľavé horné políčko stavby v mriežke bojiska (stĺpec 0–10, riadok od hornej hrany).',
+                     '// c, r = ľavé horné políčko stavby v mriežke bojiska (stĺpec 0–10, riadok od hornej hrany),',
+                     '// l = úroveň stavby 2–5 (chýba = úroveň 1).',
                      'const CASTLES = {']
             races = []
             for race in sorted(data):
                 rows = []
                 for m in sorted(data[race], key=int):
-                    items = [{'k': str(q['k']), 'c': int(q['c']), 'r': int(q['r'])} for q in data[race][m]]
+                    items = []
+                    for q in data[race][m]:
+                        it = {'k': str(q['k']), 'c': int(q['c']), 'r': int(q['r'])}
+                        lvl = int(q.get('l', 1))
+                        if lvl > 1:
+                            it['l'] = min(5, lvl)  # úroveň stavby (1 sa neukladá)
+                        items.append(it)
                     rows.append('    ' + json.dumps(str(int(m))) + ': ' + json.dumps(items, ensure_ascii=False))
                 races.append('  ' + race + ': {\n' + ',\n'.join(rows) + ('\n' if rows else '') + '  }')
             lines.append(',\n'.join(races))

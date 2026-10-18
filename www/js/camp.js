@@ -47,22 +47,27 @@ const CAMP_PIECES = {
     stables:  { role: 'spawn', unit: ['wolf', 'bear'], label: 'jazda', name: 'Stajne', spr: () => BSPR.stables },
     armory:   { role: 'spawn', unit: 'orc', label: 'kopijníci', name: 'Zbrojnica', spr: () => BSPR.armory },
     falconry: { role: 'spawn', unit: 'bat', label: 'sokoly', name: 'Sokoliareň', spr: () => BSPR.falconry },
-    tower:    { role: 'tower',   name: 'Strážna veža',    spr: () => BSPR.tower[0] },
-    mage:     { role: 'tower',   name: 'Veža mága',       spr: () => BSPR.mage[0] },
-    icetower: { role: 'tower',   name: 'Ľadová veža',     spr: () => BSPR.icetower[0] },
-    ballista: { role: 'bombard', name: 'Balista',         spr: () => BSPR.ballista[0] },
+    tower:    { role: 'tower',   name: 'Strážna veža',    spr: o => BSPR.tower[campLvl(o)], lvlArt: true },
+    mage:     { role: 'tower',   name: 'Veža mága',       spr: o => BSPR.mage[campLvl(o)], lvlArt: true },
+    icetower: { role: 'tower',   name: 'Ľadová veža',     spr: o => BSPR.icetower[campLvl(o)], lvlArt: true },
+    ballista: { role: 'bombard', name: 'Balista',         spr: o => BSPR.ballista[campLvl(o)], lvlArt: true },
     chapel:   { role: 'totem',   name: 'Kaplnka',         spr: () => BSPR.chapel },
     workshop: { role: 'spawn', unit: 'sapper', label: 'remeselníci s prachom', name: 'Dielňa remeselníka', spr: () => BSPR.workshop },
     mine:     { role: 'support', name: 'Zlatá baňa',      spr: () => BSPR.mine },
     pit:      { role: 'trap',    name: 'Jama s ostňami',  spr: () => BSPR.pit },
     firepit:  { role: 'trap',    name: 'Ohnivá jama',     spr: () => BSPR.firepit },
     beartrap: { role: 'trap',    name: 'Medvedia pasca',  spr: () => BSPR.beartrap },
-    wall:     { role: 'wall',    name: 'Hradby',          spr: o => BSPR.wall[0][o.mask != null ? o.mask : 10], hp: 1.1, dy: 2 },
-    gatehouse:{ role: 'wall',    name: 'Brána',           spr: o => gateSprite(o.mask != null ? o.mask : 10), hp: 1.5, dy: 2 },
-    hall:     { role: 'keep',    name: 'Radnica',         spr: () => BSPR.hall[0], size: [3, 3] },
+    wall:     { role: 'wall',    name: 'Hradby',          spr: o => BSPR.wall[campLvl(o)][o.mask != null ? o.mask : 10], hp: 1.1, dy: 2, lvlArt: true },
+    gatehouse:{ role: 'wall',    name: 'Brána',           spr: o => gateSprite(o.mask != null ? o.mask : 10, campLvl(o)), hp: 1.5, dy: 2, lvlArt: true },
+    hall:     { role: 'keep',    name: 'Radnica',         spr: o => BSPR.hall[campLvl(o)], size: [3, 3], lvlArt: true },
   },
 };
 const campSize = pc => pc.size || [1, 1];
+// úroveň stavby hradu (1–5, v uložení q.l): ako budovy hráča – viac zdravia a sily; lvlArt = mení aj vzhľad, ostatné majú číslo
+const CAMP_MAX_LVL = 5;
+const campLvl = o => Math.max(1, Math.min(CAMP_MAX_LVL, (o && o.lvl) || 1)) - 1; // index 0–4
+const campHpMul = lvl => 1 + 0.35 * ((lvl || 1) - 1);  // zdravie +35 % za úroveň (ako budovy hráča)
+const campPowMul = lvl => 1 + 0.4 * ((lvl || 1) - 1);  // sila striel a balvanov +40 % za úroveň
 const CAMP_EXTRA = 0.45; // misie s táborom majú bojisko o 45 % vyššie ako obrazovka (miesto na tábor aj na stavanie)
 // obdĺžniky pod stavbami hradu (aj kus nad políčkom, kam siaha obrázok) – tam scéna nekreslí stromy ani skaly
 function campClearRects(list, G) {
@@ -84,11 +89,13 @@ function campWallMask(list, q) {
 }
 // brána = úsek hradby so strážnicou nad ním (ako v hre), pre každé napojenie raz zložená
 const GATE_SPR = {};
-function gateSprite(m) {
-  if (!GATE_SPR[m]) {
+function gateSprite(m, l) {
+  l = l || 0;
+  const key = m + ',' + l;
+  if (!GATE_SPR[key]) {
     const c = document.createElement('canvas'); c.width = 16; c.height = 33;
-    const x = c.getContext('2d'); x.drawImage(BSPR.wall[0][m].c, 0, 9); x.drawImage(BSPR.gatehouse[0].c, 0, 0);
-    GATE_SPR[m] = spriteFromCanvas(c);
+    const x = c.getContext('2d'); x.drawImage(BSPR.wall[l][m].c, 0, 9); x.drawImage(BSPR.gatehouse[l].c, 0, 0);
+    GATE_SPR[key] = spriteFromCanvas(c);
   }
-  return GATE_SPR[m];
+  return GATE_SPR[key];
 }

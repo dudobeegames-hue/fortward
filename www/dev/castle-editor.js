@@ -31,6 +31,16 @@
   const setDirty = v => { dirty = v; $('saveBtn').classList.toggle('dirty', v); status(v ? 'Neuložené zmeny' : ''); if (v) rebuildSoon(); };
   const status = t => { $('status').textContent = t; };
   const inReach = q => tileY(q.r + sizeOf(q.k)[1]) > TOWER_REACH;
+  // úroveň stavby (1–5) ako v hre: v uložení q.l, úroveň 1 sa neukladá
+  const lvlOf = q => q.l || 1;
+  const setLvl = (q, l) => { l = Math.max(1, Math.min(CAMP_MAX_LVL, l)); if (l === lvlOf(q)) return false; if (l > 1) q.l = l; else delete q.l; return true; };
+  // najvyššia úroveň, ktorú má hráč v misii m (podľa odomknutí lvl2–lvl5)
+  const playerLvlAt = m => 1 + [2, 3, 4, 5].filter(l => unlockMissionOf('lvl' + l) <= m).length;
+  const hpOf = q => { const pc = pcOf(q); return pc ? CAMP_ROLES[pc.role].hp * (pc.hp || 1) * campHpMul(lvlOf(q)) : 0; };
+  function changeLvl(d) {
+    if (!sel || !setLvl(sel, lvlOf(sel) + d)) return;
+    setDirty(true); renderAll();
+  }
 
   function buildField() { scene = buildScene(W, H, G, 7 + mission * 13, mission - 1, campClearRects(lay(), G)); }
   let sceneTimer = 0; // po zmene hradu sa krajina prekreslí (pod stavbami nebudú stromy ani skaly)
@@ -52,12 +62,13 @@
   // ---- kreslenie ----
   function drawPiece(q, alpha) {
     const pc = pcOf(q); if (!pc) return;
-    const o = { fired: 0, mask: race === 'human' && (q.k === 'wall' || q.k === 'gatehouse') ? campWallMask(lay(), q) : null };
+    const o = { fired: 0, lvl: q.l || 1, mask: race === 'human' && CAMP_JOIN[q.k] ? campWallMask(lay(), q) : null };
     const sp = pc.spr(o, performance.now() / 1000), [w, h] = campSize(pc);
     const x = Math.round(tileX(q.c) + w * T / 2 - sp.w / 2), y = tileY(q.r + h) - sp.h + (pc.dy || 0);
     b.globalAlpha = alpha || 1;
     b.fillStyle = 'rgba(0,0,0,0.25)'; b.beginPath(); b.ellipse(tileX(q.c) + w * T / 2, tileY(q.r + h) - 1, Math.min(sp.w, w * T) * 0.4, 2, 0, 0, 6.29); b.fill();
     b.drawImage(sp.c, x, y);
+    if ((q.l || 1) > 1 && !pc.lvlArt) pxText(b, String(q.l), Math.round(tileX(q.c) + w * T) - 5, tileY(q.r + h) - 7, '#f8d048'); // úroveň stavby bez vlastného vzhľadu
     b.globalAlpha = 1;
   }
   function frame(c, r, w, h, col) {
@@ -115,11 +126,24 @@
     const k = sel ? sel.k : tool, pc = k && CAMP_PIECES[race][k];
     if (!pc) { $('info').textContent = 'Ťukni na stavbu v palete a potom na políčko bojiska.'; return; }
     const r = CAMP_ROLES[pc.role], [w, h] = campSize(pc);
-    $('info').innerHTML = '<b>' + pc.name + '</b> – ' + ROLE_NAME[pc.role] + (pc.role === 'spawn' ? ' (' + (pc.label || UNIT_NAME[pc.unit] || pc.unit) + ')' : '') + '<br>' + r.what +
-      '<br>zdravie ' + Math.round(r.hp * (pc.hp || 1)) + ' (+20 % za každú ďalšiu misiu) · zlato za zničenie ' + r.gold + ' · veľkosť ' + w + '×' + h + ' políčok' +
+    const L = sel ? lvlOf(sel) : 1, same = sel ? lay().filter(q => q.k === sel.k) : [], pl = playerLvlAt(mission);
+    const power = pc.role === 'tower' || pc.role === 'bombard' ? ' · sila striel ×' + campPowMul(L).toFixed(1) : pc.role === 'totem' ? ' · liečenie ×' + (1 + 0.25 * (L - 1)).toFixed(2) : '';
+    $('info').innerHTML = '<b>' + pc.name + (sel ? ' · úr. ' + L : '') + '</b> – ' + ROLE_NAME[pc.role] + (pc.role === 'spawn' ? ' (' + (pc.label || UNIT_NAME[pc.unit] || pc.unit) + ')' : '') + '<br>' + r.what +
+      '<br>zdravie ' + Math.round(r.hp * (pc.hp || 1) * campHpMul(L)) + ' (+20 % za každú ďalšiu misiu)' + power + ' · zlato za zničenie ' + r.gold + ' · veľkosť ' + w + '×' + h + ' políčok' +
       (sel ? '<br>políčko stĺpec ' + sel.c + ', riadok ' + sel.r + (inReach(sel) ? ' · <span style="color:#e84838">v dosahu veží hráča</span>' : '') +
-        '<br><button class="del" id="delSel">Zmazať</button>' : '<br><i>Klikni na políčko bojiska a postav ju.</i>');
-    if (sel) $('delSel').onclick = () => removeSel();
+        '<div class="lvl"><span>Úroveň</span><button id="lvlDown"' + (L <= 1 ? ' disabled' : '') + '>▼</button>' +
+        '<span class="pips">' + [1, 2, 3, 4, 5].map(i => '<i class="' + (i <= L ? 'on' : '') + (i > pl ? ' over' : '') + '"></i>').join('') + '</span>' +
+        '<button id="lvlUp" class="up"' + (L >= CAMP_MAX_LVL ? ' disabled' : '') + '>Vylepšiť ▲</button></div>' +
+        (same.length > 1 ? '<div class="lvl"><span>Všetky ' + pc.name.toLowerCase() + ' (' + same.length + '×)</span><button id="lvlAll">na úroveň ' + L + '</button></div>' : '') +
+        '<div class="help">hráč má v misii ' + mission + ' najviac úroveň ' + pl + (L > pl ? ' – <span style="color:#e84838">táto stavba je silnejšia</span>' : '') +
+        (pc.lvlArt ? ' · vzhľad sa mení s úrovňou' : ' · úroveň je napísaná pri stavbe') + ' · klávesy <kbd>+</kbd> / <kbd>-</kbd></div>' +
+        '<button class="del" id="delSel">Zmazať</button>' : '<br><i>Klikni na políčko bojiska a postav ju.</i>');
+    if (sel) {
+      $('delSel').onclick = () => removeSel();
+      $('lvlUp').onclick = () => changeLvl(1);
+      $('lvlDown').onclick = () => changeLvl(-1);
+      if ($('lvlAll')) $('lvlAll').onclick = () => { let ch = false; for (const q of same) ch = setLvl(q, L) || ch; if (ch) setDirty(true); renderAll(); };
+    }
   }
   function renderList() {
     $('mLabel').textContent = mission + ' – ' + MISSIONS[mission - 1].name + ' (' + (race === 'orc' ? 'orkovia' : 'ľudia') + ')';
@@ -129,11 +153,11 @@
     L.forEach(q => {
       const pc = pcOf(q), row = document.createElement('div');
       row.className = 'row' + (q === sel ? ' sel' : '');
-      row.innerHTML = '<span>' + (pc ? pc.name : '? ' + q.k) + '</span><span class="help">stĺpec ' + q.c + ', riadok ' + q.r + '</span>' + (pc && inReach(q) ? '<span class="warn">v dosahu veží</span>' : '');
+      row.innerHTML = '<span>' + (pc ? pc.name : '? ' + q.k) + (lvlOf(q) > 1 ? ' <b class="lv">úr. ' + lvlOf(q) + '</b>' : '') + '</span><span class="help">stĺpec ' + q.c + ', riadok ' + q.r + '</span>' + (pc && inReach(q) ? '<span class="warn">v dosahu veží</span>' : '');
       row.onclick = () => { sel = q; tool = null; renderAll(); };
       list.appendChild(row);
     });
-    const hp = L.reduce((s, q) => { const pc = pcOf(q); return s + (pc ? CAMP_ROLES[pc.role].hp * (pc.hp || 1) : 0); }, 0);
+    const hp = L.reduce((s, q) => s + hpOf(q), 0);
     const roles = {}; for (const q of L) { const pc = pcOf(q); if (pc) roles[pc.role] = (roles[pc.role] || 0) + 1; }
     const units = [...new Set(L.map(pcOf).filter(pc => pc && pc.role === 'spawn').map(pc => pc.label || UNIT_NAME[pc.unit] || pc.unit))];
     $('sum').innerHTML = L.length ? L.length + ' stavieb · spolu ' + Math.round(hp) + ' zdravia (misia 6) · ' + Object.entries(roles).map(([r, n]) => ROLE_NAME[r] + ' ' + n).join(', ') +
@@ -186,6 +210,8 @@
     if (ev.key === 'Escape') { tool = null; sel = null; renderAll(); return; }
     if (!sel) return;
     if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); removeSel(); return; }
+    if (ev.key === '+' || ev.key === '=' || ev.key === 'PageUp') { ev.preventDefault(); changeLvl(1); return; }
+    if (ev.key === '-' || ev.key === 'PageDown') { ev.preventDefault(); changeLvl(-1); return; }
     const mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[ev.key];
     if (mv) { ev.preventDefault(); if (fits(sel.k, sel.c + mv[0], sel.r + mv[1], sel)) { sel.c += mv[0]; sel.r += mv[1]; setDirty(true); renderAll(); } }
   });

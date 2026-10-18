@@ -41,6 +41,15 @@
   .row span:first-child { flex: 1; }
   .help { color: var(--dim); font-size: 12px; }
   .help kbd { background: var(--panel2); border: 1px solid var(--ink); border-radius: 3px; padding: 0 4px; color: var(--text); }
+  .lvl { display: flex; gap: 6px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+  .lvl > span:first-child { color: var(--dim); min-width: 60px; }
+  .lvl button.up { background: #2f5a8a; }
+  .lvl button:disabled { opacity: .4; cursor: default; filter: none; }
+  .pips { display: inline-flex; gap: 3px; }
+  .pips i { width: 12px; height: 12px; border: 2px solid var(--ink); border-radius: 2px; background: #22180f; }
+  .pips i.on { background: var(--gold); }
+  .pips i.over.on { background: var(--red); }
+  .row .lv { color: var(--gold); font-size: 12px; }
   .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--dim); }
   .legend i { display: inline-block; width: 12px; height: 12px; vertical-align: -2px; margin-right: 4px; border: 1px solid var(--ink); }
 </style>
@@ -75,7 +84,9 @@
       </div>
       <p><b>Ovládanie:</b> klik na stavbu v palete → klik na políčko mriežky ju postaví (ako v hre; stavba sa dá postaviť viackrát).
       Zelený rámik = voľné miesto, červený = obsadené alebo mimo povoleného pásu. Klik na stavbu ju vyberie, ťahom ju presunieš
-      na iné políčko. <kbd>Delete</kbd> / pravé tlačidlo zmaže, šípky posúvajú o políčko, <kbd>Esc</kbd> zruší výber.</p>
+      na iné políčko. <kbd>Delete</kbd> / pravé tlačidlo zmaže, šípky posúvajú o políčko, <kbd>+</kbd> / <kbd>-</kbd> mení úroveň vybranej stavby, <kbd>Esc</kbd> zruší výber.</p>
+      <p><b>Úrovne</b> fungujú ako v hre: každá ďalšia úroveň dá stavbe +35 % zdravia, vežiam a katapultom +40 % sily striel.
+      Ľudské veže, hradby, brány a radnica menia aj vzhľad; pri ostatných je úroveň napísaná číslom. Červené políčka úrovne = silnejšia, než akú má hráč v tej misii.</p>
       <p>Stavby v dosahu veží hráča budú pod paľbou hneď od začiatku. Orkovia sú protivník v súčasnej hre;
       ľudské hrady sa použijú, keď bude hra za orkov.</p>
     </div>

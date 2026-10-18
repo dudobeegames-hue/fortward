@@ -776,8 +776,8 @@
     return {
       rocks: [],
       parts: lay.filter(q => pieces[q.k]).map((q, i) => {
-        const pc = pieces[q.k], hp = CAMP_ROLES[pc.role].hp * (pc.hp || 1) * mm, [w, h] = campSize(pc);
-        return { kind: q.k, role: pc.role, skin: pc, c: q.c, r: q.r, x: tileX(q.c) + w * T / 2, y: tileY(q.r + h), hp, max: hp, cd: 3 + i * 1.5, flash: 0, fired: 0,
+        const pc = pieces[q.k], lvl = q.l || 1, hp = CAMP_ROLES[pc.role].hp * (pc.hp || 1) * mm * campHpMul(lvl), [w, h] = campSize(pc);
+        return { kind: q.k, role: pc.role, skin: pc, lvl, c: q.c, r: q.r, x: tileX(q.c) + w * T / 2, y: tileY(q.r + h), hp, max: hp, cd: 3 + i * 1.5, flash: 0, fired: 0,
           mask: race === 'human' && CAMP_JOIN[q.k] ? campWallMask(lay, q) : null }; // hradby ľudí sa spájajú ako v hre
       }),
     };
@@ -816,17 +816,17 @@
         let b = null, bd = 1e9;
         for (const q of st.blds) { if (!BUILD[q.kind].hp || TRAPS[q.kind]) continue; const c = bCenter(q), d = Math.hypot(c.x - o.x, c.y - o.y); if (d < bd) { bd = d; b = q; } }
         const tx = b ? bCenter(b).x : G.hallCx + (Math.random() - 0.5) * 20, ty = b ? tileY(b.r) + 8 : G.hallTop + 6, sx = o.x, sy = o.y - 14;
-        C.rocks.push({ sx, sy, x: sx, y: sy, gy: sy, tx, ty, t: 0, dur: 1.4 + Math.hypot(tx - sx, ty - sy) / 240, h: 50, tgt: b || HALL, dmg: 26 * pw });
+        C.rocks.push({ sx, sy, x: sx, y: sy, gy: sy, tx, ty, t: 0, dur: 1.4 + Math.hypot(tx - sx, ty - sy) / 240, h: 50, tgt: b || HALL, dmg: 26 * pw * campPowMul(o.lvl) });
         o.fired = 0.8; AUDIO.play('clang');
       } else if (o.role === 'tower' && o.cd <= 0) { // šíp na najbližšiu jednotku hráča v dosahu
         let tg = null, td = 84;
         for (const u of st.soldiers) { if (u.dead) continue; const d = Math.hypot(u.x - o.x, u.y - (o.y - 24)); if (d < td) { td = d; tg = u; } }
         if (!tg) { o.cd = 0.3; continue; }
         o.cd = 1.5;
-        st.eproj.push({ x: o.x, y: o.y - 28, tx: tg.x, ty: tg.y - (tg.fly ? 16 : 6), tgt: tg, dmg: 5 * pw });
+        st.eproj.push({ x: o.x, y: o.y - 28, tx: tg.x, ty: tg.y - (tg.fly ? 16 : 6), tgt: tg, dmg: 5 * pw * campPowMul(o.lvl) });
       } else if (o.role === 'totem') { // horda sa pomaly lieči
         for (const e of st.enemies) if (!e.dead && e.hp < e.max) {
-          e.hp = Math.min(e.max, e.hp + e.max * CAMP_TOTEM * dt);
+          e.hp = Math.min(e.max, e.hp + e.max * CAMP_TOTEM * (1 + 0.25 * (o.lvl - 1)) * dt); // vyšší totem lieči rýchlejšie
           if (Math.random() < 0.01) part(e.x + (Math.random() - 0.5) * 6, e.y - e.h * 0.6, 0, -12, 0.5, '#5aff8a', 0);
         }
         if (Math.random() < 0.15) part(o.x + (Math.random() - 0.5) * 6, o.y - 22, (Math.random() - 0.5) * 6, -10, 0.6, '#5aff8a', 0);
@@ -4065,7 +4065,10 @@
     for (const e of st.enemies) objs.push({ y: dpt(e), id: 1e5 + (e._id || (e._id = ++enemyN)), f: () => drawEnemy(e, time) });
     for (const tm of st.totems || []) objs.push({ y: tm.y, f: () => drawTotem(tm, time) }); // totem duchov šamana
     if (st.camp) {
-      for (const o of st.camp.parts) if (o.hp > 0) objs.push({ y: o.y, f: () => { const sp = o.skin.spr(o, time); shadow(o.x, o.y, 8); g.drawImage(sp.c, Math.round(o.x - sp.w / 2) + hitJit(o.flash), o.y - sp.h + (o.skin.dy || 0)); } });
+      for (const o of st.camp.parts) if (o.hp > 0) objs.push({ y: o.y, f: () => {
+        const sp = o.skin.spr(o, time); shadow(o.x, o.y, 8); g.drawImage(sp.c, Math.round(o.x - sp.w / 2) + hitJit(o.flash), o.y - sp.h + (o.skin.dy || 0));
+        if (o.lvl > 1 && !o.skin.lvlArt) pxText(g, String(o.lvl), Math.round(o.x + sp.w / 2) - 4, o.y - 7, '#f8d048'); // úroveň stavby bez vlastného vzhľadu
+      } });
       for (const r of st.camp.rocks) objs.push({ y: 9999, f: () => drawRock(r) });
     }
     objs.sort((a, b) => a.y - b.y || (b.x || 0) - (a.x || 0) || (a.id || 0) - (b.id || 0)); // v rovnakom rade je ľavejšia budova vpredu, jednotky v stálom poradí
