@@ -5502,7 +5502,7 @@
 
   const RACES = [
     { name: 'Ľudia',   spr: 'race_humans', state: 'open',                desc: 'Rytieri, kamenné hradby a odvážni hrdinovia.' },
-    { name: 'Orkovia', spr: 'race_orcs',   state: 'open',                desc: 'Surová sila a nekonečné hordy.' },
+    { name: 'Orkovia', spr: 'race_orcs',   state: 'open',                desc: 'Surová sila a nekonečné hordy.', icon: () => trimmed(SPR.brute8[2].idle) }, // surovec s rohatou prilbou spredu
     { name: 'Nemŕtvi', spr: 'race_undead', state: 'soon',                desc: 'Padlí kostlivci vstávajú znova do boja.' },
     { name: 'Elfovia', spr: 'race_elves',  state: 'gem', price: 500,     desc: 'Presní lukostrelci a lesná mágia.' },
     { name: 'Démoni',  spr: 'race_demons', state: 'gem', price: 500,     desc: 'Oheň, besnenie a temné obete.' },
@@ -5615,7 +5615,7 @@
     for (const r of RACES) {
       const c = document.createElement('button');
       c.className = 'race ' + r.state + (r.name === (st.race || 'Ľudia') ? ' sel' : '');
-      const img = spriteURL(SPR[r.spr][0], 4, r.state !== 'open');
+      const img = spriteURL(r.icon ? r.icon() : SPR[r.spr][0], 4, r.state !== 'open');
       const tag = r.state === 'open' ? 'Hrať' : r.state === 'soon' ? 'Čoskoro' : '<img class="gem" src="' + ICONS.gem + '">' + r.price;
       c.innerHTML = '<img src="' + img + '"><b>' + r.name + '</b><span class="tag">' + tag + '</span>';
       c.addEventListener('click', () => {
