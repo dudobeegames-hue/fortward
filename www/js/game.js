@@ -5617,7 +5617,7 @@
       c.className = 'race ' + r.state + (r.name === (st.race || 'Ľudia') ? ' sel' : '');
       const img = spriteURL(r.icon ? r.icon() : SPR[r.spr][0], 4, r.state !== 'open');
       const tag = r.state === 'open' ? 'Hrať' : r.state === 'soon' ? 'Čoskoro' : '<img class="gem" src="' + ICONS.gem + '">' + r.price;
-      c.innerHTML = '<img src="' + img + '"><b>' + r.name + '</b><span class="tag">' + tag + '</span>';
+      c.innerHTML = '<img' + (r.icon ? ' class="wide"' : '') + ' src="' + img + '"><b>' + r.name + '</b><span class="tag">' + tag + '</span>';
       c.addEventListener('click', () => {
         if (r.state === 'soon') toast(r.name + ' prídu v ďalšej verzii');
         else if (r.state === 'gem') toast('Odomykanie za gemy pripravujeme');
