@@ -268,13 +268,22 @@ const ORC_ENEMY_INTRO = {
   9: { id: 'wolf', name: 'Jazdci', desc: 'prebehnú cez orkov a idú po goblinoch s lukmi – zastavia ich surovci' },
   10: { id: 'orcKing', name: 'Veliteľ jazdy', desc: 'vyjde z tábora v poslednej vlne – dupnutím koňa omračuje a privoláva rytierov' },
 };
+// za orkov sa jedový kotol (icetower) odomyká ako druhá veža (misia 2) a ohnivý totem (mage) až v misii 3
+let UNLOCK_RACE = 'human';
+const ORC_UNLOCKS = UNLOCKS.map(l => l.map(u => Object.assign({}, u)));
+(() => {
+  const a = ORC_UNLOCKS[1], b = ORC_UNLOCKS[2], i = a.findIndex(u => u.id === 'mage'), j = b.findIndex(u => u.id === 'icetower');
+  [a[i], b[j]] = [b[j], a[i]];
+})();
+const unlocksOf = () => UNLOCK_RACE === 'orc' ? ORC_UNLOCKS : UNLOCKS;
 function techFor(m) {
-  const s = new Set();
-  for (let i = 0; i < Math.min(m, UNLOCKS.length); i++) UNLOCKS[i].forEach(u => s.add(u.id));
+  const s = new Set(), U = unlocksOf();
+  for (let i = 0; i < Math.min(m, U.length); i++) U[i].forEach(u => s.add(u.id));
   return s;
 }
 function unlockMissionOf(id) {
-  for (let i = 0; i < UNLOCKS.length; i++) if (UNLOCKS[i].some(u => u.id === id)) return i + 1;
+  const U = unlocksOf();
+  for (let i = 0; i < U.length; i++) if (U[i].some(u => u.id === id)) return i + 1;
   return 1;
 }
 

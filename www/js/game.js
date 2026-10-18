@@ -120,6 +120,7 @@
   const uCd = u => WUNIT[u.type].cd * Math.pow(0.92, u.lvl - 1);
   const uRange = u => WUNIT[u.type].range + 4 * (u.lvl - 1);
   const BUILD_ORDER = ['paving', 'tower', 'stake', 'wall', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'mage', 'icetower', 'ballista', 'chapel', 'firepit', 'beartrap', 'workshop'];
+  const ORC_ORDER = BUILD_ORDER.slice(); ORC_ORDER.splice(ORC_ORDER.indexOf('icetower'), 1); ORC_ORDER.splice(ORC_ORDER.indexOf('mage'), 0, 'icetower'); // za orkov kotol pred totemom
   const ENEMY = {
     goblin:  { spr: 'goblin',  hp: 12,  speed: 24, atk: 4,  atkCd: 0.8, gold: 3,  blood: '#62a03a' },
     orc:     { spr: 'orc',     hp: 32,  speed: 16, atk: 9,  atkCd: 1.0, gold: 6,  blood: '#62a03a' },
@@ -142,9 +143,13 @@
   const GIANTS = { 7: { 10: ['giantRam'] }, 8: { 5: ['giantRam'], 10: ['mammoth'] }, 9: { 5: ['mammoth'], 10: ['giantRam', 'mammoth'] }, 10: { 5: ['giantRam', 'mammoth'] } };
 
   const lvlMul = (b, k) => 1 + k * (b.lvl - 1);
-  const bDmg = b => BUILD[b.kind].dmg * lvlMul(b, 0.4) * (SHOOTERS[b.kind] ? 1 + 0.04 * perk('fletching') : 1) * (TRAPS[b.kind] ? 1 + 0.06 * perk('traps') : 1) * (b.spec ? SPECS[b.spec].dmg : 1);
-  const bCd = b => BUILD[b.kind].cd * Math.pow(0.92, b.lvl - 1) * (b.spec ? SPECS[b.spec].cd : 1) / (1 + 0.03 * perk('reload'));
-  const bRange = b => (BUILD[b.kind].range + 4 * (b.lvl - 1) + (b.spec ? SPECS[b.spec].range : 0)) * (1 + 0.02 * perk('lookouts'));
+  const bDmg = b => (isTreb(b) ? TREB.dmg : 1) * BUILD[b.kind].dmg * lvlMul(b, 0.4) * (SHOOTERS[b.kind] ? 1 + 0.04 * perk('fletching') : 1) * (TRAPS[b.kind] ? 1 + 0.06 * perk('traps') : 1) * (b.spec ? SPECS[b.spec].dmg : 1);
+  // trebuchet (balista za orkov): 1,5× dosah, 1,6× sila, ~2,2× pomalší, nevylepšuje sa
+  const TREB = { range: 1.5, dmg: 1.6, cd: 2.2, splash: 22 };
+  const isTreb = b => b.kind === 'ballista' && BUILD_RACE === 'orc';
+  const fixedKind = k => !!BUILD[k].fixed || (k === 'ballista' && BUILD_RACE === 'orc'); // koly a trebuchet sa nevylepšujú
+  const bCd = b => (isTreb(b) ? TREB.cd : 1) * BUILD[b.kind].cd * Math.pow(0.92, b.lvl - 1) * (b.spec ? SPECS[b.spec].cd : 1) / (1 + 0.03 * perk('reload'));
+  const bRange = b => (isTreb(b) ? TREB.range : 1) * (BUILD[b.kind].range + 4 * (b.lvl - 1) + (b.spec ? SPECS[b.spec].range : 0)) * (1 + 0.02 * perk('lookouts'));
   const bMaxHp = b => Math.round((BUILD[b.kind].hp || 1) * lvlMul(b, 0.35) * (b.kind === 'wall' ? 1 + WALL_LINK * (b.nb || 0) : 1) * (1 + 0.06 * perk('carpenters')));
   const bUpCost = b => Math.round(BUILD[b.kind].cost * 0.9 * Math.pow(1.6, b.lvl - 1) * (1 - 0.04 * perk('architects')));
   const knightCap = b => 2 + b.lvl;
@@ -1158,7 +1163,7 @@
     for (let k = 0; k < 80; k++) part(Math.random() * W, camY + H * 0.3 + Math.random() * 30, (Math.random() - 0.5) * 60, -30 - Math.random() * 60, 1.4, ['#f8d048', '#fff070', '#88b4ff', '#e84838'][k % 4], 60);
     const text = m === MISSIONS.length
       ? 'Porazil si poslednú hordu. <b>Ostrov je oslobodený!</b>'
-      : 'Misia ' + m + ' · ' + missionDef(m).name + ' · ' + TIERS[t].name.toLowerCase() + ' úroveň<br>Všetkých ' + MISSION_WAVES + ' vĺn odrazených.' + (first ? '<br>Odomkla sa misia ' + (m + 1) + '.<br><span class="newTech">Nové: ' + UNLOCKS[m].map(u => u.name).join(', ') + '</span>' : '');
+      : 'Misia ' + m + ' · ' + missionDef(m).name + ' · ' + TIERS[t].name.toLowerCase() + ' úroveň<br>Všetkých ' + MISSION_WAVES + ' vĺn odrazených.' + (first ? '<br>Odomkla sa misia ' + (m + 1) + '.<br><span class="newTech">Nové: ' + unlocksOf()[m].map(unlockName).join(', ') + '</span>' : '');
     const starLine = '<span class="bigStars">' + starSpan(stars, t) + '</span>' +
       (stars > prevStars ? '<br><span class="newTech">+' + (stars - prevStars) + ' ★ do Kráľovskej siene</span>' : '') + tierNote;
     const xpLine = st.lastXp ? '<br><span class="newTech">' + heroName() + ' +' + st.lastXp + ' XP' + (kingMeta.pending ? ' · nová úroveň ' + kingMeta.lvl + '!' : '') + '</span>' : '';
@@ -1870,6 +1875,28 @@
     AUDIO.play('lance');
     return true;
   }
+  // trebuchet: balvan po vysokom oblúku do najhustejšieho zhluku pozemnej hordy v dosahu; keď nikto nie je na dosah,
+  // ostreľuje najbližšiu stavbu tábora (ďaleký dostrel)
+  function fireTrebuchet(b) {
+    const c = bCenter(b), rng = bRange(b), sx = c.x, sy = tileY(b.r) + T - 24;
+    let best = null, bn = 0;
+    for (const e of st.enemies) {
+      if (e.dead || e.d.fly || e.y < 4 || Math.hypot(e.x - c.x, e.y - c.y) > rng) continue;
+      let n = 0; for (const o of st.enemies) if (!o.dead && !o.d.fly && Math.hypot(o.x - e.x, o.y - e.y) < TREB.splash) n++;
+      if (n > bn) { bn = n; best = e; }
+    }
+    let tx, ty, campT = null;
+    if (best) { tx = best.x; ty = best.y - 3; }
+    else {
+      const o = campLive().filter(q => Math.hypot(q.x - c.x, q.y - c.y) <= rng).sort((a, q) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(q.x - c.x, q.y - c.y))[0];
+      if (!o) return false;
+      const a = campAim(o); tx = a.x; ty = a.y; campT = o;
+    }
+    const dist = Math.hypot(tx - sx, ty - sy);
+    st.proj.push({ k: 'rock', big: true, arc: true, sx, sy, x: sx, y: sy, tx, ty, t: 0, dur: Math.max(0.7, dist / 110), h: 30 + dist * 0.35, dmg: bDmg(b), splash: TREB.splash, campT });
+    b.fired = 0.9; AUDIO.play('bolt');
+    return true;
+  }
   function fireWallUnit(b) {
     const u = b.unit, d = WUNIT[u.type], c = bCenter(b);
     return shoot(c.x, c.y, c.x, tileY(b.r) - 6, uRange(u), d.proj, d.speed, uDmg(u), 0);
@@ -2528,7 +2555,7 @@
       b.flash = Math.max(0, b.flash - dt);
       if (b.kind === 'tower' || b.kind === 'mage') { b.cd -= dt; if (b.cd <= 0 && fireFrom(b)) b.cd = bCd(b); }
       else if (b.kind === 'icetower') { b.cd -= dt; if (b.cd <= 0 && fireIce(b)) b.cd = bCd(b); }
-      else if (b.kind === 'ballista') { b.cd -= dt; if (b.cd <= 0 && fireBallista(b)) b.cd = bCd(b); }
+      else if (b.kind === 'ballista') { b.cd -= dt; b.fired = Math.max(0, (b.fired || 0) - dt); if (b.cd <= 0 && (isTreb(b) ? fireTrebuchet(b) : fireBallista(b))) b.cd = bCd(b); }
       else if (b.unit) { b.unit.cd -= dt; if (b.unit.cd <= 0 && fireWallUnit(b)) b.unit.cd = uCd(b.unit); }
       else if (UNIT_HOME[b.kind]) updateBarracks(b, dt);
       else if (b.kind === 'range') updateRange(b, dt);
@@ -3203,7 +3230,7 @@
         g.drawImage(us.c, 0, 0, us.w, 11, isOrc() ? Math.round(x0 + T / 2 - us.w / 2) : x0 + 1, y0 - 9, us.w, 11);
       }
     } else {
-      spr = bsprOf(b.kind, b.lvl);
+      spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(b.kind, b.lvl); // trebuchet po výstrele s ramenom hore
       g.drawImage(spr.c, x0 + T / 2 - Math.floor(spr.w / 2) + hitJit(b.flash), y0 + T + 1 - spr.h);
       if (b.holyT > 0) holyGlow(spr, x0 + T / 2 - Math.floor(spr.w / 2), y0 + T + 1 - spr.h, b.holyT, time);
       if (b.spec) { // vlajočka špecializácie na veži
@@ -3490,6 +3517,16 @@
       g.fillStyle = '#88d0f0'; g.fillRect(x - 1, y - 1, 3, 3); g.fillRect(x, y - 2, 1, 5);
       g.fillStyle = '#ffffff'; g.fillRect(x, y - 1, 1, 1);
       if (Math.random() < 0.5) part(p.x, p.y, 0, 0, 0.25, '#c8ecff', 0);
+      return;
+    }
+    if (p.k === 'rock' && p.big) { // balvan z trebuchetu: väčší, s tieňom na zemi
+      g.fillStyle = 'rgba(10,8,6,0.35)'; g.fillRect(r(p.x) - 2, r(p.gy), 5, 1);
+      const x = r(p.x), y = r(p.y);
+      g.fillStyle = PAL.K; g.fillRect(x - 3, y - 2, 7, 5); g.fillRect(x - 2, y - 3, 5, 7);
+      g.fillStyle = '#625a6c'; g.fillRect(x - 2, y - 2, 5, 5);
+      g.fillStyle = '#848490'; g.fillRect(x - 2, y - 2, 3, 3);
+      g.fillStyle = '#c0c0c8'; g.fillRect(x - 1, y - 1, 1, 1);
+      g.fillStyle = '#3c3846'; g.fillRect(x + 1, y + 1, 2, 1); g.fillRect(x + 2, y, 1, 2);
       return;
     }
     if (p.k === 'rock') {
@@ -4212,7 +4249,7 @@
     armory:   { name: 'Jama surovcov',     short: 'Jama',      desc: 'Vysiela surovcov – silných bijcov proti jazde' },
     mage:     { name: 'Ohnivý totem',      short: 'Totem',     desc: 'Šamanský oheň zasiahne celú skupinu' },
     icetower: { name: 'Jedový kotol',      short: 'Kotol',     desc: 'Vrhá jed – otrávi a spomalí zasiahnutých, na zemi nechá jedovatú mláku' },
-    ballista: { name: 'Orkský katapult',   short: 'Katapult',  desc: 'Ťažký balvan prerazí celý rad nepriateľov na zemi' },
+    ballista: { name: 'Trebuchet',         short: 'Trebuchet', desc: 'Pevný vrhač – z veľkej diaľky hádže obrovské balvany do celej skupiny, nabíja sa však dlho. Nevylepšuje sa' },
     chapel:   { name: 'Šamanská chatrč',   short: 'Chatrč',    desc: 'Vyšle šamana, ktorý chodí za orkmi a náčelníkom a lieči ich' },
     workshop: { name: 'Goblinský stan',    short: 'Stan',      desc: 'Vyšle goblina, ktorý chodí opravovať poškodené budovy' },
   };
@@ -4221,8 +4258,11 @@
   const ORC_UNITS = { king: { name: 'Náčelník', spr: 'chief', desc: 'Surový vodca hordy, sekerou zasiahne celú skupinu.', powers: ['rage', 'roar', 'axe'] },
     kt: { knight: 'Ork', spear: 'Surovec', rider: 'Vlčí jazdec' }, plural: { knight: 'Orkovia', rider: 'Vlčí jazdci', spear: 'Surovci' } };
   let previewRace = null;
+  // novinky misie v rase hráča (za orkov iné poradie veží a orkské mená stavieb)
+  const unlockName = u => (BUILD[u.id] && BUILD_RACE === 'orc') ? BUILD[u.id].name : u.name;
   function applyRace() {
     BUILD_RACE = isOrc() ? 'orc' : 'human';
+    UNLOCK_RACE = BUILD_RACE;
     const U = isOrc() ? ORC_UNITS : HUMAN_UNITS;
     Object.assign(HEROES.king, U.king);
     for (const k in KTYPES) KTYPES[k].name = U.kt[k];
@@ -4433,8 +4473,8 @@
         act(icon, name + ' ' + (all || !pick.length ? list.length + '×' : pick.length + '/' + list.length),
           coinTxt(pick.length ? sum : list.reduce((t, x) => t + costFn(x), 0)), pick.length > 0, () => { for (const x of pick) apply(x); rebuildOcc(); }, cls, px);
       };
-      const cand = d.fixed ? [] : grp.filter(w => w.lvl < cap).sort((a, b) => a.lvl - b.lvl);
-      if (d.fixed) { /* koly sa nevylepšujú */ }
+      const cand = fixedKind(kind) ? [] : grp.filter(w => w.lvl < cap).sort((a, b) => a.lvl - b.lvl);
+      if (fixedKind(kind)) { /* koly a trebuchet sa nevylepšujú */ }
       else if (cand.length) bulk(after(cand[0], { lvl: cand[0].lvl + 1, unit: null, gate: false, spikes: false, spec: null }), 'Vylepšiť', cand, bUpCost, w => {
         const ratio = d.hp ? w.hp / bMaxHp(w) : 1, c = bUpCost(w);
         st.gold -= c; w.spent += c; w.lvl++;
@@ -4470,6 +4510,7 @@
       else if (b.kind === 'firepit') stats = 'horenie ' + Math.round(bDmg(b)) + '/s počas ' + FIRE_BURN + ' s';
       else if (b.kind === 'beartrap') stats = 'zastaví na ' + trapStun(b).toFixed(1) + ' s';
       else if (b.kind === 'icetower') stats = 'spomalí na ' + (d.chill + 0.3 * (b.lvl - 1)).toFixed(1) + ' s · poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);
+      else if (isTreb(b)) stats = 'balvan ' + Math.round(bDmg(b)) + ' celej skupine · dosah ' + Math.round(bRange(b)) + ' · výstrel každých ' + bCd(b).toFixed(1) + ' s';
       else if (b.kind === 'ballista') stats = 'poškodenie ' + Math.round(bDmg(b)) + ' každému v rade · dosah ' + bRange(b);
       else if (d.range) stats = 'poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);
       else if (UNIT_HOME[b.kind]) { const kt = KTYPES[UNIT_HOME[b.kind]]; stats = UNIT_PLURAL[UNIT_HOME[b.kind]].toLowerCase() + ' ' + knightCap(b) + ' · sila ' + Math.round(knightDmg(b) * kt.dmg); }
@@ -4483,8 +4524,8 @@
       if (b.spec) stats += ' · ' + SPECS[b.spec].name;
       if (b.gate) stats += ' · rytieri cez ňu prejdú';
       if ((UNIT_HOME[b.kind] || b.kind === 'range') && knightsBlocked(b)) stats = '<span class="warn">⚠ vojaci sa nedostanú von</span> · ' + stats;
-      selRow(after(b, {}), (b.gate ? 'Brána' : d.name) + (d.fixed ? '' : ' · úr. ' + b.lvl), stats);
-      if (!d.fixed) upAct(b.lvl, bCap(), bUpCost(b), () => {
+      selRow(after(b, {}), (b.gate ? 'Brána' : d.name) + (fixedKind(b.kind) ? '' : ' · úr. ' + b.lvl), stats);
+      if (!fixedKind(b.kind)) upAct(b.lvl, bCap(), bUpCost(b), () => {
         const ratio = d.hp ? b.hp / bMaxHp(b) : 1, c = bUpCost(b);
         st.gold -= c; b.spent += c; b.lvl++;
         if (d.hp) b.hp = Math.ceil(bMaxHp(b) * ratio);
@@ -4541,7 +4582,8 @@
         });
         row.appendChild(tb);
       }
-      for (const kind of BUILD_ORDER.filter(k => tab.kinds.includes(k) && (!BUILD[k].orc || isOrc()))) {
+      const order = isOrc() ? ORC_ORDER : BUILD_ORDER; // za orkov kotol ako druhá veža
+      for (const kind of order.filter(k => tab.kinds.includes(k) && (!BUILD[k].orc || isOrc()))) {
         const d = BUILD[kind];
         const b = document.createElement('button');
         if (!has(kind)) { // zamknutá stavba
@@ -5041,7 +5083,7 @@
     $('mMeta').innerHTML = MISSION_WAVES + ' vĺn · obtiažnosť <span class="stars">' + '●'.repeat(diff) + '<i>' + '●'.repeat(5 - diff) + '</i></span>' + (done ? ' · <span class="ok">splnená ✓</span>' : '');
     const foes = [].concat(enemyIntro(m) || []);
     $('mNew').innerHTML = (foes.length ? '<span>' + (foes.length > 1 ? 'Nepriatelia:' : 'Nepriateľ:') + '</span>' + foes.map(foe => '<em class="foe"><img src="' + ICONS['e_' + foe.id] + '">' + foe.name + '</em>').join('') : '') +
-      '<span>' + (m === 1 ? 'Výbava:' : 'Novinka:') + '</span>' + UNLOCKS[m - 1].map(u => '<em><img src="' + ICONS[u.icon] + '">' + u.name + '</em>').join('');
+      '<span>' + (m === 1 ? 'Výbava:' : 'Novinka:') + '</span>' + unlocksOf()[m - 1].map(u => '<em><img src="' + ICONS[u.icon] + '">' + unlockName(u) + '</em>').join('');
     // úroveň misie: predvolene prvá otvorená bez plných 3 hviezd
     if (st.mapTierFor !== m) {
       st.mapTierFor = m; st.mapTier = 0;
@@ -5283,8 +5325,8 @@
 
   // ---- kartičky s novinkami: po rozsvietení ďalšieho hradu, hráč ich odťuká jednu po druhej ----
   function unlockItems(m) {
-    const items = (UNLOCKS[m - 1] || []).map(u => ({
-      icon: ICONS[u.icon], name: u.name,
+    const items = (unlocksOf()[m - 1] || []).map(u => ({
+      icon: ICONS[u.icon], name: unlockName(u),
       tag: BUILD[u.id] ? 'Nová stavba' : ABIL[u.id] ? 'Kráľova schopnosť' : /^(volley|fireball|freeze|lightning)$/.test(u.id) ? 'Kúzlo' : 'Nové vylepšenie',
       desc: u.desc || (BUILD[u.id] ? BUILD[u.id].desc + '.' : ''),
     }));
