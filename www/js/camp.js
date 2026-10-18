@@ -19,25 +19,29 @@ const CAMP_ROLES = {
 // a pri liahni druh jednotky (unit). Hrady sa skladajú v editore hradov (www/dev/castle-editor.html)
 // a ukladajú do js/castles.js. Ľudské stavby ožijú, keď sa bude dať hrať za orkov.
 const CAMP_PIECES = {
-  orc: {
-    goblinTent:  { role: 'spawn', unit: 'goblin',  name: 'Goblinský stan',       spr: () => BSPR.orcTent },
-    orcBarracks: { role: 'spawn', unit: 'orc',     name: 'Orkský barak',         spr: () => BSPR.orcBarracks },
-    brutePit:    { role: 'spawn', unit: 'brute',   name: 'Jama surovcov',        spr: () => BSPR.brutePit },
-    goblinRange: { role: 'spawn', unit: 'garcher', name: 'Goblinská strelnica',  spr: () => BSPR.goblinRange },
-    batCave:     { role: 'spawn', unit: 'bat',     name: 'Netopierí brloh',      spr: (o, t) => BSPR.batCave[Math.floor(t * 4) % 2] },
-    shamanHut:   { role: 'spawn', unit: 'shaman',  name: 'Šamanská chatrč',      spr: (o, t) => BSPR.shamanHut[Math.floor(t * 3) % 2] },
-    bearDen:     { role: 'spawn', unit: 'bear',    name: 'Medvedí brloh',        spr: () => BSPR.bearDen },
-    powderHut:   { role: 'spawn', unit: 'sapper',  name: 'Prachareň',            spr: () => BSPR.powderHut },
-    wolfPen:     { role: 'spawn', unit: 'wolf',    name: 'Vlčia ohrada',         spr: () => BSPR.wolfPen },
-    catapult:    { role: 'bombard', name: 'Orkský trebuchet', spr: o => BSPR.orcTrebuchet[o.fired > 0 ? 1 : 0] }, // strieľa nadol k hráčovi
-    tower:       { role: 'tower',   name: 'Orkská veža',     spr: () => BSPR.orcTower },
-    totem:       { role: 'totem',   name: 'Šamanský totem',  spr: (o, t) => BSPR.orcTotem[Math.floor(t * 3) % 2] },
-    drum:        { role: 'drum',    name: 'Vojnový bubon',   spr: (o, t) => BSPR.orcDrum[Math.floor(t * 4) % 2] },
+  orc: { // všetky stavby, ktoré má hráč za orkov (rovnaké druhy a mená ako v hre)
+    // liahne vypúšťajú druhy hordy z vĺn (unit)
+    barracks:  { role: 'spawn', unit: 'orc',               name: 'Orkský barak',        spr: () => BSPR.orcBarracks },
+    range:     { role: 'spawn', unit: 'garcher',           name: 'Goblinská strelnica', spr: () => BSPR.goblinRange },
+    stables:   { role: 'spawn', unit: ['wolf', 'bear'], label: 'vlčí a medvedí jazdci', name: 'Vlčia ohrada', spr: () => BSPR.wolfPen },
+    armory:    { role: 'spawn', unit: 'brute',             name: 'Jama surovcov',       spr: () => BSPR.brutePit },
+    falconry:  { role: 'spawn', unit: 'bat',               name: 'Netopierí brloh',     spr: (o, t) => BSPR.batCave[Math.floor(t * 4) % 2] },
+    chapel:    { role: 'spawn', unit: 'shaman',            name: 'Šamanská chatrč',     spr: (o, t) => BSPR.shamanHut[Math.floor(t * 3) % 2] },
+    workshop:  { role: 'spawn', unit: ['goblin', 'sapper'], label: 'gobliny a podkopníci', name: 'Goblinský stan', spr: () => BSPR.orcTent },
+    // veže a vrhač: tábor hordy ich má otočené k hráčovi (veža spredu, trebuchet strieľa nadol)
+    tower:     { role: 'tower',   name: 'Orkská veža',     spr: o => BSPR.orcTower[campLvl(o)], lvlArt: true },
+    mage:      { role: 'tower',   name: 'Ohnivý totem',    spr: o => OBSPR.mage[campLvl(o)], lvlArt: true },
+    icetower:  { role: 'tower',   name: 'Jedový kotol',    spr: o => OBSPR.icetower[campLvl(o)], lvlArt: true },
+    ballista:  { role: 'bombard', name: 'Trebuchet',       spr: o => BSPR.orcTrebuchet[o.fired > 0 ? 1 : 0], fixed: true }, // nevylepšuje sa (ako v hre)
+    mine:      { role: 'support', name: 'Zlatá baňa',      spr: () => BSPR.mine },
+    pit:       { role: 'trap',    name: 'Jama s ostňami',  spr: () => BSPR.pit },
+    firepit:   { role: 'trap',    name: 'Ohnivá jama',     spr: () => BSPR.firepit },
+    beartrap:  { role: 'trap',    name: 'Medvedia pasca',  spr: () => BSPR.beartrap },
     // hradba, brána a pevnosť ako stavby hráča za orkov: s úrovňou menia vzhľad (OBSPR), hradby sa spájajú
-    wall:        { role: 'wall',    name: 'Hradba',          spr: o => OBSPR.wall[campLvl(o)][o.mask != null ? o.mask : 10], hp: 1.1, dy: 2, lvlArt: true },
-    gatehouse:   { role: 'wall',    name: 'Brána',           spr: o => gateSprite(o.mask != null ? o.mask : 10, campLvl(o), true), hp: 1.5, dy: 2, lvlArt: true },
-    stakes:      { role: 'wall',    name: 'Koly',            spr: () => BSPR.stakes, hp: 0.4, fixed: true }, // koly sa nevylepšujú (ako v hre)
-    keep:        { role: 'keep',    name: 'Orkská pevnosť',  spr: o => OBSPR.hall[campLvl(o)], size: [3, 3], lvlArt: true },
+    stake:     { role: 'wall',    name: 'Koly',            spr: () => BSPR.stakes, hp: 0.4, fixed: true }, // koly sa nevylepšujú (ako v hre)
+    wall:      { role: 'wall',    name: 'Drevená hradba',  spr: o => OBSPR.wall[campLvl(o)][o.mask != null ? o.mask : 10], hp: 1.1, dy: 2, lvlArt: true },
+    gatehouse: { role: 'wall',    name: 'Brána',           spr: o => gateSprite(o.mask != null ? o.mask : 10, campLvl(o), true), hp: 1.5, dy: 2, lvlArt: true },
+    hall:      { role: 'keep',    name: 'Orkská pevnosť',  spr: o => OBSPR.hall[campLvl(o)], size: [3, 3], lvlArt: true },
   },
   human: { // všetky stavby, ktoré má hráč za ľudí
     // liahne vypúšťajú druhy z vĺn (unit), ktoré za orkov vyzerajú ako ľudské jednotky (label)
@@ -79,13 +83,13 @@ function campClearRects(list, G) {
 }
 // hradby a brány sa spájajú ako v hre: so susednými hradbami, bránami a vežami (na radnicu či pevnosť len z boku);
 // (obe rasy majú hradbu wall a bránu gatehouse)
-const CAMP_JOIN = { wall: 1, gatehouse: 1, tower: 1, mage: 1, icetower: 1, ballista: 1, hall: 1, keep: 1 };
+const CAMP_JOIN = { wall: 1, gatehouse: 1, tower: 1, mage: 1, icetower: 1, ballista: 1, hall: 1 };
 const CAMP_WALLS = { wall: 1, gatehouse: 1 }; // tieto potrebujú masku spojení
 // list = stavby hradu ({k|kind, c, r}); vráti masku spojení 1 hore, 2 vpravo, 4 dole, 8 vľavo
 function campWallMask(list, q) {
   const kindOf = o => o.k || o.kind;
   const at = (c, r) => list.find(o => { const pc = CAMP_PIECES.human[kindOf(o)] || CAMP_PIECES.orc[kindOf(o)], [w, h] = pc ? campSize(pc) : [1, 1]; return c >= o.c && c < o.c + w && r >= o.r && r < o.r + h; });
-  const j = (c, r, vert) => { const o = at(c, r); return !!o && !!CAMP_JOIN[kindOf(o)] && !(vert && (kindOf(o) === 'hall' || kindOf(o) === 'keep')); };
+  const j = (c, r, vert) => { const o = at(c, r); return !!o && !!CAMP_JOIN[kindOf(o)] && !(vert && kindOf(o) === 'hall'); };
   return (j(q.c, q.r - 1, true) ? 1 : 0) | (j(q.c + 1, q.r) ? 2 : 0) | (j(q.c, q.r + 1, true) ? 4 : 0) | (j(q.c - 1, q.r) ? 8 : 0);
 }
 // brána = úsek hradby so strážnicou nad ním (ako v hre), pre každé napojenie raz zložená

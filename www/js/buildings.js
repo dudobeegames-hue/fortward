@@ -1450,7 +1450,7 @@ function initBuildingSprites() {
   BSPR.stables = makeStables();
   BSPR.armory = makeArmory();
   BSPR.orcKeep = makeOrcKeep(2); // pevnosť v tábore hordy (úroveň 2)
-  BSPR.orcTower = makeOrcTower();
+  BSPR.orcTower = [1, 2, 3, 4, 5].map(l => makeOrcTower(false, l)); // veža tábora hordy: ork spredu, pozerá na hráča
   BSPR.stakes = makeStakes();
   BSPR.stake = BSPR.stakes; // koly hráča za orkov (rovnaký obrázok ako koly v tábore hordy)
   BSPR.orcTrebuchet = [makeOrcTrebuchet(3, false, true), makeOrcTrebuchet(3, true, true)]; // trebuchet tábora hordy strieľa nadol k hráčovi
