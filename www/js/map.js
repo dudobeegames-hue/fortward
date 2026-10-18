@@ -266,7 +266,7 @@ const ORC_ENEMY_INTRO = {
   8: [{ id: 'sapper', name: 'Remeselník s prachom', desc: 'beží k palisáde a vyhodí ju do vzduchu – zastreľ ho skôr' },
       { id: 'mammoth', name: 'Obliehacia veža', desc: 'obor v hrubom pancieri – lukostrelci z cimburia strieľajú za jazdy a veža prevalcuje vojakov; proti nej pošli obliehacie stroje' }],
   9: { id: 'wolf', name: 'Jazdci', desc: 'prebehnú cez orkov a idú po goblinoch s lukmi – zastavia ich surovci' },
-  10: { id: 'orcKing', name: 'Ľudský kráľ', desc: 'vyjde z tábora v poslednej vlne – dupnutím omračuje a privoláva rytierov' },
+  10: { id: 'orcKing', name: 'Veliteľ jazdy', desc: 'vyjde z tábora v poslednej vlne – dupnutím koňa omračuje a privoláva rytierov' },
 };
 function techFor(m) {
   const s = new Set();

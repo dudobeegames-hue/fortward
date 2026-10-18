@@ -655,6 +655,8 @@ function initSprites() {
   SPR.shield = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l), { c: '#d0d4dc', B: '#80869a', n: '#44485a' }));
   SPR.rider = RIDER_FRAMES.map(f => buildSprite(f));
   lazySpr('rider8', buildRider8); // jazdec na koni v 8 smeroch (klus, kopija sklopená k útoku)
+  lazySpr('hknight8', buildHKnight8); // ťažký rytier (nepriateľ za orkov)
+  lazySpr('captain8', buildCaptain8); // kapitán jazdy (boss za orkov)
   SPR.monk = MONK_LEGS.map(l => buildSprite(MONK_BODY.concat(l)));
   SPR.monkCast = [buildSprite(MONK_CAST), buildSprite(MONK_CAST)];
   SPR.craft = CRAFT_LEGS.map(l => buildSprite(CRAFT_BODY.concat(l)));
@@ -1746,6 +1748,11 @@ const RD8_HAND = {
   S:  { x: 1,  y: 6, idle: -1.65, ax: 4,  ay: 6, aim: 1.25, k: 0.75, legs: 'front' },
 };
 const buildRider8 = () => buildUnit8({ W: 40, H: 30, body: RD8_BODY, mount: RD8_HORSE, shield: KN8_SHIELD, hand: RD8_HAND, legs: RD8_LEGS, spear: 12, stride: 5 });
+// nepriatelia za orkov (len jednotky z ľudských budov): ťažký rytier v tmavej oceli a kapitán jazdy v pozlátenej zbroji
+const PAL_HKNIGHT = { w: '#bcc0cc', m: '#80869a', M: '#4a4e60', D: '#2a2c38' };
+const PAL_CAPTAIN = { w: '#fff7c8', m: '#f8d048', M: '#b88420', D: '#6e4a12', W: '#ffffff' };
+const buildHKnight8 = () => buildUnit8({ body: KN8_BODY, shield: KN8_SHIELD, legs: KN8_LEGS, hand: KN8_HAND, blade: 7, pal: PAL_HKNIGHT });
+const buildCaptain8 = () => buildUnit8({ W: 40, H: 30, body: RD8_BODY, mount: RD8_HORSE, shield: KN8_SHIELD, hand: RD8_HAND, legs: RD8_LEGS, spear: 12, stride: 5, pal: PAL_CAPTAIN });
 
 // ---- náčelník orkov (hrdina hráča za orkov): holá hlava s malým čelom a veľkou tvárou, kly, červené náplecníky
 // s kostenými ostňami, kožená zbroj so zlatou prackou, sekera ----
