@@ -5565,8 +5565,8 @@
     moveKnight(k, k.hx, k.hy, (k.spd || 26) * 1.15, dt);
     if (!k.next) moveTo(k, k.hx, k.hy, (k.spd || 26) * 1.15, dt); // cesta zatarasená – ide priamo
   }
-  // ---- strážca plátien: mobilný prehliadač môže pri nedostatku pamäte (napr. po návrate z pozadia) zahodiť obsah
-  // plátien – ostrov, hrady, budovy a jednotky sa potom nevykreslia a ostane len to, čo sa kreslí priamo (čísla, hviezdy).
+  // ---- strážca plátien: prehliadač môže v karte na pozadí uspať plátna (šetrí grafickú pamäť) a pri návrate ich vrátiť
+  // prázdne – ostrov, hrady, budovy a jednotky sa potom nevykreslia a ostane len to, čo sa kreslí priamo (čísla, hviezdy).
   // Strážne plátno s farebným bodom a obrázok ostrova sa občas skontrolujú; keď obsah zmizol, hra sa načíta znova.
   const guardCv = document.createElement('canvas'); guardCv.width = guardCv.height = 4;
   const guardCx = guardCv.getContext('2d'); guardCx.fillStyle = '#ff00ff'; guardCx.fillRect(0, 0, 4, 4);
@@ -5575,6 +5575,8 @@
     try {
       if (lostCtx(guardCx, 1, 1)) return true;
       if (island && island.bg && lostCtx(island.bg.getContext('2d'), island.bg.width >> 1, island.bg.height >> 1)) return true; // stred ostrova je vždy súš
+      const coin = SPR.coin && SPR.coin[0]; // malý sprite (minca má plný stred) – aj malé obrázky stavieb a jednotiek
+      if (coin && lostCtx(coin.c.getContext('2d'), coin.w >> 1, coin.h >> 1)) return true;
     } catch (e) { }
     return false;
   }
