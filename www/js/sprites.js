@@ -685,7 +685,13 @@ function hitSpr(spr) {
 }
 
 // Zväčšená ikona (nearest neighbor) ako dataURL pre HTML rozhranie.
+// výsledok sa zapamätá na sprite (toDataURL je pomalé a ikony sa v menu kreslia opakovane)
 function spriteURL(spr, scale, silhouette) {
+  const key = scale + (silhouette ? 's' : '');
+  if (spr._url && spr._url[key]) return spr._url[key];
+  return ((spr._url = spr._url || {})[key] = spriteURLRaw(spr, scale, silhouette));
+}
+function spriteURLRaw(spr, scale, silhouette) {
   const c = document.createElement('canvas');
   c.width = spr.w * scale; c.height = spr.h * scale;
   const x = c.getContext('2d');

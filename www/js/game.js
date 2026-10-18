@@ -574,6 +574,32 @@
     layoutField();
   }
   // mriežka a krajina bojiska (výška závisí od misie)
+  // terén bojiska misie (podľa rozmerov, provincie a tábora protivníka); posledné tri sa pamätajú a terén vybranej misie
+  // sa vyrobí vopred, kým hráč číta jej popis na mape – ťuk na Do boja je potom okamžitý
+  const sceneCache = new Map();
+  function fieldGeom(m) {
+    const fh = H + (m > HOME_PROVINCES ? Math.round(H * CAMP_EXTRA) : 0), g2 = Object.assign({}, G);
+    g2.cols = Math.min(GRID_COLS, Math.floor(W / T)); g2.gx0 = Math.floor((W - g2.cols * T) / 2);
+    g2.rows = Math.floor((fh - GROUND_PAD) / T); g2.gy0 = fh - GROUND_PAD - g2.rows * T;
+    g2.hc0 = Math.floor(g2.cols / 2) - 1; g2.hr0 = g2.rows - 3;
+    g2.hallCx = g2.gx0 + g2.hc0 * T + 1.5 * T; g2.hallTop = g2.gy0 + g2.hr0 * T; g2.hallBot = g2.hallTop + 3 * T;
+    g2.zoneTopMax = g2.gy0 + (g2.rows - (5 + MAX_LVL)) * T;
+    return { fh, g2 };
+  }
+  function sceneFor(m) {
+    const { fh, g2 } = fieldGeom(m), key = W + 'x' + fh + ':' + nodeOf(m) + ':' + foeRace() + ':' + m;
+    if (sceneCache.has(key)) return sceneCache.get(key);
+    const lay = typeof CASTLES !== 'undefined' && CASTLES[foeRace()] && CASTLES[foeRace()][m];
+    const sc = buildScene(W, fh, g2, 7 + (nodeOf(m) + 1) * 13, nodeOf(m), campClearRects(lay, g2));
+    sceneCache.set(key, sc);
+    if (sceneCache.size > 3) sceneCache.delete(sceneCache.keys().next().value);
+    return sc;
+  }
+  let prepT = 0;
+  function prepareScene(m) {
+    clearTimeout(prepT);
+    prepT = setTimeout(() => { if (st.phase === 'map' && st.mapSel === m) sceneFor(m); }, 250);
+  }
   function layoutField() {
     FH = H + (st.mission > HOME_PROVINCES ? Math.round(H * CAMP_EXTRA) : 0); // misie s táborom: dlhšie bojisko, posúva sa prstom
     buf.width = W; buf.height = FH;
@@ -584,8 +610,7 @@
     G.hc0 = Math.floor(G.cols / 2) - 1; G.hr0 = G.rows - 3;
     G.hallCx = tileX(G.hc0) + 1.5 * T; G.hallTop = tileY(G.hr0); G.hallBot = G.hallTop + 3 * T;
     G.zoneTopMax = tileY(G.rows - (5 + MAX_LVL));
-    const lay = typeof CASTLES !== 'undefined' && CASTLES[foeRace()] && CASTLES[foeRace()][st.mission];
-    scene = buildScene(W, FH, G, 7 + (nodeOf(st.mission) + 1) * 13, nodeOf(st.mission), campClearRects(lay, G));
+    scene = sceneFor(st.mission);
     if (had) { // posuň stavby, ak sa zmenila mriežka
       const dc = G.hc0 - oldHc, dr = G.hr0 - oldHr;
       for (const b of st.blds) { b.c += dc; b.r += dr; }
@@ -3815,7 +3840,12 @@
     if (ICONS.tower) { buildingIcons(); unitIcons(); syncHeroIcons(); }
   }
   // sprite orezaný na obrys (ikony obliehacích strojov: šikmý pohľad spredu z 3D modelu)
+  const trimCache = new WeakMap();
   function trimmed(spr) {
+    if (trimCache.has(spr)) return trimCache.get(spr);
+    const r = trimmedRaw(spr); trimCache.set(spr, r); return r;
+  }
+  function trimmedRaw(spr) {
     const { w, h } = spr, d = spr.c.getContext('2d').getImageData(0, 0, w, h).data;
     let x0 = w, y0 = h, x1 = -1, y1 = -1;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
@@ -3823,7 +3853,13 @@
     return { c: cut(spr.c), sil: cut(spr.sil), w: x1 - x0 + 1, h: y1 - y0 + 1 };
   }
   // ikony jednotiek a hrdinu podľa rasy (portrét = hlava a ramená zozadu, orezané z 8-smerovej sady)
+  const portraitCache = new Map();
   function heroPortrait(set, x, y, n) {
+    const key = x + ',' + y + ',' + n, hit = portraitCache.get(set); // sada je kľúčom mapy, výrez porovnáme
+    if (hit && hit.key === key) return hit.url;
+    const url = heroPortraitRaw(set, x, y, n); portraitCache.set(set, { key, url }); return url;
+  }
+  function heroPortraitRaw(set, x, y, n) {
     const c = document.createElement('canvas'); c.width = n; c.height = n;
     c.getContext('2d').drawImage(set[6].idle.c, x, y, n, n, 0, 0, n, n);
     return spriteURL({ c, w: n, h: n }, 3);
@@ -4582,6 +4618,7 @@
 
   function renderMapPanel() {
     const m = st.mapSel, def = missionDef(m);
+    prepareScene(m); // terén misie sa pripraví vopred
     const done = m < st.unlocked;
     $('mNum').textContent = m;
     $('mNum').className = 'mnum' + (done ? ' done' : '');
@@ -4914,7 +4951,7 @@
 
   $('overMap').addEventListener('click', showMap);
   $('overRetry').addEventListener('click', () => startMission(st.mission, st.tier));
-  $('mapPlay').addEventListener('click', () => { if (!st.mapAnim && tierOpen(st.mapSel, st.mapTier || 0)) startMission(st.mapSel, st.mapTier || 0); });
+  $('mapPlay').addEventListener('click', () => { if (!st.mapAnim && tierOpen(st.mapSel, st.mapTier || 0)) { AUDIO.play('click'); afterPress($('mapPlay'), () => startMission(st.mapSel, st.mapTier || 0)); } });
   // Menu na mape aj Späť z pozícií vedú na úvodný obrázok (Hrať / Nastavenia)
   function showMenu() {
     setTab('map', true);
@@ -5032,6 +5069,17 @@
     }
   });
   for (const sc of ['slots', 'title']) scrollRO.observe($(sc).querySelector('.paper'));
+  // ťuk na tlačidlo menu: tlačidlo sa hneď zatlačí a zaznie zvuk; ťažšia práca (načítanie pozície, mapa, terén misie)
+  // sa spustí až po vykreslení tejto odozvy, takže aj na pomalom zariadení je hneď vidieť, že ťuk zabral
+  let pressBusy = false;
+  function afterPress(el, fn) {
+    if (pressBusy) return;
+    pressBusy = true;
+    if (el) el.classList.add('pressed');
+    let started = false;
+    const run = () => { if (started) return; started = true; setTimeout(() => { try { fn(); } finally { pressBusy = false; if (el) el.classList.remove('pressed'); } }, 0); };
+    requestAnimationFrame(run); setTimeout(run, 120); // poistka: keď prehliadač práve nekreslí (skrytá karta), nečaká sa na snímku
+  }
   function showSlots(opts) {
     st.phase = 'title';
     $('title').hidden = true; $('map').hidden = true;
@@ -5046,9 +5094,11 @@
         : '<b>Nová hra</b><small>Prázdna pozícia</small>') + '</div>' + (info ? '<button class="slotDel" title="Vymazať"><img src="' + TRASH + '" alt="Vymazať"></button>' : '<span class="slotGo"><img src="' + UI_ICONS.plus + '" alt="Nová hra"></span>');
       c.addEventListener('click', () => { // rozohraná pozícia rovno na ostrov, nová na výber rasy
         AUDIO.play('build');
-        if (!info) clearSlot(n); // nová hra začína úplne načisto: kráľ, žiadne skúsenosti ani schopnosti (aj po starých zvyškoch)
-        loadSlot(n);
-        if (info) { $('slots').hidden = true; showMap(); } else showTitle();
+        afterPress(c, () => {
+          if (!info) clearSlot(n); // nová hra začína úplne načisto: kráľ, žiadne skúsenosti ani schopnosti (aj po starých zvyškoch)
+          loadSlot(n);
+          if (info) { $('slots').hidden = true; showMap(); } else showTitle();
+        });
       });
       const del = c.querySelector('.slotDel');
       if (del) del.addEventListener('click', ev => {
@@ -5075,7 +5125,7 @@
       c.addEventListener('click', () => {
         if (r.state === 'soon') toast(r.name + ' prídu v ďalšej verzii');
         else if (r.state === 'gem') toast('Odomykanie za gemy pripravujeme');
-        else { saveJSON(sk('race'), r.name); st.race = r.name; applyRace(); saveProgress(); showMap(); }
+        else { AUDIO.play('click'); afterPress(c, () => { saveJSON(sk('race'), r.name); st.race = r.name; applyRace(); saveProgress(); showMap(); }); }
       });
       box.appendChild(c);
     }
