@@ -331,6 +331,51 @@ for (const v of ['S', 'SE', 'E', 'NE', 'N']) BR8R_BODY[v] = OR8[v].slice(0, 7).c
 const BR8R_HAND = {};
 for (const v in OR8_HAND) BR8R_HAND[v] = Object.assign({}, OR8_HAND[v], { y: 6 });
 
+// ---- medvedí vojvoda (hrdina za orkov): tmavá kapucňa z medvedej kože s ušami, zlatá čelenka, kostené ostne na náplecníkoch,
+// červená pelerína; medveď má červenú pokrývku so zlatým lemom a železným chráničom na hlave ----
+const BL8_BODY = views5([
+  '...Ld.LL.dL...',
+  '...LLLlLLLd...',
+  '...gggggggG...',
+  '...oqrOOrqd...',
+  '...ooOOOOqd...',
+  '..LowOOOOwqd..',
+  '.eMMmRrrRmMMe.',
+  '.qd........qd.',
+  '.dd........dd.',
+], [
+  '....Ld..Ld....',
+  '....LLLlLLd...',
+  '....GggggggG..',
+  '....dLOOrqO...',
+  '....dLOOOOqo..',
+  '....dd.oOwq...',
+  '...emMMmqO....',
+  '......qd......',
+  '......dd......',
+], [
+  '...Ld.LL.dL...',
+  '...LLLlLLLd...',
+  '...gggggggG...',
+  '...LLLlLLLd...',
+  '...LLlLLLdd...',
+  '..LrRRRRRrRd..',
+  '.eMMRrrrRRMMe.',
+  '.qd........qd.',
+  '.dd........dd.',
+], 5);
+// pokrývka: dva riadky trupu medveďa prefarbené na červené súkno, v spodnom zlatý lem (pri bočnom pohľade len po plece)
+const bearCloth = (rows, r0, x1) => rows.map((r, j) => j < r0 || j > r0 + 1 ? r : r.replace(/[lL]/g, (c, x) => x > x1 ? c
+  : j === r0 + 1 && x % 3 === 0 ? 'g' : c === 'l' ? 'r' : 'R'));
+const BEARLORD8 = {};
+for (const v in BEAR8) {
+  const b = BEAR8[v], side = v === 'E';
+  BEARLORD8[v] = Object.assign({}, b, { body: bearCloth(b.body, side ? 4 : 3, side ? 12 : 99) });
+}
+BEARLORD8.E.body = BEARLORD8.E.body.map((r, j) => j === 2 ? r.slice(0, 14) + 'mKmL' : r); // železný chránič okolo oka
+BEARLORD8.S.head = Object.assign({}, BEAR8.S.head, { rows: ['l....l', 'llmmLL', 'lKmmKL', '.leeL.', '..KK..'] });
+BEARLORD8.SE.head = Object.assign({}, BEAR8.SE.head, { rows: ['l....l', 'lllmmL', 'llKmKL', '..leeL', '...KK.'] });
+
 // ---- veľký orkský veľkráľ: maľovaný tieňovaným štetcom (painter z buildings.js) v pohľadoch spredu, zboku a zozadu;
 // telo 26×30 ako pôvodný boss, obojručná sekera sa dokresľuje pod uhlom (postoj, napriahnutie, švih, dokončenie) ----
 const OKB_W = 48, OKB_H = 42, OKB_OX = 11, OKB_OY = OKB_H - U8_PB - 30; // telo v plátne: chodidlá na riadku H - PB - 1
@@ -455,4 +500,11 @@ function initOrcSprites() {
   lazySpr('shaman8', () => buildUnit8({ body: SH8, hand: SH8_HAND, legs: orcLegs('P', 'p', 'q'), spear: 9, tip: ['w', 'o'], fist: 'o' }));
   lazySpr('wolf8', () => buildUnit8({ W: 36, H: 28, body: WR8_BODY, mount: WOLF8, legs: WOLF8_LEGS, far: 'DK', hand: WR8_HAND, blade: 4, fist: 'o', stride: 3.5 }));
   lazySpr('bear8', () => buildUnit8({ W: 38, H: 30, body: BR8R_BODY, mount: BEAR8, legs: BEAR8_LEGS, hand: BR8R_HAND, axe: [6, 2.5], fist: 'o', stride: 4.5 }));
+  // medvedí vojvoda ako hrdina: snímka švihu (slash) = stredná snímka úderu, ako má sada hrdinov
+  lazySpr('bearlord8', () => {
+    const set = buildUnit8({ W: 40, H: 32, body: BL8_BODY, mount: BEARLORD8, legs: BEAR8_LEGS, hand: BR8R_HAND, axe: [8, 3.25], fist: 'o', stride: 4.5 });
+    for (const v of set) v.slash = v.atk[1];
+    return set;
+  });
+  Object.defineProperty(SPR, 'bearlord', { configurable: true, enumerable: true, get: () => [SPR.bearlord8[2].idle] });
 }

@@ -646,8 +646,8 @@ function initSprites() {
   lazySpr('sorc8', buildSorc8); // čarodejka v 8 smeroch s copom a ohnivou palicou
   lazySpr('chief8', buildChief8); // náčelník orkov (hrdina za orkov)
   Object.defineProperty(SPR, 'chief', { configurable: true, enumerable: true, get: () => [SPR.chief8[2].idle] });
-  lazySpr('shamaness8', buildShamaness8); // šamanka orkov (hrdinka za orkov)
-  Object.defineProperty(SPR, 'shamaness', { configurable: true, enumerable: true, get: () => [SPR.shamaness8[2].idle] });
+  lazySpr('oshaman8', buildOrcShaman8); // šaman orkov (hrdina za orkov)
+  Object.defineProperty(SPR, 'oshaman', { configurable: true, enumerable: true, get: () => [SPR.oshaman8[2].idle] });
   SPR.paladin = PALADIN_LEGS.map(l => buildSprite(PALADIN_BODY.concat(l), PAL_PALADIN));
   SPR.sorc = SORC_LEGS.map(l => buildSprite(SORC_BODY.concat(l), PAL_SORC));
   SPR.spear = SOLDIER_LEGS.map(l => buildSprite(SPEAR_BODY.concat(l))); // ľudia vždy v modrom
@@ -1823,67 +1823,68 @@ const buildChief8 = () => {
   return buildHero8({ body: { S, SE: turnHead8(S, 7), E, NE: turnHead8(N, 7), N }, kneel: outlineRows(CH8_ART.kneel), weapon: 'axe', flag });
 };
 
-// ---- šamanka orkov (hrdinka za orkov): kostený venček s perami, tmavé vrkoče, malé kly, kostený náhrdelník,
-// kožené rúcho so zlatou prackou, palica so zelenou duchovnou guľou (ako čarodejka, len zelená) ----
-const SH8_ART = {
+// ---- šaman orkov (hrdina za orkov): čierny plášť s kapucňou cez hlavu, v tieni kapucne svietia červené oči a kly,
+// rukávy vyhrnuté po lakte (holé zelené predlaktia), kostený amulet, palica so zelenou duchovnou guľou ----
+// n = plášť, c = svetlejší záhyb, B = najtmavší tieň (vlastné farby v pal), r = oči, q/O = tvár v tieni, e = kly a amulet
+const OSH8_ART = {
   S: [
-    '..r..ee..r..',
-    '..reeEEeer..',
-    '..dooOOOqd..',
-    '..doKOOKqd..',
-    '..dooeeOqd..',
-    '..d.oOOq.d..',
-    '.dLeeeeeeLd.',
-    'oLLlLLLLlLLq',
-    'o.LlLgLLlL.q',
-    '..LllLLllL..',
-    '..LllLLllL..',
-    '..dLdLLdLd..',
+    '....ncnn....',
+    '...nccnnnB..',
+    '..ncnBBBBnB.',
+    '..ncBrBBrBnB',
+    '..ncqeOOeqnB',
+    '..nnBqOOqBnB',
+    '.nccnnnnnnBB',
+    'cncnnennnnBc',
+    'o.nnnnnnnB.q',
+    'o.ncnnnnnB.q',
+    '..ncnnnnnB..',
+    '..ndnnnndB..',
   ],
   E: [
-    '....r.ee....',
-    '...reeEEe...',
-    '...ddoOOOq..',
-    '...ddoOOKq..',
-    '...ddooOeOo.',
-    '...d..oOq...',
-    '..dLeeeeL...',
-    '..LLlLLLL...',
-    '..LlLgLLoo..',
-    '...LllLLl...',
-    '...LllLLl...',
-    '...dLdLdL...',
+    '.....nnc....',
+    '....nnccn...',
+    '...nnncBBn..',
+    '...nnncBrBn.',
+    '...nnnnqOeO.',
+    '...nnnnBqBn.',
+    '..nnnnnnnB..',
+    '..ncnnnncc..',
+    '..nnnnnnoo..',
+    '...ncnnnB...',
+    '...ncnnnB...',
+    '...ndnndB...',
   ],
   N: [
-    '..r..ee..r..',
-    '..reeEEeer..',
-    '..dddddddd..',
-    '..ddddLddd..',
-    '..dddLdddd..',
-    '...dLddLd...',
-    '.dLLLLLLLLd.',
-    'oLLlLLLLlLLq',
-    'o.LlLLLLlL.q',
-    '..LllLLllL..',
-    '..LllLLllL..',
-    '..dLdLLdLd..',
+    '....ncnn....',
+    '...nccnnnB..',
+    '..ncnnnnnnB.',
+    '..ncnnnnnnB.',
+    '..nccnnnnnB.',
+    '..nnnnnnnBB.',
+    '.nccnnnnnnBB',
+    'cncnnnnnnnBc',
+    'o.nnnnnnnB.q',
+    'o.ncnnnnnB.q',
+    '..ncnnnnnB..',
+    '..ndnnnndB..',
   ],
   kneel: [
-    '..r..ee..r..',
-    '..reeEEeer..',
-    '..dooOOOqd..',
-    '..doKOOKqd..',
-    '.dLeeeeeeLd.',
-    'oLLlLLLLlLLq',
-    'o.LlLgLLlL.q',
-    '..LllLLllL..',
-    '..qOOqqOOq..',
+    '....ncnn....',
+    '...nccnnnB..',
+    '..ncBrBBrBnB',
+    '..ncqeOOeqnB',
+    '.nccnnnnnnBB',
+    'cncnnennnnBc',
+    'o.nnnnnnnB.q',
+    '..ncnnnnnB..',
+    '..nBnnnnBn..',
     '..dddddddd..',
   ],
 };
-// guľa na palici je zelená (y = svetlé jadro, f = okraj, G = objímka), nohy v kožených čižmách
-const buildShamaness8 = () => {
-  const S = outlineRows(SH8_ART.S), E = outlineRows(SH8_ART.E), N = outlineRows(SH8_ART.N);
-  return buildHero8({ body: { S, SE: turnHead8(S, 7), E, NE: turnHead8(N, 7), N }, kneel: outlineRows(SH8_ART.kneel), weapon: 'staff', hand: SORC8_HAND,
-    pal: { y: '#d8ffa0', f: '#62c030', G: '#3c8a22', M: '#6e4422', D: '#3e2614' } });
+// guľa na palici je zelená (y = svetlé jadro, f = okraj, G = objímka), M/D = drevo palice, plášť čierny s fialovým nádychom
+const buildOrcShaman8 = () => {
+  const S = outlineRows(OSH8_ART.S), E = outlineRows(OSH8_ART.E), N = outlineRows(OSH8_ART.N);
+  return buildHero8({ body: { S, SE: turnHead8(S, 7), E, NE: turnHead8(N, 7), N }, kneel: outlineRows(OSH8_ART.kneel), weapon: 'staff', hand: SORC8_HAND,
+    pal: { y: '#d8ffa0', f: '#62c030', G: '#3c8a22', M: '#6e4422', D: '#3e2614', n: '#2c2834', c: '#4a4456', B: '#201c26' } });
 };
