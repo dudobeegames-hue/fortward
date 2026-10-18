@@ -28,8 +28,9 @@ const SPLASH = (() => {
   let leaving = false, hideT = 0;
   // postup načítania 0–1 (pásik na úvodnom obrázku)
   function progress(p) {
-    const bar = document.querySelector('#loadBar i');
-    if (bar) bar.style.width = Math.round(Math.max(0, Math.min(1, p)) * 100) + '%';
+    const bar = document.querySelector('#loadBar i'), pct = document.getElementById('loadPct'), v = Math.round(Math.max(0, Math.min(1, p)) * 100);
+    if (bar) bar.style.width = v + '%';
+    if (pct) pct.textContent = v + ' %';
   }
   function done() {
     const el = document.getElementById('splash'), btns = document.getElementById('splashBtns'), btn = document.getElementById('splashPlay');

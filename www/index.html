@@ -373,10 +373,14 @@
   /* tlačidlá na úvodnom obrázku: zelené Hrať (stred na 56 % výšky) a pod ním sivé Nastavenia */
   #splashBtns { position: absolute; left: 50%; top: 56%; transform: translate(-50%, -35px) scale(.9); opacity: 0; pointer-events: none;
     display: flex; flex-direction: column; align-items: center; gap: 14px; transition: opacity .5s ease, transform .5s ease; }
-  /* načítavací pásik na úvodnom obrázku: zlatá výplň v tmavom ráme, po načítaní zmizne a zjavia sa tlačidlá */
-  #loadBar { position: absolute; left: 50%; top: 62%; width: min(60%, 260px); height: 12px; transform: translateX(-50%); box-sizing: border-box;
-    border: 2px solid #1c140e; border-radius: 3px; background: rgba(20,14,10,.65); box-shadow: 0 0 0 1px rgba(248,208,72,.35); transition: opacity .4s ease; }
-  #loadBar i { display: block; height: 100%; width: 0; background: linear-gradient(#fff070, #f8d048 55%, #b88420); transition: width .15s linear; }
+  /* načítavací pásik dole na úvodnom obrázku: nad ním nápis s percentami, modrá výplň v tmavom ráme; po načítaní zmizne */
+  #loadBar { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 7%); width: min(78%, 320px); transform: translateX(-50%);
+    text-align: center; transition: opacity .4s ease; }
+  #loadBar b { display: block; margin-bottom: 6px; font: 600 16px 'Pixelify Sans', Rubik, sans-serif; color: #eef4ff; letter-spacing: .5px;
+    text-shadow: 0 2px 0 #0c1232, 0 0 6px rgba(0,0,0,.8); }
+  #loadBar .track { height: 14px; box-sizing: border-box; border: 2px solid #0c1232; border-radius: 4px; background: rgba(8,12,34,.7);
+    box-shadow: 0 0 0 1px rgba(136,180,255,.45), 0 2px 6px rgba(0,0,0,.5); overflow: hidden; }
+  #loadBar i { display: block; height: 100%; width: 0; background: linear-gradient(#88b4ff, #3c64c8 55%, #22337a); transition: width .15s linear; }
   #loadBar.hide { opacity: 0; }
   #splashBtns.show { opacity: 1; pointer-events: auto; transform: translate(-50%, -35px) scale(1); }
   #splashBtns.hide { opacity: 0; pointer-events: none; }
@@ -756,7 +760,7 @@
 </style>
 </head>
 <body>
-<div id="splash"><img src="img/splash.jpg" alt="Fortward"><div id="loadBar"><i></i></div><div id="splashBtns"><button id="splashPlay" class="greenBtn">Hrať</button><button id="splashSet" class="grayBtn">Nastavenia</button></div><div id="setPanel" hidden><h2 id="setHead">Nastavenia</h2><div id="setMain" class="setIcons"><button class="setIc snd" data-kind="music"><span class="ico"><img class="icoMusic" alt=""></span><b>Hudba</b></button><button class="setIc snd" data-kind="sfx"><span class="ico"><img class="icoSound" alt=""></span><b>Zvuky</b></button><button class="setIc" id="langBtn"><span class="ico"><img id="icoLang" class="flag" alt=""></span><b>Jazyk</b></button></div><div id="langList" hidden></div><button id="setBack" class="btn backBtn">Späť</button></div></div>
+<div id="splash"><img src="img/splash.jpg" alt="Fortward"><div id="loadBar"><b>Načítavam… <span id="loadPct">0 %</span></b><div class="track"><i></i></div></div><div id="splashBtns"><button id="splashPlay" class="greenBtn">Hrať</button><button id="splashSet" class="grayBtn">Nastavenia</button></div><div id="setPanel" hidden><h2 id="setHead">Nastavenia</h2><div id="setMain" class="setIcons"><button class="setIc snd" data-kind="music"><span class="ico"><img class="icoMusic" alt=""></span><b>Hudba</b></button><button class="setIc snd" data-kind="sfx"><span class="ico"><img class="icoSound" alt=""></span><b>Zvuky</b></button><button class="setIc" id="langBtn"><span class="ico"><img id="icoLang" class="flag" alt=""></span><b>Jazyk</b></button></div><div id="langList" hidden></div><button id="setBack" class="btn backBtn">Späť</button></div></div>
 <div id="logoIntro"><img src="img/logo.jpg" alt="DBee games"></div>
 <script src="js/splash.js?v=__BUILD__"></script>
 <div id="game">

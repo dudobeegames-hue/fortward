@@ -4,7 +4,7 @@
   const $ = id => document.getElementById(id);
   const screen = $('screen'), sctx = screen.getContext('2d');
   const buf = document.createElement('canvas');
-  const g = buf.getContext('2d', { willReadFrequently: true });
+  const g = buf.getContext('2d'); // snímka sa už nečíta späť (zrno celej obrazovky sa nerobí – bolo drahé a rozdiel minimálny)
 
   const T = 16;            // veľkosť políčka mriežky
   const MAX_LVL = 5;
@@ -3248,26 +3248,6 @@
     }
   }
 
-  // jednotná rastrová textúra: kvantovanie všetkých pixelov na rovnaké úrovne s Bayer ditheringom
-  const QL = PX_LEVELS - 1;
-  const QLUT = new Uint8Array(256 * 16);
-  for (let v = 0; v < 256; v++) for (let t = 0; t < 16; t++) {
-    QLUT[v * 16 + t] = Math.round(Math.min(QL, Math.floor(v * QL / 255 + BAYER4[t])) * 255 / QL);
-  }
-  function grain() {
-    const y0 = Math.max(0, Math.min(buf.height - H, Math.round(camY))), rows = Math.min(H, buf.height);
-    const id = g.getImageData(0, y0, W, rows), d = id.data;
-    let i = 0;
-    for (let y = 0; y < rows; y++) {
-      const by = ((y + y0) & 3) * 4;
-      for (let x = 0; x < W; x++, i += 4) {
-        const t = by + (x & 3);
-        d[i] = QLUT[d[i] * 16 + t]; d[i + 1] = QLUT[d[i + 1] * 16 + t]; d[i + 2] = QLUT[d[i + 2] * 16 + t];
-      }
-    }
-    g.putImageData(id, 0, y0);
-  }
-
   function drawMapNode(i, n, time) {
     const num = missionAt(i), done = num < st.unlocked, open = num === st.unlocked;
     const anim = st.mapAnim && st.mapAnim.seg === num - 2; // hrad práve odomykaný
@@ -3557,7 +3537,6 @@
   }
 
   function present() {
-    grain();
     let sx = 0, sy = 0;
     if (st.shake > 0) { sx = Math.round((Math.random() - 0.5) * 3); sy = Math.round((Math.random() - 0.5) * 3); }
     sctx.imageSmoothingEnabled = false;
