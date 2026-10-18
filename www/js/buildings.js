@@ -923,46 +923,36 @@ function makeOrcFireTotem(lvl) {
   if (lvl >= 2) { p.set(2, 0, BONE2); p.set(1, 1, BONE); p.set(9, 0, BONE2); p.set(10, 1, BONE); }     // rohy
   return p.finish();
 }
-// trebuchet 22×30–36 (orkská obdoba balisty): pevný vrhač s A-rámom, dlhým ramenom, protizávažím a prakom;
-// fired = rameno po výhode hore, protizávažie dole. Úrovne: 1 svetlé drevo, 2 tmavé drevo a kosti, 3 okované závažie,
-// 4 kamenná podstava, 5 čierny kameň, lebka na závaží a červené súkno
-function makeOrcTrebuchet(lvl, fired) {
-  lvl = lvl || 2;
-  const M = orcTowerMat(lvl), H = [0, 30, 31, 32, 34, 36][lvl], p = painter(22, H);
-  const ROCK = ['#22202a', '#3c3846', '#4e4858', '#625a6c', '#7a7286'].map(hexRGB);
-  const baseY = M.stone ? H - 5 : H - 3;
-  if (M.stone) for (let y = baseY; y < H; y++) for (let x = 0; x <= 21; x++) {                          // kamenná podstava
-    const course = Math.floor((y - baseY) / 3), off = (course % 2) * 3;
-    let v = 0.62 - x / 21 * 0.3 + (hash2((x + off) / 6 | 0, course, 255) - 0.5) * 0.15;
-    if (y === baseY) v += 0.2; else if ((y - baseY) % 3 === 2 || (x + off) % 6 === 5) v -= 0.3;
-    p.shade(x, y, M.stone, v);
-  } else for (let y = baseY; y < H; y++) for (let x = 1; x <= 20; x++) p.shade(x, y, M.W, y === baseY ? 0.8 - x * 0.015 : y === H - 1 ? 0.2 : 0.5); // drevené sane
-  const px = 11, py = baseY - 16;                                                                       // os ramena
-  pLine(p, 16, baseY - 1, px + 1, py + 1, (x, y) => { p.shade(x, y, M.W, 0.35); p.shade(x + 1, y, M.W, 0.25); }); // zadná noha A-rámu
-  pLine(p, 5, baseY - 1, px, py + 1, (x, y) => { p.shade(x, y, M.W, 0.8); p.shade(x + 1, y, M.W, 0.55); });     // predná noha
-  for (let x = 7; x <= 14; x++) p.shade(x, baseY - 7, M.W, 0.6 - (x - 7) * 0.03);                     // priečka
-  if (M.iron) for (const [x, y] of [[8, baseY - 7], [13, baseY - 7]]) p.set(x, y, RIVET);
-  // rameno: dlhý koniec s prakom, krátky s protizávažím
-  const long = fired ? [px + 4, py - 13] : [px - 9, py + 11], short = fired ? [px - 2, py + 5] : [px + 4, py - 4];
-  pLine(p, short[0], short[1], long[0], long[1], (x, y) => { p.shade(x, y, M.W, 0.85); p.shade(x, y + 1, M.W, 0.45); });
-  p.set(px, py, M.iron ? RIVET : BONE);                                                                 // os
-  // protizávažie visí pod krátkym koncom
-  const cx = short[0], cy = short[1] + 1;
-  for (let y = cy; y <= cy + 5; y++) for (let x = cx - 2; x <= cx + 3; x++) {
-    if (M.iron) { p.set(x, y, (y === cy || y === cy + 5) ? (x % 2 ? RIVET : IRON) : PLATE[x <= cx ? 3 : 1]); continue; }
-    p.shade(x, y, y === cy ? M.W : ROCK, y === cy ? 0.6 : 0.8 - (x - cx + 2) * 0.12 + ((x + y) % 3 === 0 ? -0.2 : 0)); // debna s kameňmi
+// trebuchet 22×32 (orkská obdoba balisty), pohľad v smere streľby: dve kolové A-steny, hore os, zvislé rameno
+// s protizávažím a prakom. front = false: hráč za orkov, strieľa nahor (pripravený: dlhé rameno dole s balvanom pri zemi,
+// závažie hore; po výstrele rameno hore, závažie dole). front = true: tábor hordy strieľa nadol k hráčovi
+// (pripravený: rameno hore s balvanom, závažie dole; po výstrele rameno dole k divákovi, závažie hore).
+function makeOrcTrebuchet(lvl, fired, front) {
+  lvl = lvl || 3;
+  const M = orcTowerMat(lvl), H = 32, p = painter(22, H);
+  const ROCK = ['#22202a', '#3c3846', '#4e4858', '#625a6c', '#7a7286'].map(hexRGB), ROPE = hexRGB('#a88a64');
+  const baseY = H - 4, py = baseY - 14;                                       // sane a os ramena
+  for (let y = baseY; y < H; y++) for (let x = 1; x <= 20; x++) p.shade(x, y, M.W, y === baseY ? 0.8 - x * 0.015 : y === H - 1 ? 0.2 : 0.5 - (x % 5 === 0 ? 0.15 : 0)); // drevené sane
+  for (const [x0, x1] of [[2, 6], [15, 19]]) {                                // bočné A-steny: dva stĺpy a vzpera
+    pLine(p, x0, baseY - 1, x0 + 2, py, (x, y) => p.shade(x, y, M.W, x0 < 10 ? 0.8 : 0.45));
+    pLine(p, x1, baseY - 1, x1 - 2, py, (x, y) => p.shade(x, y, M.W, x0 < 10 ? 0.6 : 0.3));
+    for (let x = x0 + 1; x <= x1 - 1; x++) p.shade(x, baseY - 6, M.W, x0 < 10 ? 0.55 : 0.35);
   }
-  if (lvl >= 5) { // lebka na závaží a červené súkno
-    for (let y = cy + 1; y <= cy + 3; y++) for (let x = cx - 1; x <= cx + 2; x++) p.set(x, y, (y === cy + 2 && (x === cx - 1 || x === cx + 2)) ? hexRGB('#d83818') : x <= cx ? BONE : BONE2);
-    for (let y = cy + 6; y <= cy + 7; y++) for (let x = cx - 2; x <= cx + 3; x++) if (!(y === cy + 7 && x % 2)) p.set(x, y, y === cy + 6 ? BLOOD2 : BLOOD);
-  } else if (lvl >= 2) p.set(cx, cy + 2, BONE);
-  // prak: pripravený = balvan leží na zemi vľavo, po výstrele prázdny prak visí z dlhého konca
-  if (fired) { pLine(p, long[0], long[1], long[0] + 2, long[1] + 4, (x, y) => p.set(x, y, hexRGB('#a88a64'))); }
-  else {
-    pLine(p, long[0], long[1], 3, baseY - 3, (x, y) => p.set(x, y, hexRGB('#a88a64')));
-    for (let y = baseY - 4; y <= baseY - 1; y++) for (let x = 1; x <= 4; x++) if (!((y === baseY - 4 || y === baseY - 1) && (x === 1 || x === 4))) p.shade(x, y, ROCK, 0.95 - (x - 1) * 0.15 - (y - baseY + 4) * 0.1);
+  for (let x = 4; x <= 17; x++) p.set(x, py, M.iron ? (x % 3 === 1 ? RIVET : IRON) : M.W[3]);           // os naprieč
+  const armDown = front ? fired : !fired;                                      // dlhé rameno smeruje dole k zemi
+  const armEnd = armDown ? baseY - 2 : 0, cwTop = armDown ? py - 8 : py + 2;
+  for (let y = Math.min(py, armEnd); y <= Math.max(py, armEnd); y++) { p.shade(10, y, M.W, 0.85); p.shade(11, y, M.W, 0.45); } // rameno
+  for (let y = cwTop; y <= cwTop + 6; y++) for (let x = 7; x <= 14; x++) {  // protizávažie
+    if (M.iron) { p.set(x, y, (y === cwTop || y === cwTop + 6) ? (x % 2 ? RIVET : IRON) : PLATE[x <= 10 ? 3 : 1]); continue; }
+    p.shade(x, y, ROCK, 0.85 - (x - 7) * 0.08 + ((x + y) % 3 === 0 ? -0.2 : 0));
   }
-  if (lvl >= 2 && !M.stone) { p.set(1, baseY - 1, BONE); p.set(20, baseY - 1, BONE2); }               // kostené kovanie sání
+  if (lvl >= 2) p.set(10, cwTop + 3, BONE), p.set(11, cwTop + 3, BONE2);    // kostené kovanie na závaží
+  const loaded = !fired, rockY = armDown ? baseY - 5 : 0;
+  if (loaded) { // balvan v praku na konci ramena
+    for (let y = rockY; y <= rockY + 3; y++) for (let x = 9; x <= 12; x++) if (!((y === rockY || y === rockY + 3) && (x === 9 || x === 12))) p.shade(x, y, ROCK, 0.95 - (x - 9) * 0.15 - (y - rockY) * 0.1);
+    p.set(8, rockY + 1, ROPE); p.set(13, rockY + 1, ROPE);
+  } else { p.set(9, armEnd + (armDown ? -1 : 1), ROPE); p.set(12, armEnd + (armDown ? -1 : 1), ROPE); } // prázdny prak
+  if (lvl >= 2) { p.set(1, baseY, BONE); p.set(20, baseY, BONE2); }           // kostené kovanie sání
   return p.finish();
 }
 // ---- obrí bossovia hordy (spredu – idú dolu k radnici) ----
@@ -1036,25 +1026,6 @@ function makeMammoth(step) {
 }
 // ---- stavby orkského tábora (od misie 6) ----
 // orkský katapult 18x18 (spredu, mieri na hráča): hrubý rám z kmeňov, rameno s kosteným hákom; loaded = rameno vzadu s balvanom
-function makeOrcCatapult(loaded) {
-  const p = painter(18, 18);
-  const STONE = ['#22202a', '#3c3846', '#4e4858', '#625a6c', '#7a7286'].map(hexRGB);
-  for (let x = 1; x <= 16; x++) { p.shade(x, 13, ORC_WOOD, 0.75 - x * 0.02); p.shade(x, 14, ORC_WOOD, 0.4); } // spodný trám
-  for (const [px, v] of [[3, 0.8], [14, 0.4]]) pLine(p, px, 13, 9 + (px < 9 ? -1 : 1), 4, (x, y) => p.shade(x, y, ORC_WOOD, v)); // šikmé stĺpy do A
-  for (let x = 6; x <= 11; x++) p.shade(x, 4, ORC_WOOD, 0.7 - (x - 6) * 0.06);                    // priečka
-  p.set(8, 3, BONE); p.set(9, 3, BONE2);                                                              // kostené kovanie
-  if (loaded) {
-    pLine(p, 9, 12, 13, 2, (x, y) => { p.shade(x, y, ORC_WOOD, 0.85); p.shade(x + 1, y, ORC_WOOD, 0.45); });
-    for (let y = 0; y <= 2; y++) for (let x = 12; x <= 15; x++) if (!((y === 0 || y === 2) && (x === 12 || x === 15))) p.shade(x, y, STONE, 0.95 - (x - 12) * 0.15 - y * 0.1);
-  } else {
-    pLine(p, 9, 12, 5, 2, (x, y) => { p.shade(x, y, ORC_WOOD, 0.85); p.shade(x + 1, y, ORC_WOOD, 0.45); });
-    p.set(4, 1, BONE); p.set(5, 1, BONE2);                                                            // prázdny hák
-  }
-  for (const wx of [0, 15]) for (let y = 12; y <= 17; y++) for (let x = wx; x <= wx + 2; x++)        // hrubé kolesá z kmeňa
-    p.shade(x, y, ORC_WOOD, (y === 12 || y === 17) ? 0.2 : (x + y) % 3 === 0 ? 0.3 : x === wx ? 0.8 : 0.55);
-  p.set(1, 14, BONE); p.set(16, 14, BONE);
-  return p.finish();
-}
 // šamanský totem 12x26: vyrezávaný kmeň s tvárami, na vrchole lebka s rohmi, zelené svetlo v očiach; glow = fáza žiary
 function makeOrcTotem(glow) {
   const p = painter(12, 26);
@@ -1482,7 +1453,7 @@ function initBuildingSprites() {
   BSPR.orcTower = makeOrcTower();
   BSPR.stakes = makeStakes();
   BSPR.stake = BSPR.stakes; // koly hráča za orkov (rovnaký obrázok ako koly v tábore hordy)
-  BSPR.orcCatapult = [makeOrcCatapult(true), makeOrcCatapult(false)];
+  BSPR.orcTrebuchet = [makeOrcTrebuchet(3, false, true), makeOrcTrebuchet(3, true, true)]; // trebuchet tábora hordy strieľa nadol k hráčovi
   BSPR.orcTotem = [makeOrcTotem(false), makeOrcTotem(true)];
   BSPR.orcDrum = [makeOrcDrum(false), makeOrcDrum(true)];
   BSPR.orcTent = makeOrcTent();
@@ -1516,7 +1487,7 @@ function initBuildingSprites() {
   Object.assign(OBSPR, {
     hall: [1, 2, 3, 4, 5].map(l => makeOrcKeep(l)), tower: [1, 2, 3, 4, 5].map(l => makeOrcTower(true, l)),
     mage: [1, 2, 3, 4, 5].map(l => makeOrcFireTotem(l)), icetower: [1, 2, 3, 4, 5].map(l => makeOrcPoison(l)),
-    ballista: makeOrcTrebuchet(3), ballistaFired: makeOrcTrebuchet(3, true), // trebuchet sa nevylepšuje – jeden vzhľad
+    ballista: makeOrcTrebuchet(3), ballistaFired: makeOrcTrebuchet(3, true), // trebuchet hráča strieľa nahor, nevylepšuje sa
     barracks: BSPR.orcBarracks, range: BSPR.goblinRange, stables: BSPR.wolfPen, armory: BSPR.brutePit, falconry: BSPR.batCave[0],
     chapel: BSPR.shamanHut[0], workshop: BSPR.orcTent,
   });

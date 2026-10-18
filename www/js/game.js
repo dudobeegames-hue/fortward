@@ -1062,7 +1062,8 @@
     st.fireWalls = []; st.shields = []; st.fallFx = []; st.bolts = []; st.blasts = []; st.healFx = [];
     st.clouds = []; st.totems = []; st.pools = []; st.axes = [];
     const k = st.king; // zúrivosť, medvedia koža, hostina a rozbehnutý nápor sa do ďalšej vlny neprenesú
-    if (k) { k.rageT = 0; k.hideT = 0; k.feastT = 0; k.charge = null; k.stunT = 0; k.kb = null; }
+    if (k) { k.rageT = 0; k.hideT = 0; k.feastT = 0; k.charge = null; k.stunT = 0; k.kb = null; k.post = null; } // po vlne sa hrdina vráti k radnici
+    syncHeroHome();
     st.hallHolyT = 0; for (const b of st.blds) b.holyT = 0;
     for (const s of st.soldiers) s.stunT = 0;
   }
@@ -1605,6 +1606,7 @@
     part(u.x, u.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.3, '#e84838', 100);
     if (u.hp > 0) return;
     if (u.isKing) { // kráľ padol – do konca vlny nebojuje, po vlne ho možno oživiť za zlato
+      u.post = null; syncHeroHome();
       u.dead = true; u.deadT = 0; u.fadeT = null; u.tgt = null; u.flash = 0;
       for (let k = 0; k < 10; k++) part(u.x, u.y - 6, (Math.random() - 0.5) * 40, -Math.random() * 40, 0.6, '#f8d048', 80);
       AUDIO.play('crumble');
@@ -1627,7 +1629,10 @@
   // hrdina bráni celú šírku stavebnej zóny: okrem okruhu pred radnicou zasiahne aj nepriateľa kdekoľvek v zóne
   // alebo tesne pred ňou (napr. pri veži na okraji)
   const heroBandTop = () => tileY(zoneTopRow()) - T - 10 * tal('reach');
-  const heroReaches = (e, aggro) => Math.hypot(e.x - st.king.hx, e.y - st.king.hy) <= aggro || e.y >= heroBandTop();
+  // miesto, ktoré hrdina bráni: stanovište zvolené ťuknutím (k.post), inak pri radnici
+  const heroPos = k => k.post || { x: k.hx, y: k.hy };
+  // na stanovišti bráni len jeho okolie; doma aj celú stavebnú zónu
+  const heroReaches = (e, aggro) => { const k = st.king, h = heroPos(k); return Math.hypot(e.x - h.x, e.y - h.y) <= aggro || (!k.post && e.y >= heroBandTop()); };
   // stihne hrdina nepriateľa, kým ho zničia iní? Sčíta strely, ktoré už k nemu letia, a poškodenie,
   // ktoré mu za čas cesty hrdinu dajú veže (strieľajú na toho, kto je najbližšie k radnici) a rytier, s ktorým bojuje
   const TOWER_KINDS = { tower: 1, mage: 1, icetower: 1, ballista: 1 };
@@ -1784,7 +1789,7 @@
         st.proj.push({ k: heroDef().proj || 'fire', x: k.x + tip.x, y: k.y + tip.y, tgt: t, tx: t.x, ty: t.y - t.h * 0.5, dmg: kingDmg(), spd: 150, splash: 8, vx: 0, vy: -1 });
         AUDIO.play('fire');
       }
-    } else if (Math.hypot(k.hx - k.x, k.hy - k.y) > 2) { moveKnight(k, k.hx, k.hy, k.spd * waterMul(k), dt); k.anim += dt * 6; }
+    } else { const h = heroPos(k); if (Math.hypot(h.x - k.x, h.y - k.y) > 2) { moveKnight(k, h.x, h.y, k.spd * waterMul(k), dt); k.anim += dt * 6; } }
   }
   // rytier alebo kráľ: nájdi nepriateľa v okruhu domova, bojuj, inak sa vráť
   function updateFighter(u, dt, homeX, homeY, aggro, dmg, cleave, mover) {
@@ -2188,9 +2193,22 @@
   // ťuk na bojisko počas boja: zvolené kúzlo sa zošle na to miesto
   function tapBattle(x, y) {
     const id = st.spellSel;
-    if (!id) return;
+    if (!id) { sendHero(x, y); return; }
     if (castSpell(id, x, y)) st.spellSel = null;
   }
+  // presun hrdinu počas vlny: ťuk na bojisko ho pošle na to miesto, kde bráni okolie (na radnicu ani mimo poľa nie)
+  function sendHero(x, y) {
+    const k = st.king;
+    if (st.phase !== 'battle') return;
+    if (!kingUp()) { AUDIO.play('deny'); hint(heroFell()); return; }
+    const hr = hallRect();
+    x = Math.max(G.gx0 + 4, Math.min(G.gx0 + G.cols * T - 4, x)); y = Math.max(G.gy0 + 6, Math.min(hr.y0 - 4, y));
+    k.post = { x, y }; k.tgt = null; k.next = null;
+    st.marks.push({ x, y, life: 0.5, max: 0.5, wave: 8, post: true });
+    AUDIO.play('click'); syncHeroHome();
+  }
+  // tlačidlo Domov (vľavo): vidno ho, len keď je hrdina mimo radnice na stanovišti
+  function syncHeroHome() { const b = $('heroHome'); if (b) b.hidden = !(st.phase === 'battle' && st.king && st.king.post && !st.king.dead); }
   function castSpell(id, x, y) {
     if (st.phase !== 'battle' || !spellOn(id) || !kingUp() || st[SPELLS[id].cdKey] > 0) { AUDIO.play('deny'); return false; }
     if (id === 'volley') { volley(x, y); return true; }
@@ -2605,13 +2623,13 @@
         k.tpBack -= dt;
         if (k.tpBack <= 0) {
           for (let q = 0; q < 16; q++) part(k.x, k.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.5, q % 2 ? '#c8a0ff' : '#ffffff', 20);
-          k.x = k.hx; k.y = k.hy; k.tgt = null; k.next = null;
+          const h = heroPos(k); k.x = h.x; k.y = h.y; k.tgt = null; k.next = null;
           for (let q = 0; q < 16; q++) part(k.x, k.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.5, q % 2 ? '#c8a0ff' : '#ffffff', 20);
           AUDIO.play('bolt');
         }
       } else if (k.charge) updateCharge(k, dt);
       else if (hd.range) updateSorc(k, dt);
-      else updateFighter(k, dt, k.hx, k.hy, hd.reach + T + 10 * tal('reach'), kingDmg(), true, moveKnight); // vyráža o políčko pred stavebnú zónu, chodí len cez brány
+      else { const h = heroPos(k); updateFighter(k, dt, h.x, h.y, hd.reach + T + 10 * tal('reach'), kingDmg(), true, moveKnight); } // vyráža o políčko pred stavebnú zónu (či od stanovišťa), chodí len cez brány
       if (tal('regen') && k.hp < kingMax()) k.hp = Math.min(kingMax(), k.hp + kingMax() * 0.015 * tal('regen') * dt);
       if (hd.aura) { // paladin lieči rytierov okolo seba
         const rate = hd.aura * (1 + 0.5 * tal('aura'));
@@ -2895,7 +2913,7 @@
     const sd = smoothDir(u, mvx, mvy);
     if (near) turn8(u, dir8(t.x - u.x, t.y - u.y), 3);
     else if (moving) turn8(u, sd, 5);
-    else if (Math.hypot(u.hx - u.x, u.hy - u.y) < 3) turn8(u, 6, 5);
+    else if (Math.hypot(heroPos(u).x - u.x, heroPos(u).y - u.y) < 3) turn8(u, 6, 5);
     if (u.face8 == null) u.face8 = 6;
     const v = set[u.face8];
     if (u.swing > 0) return v.slash; // meč nahradí svetelný oblúk švihu (kladivo ostane dopadnuté)
@@ -3261,6 +3279,14 @@
   const joinsV = (c, r) => occAt(c, r) !== HALL && joins(c, r); // na radnicu sa hradby napájajú len z bokov, nie zhora
   const joinsBuilding = (c, r) => { const o = occAt(c, r); return !!o && o !== HALL && o.kind !== 'wall' && !!JOINERS[o.kind]; };
 
+  // stanovište hrdinu: zapichnutá zástavka v rase hráča a krúžok na zemi
+  function drawPost(p, time) {
+    const fl = FLAG_COL[BUILD_RACE], x = Math.round(p.x), y = Math.round(p.y), wv = Math.floor(time * 5) % 2;
+    g.globalAlpha = 0.5; g.strokeStyle = fl[1]; g.lineWidth = 1; g.beginPath(); g.ellipse(x + 0.5, y + 0.5, 6, 3, 0, 0, 6.29); g.stroke(); g.globalAlpha = 1;
+    g.fillStyle = '#3e2614'; g.fillRect(x, y - 9, 1, 10);
+    g.fillStyle = fl[0]; g.fillRect(x + 1, y - 9 + wv, 4, 3);
+    g.fillStyle = fl[1]; g.fillRect(x + 1, y - 9 + wv, 2, 1);
+  }
   // farby vlajok hráča: [súkno, svetlý okraj, cíp] – ľudia modré, orkovia oranžové
   const FLAG_COL = { human: ['#3c64c8', '#88b4ff', '#f8d048'], orc: ['#e87818', '#f8b048', '#fff070'] };
   function drawHall(time) {
@@ -4080,6 +4106,7 @@
     if (playing) for (const b of st.blds) if (TRAPS[b.kind]) drawPit(b, time);
     if (st.phase === 'build') drawBuildOverlay(time);
     for (const m of st.marks) drawMark(m);
+    if (st.king && st.king.post && !st.king.dead && st.phase === 'battle') drawPost(st.king.post, time);
     drawPools(time);
     drawClouds(time); // jedový mrak leží na zemi pod nohami jednotiek
     for (const fw of st.fireWalls || []) drawFireGround(fw, time);
@@ -4943,6 +4970,11 @@
     b.querySelector('img').src = atk ? UI_ICONS.swords : UI_ICONS.shieldDefend;
     b.querySelector('span').textContent = atk ? 'ÚTOK' : 'OBRANA';
   }
+  $('heroHome').addEventListener('click', ev => {
+    ev.stopPropagation();
+    const k = st.king; if (!k || !k.post) return;
+    k.post = null; k.tgt = null; k.next = null; AUDIO.play('click'); syncHeroHome();
+  });
   $('stanceBtn').addEventListener('click', ev => {
     ev.stopPropagation();
     st.stance = armyAttacks() ? 'defend' : 'attack';
@@ -5112,6 +5144,7 @@
     const es = emptySlots(); $('heroTxt').textContent = es; $('heroTxt').hidden = !es; // voľný slot na schopnosť
     document.querySelector('.tabCard[data-tab=heroes]').classList.toggle('shine', heroIds().some(heroIsNew));
   }
+  $('heroHome').querySelector('img').src = UI_ICONS.homeTab;
   $('icoHome').src = UI_ICONS.homeTab; $('icoTrophy').src = UI_ICONS.trophy; $('icoSwords').src = UI_ICONS.swords; $('icoShop').src = UI_ICONS.chest;
   let boxDown = false; // položil sa prst/myš do okna misie od jeho otvorenia?
   const openMission = () => { renderMapPanel(); boxDown = false; $('missionBox').hidden = false; };
