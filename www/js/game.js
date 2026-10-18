@@ -79,7 +79,13 @@
     // čarodejka
     firewall:  { name: 'Ohnivá stena', cdKey: 'fwCd',     cd: 24, dur: 5, w: 44 },
     teleport:  { name: 'Teleport',     cdKey: 'tpCd',     cd: 16, R: 28 },
+    // náčelník orkov
+    rage:      { name: 'Zúrivosť',     cdKey: 'rageCd',   cd: 26, instant: true, dur: 6, R: 60 },
+    roar:      { name: 'Rev',          cdKey: 'roarCd',   cd: 18, instant: true, R: 34 },
+    axe:       { name: 'Vrhnutá sekera', cdKey: 'axeCd',  cd: 12, range: 100 },
   };
+  // zúrivosť: zasiahnutí orkovia a náčelník útočia o 50 % rýchlejšie (kratšie čakanie medzi údermi), ale dostávajú o 20 % viac
+  const rageMul = u => u.rageT > 0 ? 1 / 1.5 : 1;
   const spellMax = id => id === 'volley' ? volleyCd() : SPELLS[id].cd;
   const spellPow = () => 1 + 0.15 * (st.mission - 1); // kúzla silnejú s misiou, aby stačili na tuhšiu hordu
   const mineGold = b => (20 + 12 * (b.lvl - 1)) * (1 + 0.06 * perk('mines'));
@@ -330,6 +336,9 @@
     heal:      { name: 'Uzdravenie',   desc: 'Ihneď vylieči paladina a rytierov okolo neho.',           icon: 'sp_heal' },
     firewall:  { name: 'Ohnivá stena', desc: 'Pás ohňa na zvolenom mieste podpáli každého, kto ním prejde.', icon: 'sp_firewall' },
     teleport:  { name: 'Teleport',     desc: 'Čarodejka sa premiestni na zvolené miesto, zraní a omráči nepriateľov okolo a hneď sa vráti k radnici.', icon: 'sp_teleport' },
+    rage:      { name: 'Zúrivosť',     desc: 'Náčelník a orkovia okolo neho na 6 s útočia o 50 % rýchlejšie, ale dostávajú o 20 % viac poškodenia.', icon: 'sp_rage' },
+    roar:      { name: 'Rev',          desc: 'Nepriatelia okolo náčelníka odletia preč a na chvíľu ostanú omráčení.', icon: 'sp_roar' },
+    axe:       { name: 'Vrhnutá sekera', desc: 'Sekera letí k zvolenému miestu a späť – každého na ceste zasiahne dvakrát.', icon: 'sp_axe' },
   };
   const slotOpen = i => kingMeta.lvl >= KING_SLOT_LVL[i];
   const spellOn = id => kingMeta.slots.some((s, i) => s === id && slotOpen(i));
@@ -922,7 +931,7 @@
     Object.assign(st, {
       wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.05 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, shake: 0, soldierN: 0,
       blds: [], paving: {}, enemies: [], soldiers: [], form: null, proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
-      cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, shieldCd: 0, healCd: 0, fwCd: 0, tpCd: 0, shields: [], fireWalls: [], heroDead: {},
+      cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, shieldCd: 0, healCd: 0, fwCd: 0, tpCd: 0, rageCd: 0, roarCd: 0, axeCd: 0, axes: [], shields: [], fireWalls: [], heroDead: {},
       spellSel: null, siegeOrder: [], siegePick: null, fallFx: [], blasts: [], healFx: [], bolts: [], hallHolyT: 0, stance: 'attack', introPan: null,
     });
     rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
@@ -1521,7 +1530,7 @@
 
   function hitUnit(u, dmg) {
     if (u.isKing && u.tpBack > 0) return; // čarodejku počas teleportu nič nezraní
-    u.hp -= dmg * (u.armor || 1); u.flash = 0.08;
+    u.hp -= dmg * (u.armor || 1) * (u.rageT > 0 ? 1.2 : 1); u.flash = 0.08; // v zúrivosti sa nekryje
     part(u.x, u.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.3, '#e84838', 100);
     if (u.hp > 0) return;
     if (u.isKing) { // kráľ padol – do konca vlny nebojuje, po vlne ho možno oživiť za zlato
@@ -1729,7 +1738,7 @@
       else {
         if (!t.foe) t.foe = u;
         if (u.cd <= 0) {
-          u.cd = u.isKing ? heroDef().cd * (1 - 0.12 * tal('swift')) : 0.8; u.swing = u.isKing ? 0.3 : 0.15; // kráľov úder má dlhší švih (3 snímky)
+          u.cd = (u.isKing ? heroDef().cd * (1 - 0.12 * tal('swift')) : 0.8) * rageMul(u); u.swing = u.isKing ? 0.3 : 0.15; // kráľov úder má dlhší švih (3 snímky)
           AUDIO.play(u.isKing ? 'kingHit' : 'clang');
           let mul = 1;
           if (spear && t.d.cav) mul *= SPEAR_VS_CAV;                                   // kopija proti jazde
@@ -1968,7 +1977,7 @@
       if (d <= ARCHER_RANGE) { near = true; if (d < nd) { nd = d; u.aimT = e; } }
     }
     if (near && u.cd <= 0 && shoot(u.x, u.y, u.x, u.y - 9, ARCHER_RANGE, 'arrow', 180, u.dmg * (st.cryT > 0 ? CRY_DMG : 1), 0, ARCHER_PRIO)) {
-      u.cd = ARCHER_CD / (st.cryT > 0 ? CRY_SPD : 1); u.swing = 0.1;
+      u.cd = ARCHER_CD / (st.cryT > 0 ? CRY_SPD : 1) * rageMul(u); u.swing = 0.1;
       u.aimT = st.proj[st.proj.length - 1].tgt || u.aimT; // vystrelil na prednostný cieľ – k nemu sa otočí
     }
     else if (!near) { // nikto z hordy v dosahu – strieľa na stavbu tábora, ak na ňu dostrelí
@@ -1977,7 +1986,7 @@
       if (u.cd <= 0 && o && Math.hypot(o.x - u.x, o.y - u.y) <= ARCHER_RANGE) {
         const a = campAim(o);
         st.proj.push({ k: 'arrow', x: u.x, y: u.y - 9, tgt: null, tx: a.x + (Math.random() - 0.5) * 6, ty: a.y, dmg: u.dmg * (st.cryT > 0 ? CRY_DMG : 1), spd: 180, splash: 0, vx: 0, vy: -1, campT: o });
-        u.cd = ARCHER_CD / (st.cryT > 0 ? CRY_SPD : 1); u.swing = 0.1; AUDIO.play('arrow');
+        u.cd = ARCHER_CD / (st.cryT > 0 ? CRY_SPD : 1) * rageMul(u); u.swing = 0.1; AUDIO.play('arrow');
       }
     }
     // ide na svoje miesto v rade (počas mierenia pomalšie)
@@ -2115,6 +2124,39 @@
       st.fwCd = sp.cd; AUDIO.play('fire');
       return true;
     }
+    if (id === 'rage') { // náčelník a orkovia v okruhu sa rozzúria: červená žiara, rýchlejšie údery
+      const dur = sp.dur;
+      k.rageT = dur;
+      for (const s of st.soldiers) if (!s.dead && !s.siege && !s.fly && !s.helper && Math.hypot(s.x - k.x, (s.y - k.y) / 0.7) < sp.R) s.rageT = dur;
+      st.marks.push({ x: k.x, y: k.y, life: 0.6, max: 0.6, wave: sp.R * 0.8, rage: true });
+      for (let q = 0; q < 34; q++) { const a = Math.random() * 6.28, r = Math.random() * sp.R * 0.6; part(k.x + Math.cos(a) * r, k.y + Math.sin(a) * r * 0.6, 0, -16 - Math.random() * 14, 0.6, q % 3 ? '#e84838' : '#ff9a80', 0); }
+      st.rageCd = sp.cd; AUDIO.play('horn'); banner('Zúrivosť!');
+      return true;
+    }
+    if (id === 'roar') { // rev: tlaková vlna od náčelníka odhodí nepriateľov za jej okraj a na chvíľu ich omráči (bossov len omráči)
+      for (const e of st.enemies) {
+        if (e.dead) continue;
+        const dx = e.x - k.x, dy = (e.y - k.y) / 0.7, d = Math.hypot(dx, dy);
+        if (d >= sp.R) continue;
+        damage(e, 6 * pow);
+        e.stunT = Math.max(e.stunT || 0, e.d.boss ? 0.6 : 1.4);
+        if (!e.d.boss && !e.d.giant) {
+          const ux = d > 0.5 ? dx / d : Math.random() - 0.5, uy = d > 0.5 ? dy / d : -1, push = sp.R + 8 - d;
+          e.kb = { vx: ux * push / 0.25, vy: uy * 0.7 * push / 0.25, t: 0.25 };
+        }
+      }
+      for (let r = 0; r < 3; r++) st.marks.push({ x: k.x, y: k.y - 2, life: 0.45 + r * 0.12, max: 0.45 + r * 0.12, wave: sp.R + 2 - r * 6, roar: true });
+      for (let q = 0; q < 28; q++) { const a = q / 28 * 6.28; part(k.x + Math.cos(a) * 5, k.y + Math.sin(a) * 3, Math.cos(a) * 80, Math.sin(a) * 52, 0.4, '#b8a890', 0); } // prach po zemi
+      st.shake = Math.max(st.shake, 0.3);
+      st.roarCd = sp.cd; AUDIO.play('boom'); AUDIO.play('horn'); banner('RAAAH!');
+      return true;
+    }
+    if (id === 'axe') { // sekera letí k cieľu (najďalej na dosah) a späť do ruky; každého na ceste zasiahne raz tam a raz späť
+      const dx = x - k.x, dy = y - (k.y - 8), d = Math.hypot(dx, dy) || 1, r = Math.min(sp.range, d);
+      st.axes.push({ x: k.x, y: k.y - 8, sx: k.x, sy: k.y - 8, tx: k.x + dx / d * r, ty: k.y - 8 + dy / d * r, t: 0, dur: r / 170, back: false, hit: new Set(), rot: 0, dmg: 16 * pow });
+      st.axeCd = sp.cd; AUDIO.play('arrow');
+      return true;
+    }
     if (id === 'teleport') {
       for (let q = 0; q < 18; q++) part(k.x, k.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.5, q % 2 ? '#c8a0ff' : '#ffffff', 20);
       k.x = Math.max(G.gx0 + 4, Math.min(G.gx0 + G.cols * T - 4, x)); k.y = y; k.tgt = null; k.next = null;
@@ -2191,6 +2233,47 @@
     }
   }
 
+  // zúrivosť (odpočet a červené iskry) a letiace sekery náčelníka
+  function updateChiefFx(dt) {
+    for (const u of st.soldiers.concat(st.king ? [st.king] : [])) if (u.rageT > 0) {
+      u.rageT -= dt;
+      if (Math.random() < dt * 8) part(u.x + (Math.random() - 0.5) * 8, u.y - 4 - Math.random() * 10, (Math.random() - 0.5) * 6, -14, 0.4, Math.random() < 0.6 ? '#e84838' : '#ff9a80', 0);
+    }
+    for (const a of st.axes) {
+      a.rot += dt * 22;
+      const k = st.king;
+      if (!a.back) {
+        a.t += dt;
+        const p = Math.min(1, a.t / a.dur);
+        a.x = a.sx + (a.tx - a.sx) * p; a.y = a.sy + (a.ty - a.sy) * p;
+        if (p >= 1) { a.back = true; a.hit = new Set(); }
+      } else { // späť do ruky náčelníka (aj keď sa medzitým pohol); keď padne, sekera dopadne na zem
+        const hx = k && !k.dead ? k.x : a.sx, hy = k && !k.dead ? k.y - 8 : a.sy, d = Math.hypot(hx - a.x, hy - a.y), v = 190 * dt;
+        if (d <= v + 2) { a.done = true; continue; }
+        a.x += (hx - a.x) / d * v; a.y += (hy - a.y) / d * v;
+      }
+      for (const e of st.enemies) if (!e.dead && !a.hit.has(e) && Math.hypot(e.x - a.x, (e.y - e.h * 0.4) - a.y) < 8) {
+        a.hit.add(e); damage(e, a.dmg);
+        for (let q = 0; q < 4; q++) part(e.x, e.y - 6, (Math.random() - 0.5) * 40, -Math.random() * 25, 0.3, '#e84838', 90);
+      }
+      for (const o of campLive()) if (!a.hit.has(o) && Math.hypot(o.x - a.x, o.y - 8 - a.y) < 12) { a.hit.add(o); hitCamp(o, a.dmg * 0.6); }
+    }
+    st.axes = st.axes.filter(a => !a.done);
+  }
+  // letiaca sekera: drevené porisko a oceľová čepeľ, točí sa okolo stredu
+  const AXE_IMG = (() => {
+    const c = document.createElement('canvas'); c.width = 11; c.height = 11;
+    const x = c.getContext('2d'), px = (a, b, col) => { x.fillStyle = col; x.fillRect(a, b, 1, 1); };
+    for (let i = 2; i <= 9; i++) { px(i, 10 - i + 1, '#1c140e'); px(i, 10 - i, '#a86c38'); }
+    for (let yy = 0; yy <= 4; yy++) for (let xx = 6; xx <= 10; xx++) if (xx - 6 + yy <= 5 && !(xx === 6 && yy === 4)) px(xx, yy, xx === 10 || yy === 0 ? '#f4f4f8' : '#a0a0aa');
+    return c;
+  })();
+  function drawAxes() {
+    for (const a of st.axes) {
+      g.save(); g.translate(Math.round(a.x), Math.round(a.y)); g.rotate(Math.round(a.rot / (Math.PI / 4)) * Math.PI / 4); // otočenie po 45° ostane pixelové
+      g.drawImage(AXE_IMG, -5, -5); g.restore();
+    }
+  }
   function update(dt) {
     if (st.spawnQ.length) {
       st.spawnT -= dt;
@@ -2339,7 +2422,8 @@
     st.volleyT = Math.max(0, st.volleyT - dt);
     st.cryT = Math.max(0, st.cryT - dt); st.cryCd = Math.max(0, st.cryCd - dt);
     st.freezeCd = Math.max(0, st.freezeCd - dt); st.fireCd = Math.max(0, st.fireCd - dt); st.boltCd = Math.max(0, st.boltCd - dt);
-    for (const key of ['shieldCd', 'healCd', 'fwCd', 'tpCd']) st[key] = Math.max(0, (st[key] || 0) - dt);
+    for (const key of ['shieldCd', 'healCd', 'fwCd', 'tpCd', 'rageCd', 'roarCd', 'axeCd']) st[key] = Math.max(0, (st[key] || 0) - dt);
+    updateChiefFx(dt);
     for (const f of st.fallFx) { // padajúca ohnivá guľa s chvostom iskier
       f.t -= dt;
       const fy = f.y - 90 * Math.max(0, f.t / f.max), fx = f.x + 30 * Math.max(0, f.t / f.max);
@@ -3236,12 +3320,12 @@
     }
     if (m.wave) {
       const ease = 1 - Math.pow(1 - t, 2);
-      const inner = m.holy ? '248,208,72' : m.heal ? '120,230,90' : '168,104,232'; // svätý štít zlatý, uzdravenie zelené, teleport fialový
+      const inner = m.holy ? '248,208,72' : m.heal ? '120,230,90' : m.rage ? '232,72,56' : m.roar ? '200,180,140' : '168,104,232'; // svätý štít zlatý, uzdravenie zelené, zúrivosť červená, rev prašný, teleport fialový
       for (const [rr, col, w] of [[m.wave * ease, 'rgba(255,255,255,' + (1 - t) + ')', 2], [m.wave * ease * 0.7, 'rgba(' + inner + ',' + (0.9 * (1 - t)) + ')', 2]]) {
         g.strokeStyle = col; g.lineWidth = w;
         g.beginPath(); g.ellipse(m.x, m.y, Math.max(1, rr), Math.max(1, rr * 0.7), 0, 0, 6.29); g.stroke();
       }
-      g.globalAlpha = 0.25 * (1 - t); g.fillStyle = m.holy ? '#fff0a0' : m.heal ? '#b0f090' : '#c8a0ff';
+      g.globalAlpha = 0.25 * (1 - t); g.fillStyle = m.holy ? '#fff0a0' : m.heal ? '#b0f090' : m.rage ? '#ff8070' : m.roar ? '#d8c8a0' : '#c8a0ff';
       g.beginPath(); g.ellipse(m.x, m.y, Math.max(1, m.wave * ease), Math.max(1, m.wave * ease * 0.7), 0, 0, 6.29); g.fill();
       g.globalAlpha = 1; g.lineWidth = 1;
       return;
@@ -3704,6 +3788,7 @@
       for (let k = 0; k < 5; k++) { g.fillStyle = cols[k]; g.fillRect(Math.round(p.x - p.vx * k), Math.round(p.y - p.vy * k), 1, 1); }
     }
     for (const dr of st.drops) drawDrop(dr);
+    drawAxes();
     drawFog(time);
     for (const b of st.bolts) drawBolt(b);
     for (const f of st.fallFx) drawFallingFireball(f);
@@ -3823,9 +3908,9 @@
     chapel:   { name: 'Šamanská chatrč',   short: 'Chatrč',    desc: 'Vyšle šamana, ktorý chodí za orkmi a náčelníkom a lieči ich' },
     workshop: { name: 'Goblinský stan',    short: 'Stan',      desc: 'Vyšle goblina, ktorý chodí opravovať poškodené budovy' },
   };
-  const HUMAN_UNITS = { king: { name: HEROES.king.name, spr: HEROES.king.spr, desc: HEROES.king.desc },
+  const HUMAN_UNITS = { king: { name: HEROES.king.name, spr: HEROES.king.spr, desc: HEROES.king.desc, powers: HEROES.king.powers.slice() },
     kt: Object.fromEntries(Object.entries(KTYPES).map(([k, v]) => [k, v.name])), plural: Object.assign({}, UNIT_PLURAL) };
-  const ORC_UNITS = { king: { name: 'Náčelník', spr: 'chief', desc: 'Surový vodca hordy, sekerou zasiahne celú skupinu.' },
+  const ORC_UNITS = { king: { name: 'Náčelník', spr: 'chief', desc: 'Surový vodca hordy, sekerou zasiahne celú skupinu.', powers: ['rage', 'roar', 'axe'] },
     kt: { knight: 'Ork', spear: 'Surovec', rider: 'Vlčí jazdec' }, plural: { knight: 'Orkovia', rider: 'Vlčí jazdci', spear: 'Surovci' } };
   let previewRace = null;
   function applyRace() {
@@ -3835,6 +3920,8 @@
     for (const k in KTYPES) KTYPES[k].name = U.kt[k];
     Object.assign(UNIT_PLURAL, U.plural);
     if (!ownsHero(st.hero)) setActiveHero('king');
+    const pw = heroDef().powers; // schopnosti v slotoch musia patriť hrdinovi tejto rasy
+    kingMeta.slots = kingMeta.slots.map(s => pw.includes(s) ? s : null);
     for (const k in BUILD) Object.assign(BUILD[k], HUMAN_NAMES[k], BUILD_RACE === 'orc' ? ORC_NAMES[k] : null);
     if (previewRace !== BUILD_RACE) { for (const k in previewCache) delete previewCache[k]; previewRace = BUILD_RACE; }
     if (ICONS.tower) { buildingIcons(); unitIcons(); syncHeroIcons(); }
@@ -3898,8 +3985,10 @@
     ICONS.coin = spriteURL(SPR.coin[0], 4);
     ICONS.paving = spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3);
     Object.assign(ICONS, { sp_volley: UI_ICONS.spellVolley, sp_fire: UI_ICONS.spellFire, sp_frost: UI_ICONS.spellFrost, sp_bolt: UI_ICONS.spellBolt,
-      sp_warcry: UI_ICONS.spellHorn, sp_shield: UI_ICONS.spellShield, sp_heal: UI_ICONS.spellHeal, sp_firewall: UI_ICONS.spellFirewall, sp_teleport: UI_ICONS.spellTeleport });
-    const SPI = { volley: 'sp_volley', fireball: 'sp_fire', freeze: 'sp_frost', lightning: 'sp_bolt', warcry: 'sp_warcry', shield: 'sp_shield', heal: 'sp_heal', firewall: 'sp_firewall', teleport: 'sp_teleport' };
+      sp_warcry: UI_ICONS.spellHorn, sp_shield: UI_ICONS.spellShield, sp_heal: UI_ICONS.spellHeal, sp_firewall: UI_ICONS.spellFirewall, sp_teleport: UI_ICONS.spellTeleport,
+      sp_rage: UI_ICONS.spellRage, sp_roar: UI_ICONS.spellRoar, sp_axe: UI_ICONS.spellAxe });
+    const SPI = { volley: 'sp_volley', fireball: 'sp_fire', freeze: 'sp_frost', lightning: 'sp_bolt', warcry: 'sp_warcry', shield: 'sp_shield', heal: 'sp_heal', firewall: 'sp_firewall', teleport: 'sp_teleport',
+      rage: 'sp_rage', roar: 'sp_roar', axe: 'sp_axe' };
     document.querySelectorAll('.spell').forEach(b => { b.querySelector('img').src = ICONS[SPI[b.dataset.spell]]; });
     ICONS.gem = spriteURL(SPR.gem[0], 4);
     document.querySelectorAll('img.coin').forEach(i => { i.src = ICONS.coin; });

@@ -267,6 +267,29 @@ const UI_ICONS = (() => {
     }
     for (const cx of [3, 8, 13]) { put(cx, 9, '#fff7c8'); put(cx, 8, '#f8d048'); }
   });
+  // schopnosti náčelníka orkov: zúrivosť (zaťatá zelená päsť v červenom plameni), rev (otvorená papuľa s klmi a vlnami),
+  // vrhnutá sekera (sekera v letu s oblúkom pohybu)
+  const spellRage = outlined(15, 15, put => {
+    for (let y = 2; y <= 14; y++) for (let x = 1; x <= 13; x++) { // plameň za päsťou
+      const w = Math.round((y - 2) * 0.55) + 1, cx = 7 + Math.round(Math.sin(y * 1.3) * 1.2);
+      if (Math.abs(x - cx) <= w) put(x, y, Math.abs(x - cx) > w - 2 ? '#8c2018' : y < 7 ? '#f89838' : '#e84838');
+    }
+    for (let y = 6; y <= 12; y++) for (let x = 4; x <= 10; x++) put(x, y, x === 4 || y === 6 ? '#9cd45a' : x === 10 || y === 12 ? '#305c22' : '#62a03a'); // päsť
+    for (const x of [6, 8]) for (let y = 7; y <= 9; y++) put(x, y, '#305c22'); // prsty
+    put(3, 9, '#62a03a'); put(3, 10, '#62a03a'); // palec
+  });
+  const spellRoar = outlined(17, 15, put => {
+    for (let y = 2; y <= 12; y++) for (let x = 2; x <= 10; x++) if (Math.hypot(x - 6, (y - 7) * 0.9) <= 5) put(x, y, x < 6 ? '#7cb848' : '#3e7a2a'); // hlava
+    for (let y = 7; y <= 11; y++) for (let x = 4; x <= 8; x++) put(x, y, '#3a0c0a'); // otvorená papuľa
+    put(4, 7, '#eee6cc'); put(8, 7, '#eee6cc'); put(4, 11, '#eee6cc'); put(8, 11, '#eee6cc'); put(4, 10, '#eee6cc'); put(8, 10, '#eee6cc'); // kly
+    put(4, 4, '#e84838'); put(8, 4, '#e84838'); // oči
+    for (const [r, col] of [[3, '#fff070'], [5, '#f8d048']]) for (let a = -2; a <= 2; a++) put(11 + r - Math.abs(a) * (r > 3 ? 1 : 0), 7 + a, col); // zvukové vlny
+  });
+  const spellAxe = outlined(15, 15, put => {
+    for (let i = 1; i <= 11; i++) put(i + 1, 13 - i, i % 4 === 0 ? '#6e4422' : '#a86c38'); // porisko
+    for (let y = 1; y <= 7; y++) for (let x = 7; x <= 13; x++) if ((x - 7) + (y - 1) >= 3 && (x - 7) + (y - 1) <= 10 && x - y >= 2) put(x, y, x === 13 || y === 1 ? '#ffffff' : '#a0a0aa'); // čepeľ
+    for (const [x, y] of [[2, 6], [3, 4], [5, 2]]) put(x, y, '#c8d0e0'); // oblúk letu
+  });
   const spellTeleport = outlined(13, 13, put => {
     for (let t = 0; t < 34; t++) { // špirála
       const a = t * 0.45, r = 0.6 + t * 0.15;
@@ -594,6 +617,6 @@ const UI_ICONS = (() => {
 
   // papier a tyče zvitku sa pre rovnakú veľkosť kreslia len raz (menu sa otvára opakovane)
   const memo = fn => { const m = new Map(); return (...a) => { const k = a.join('x'); if (!m.has(k)) m.set(k, fn(...a)); return m.get(k); }; };
-  return { pix, music, sound, plus, home, hall, trophy, star, swords, shieldDefend, chest, spellVolley, spellFire, spellFrost, spellBolt, spellHorn, spellShield, spellHeal, spellFirewall, spellTeleport, scrollPaper: memo(scrollPaper), scrollRod: memo(scrollRod), scrollTag, flags, langs,
+  return { pix, music, sound, plus, home, hall, trophy, star, swords, shieldDefend, chest, spellVolley, spellFire, spellFrost, spellBolt, spellHorn, spellShield, spellHeal, spellFirewall, spellTeleport, spellRage, spellRoar, spellAxe, scrollPaper: memo(scrollPaper), scrollRod: memo(scrollRod), scrollTag, flags, langs,
     actDown, actRepair, actSpec, tabs, homeTab, tierStars };
 })();

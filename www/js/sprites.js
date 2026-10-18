@@ -1086,7 +1086,30 @@ function buildHero8(spec) {
     const px = new Array(K8_W * K8_H).fill(null);
     const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < K8_W && y < K8_H && c) px[y * K8_W + x] = c; };
     const body = spec.body[view].concat(legRows), oy = K8_BY + (lunge ? 1 : 0);
+    // zástava na chrbte (náčelník orkov): žrď s kosteným hrotom a červené súkno s lebkou a vystrihnutým chvostom;
+    // zozadu je pred telom (s obrysom aj cez telo, aby sa oddelila od peleríny), spredu a zboku vytŕča spoza neho
+    const fl = spec.flag && spec.flag[view];
+    const drawFlag = over => {
+      // žrď v strede chrbta s kosteným hrotom, hore priečka a pod ňou súkno visiace nadol (w = šírka; zboku užšie);
+      // spodný okraj súkna je vystrihnutý do dvoch cípov, v strede lebka
+      const pts = [], cx = K8_BX + fl.x, top = oy + fl.y0, hw = (fl.w - 1) >> 1;
+      for (let y = fl.y0; y <= fl.y1; y++) pts.push([cx, oy + y, col(y === fl.y0 ? 'e' : y % 4 === 0 ? 'L' : 'l')]);
+      for (let i = -hw - 1; i <= hw + 1; i++) pts.push([cx + i, top + 1, col(i === -hw - 1 || i === hw + 1 ? 'e' : 'L')]);
+      for (let r = 0; r < 6; r++) for (let i = -hw; i <= hw; i++) {
+        if (r === 5 && i === 0) continue; // vystrihnutý chvost
+        const skull = hw >= 2 && (r === 1 || r === 2) && Math.abs(i) <= 1;
+        const c = skull ? (r === 2 && i !== 0 ? 'K' : 'e') : i === hw || r === 5 ? 'R' : 'r';
+        const k = pts.findIndex(q => q[0] === cx + i && q[1] === top + 2 + r);
+        if (k >= 0) pts.splice(k, 1);
+        pts.push([cx + i, top + 2 + r, col(c)]);
+      }
+      const m = new Set(pts.map(([x, y]) => x + ',' + y));
+      for (const [x, y] of pts) for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!m.has((x + ax) + ',' + (y + ay)) && (over || !px[(y + ay) * K8_W + x + ax])) put(x + ax, y + ay, K);
+      for (const [x, y, c] of pts) put(x, y, c);
+    };
+    if (fl && !fl.front) drawFlag(false);
     body.forEach((row, r) => { for (let c = 0; c < row.length; c++) if (row[c] !== '.') put(K8_BX + c, oy + r, col(row[c])); });
+    if (fl && fl.front) drawFlag(true);
     // meč: rukoväť a hlavica za rukou, zlatá záštita, dlhá čepeľ s lesklou hranou (bez meča = snímka švihu, meč nahradí efekt)
     const h = hand(view), hx = h.x, hy = h.y + (lunge ? 1 : 0);
     if (ang == null) { put(hx, hy, col('s')); return px; }
@@ -1722,60 +1745,61 @@ const RD8_HAND = {
 };
 const buildRider8 = () => buildUnit8({ W: 40, H: 30, body: RD8_BODY, mount: RD8_HORSE, shield: KN8_SHIELD, hand: RD8_HAND, legs: RD8_LEGS, spear: 12, stride: 5 });
 
-// ---- náčelník orkov (hrdina hráča za orkov): rohatá kostená prilba, kly, kožušina na pleciach, červená bedrová zástera, sekera ----
+// ---- náčelník orkov (hrdina hráča za orkov): holá hlava s malým čelom a veľkou tvárou, kly, červené náplecníky
+// s kostenými ostňami, kožená zbroj so zlatou prackou, sekera ----
 // kresba bez obrysu (12 bodov), obrys sa dopočíta (14 bodov ako telá ostatných hrdinov)
 const CH8_ART = {
   S: [
-    'e..mwmmM...e',
-    'Ee.mmmmMD.eE',
-    '.EeDDDDDDeE.',
-    '...oqrOrq...',
-    '...oOOOOq...',
-    '...owOOwq...',
-    '.lLLooOqLLd.',
-    'oLlLLLLLLLdq',
-    'o.rrRgRrrR.q',
-    '..rrRRRrrR..',
-    '..rRrrRrRR..',
-    '..dddddddd..',
+    '...ooooOq...',
+    '..oqqOOqqOq.',
+    '..orrOOrrOq.',
+    '..ooOOOOOOq.',
+    'e.oeOOOOeOqe',
+    'e..oKKKKOq.e',
+    'rrrRooOqrrrR',
+    'rrRRLlLLrRRR',
+    'oRRLLLLLdRRq',
+    'o.LlLgLLLd.q',
+    '..LlLLLLLd..',
+    '..dLdLLdLd..',
   ],
   E: [
-    '...mwmmM.e..',
-    '..emmmmMDeE.',
-    '...DDDDDDD..',
-    '....oOOOrqO.',
-    '....ooOOOqOo',
-    '.....oOOwq..',
-    '...lLLoOqL..',
-    '..lLLoLLLd..',
-    '..LLLoLLd...',
-    '..rrRoRrR...',
-    '..rRrrRrR...',
-    '..ddddddd...',
+    '....oooOq...',
+    '....oqqOOqO.',
+    '....ooOOrrO.',
+    '....ooOOOOOo',
+    '....ooOOOeO.',
+    '..e..oOKKe..',
+    '..rrrRoqO...',
+    '..rRRRLLLoo.',
+    '...RLLLLLoo.',
+    '....LLLgLd..',
+    '....LlLLLd..',
+    '....dLdLdL..',
   ],
   N: [
-    'e..mwmmM...e',
-    'Ee.mmmmMD.eE',
-    '.EeDDDDDDeE.',
-    '...oooooq...',
     '...ooooOq...',
-    '....oOOq....',
-    '.lLLLLLLLLd.',
-    'oLlLLLLLLLdq',
-    'o.rRRRRRRR.q',
-    '..rRRRRRRR..',
-    '..rRrRRrRR..',
-    '..dddddddd..',
+    '..ooooOOOOq.',
+    '..oooooOOOq.',
+    '..oooooOOOq.',
+    'e..ooooOOq.e',
+    'e...oOOq...e',
+    'rrrRLLLLrrrR',
+    'rrRRLLLLrRRR',
+    'oRRLLLLLdRRq',
+    'o.LlLLLLLd.q',
+    '..LlLLLLLd..',
+    '..dLdLLdLd..',
   ],
   kneel: [
-    'e..mwmmM...e',
-    'Ee.mmmmMD.eE',
-    '.EeDDDDDDeE.',
-    '...oOOOOq...',
-    '.lLLooOqLLd.',
-    'oLlLLLLLLLdq',
-    'o.rrRgRrrR.q',
-    '..rrRRRrrR..',
+    '...ooooOq...',
+    '..oqqOOqqOq.',
+    'e.oeOOOOeOqe',
+    'e..oKKKKOq.e',
+    'rrrRooOqrrrR',
+    'rrRRLlLLrRRR',
+    'o.LlLgLLLd.q',
+    '..LlLLLLLd..',
     '..qOOqqOOq..',
     '..dddddddd..',
   ],
@@ -1791,5 +1815,8 @@ function outlineRows(rows) {
 const turnHead8 = (rows, n) => rows.map((r, i) => i < n ? '.' + r.slice(0, -1) : r);
 const buildChief8 = () => {
   const S = outlineRows(CH8_ART.S), E = outlineRows(CH8_ART.E), N = outlineRows(CH8_ART.N);
-  return buildHero8({ body: { S, SE: turnHead8(S, 7), E, NE: turnHead8(N, 7), N }, kneel: outlineRows(CH8_ART.kneel), weapon: 'axe' });
+  // žrď so zástavou v strede chrbta: x = stĺpec žrde v tele, y0..y1 = jej výška (záporné = nad hlavou), w = šírka súkna
+  const flag = { S: { x: 7, y0: -7, y1: 7, w: 5 }, SE: { x: 7, y0: -7, y1: 7, w: 5 }, E: { x: 4, y0: -7, y1: 8, w: 3 },
+    NE: { x: 7, y0: -7, y1: 8, w: 5, front: true }, N: { x: 7, y0: -7, y1: 8, w: 5, front: true } };
+  return buildHero8({ body: { S, SE: turnHead8(S, 7), E, NE: turnHead8(N, 7), N }, kneel: outlineRows(CH8_ART.kneel), weapon: 'axe', flag });
 };
