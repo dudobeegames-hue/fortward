@@ -290,6 +290,30 @@ const UI_ICONS = (() => {
     for (let y = 1; y <= 7; y++) for (let x = 7; x <= 13; x++) if ((x - 7) + (y - 1) >= 3 && (x - 7) + (y - 1) <= 10 && x - y >= 2) put(x, y, x === 13 || y === 1 ? '#ffffff' : '#a0a0aa'); // čepeľ
     for (const [x, y] of [[2, 6], [3, 4], [5, 2]]) put(x, y, '#c8d0e0'); // oblúk letu
   });
+  // schopnosti šamanky: totem duchov (vyrezávaný kôl so zelenými očami), jedový mrak (zelený oblak s lebkou), zakliatie (mačacia hlava)
+  const spellTotem = outlined(11, 17, put => {
+    for (let y = 3; y <= 16; y++) for (let x = 3; x <= 7; x++) put(x, y, x === 3 ? '#a86c38' : x === 7 ? '#3e2614' : y % 5 === 2 ? '#3e2614' : '#6e4422');
+    for (const fy of [5, 10]) { put(4, fy, '#c8ff7a'); put(6, fy, '#c8ff7a'); put(5, fy + 2, '#1c140e'); }
+    for (let x = 1; x <= 9; x++) put(x, 8, x === 1 || x === 9 ? '#e84838' : '#8a5a2e'); // rameno s pierkami
+    for (let x = 3; x <= 7; x++) put(x, 2, '#eee6cc'); put(3, 1, '#eee6cc'); put(7, 1, '#eee6cc'); put(2, 0, '#eee6cc'); put(8, 0, '#eee6cc'); // lebka s rohmi
+  });
+  const spellPoison = outlined(17, 13, put => {
+    for (let y = 1; y <= 11; y++) for (let x = 1; x <= 15; x++) {
+      const d = Math.min(Math.hypot(x - 5, y - 7) / 4.2, Math.hypot(x - 10, y - 5) / 5, Math.hypot(x - 12, y - 8) / 3.6);
+      if (d <= 1) put(x, y, d > 0.8 ? '#24581a' : y < 5 ? '#9cf060' : '#4ca02a');
+    }
+    for (let y = 4; y <= 7; y++) for (let x = 8; x <= 11; x++) put(x, y, '#eee6cc'); // lebka v mraku
+    put(8, 5, '#1c140e'); put(10, 5, '#1c140e'); put(9, 7, '#1c140e'); put(11, 7, '#1c140e');
+  });
+  const spellHex = outlined(15, 13, put => {
+    for (let y = 3; y <= 12; y++) for (let x = 2; x <= 12; x++) if (Math.hypot(x - 7, (y - 8) * 1.2) <= 5.4) put(x, y, x < 7 ? '#f8c070' : '#e89038'); // hlava
+    for (const ex of [3, 11]) for (let k = 0; k < 4; k++) put(ex, 4 - k, '#e89038'); // uši
+    put(3, 1, '#c46a24'); put(11, 1, '#c46a24'); put(4, 2, '#f8c070'); put(10, 2, '#e89038');
+    put(5, 7, '#1c140e'); put(9, 7, '#1c140e'); put(5, 6, '#9cf060'); put(9, 6, '#9cf060'); // oči
+    put(7, 9, '#f08890'); put(6, 10, '#c46a24'); put(8, 10, '#c46a24'); // nos a ústa
+    for (const [x, y] of [[0, 9], [1, 10], [14, 9], [13, 10]]) put(x, y, '#fff0d8'); // fúzy
+    put(12, 2, '#c8a0ff'); put(13, 0, '#ffffff'); put(1, 3, '#c8a0ff'); // iskry zakliatia
+  });
   const spellTeleport = outlined(13, 13, put => {
     for (let t = 0; t < 34; t++) { // špirála
       const a = t * 0.45, r = 0.6 + t * 0.15;
@@ -617,6 +641,6 @@ const UI_ICONS = (() => {
 
   // papier a tyče zvitku sa pre rovnakú veľkosť kreslia len raz (menu sa otvára opakovane)
   const memo = fn => { const m = new Map(); return (...a) => { const k = a.join('x'); if (!m.has(k)) m.set(k, fn(...a)); return m.get(k); }; };
-  return { pix, music, sound, plus, home, hall, trophy, star, swords, shieldDefend, chest, spellVolley, spellFire, spellFrost, spellBolt, spellHorn, spellShield, spellHeal, spellFirewall, spellTeleport, spellRage, spellRoar, spellAxe, scrollPaper: memo(scrollPaper), scrollRod: memo(scrollRod), scrollTag, flags, langs,
+  return { pix, music, sound, plus, home, hall, trophy, star, swords, shieldDefend, chest, spellVolley, spellFire, spellFrost, spellBolt, spellHorn, spellShield, spellHeal, spellFirewall, spellTeleport, spellRage, spellRoar, spellAxe, spellTotem, spellPoison, spellHex, scrollPaper: memo(scrollPaper), scrollRod: memo(scrollRod), scrollTag, flags, langs,
     actDown, actRepair, actSpec, tabs, homeTab, tierStars };
 })();
