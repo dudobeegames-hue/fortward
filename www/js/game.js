@@ -119,7 +119,7 @@
   const uDmg = u => WUNIT[u.type].dmg * (1 + 0.4 * (u.lvl - 1)) * (1 + 0.04 * perk('fletching'));
   const uCd = u => WUNIT[u.type].cd * Math.pow(0.92, u.lvl - 1);
   const uRange = u => WUNIT[u.type].range + 4 * (u.lvl - 1);
-  const BUILD_ORDER = ['paving', 'tower', 'wall', 'stake', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'mage', 'icetower', 'ballista', 'chapel', 'firepit', 'beartrap', 'workshop'];
+  const BUILD_ORDER = ['paving', 'tower', 'stake', 'wall', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'mage', 'icetower', 'ballista', 'chapel', 'firepit', 'beartrap', 'workshop'];
   const ENEMY = {
     goblin:  { spr: 'goblin',  hp: 12,  speed: 24, atk: 4,  atkCd: 0.8, gold: 3,  blood: '#62a03a' },
     orc:     { spr: 'orc',     hp: 32,  speed: 16, atk: 9,  atkCd: 1.0, gold: 6,  blood: '#62a03a' },
@@ -3191,14 +3191,16 @@
         if (b.holyT > 0) holyGlow(gh, x0, y0 - 15, b.holyT, time); // brána prekrýva hradbu – leskne sa aj ona
         for (const fx of [x0 + 2, x0 + 12]) { // vlajočky na pilieroch
           const wv = Math.floor(time * 6 + fx * 0.7) % 2;
+          const fl = FLAG_COL[BUILD_RACE];
           g.fillStyle = '#4a4e60'; g.fillRect(fx, y0 - 20, 1, 5);
-          g.fillStyle = '#3c64c8'; g.fillRect(fx + 1, y0 - 20 + wv, 4, 2);
-          g.fillStyle = '#88b4ff'; g.fillRect(fx + 1, y0 - 20 + wv, 2, 1);
-          g.fillStyle = '#f8d048'; g.fillRect(fx + 4, y0 - 19 - wv, 1, 1);
+          g.fillStyle = fl[0]; g.fillRect(fx + 1, y0 - 20 + wv, 4, 2);
+          g.fillStyle = fl[1]; g.fillRect(fx + 1, y0 - 20 + wv, 2, 1);
+          g.fillStyle = fl[2]; g.fillRect(fx + 4, y0 - 19 - wv, 1, 1);
         }
       } else if (b.unit) {
-        const us = SPR[raceSpr(WUNIT[b.unit.type].spr)][0];
-        g.drawImage(us.c, 0, 0, us.w, 11, x0 + 1, y0 - 9, us.w, 11);
+        // za orkov goblin či ork zo sady v 8 smeroch, otočený chrbtom (pozerá hore na nepriateľa ako ľudský strelec)
+        const k = raceSpr(WUNIT[b.unit.type].spr), us = isOrc() && SPR[k + '8'] ? trimmed(SPR[k + '8'][6].idle) : SPR[k][0];
+        g.drawImage(us.c, 0, 0, us.w, 11, isOrc() ? Math.round(x0 + T / 2 - us.w / 2) : x0 + 1, y0 - 9, us.w, 11);
       }
     } else {
       spr = bsprOf(b.kind, b.lvl);
@@ -3232,17 +3234,22 @@
   const joinsV = (c, r) => occAt(c, r) !== HALL && joins(c, r); // na radnicu sa hradby napájajú len z bokov, nie zhora
   const joinsBuilding = (c, r) => { const o = occAt(c, r); return !!o && o !== HALL && o.kind !== 'wall' && !!JOINERS[o.kind]; };
 
+  // farby vlajok hráča: [súkno, svetlý okraj, cíp] – ľudia modré, orkovia oranžové
+  const FLAG_COL = { human: ['#3c64c8', '#88b4ff', '#f8d048'], orc: ['#e87818', '#f8b048', '#fff070'] };
   function drawHall(time) {
     const spr = bsprOf('hall', st.hallLvl);
     const x = Math.round(G.hallCx - spr.w / 2), y = G.hallBot + 1 - spr.h;
     g.drawImage(spr.c, x, y); // radnica sa pri zásahu netrasie
     if (st.hallHolyT > 0) holyGlow(spr, x, y, st.hallHolyT, time);
-    // vlajky (len radnica ľudí; pevnosť orkov má vlastné zástavy)
-    if (BUILD_RACE !== 'orc') for (const fx of [x + 7, x + 42]) {
-      const wv = Math.floor(time * 6 + fx) % 2;
-      g.fillStyle = '#3c64c8'; g.fillRect(fx + 1, y - 0 + wv, 5, 2);
-      g.fillStyle = '#88b4ff'; g.fillRect(fx + 1, y + wv, 2, 1);
-      g.fillStyle = '#f8d048'; g.fillRect(fx + 5, y + 1 - wv, 1, 1);
+    // vlajky: radnica ľudí modré na stožiaroch veží, pevnosť orkov oranžové na kôloch pri krajoch hradieb
+    const fl = FLAG_COL[BUILD_RACE], orc = BUILD_RACE === 'orc';
+    const stake = y + spr.h - 50 + (st.hallLvl === 1 ? 24 : 16); // vrch kolov bočných hradieb pevnosti (vyššie úrovne sú vyššie)
+    for (const fx of orc ? [x + 9, x + 45] : [x + 7, x + 42]) {
+      const wv = Math.floor(time * 6 + fx) % 2, fy = orc ? stake - 8 : y;
+      if (orc) { g.fillStyle = '#3e2614'; g.fillRect(fx, fy, 1, 8); }
+      g.fillStyle = fl[0]; g.fillRect(fx + 1, fy + wv, 5, 2);
+      g.fillStyle = fl[1]; g.fillRect(fx + 1, fy + wv, 2, 1);
+      g.fillStyle = fl[2]; g.fillRect(fx + 5, fy + 1 - wv, 1, 1);
     }
     // oheň pri poškodení
     const r = st.hallHp / hallMax();

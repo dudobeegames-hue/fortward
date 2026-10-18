@@ -1446,6 +1446,13 @@ function buildUnit8(spec) {
         const tp = spec.tip || ['W', 'w']; // hrot (pri šamanovej palici svietiaca guľa)
         pts.push([x, y, col(t >= spec.spear - 0.25 ? tp[0] : t >= spec.spear - 2 ? tp[1] : t <= -3.5 ? 'd' : 'l')]);
       }
+      if (spec.pennant) { // zástavka pod hrotom: modré súkno so zlatým lemom, visí na stranu od ratišťa
+        const px = -dy, py = dx, sg = py < 0 ? -1 : 1; // kolmica k ratišťu, vždy smerom nadol
+        for (let t = spec.spear - 4.5; t <= spec.spear - 1.5; t += 0.5) for (let o = 1; o <= 3 - (t - spec.spear + 4.5) * 0.5; o++) {
+          const x = Math.round(hx + dx * t + px * o * sg), y = Math.round(hy + dy * t + py * o * sg);
+          if (!pts.some(q => q[0] === x && q[1] === y)) pts.push([x, y, col(o === 1 ? 'g' : 'B')]);
+        }
+      }
       layer(pts, false);
       put(Math.round(hx), Math.round(hy), col(FIST)); // päsť
       if (thrust) put(Math.round(hx + dx * 3), Math.round(hy + dy * 3), col(FIST)); // pri bodnutí drží ratište oboma rukami
@@ -1750,9 +1757,10 @@ const RD8_HAND = {
 const buildRider8 = () => buildUnit8({ W: 40, H: 30, body: RD8_BODY, mount: RD8_HORSE, shield: KN8_SHIELD, hand: RD8_HAND, legs: RD8_LEGS, spear: 12, stride: 5 });
 // nepriatelia za orkov (len jednotky z ľudských budov): ťažký rytier v tmavej oceli a kapitán jazdy v pozlátenej zbroji
 const PAL_HKNIGHT = { w: '#bcc0cc', m: '#80869a', M: '#4a4e60', D: '#2a2c38' };
-const PAL_CAPTAIN = { w: '#fff7c8', m: '#f8d048', M: '#b88420', D: '#6e4a12', W: '#ffffff' };
+// kapitán: pozlátená zbroj, biely kôň, biely waffenrock s modrou (ľudia ostávajú modrí), biela kopija so zástavkou
+const PAL_CAPTAIN = { w: '#fff7c8', m: '#f8d048', M: '#b88420', D: '#6e4a12', W: '#ffffff', c: '#f4f4f8', l: '#e8e8f0', L: '#b0b0c0', d: '#70707e', e: '#ffffff' };
 const buildHKnight8 = () => buildUnit8({ body: KN8_BODY, shield: KN8_SHIELD, legs: KN8_LEGS, hand: KN8_HAND, blade: 7, pal: PAL_HKNIGHT });
-const buildCaptain8 = () => buildUnit8({ W: 40, H: 30, body: RD8_BODY, mount: RD8_HORSE, shield: KN8_SHIELD, hand: RD8_HAND, legs: RD8_LEGS, spear: 12, stride: 5, pal: PAL_CAPTAIN });
+const buildCaptain8 = () => buildUnit8({ W: 40, H: 32, body: RD8_BODY, mount: RD8_HORSE, shield: KN8_SHIELD, hand: RD8_HAND, legs: RD8_LEGS, spear: 14, pennant: true, stride: 5, pal: PAL_CAPTAIN });
 
 // ---- náčelník orkov (hrdina hráča za orkov): holá hlava s malým čelom a veľkou tvárou, kly, červené náplecníky
 // s kostenými ostňami, kožená zbroj so zlatou prackou, sekera ----

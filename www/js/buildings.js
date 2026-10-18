@@ -707,15 +707,28 @@ const BONE = hexRGB('#eee6cc'), BONE2 = hexRGB('#a8a088'), BLOOD = hexRGB('#8c20
 // pevnosť hordy 56 bodov široká, 5 úrovní (orkská obdoba radnice):
 // 1 nízka ohrada zo svetlého dreva a zrub s kožušinovou strechou, 2 tmavá zrubová veža s kostenými hrotmi,
 // 3 kamenná päta veže a okovaná brána, 4 celá veža z tmavého kameňa, okované koly so železnými hrotmi a žeravníky,
-// 5 čierna pevnosť so železom, rohatá lebka navrchu a veľké zástavy
+// 5 celá z čierneho kameňa (aj bočné hradby s cimburím), železo, rohatá lebka navrchu a veľké zástavy
 function makeOrcKeep(lvl) {
   lvl = lvl || 2;
   const H = [0, 50, 50, 52, 54, 58][lvl], o = H - 50; // vyššie úrovne sú vyššie (všetko sa posunie o o bodov nadol)
   const p = painter(56, H);
   const W = lvl === 1 ? ORC_WOOD_LIGHT : ORC_WOOD, Y = y => y + o;
   const stoneFrom = lvl >= 4 ? 4 : lvl === 3 ? 30 : 99; // od ktorého riadku je veža kamenná
-  // bočné opevnenie z hrubých zvislých kolov (hroty: drevo, kosť, od úr. 4 železo)
-  for (let x = 1; x <= 54; x++) {
+  // bočné opevnenie: na úr. 5 kamenný múr s cimburím a železnými hrotmi, inak hrubé zvislé koly (hroty: drevo, kosť, od úr. 4 železo)
+  if (lvl >= 5) for (let x = 1; x <= 54; x++) {
+    const merlon = Math.floor((x - 1) / 3) % 2 === 0, top = merlon ? 13 : 16;
+    if (merlon && (x - 1) % 3 === 1) p.set(x, Y(12), RIVET);                    // železný hrot na zube
+    for (let y = top; y <= 49; y++) {
+      const course = Math.floor((y - 17) / 4), off = (course % 2) * 3;
+      let v = 0.6 - (x > 27 ? 0.12 : 0) + (hash2(Math.floor((x + off) / 6), course, 247) - 0.5) * 0.18;
+      if (y === top) v = 0.85;                                                    // svetlý vrch zubov a ochodze
+      else if (y >= 17 && ((y - 17) % 4 === 3 || (x + off) % 6 === 5)) v -= 0.32; // škáry medzi kameňmi
+      if (merlon && (x - 1) % 3 === 2 && y < 17) v -= 0.25;                       // tieň na pravej strane zuba
+      if (y === 30 || y === 31) { p.set(x, Y(y), y === 30 ? (x % 3 === 1 ? RIVET : PLATE[3]) : PLATE[1]); continue; } // okovaný pás
+      p.shade(x, Y(y), STONE_DARK, v);
+    }
+  }
+  else for (let x = 1; x <= 54; x++) {
     const lx = (x - 1) % 3, top = (lvl === 1 ? 24 : 16) + ((Math.floor((x - 1) / 3) * 5) % 2), tip = lx === 1 ? top - 2 : top;
     for (let y = tip; y <= 49; y++) {
       let v = [0.8, 0.6, 0.32][lx] - (y - top) * 0.004;
@@ -800,8 +813,9 @@ function makeOrcKeep(lvl) {
   }
   return p.finish();
 }
-// orkská strážna veža 16x34: drevená konštrukcia, plošina s hrotmi, ork lukostrelec
-function makeOrcTower() {
+// orkská strážna veža 16x34: drevená konštrukcia, plošina s hrotmi, ork lukostrelec;
+// back = veža hráča za orkov: ork stojí chrbtom k divákovi a pozerá na nepriateľa hore (ako lukostrelec na ľudskej veži)
+function makeOrcTower(back) {
   const p = painter(16, 34);
   for (const lx of [3, 12]) for (let y = 14; y <= 33; y++) p.shade(lx, y, ORC_WOOD, lx === 3 ? 0.75 : 0.4);
   pLine(p, 4, 17, 11, 24, (x, y) => p.shade(x, y, ORC_WOOD, 0.5));
@@ -811,13 +825,27 @@ function makeOrcTower() {
   for (let y = 10; y <= 13; y++) for (let x = 1; x <= 14; x++) p.shade(x, y, ORC_WOOD, y === 10 ? 0.85 : 0.45 - (x - 1) * 0.015 + ((x - 1) % 3 === 2 ? -0.15 : 0));
   for (let x = 1; x <= 14; x += 3) { p.shade(x, 8, ORC_WOOD, 0.7); p.shade(x, 9, ORC_WOOD, 0.6); p.set(x, 7, BONE); }  // hroty plošiny
   // ork na plošine
-  for (let y = 3; y <= 9; y++) for (let x = 5; x <= 10; x++) {
-    if ((y === 3 || y === 9) && (x === 5 || x === 10)) continue;
-    const skin = y <= 6;
-    p.set(x, y, skin ? hexRGB(x < 8 ? '#9cd45a' : '#62a03a') : hexRGB(x < 8 ? '#6e4422' : '#3e2614'));
+  if (back) { // zozadu: tulec so šípmi, temeno hlavy, uši, kožený chrbát; luk drží pred sebou (vidno len jeho konce)
+    for (let y = 1; y <= 4; y++) { p.set(6, y, ORC_WOOD[4]); p.set(7, y, ORC_WOOD[3]); }
+    p.set(6, 0, BONE); p.set(7, 0, BONE2);                                       // pierka šípov
+    for (let y = 3; y <= 9; y++) for (let x = 5; x <= 10; x++) {
+      if ((y === 3 || y === 9) && (x === 5 || x === 10)) continue;
+      if (y >= 4 && y <= 8 && x >= 6 && x <= 7 && y > 4) { p.set(x, y, hexRGB(x === 6 ? '#6e4422' : '#3e2614')); continue; } // tulec na chrbte
+      const skin = y <= 6;
+      p.set(x, y, skin ? hexRGB(x < 8 ? '#7cb848' : '#4a8a2e') : hexRGB(x < 8 ? '#6e4422' : '#3e2614'));
+    }
+    p.set(4, 5, hexRGB('#7cb848')); p.set(11, 5, hexRGB('#4a8a2e'));             // uši
+    for (let x = 5; x <= 10; x++) p.set(x, 7, hexRGB('#2a1a0e'));                // remeň cez plecia
+    p.set(12, 2, ORC_WOOD[5]); p.set(13, 1, BONE); p.set(12, 8, ORC_WOOD[5]); p.set(13, 9, BONE); // konce luku
+  } else {
+    for (let y = 3; y <= 9; y++) for (let x = 5; x <= 10; x++) {
+      if ((y === 3 || y === 9) && (x === 5 || x === 10)) continue;
+      const skin = y <= 6;
+      p.set(x, y, skin ? hexRGB(x < 8 ? '#9cd45a' : '#62a03a') : hexRGB(x < 8 ? '#6e4422' : '#3e2614'));
+    }
+    p.set(6, 5, BLOOD2); p.set(9, 5, BLOOD2);                                    // oči
+    for (let y = 1; y <= 9; y++) p.set(12, y, ORC_WOOD[5]); p.set(13, 1, BONE); p.set(13, 9, BONE); // luk
   }
-  p.set(6, 5, BLOOD2); p.set(9, 5, BLOOD2);                                      // oči
-  for (let y = 1; y <= 9; y++) p.set(12, y, ORC_WOOD[5]); p.set(13, 1, BONE); p.set(13, 9, BONE); // luk
   return p.finish();
 }
 // jedový kotol 16x34 (orkská obdoba ľadovej veže): kôl na kolových nohách, na plošine čierny kotol s bublajúcim jedom
@@ -1387,7 +1415,7 @@ function initBuildingSprites() {
   BSPR.gateIcon = spriteFromCanvas(ic);
   // orkské podoby stavieb hráča: budovy hordy, ktoré už poznáme z tábora, plus palisáda, brána a jedový kotol
   Object.assign(OBSPR, {
-    hall: [1, 2, 3, 4, 5].map(l => makeOrcKeep(l)), tower: BSPR.orcTower, mage: BSPR.orcTotem[1], icetower: makeOrcPoison(), ballista: BSPR.orcCatapult[0],
+    hall: [1, 2, 3, 4, 5].map(l => makeOrcKeep(l)), tower: makeOrcTower(true), mage: BSPR.orcTotem[1], icetower: makeOrcPoison(), ballista: BSPR.orcCatapult[0],
     barracks: BSPR.orcBarracks, range: BSPR.goblinRange, stables: BSPR.wolfPen, armory: BSPR.brutePit, falconry: BSPR.batCave[0],
     chapel: BSPR.shamanHut[0], workshop: BSPR.orcTent,
   });
