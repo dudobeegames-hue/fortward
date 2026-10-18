@@ -33,7 +33,7 @@
   const inReach = q => tileY(q.r + sizeOf(q.k)[1]) > TOWER_REACH;
   // úroveň stavby (1–5) ako v hre: v uložení q.l, úroveň 1 sa neukladá
   const lvlOf = q => q.l || 1;
-  const setLvl = (q, l) => { l = Math.max(1, Math.min(CAMP_MAX_LVL, l)); if (l === lvlOf(q)) return false; if (l > 1) q.l = l; else delete q.l; return true; };
+  const setLvl = (q, l) => { if (pcOf(q) && pcOf(q).fixed) l = 1; l = Math.max(1, Math.min(CAMP_MAX_LVL, l)); if (l === lvlOf(q)) return false; if (l > 1) q.l = l; else delete q.l; return true; };
   // najvyššia úroveň, ktorú má hráč v misii m (podľa odomknutí lvl2–lvl5)
   const playerLvlAt = m => 1 + [2, 3, 4, 5].filter(l => unlockMissionOf('lvl' + l) <= m).length;
   const hpOf = q => { const pc = pcOf(q); return pc ? CAMP_ROLES[pc.role].hp * (pc.hp || 1) * campHpMul(lvlOf(q)) : 0; };
@@ -42,7 +42,7 @@
     setDirty(true); renderAll();
   }
 
-  function buildField() { scene = buildScene(W, H, G, 7 + mission * 13, mission - 1, campClearRects(lay(), G)); }
+  function buildField() { scene = buildScene(W, H, G, 7 + mission * 13, mission - 1, campClearRects(lay(), G), race === 'human' ? 'planks' : null); }
   let sceneTimer = 0; // po zmene hradu sa krajina prekreslí (pod stavbami nebudú stromy ani skaly)
   const rebuildSoon = () => { clearTimeout(sceneTimer); sceneTimer = setTimeout(() => { buildField(); draw(); }, 200); };
 
@@ -62,7 +62,7 @@
   // ---- kreslenie ----
   function drawPiece(q, alpha) {
     const pc = pcOf(q); if (!pc) return;
-    const o = { fired: 0, lvl: q.l || 1, mask: race === 'human' && CAMP_JOIN[q.k] ? campWallMask(lay(), q) : null };
+    const o = { fired: 0, lvl: q.l || 1, mask: CAMP_WALLS[q.k] ? campWallMask(lay(), q) : null };
     const sp = pc.spr(o, performance.now() / 1000), [w, h] = campSize(pc);
     const x = Math.round(tileX(q.c) + w * T / 2 - sp.w / 2), y = tileY(q.r + h) - sp.h + (pc.dy || 0);
     b.globalAlpha = alpha || 1;
@@ -81,7 +81,7 @@
     b.fillStyle = 'rgba(255,255,255,0.10)';
     for (let c = 0; c <= G.cols; c++) b.fillRect(tileX(c), G.gy0, 1, G.rows * T);
     for (let r = 0; r <= G.rows; r++) b.fillRect(G.gx0, tileY(r), G.cols * T, 1);
-    const hall = BSPR.hall[0];
+    const hall = race === 'human' ? OBSPR.hall[0] : BSPR.hall[0]; // proti ľudským hradom hrá hráč za orkov
     b.drawImage(hall.c, Math.round(G.hallCx - hall.w / 2), G.hallBot - hall.h);
     b.fillStyle = '#f8d048'; for (let x = G.gx0; x < G.gx0 + G.cols * T; x += 4) b.fillRect(x, TOWER_REACH, 2, 1); // dostrel veží
     const items = lay().slice().sort((p, o) => (p.r + sizeOf(p.k)[1]) - (o.r + sizeOf(o.k)[1]) || o.c - p.c);
@@ -131,17 +131,16 @@
     $('info').innerHTML = '<b>' + pc.name + (sel ? ' · úr. ' + L : '') + '</b> – ' + ROLE_NAME[pc.role] + (pc.role === 'spawn' ? ' (' + (pc.label || UNIT_NAME[pc.unit] || pc.unit) + ')' : '') + '<br>' + r.what +
       '<br>zdravie ' + Math.round(r.hp * (pc.hp || 1) * campHpMul(L)) + ' (+20 % za každú ďalšiu misiu)' + power + ' · zlato za zničenie ' + r.gold + ' · veľkosť ' + w + '×' + h + ' políčok' +
       (sel ? '<br>políčko stĺpec ' + sel.c + ', riadok ' + sel.r + (inReach(sel) ? ' · <span style="color:#e84838">v dosahu veží hráča</span>' : '') +
-        '<div class="lvl"><span>Úroveň</span><button id="lvlDown"' + (L <= 1 ? ' disabled' : '') + '>▼</button>' +
+        (pc.fixed ? '<div class="help">nevylepšuje sa (ako v hre)</div>' : '<div class="lvl"><span>Úroveň</span><button id="lvlDown"' + (L <= 1 ? ' disabled' : '') + '>▼</button>' +
         '<span class="pips">' + [1, 2, 3, 4, 5].map(i => '<i class="' + (i <= L ? 'on' : '') + (i > pl ? ' over' : '') + '"></i>').join('') + '</span>' +
         '<button id="lvlUp" class="up"' + (L >= CAMP_MAX_LVL ? ' disabled' : '') + '>Vylepšiť ▲</button></div>' +
         (same.length > 1 ? '<div class="lvl"><span>Všetky ' + pc.name.toLowerCase() + ' (' + same.length + '×)</span><button id="lvlAll">na úroveň ' + L + '</button></div>' : '') +
         '<div class="help">hráč má v misii ' + mission + ' najviac úroveň ' + pl + (L > pl ? ' – <span style="color:#e84838">táto stavba je silnejšia</span>' : '') +
-        (pc.lvlArt ? ' · vzhľad sa mení s úrovňou' : ' · úroveň je napísaná pri stavbe') + ' · klávesy <kbd>+</kbd> / <kbd>-</kbd></div>' +
+        (pc.lvlArt ? ' · vzhľad sa mení s úrovňou' : ' · úroveň je napísaná pri stavbe') + ' · klávesy <kbd>+</kbd> / <kbd>-</kbd></div>') +
         '<button class="del" id="delSel">Zmazať</button>' : '<br><i>Klikni na políčko bojiska a postav ju.</i>');
     if (sel) {
       $('delSel').onclick = () => removeSel();
-      $('lvlUp').onclick = () => changeLvl(1);
-      $('lvlDown').onclick = () => changeLvl(-1);
+      if ($('lvlUp')) { $('lvlUp').onclick = () => changeLvl(1); $('lvlDown').onclick = () => changeLvl(-1); }
       if ($('lvlAll')) $('lvlAll').onclick = () => { let ch = false; for (const q of same) ch = setLvl(q, L) || ch; if (ch) setDirty(true); renderAll(); };
     }
   }

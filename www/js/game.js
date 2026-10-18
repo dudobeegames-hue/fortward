@@ -27,8 +27,8 @@
     icetower: { name: 'Ľadová veža',  short: 'Ľad',    cost: 90,  hp: 220, range: 72, dmg: 5,  cd: 1.3, proj: 'ice', speed: 150, chill: 2.2, block: true, desc: 'Ľadové strely spomalia zasiahnutého aj nepriateľov okolo neho' },
     ballista: { name: 'Balista',      short: 'Balista', cost: 140, hp: 260, range: 118, dmg: 34, cd: 3.2, proj: 'lance', speed: 250, block: true, desc: 'Ťažký šíp prestrelí celý rad nepriateľov na zemi' },
     wall:     { name: 'Hradby',       short: 'Hradby', cost: 12,  hp: 240, block: true, desc: 'Zatarasí cestu – horda ich musí rozbiť alebo obísť' },
-    // palisáda len za orkov: lacná, nevylepšuje sa (fixed), kto do nej udrie, ten sa napichne
-    stake:    { name: 'Palisáda',     short: 'Palisáda', cost: 6, hp: 110, block: true, fixed: true, orc: true, desc: 'Lacný plot zo zahrotených kolov – nevylepšuje sa a kto doň udrie, ten sa napichne' },
+    // koly len za orkov: lacné, nevylepšujú sa (fixed), kto do nich udrie, ten sa napichne
+    stake:    { name: 'Koly',         short: 'Koly',     cost: 6, hp: 110, block: true, fixed: true, orc: true, desc: 'Lacné zahrotené koly – nevylepšujú sa a kto do nich udrie, ten sa napichne' },
     pit:      { name: 'Jama s ostňami', short: 'Jama', cost: 30,  dmg: 12, block: false, desc: 'Zraní a spomalí každého, kto ňou prejde' },
     mine:     { name: 'Zlatá baňa',   short: 'Baňa',   cost: 100, hp: 180, block: true, desc: 'Po každej prežitej vlne prinesie zlato' },
     chapel:   { name: 'Kaplnka',      short: 'Kaplnka', cost: 120, hp: 200, block: true, desc: 'Vyšle mnícha, ktorý chodí za rytiermi a hrdinom a lieči ich' },
@@ -58,7 +58,7 @@
   const UNIT_PLURAL = { knight: 'Rytieri', rider: 'Jazdci', spear: 'Kopijníci' };
   const SPIKE_COST = 25, SPIKE_TYPE_COST = 40;
   const spikeDmg = b => (4 + 3 * (b.lvl - 1)) * (1 + 0.06 * perk('traps'));
-  const stakeDmg = () => (3 + 0.5 * (st.mission - 1)) * (1 + 0.06 * perk('traps')); // palisáda: rastie s misiou, nie s úrovňou
+  const stakeDmg = () => (3 + 0.5 * (st.mission - 1)) * (1 + 0.06 * perk('traps')); // koly: rastú s misiou, nie s úrovňou
   // druhy ostňov (od misie 9): ohnivé zapália, ľadové spomalia útočníka
   const SPIKE_TYPES = {
     fire: { name: 'Ohnivé ostne', tip: '#f89838', body: '#d83818', desc: 'útočník horí' },
@@ -434,7 +434,7 @@
   };
   // postup na mape: unlocked = najvyššia odomknutá misia (11 = ostrov oslobodený)
   Object.assign(st, { mission: 1, unlocked: 1, mapSel: 1, mapAnim: null, tech: techFor(1) });
-  const has = id => id === 'stake' ? isOrc() && st.tech.has('wall') : st.tech.has(id); // palisáda: len orkovia, spolu s hradbami
+  const has = id => id === 'stake' ? isOrc() && st.tech.has('wall') : st.tech.has(id); // koly: len orkovia, spolu s hradbami
   // novinky: odomknutá stavba / vylepšenie / hrdina, na ktoré hráč ešte neťukol – jeho karta a záložka sa lesknú
   const SHINE_TECH = { gate: 1, spikes: 1, spikeTypes: 1, wallArcher: 1, wallCrossbow: 1, spec: 1, lvl2: 1, lvl3: 1, lvl4: 1, lvl5: 1 };
   let seenNew = [];
@@ -652,7 +652,7 @@
     const { fh, g2 } = fieldGeom(m), key = W + 'x' + fh + ':' + nodeOf(m) + ':' + foeRace() + ':' + m;
     if (sceneCache.has(key)) return sceneCache.get(key);
     const lay = typeof CASTLES !== 'undefined' && CASTLES[foeRace()] && CASTLES[foeRace()][m];
-    const sc = buildScene(W, fh, g2, 7 + (nodeOf(m) + 1) * 13, nodeOf(m), campClearRects(lay, g2));
+    const sc = buildScene(W, fh, g2, 7 + (nodeOf(m) + 1) * 13, nodeOf(m), campClearRects(lay, g2), isOrc() ? 'planks' : null); // nádvorie pevnosti orkov z dosiek
     sceneCache.set(key, sc);
     if (sceneCache.size > 3) sceneCache.delete(sceneCache.keys().next().value);
     return sc;
@@ -776,9 +776,9 @@
     return {
       rocks: [],
       parts: lay.filter(q => pieces[q.k]).map((q, i) => {
-        const pc = pieces[q.k], lvl = q.l || 1, hp = CAMP_ROLES[pc.role].hp * (pc.hp || 1) * mm * campHpMul(lvl), [w, h] = campSize(pc);
+        const pc = pieces[q.k], lvl = pc.fixed ? 1 : q.l || 1, hp = CAMP_ROLES[pc.role].hp * (pc.hp || 1) * mm * campHpMul(lvl), [w, h] = campSize(pc);
         return { kind: q.k, role: pc.role, skin: pc, lvl, c: q.c, r: q.r, x: tileX(q.c) + w * T / 2, y: tileY(q.r + h), hp, max: hp, cd: 3 + i * 1.5, flash: 0, fired: 0,
-          mask: race === 'human' && CAMP_JOIN[q.k] ? campWallMask(lay, q) : null }; // hradby ľudí sa spájajú ako v hre
+          mask: CAMP_WALLS[q.k] ? campWallMask(lay, q) : null }; // hradby a palisády sa spájajú ako v hre
       }),
     };
   }
@@ -3237,8 +3237,8 @@
     const x = Math.round(G.hallCx - spr.w / 2), y = G.hallBot + 1 - spr.h;
     g.drawImage(spr.c, x, y); // radnica sa pri zásahu netrasie
     if (st.hallHolyT > 0) holyGlow(spr, x, y, st.hallHolyT, time);
-    // vlajky
-    for (const fx of [x + 7, x + 42]) {
+    // vlajky (len radnica ľudí; pevnosť orkov má vlastné zástavy)
+    if (BUILD_RACE !== 'orc') for (const fx of [x + 7, x + 42]) {
       const wv = Math.floor(time * 6 + fx) % 2;
       g.fillStyle = '#3c64c8'; g.fillRect(fx + 1, y - 0 + wv, 5, 2);
       g.fillStyle = '#88b4ff'; g.fillRect(fx + 1, y + wv, 2, 1);
@@ -4427,7 +4427,7 @@
           coinTxt(pick.length ? sum : list.reduce((t, x) => t + costFn(x), 0)), pick.length > 0, () => { for (const x of pick) apply(x); rebuildOcc(); }, cls, px);
       };
       const cand = d.fixed ? [] : grp.filter(w => w.lvl < cap).sort((a, b) => a.lvl - b.lvl);
-      if (d.fixed) { /* palisáda sa nevylepšuje */ }
+      if (d.fixed) { /* koly sa nevylepšujú */ }
       else if (cand.length) bulk(after(cand[0], { lvl: cand[0].lvl + 1, unit: null, gate: false, spikes: false, spec: null }), 'Vylepšiť', cand, bUpCost, w => {
         const ratio = d.hp ? w.hp / bMaxHp(w) : 1, c = bUpCost(w);
         st.gold -= c; w.spent += c; w.lvl++;
@@ -4589,20 +4589,6 @@
   // dlažba: presne ako nádvorie pod radnicou (scene.js) – rovnaké tehlové rady 6×5, škáry a farby RAMP.walk;
   // počíta sa z polohy na bojisku, takže susedné dlaždice aj nádvorie na seba plynule nadväzujú
   const paveCache = {};
-  // orkská podlaha: zvislé hrubé dosky (4 body široké) s tmavými škárami, posunutými koncami, letokruhmi, sukmi
-  // a železnými klincami pri koncoch; počíta sa zo súradníc sveta, takže susedné políčka na seba plynulo nadväzujú
-  const PLANK = ['#2a1a0e', '#3e2614', '#523420', '#6e4422', '#86562c', '#a86c38', '#c08848'].map(hexRGB);
-  function plankRGB(X, Y) {
-    const p = Math.floor(X / 4), x = X - p * 4, o = Math.floor(hash2(p, 0, 31) * 16), seg = Math.floor((Y + o) / 16), yy = (Y + o) - seg * 16;
-    if (x === 0 || yy === 0) return PLANK[0];                                                       // škára medzi doskami
-    if (x === 2 && yy === 2) return hexRGB(hash2(p, seg, 36) > 0.5 ? '#a0a0aa' : '#6a6a78');      // klinec pri konci dosky
-    let v = 0.5 + (hash2(p, seg, 32) - 0.5) * 0.3 + (hash2(p, Math.floor((Y + o) / 3), 33) - 0.5) * 0.12;
-    if (x === 1) v += 0.14; else if (x === 3) v -= 0.1;                                              // osvetlená a zatienená hrana dosky
-    if (yy === 1) v += 0.1; else if (yy === 15) v -= 0.12;
-    const kn = 4 + Math.floor(hash2(p, seg, 34) * 8);                                                // suk
-    if (hash2(p, seg, 35) > 0.7 && (yy === kn || yy === kn + 1) && x >= 1 && x <= 2) v -= 0.3;
-    return pickRamp(PLANK, Math.max(0, Math.min(1, v)), X, Y);
-  }
   function paveAt(px, py) {
     const orc = BUILD_RACE === 'orc', key = (orc ? 'o' : '') + px + ',' + py;
     if (paveCache[key]) return paveCache[key];
@@ -4685,7 +4671,7 @@
   const dragFree = (c, r) => (drag && drag.kind === 'paving' ? paveFree : wallFree)(c, r);
   const dragAfford = () => Math.floor(st.gold / costOf(drag ? drag.kind : 'wall'));
   const wallsAfford = () => Math.floor(st.gold / costOf('wall'));
-  function placeWall(c, r, kind) { // hradba alebo palisáda
+  function placeWall(c, r, kind) { // hradba alebo koly
     kind = kind || 'wall';
     st.gold -= costOf(kind);
     addBuilding(kind, c, r); stats.builds++;

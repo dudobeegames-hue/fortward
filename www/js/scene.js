@@ -61,9 +61,24 @@ const TR = {
 };
 for (const k in TR) TR[k] = TR[k].map(hexRGB);
 
+// orkská podlaha: zvislé hrubé dosky (4 body široké) s tmavými škárami, posunutými koncami, letokruhmi, sukmi
+// a železnými klincami pri koncoch; počíta sa zo súradníc sveta, takže susedné políčka na seba plynulo nadväzujú
+const PLANK = ['#2a1a0e', '#3e2614', '#523420', '#6e4422', '#86562c', '#a86c38', '#c08848'].map(hexRGB);
+function plankRGB(X, Y) {
+  const p = Math.floor(X / 4), x = X - p * 4, o = Math.floor(hash2(p, 0, 31) * 16), seg = Math.floor((Y + o) / 16), yy = (Y + o) - seg * 16;
+  if (x === 0 || yy === 0) return PLANK[0];                                                       // škára medzi doskami
+  if (x === 2 && yy === 2) return hexRGB(hash2(p, seg, 36) > 0.5 ? '#a0a0aa' : '#6a6a78');      // klinec pri konci dosky
+  let v = 0.5 + (hash2(p, seg, 32) - 0.5) * 0.3 + (hash2(p, Math.floor((Y + o) / 3), 33) - 0.5) * 0.12;
+  if (x === 1) v += 0.14; else if (x === 3) v -= 0.1;                                              // osvetlená a zatienená hrana dosky
+  if (yy === 1) v += 0.1; else if (yy === 15) v -= 0.12;
+  const kn = 4 + Math.floor(hash2(p, seg, 34) * 8);                                                // suk
+  if (hash2(p, seg, 35) > 0.7 && (yy === kn || yy === kn + 1) && x >= 1 && x <= 2) v -= 0.3;
+  return pickRamp(PLANK, Math.max(0, Math.min(1, v)), X, Y);
+}
+
 // G: { T, gx0, gy0, cols, rows, hallCx, hallTop, hallBot, zoneTopMax }
-// clear = obdĺžniky [x0, y0, x1, y1] bez stromov a skál (stavby tábora hordy)
-function buildScene(W, H, G, seed, themeIdx, clear) {
+// clear = obdĺžniky [x0, y0, x1, y1] bez stromov a skál (stavby tábora hordy); yard = 'planks' – nádvorie z dosiek (orkovia)
+function buildScene(W, H, G, seed, themeIdx, clear, yard) {
   const th = THEMES[((themeIdx || 0) % THEMES.length + THEMES.length) % THEMES.length];
   const bg = document.createElement('canvas'); bg.width = W; bg.height = H;
   const bx = bg.getContext('2d');
@@ -101,7 +116,10 @@ function buildScene(W, H, G, seed, themeIdx, clear) {
     const cx = roadCx(y), hw = roadHw(y);
     for (let x = 0; x < W; x++) {
       const dd = roadD(x, y), yd = yardD(x, y);
-      if (yd < 0) {
+      if (yd < 0 && yard === 'planks') { // orkské nádvorie: hrubé dosky ako orkský chodník, okraj tmavší
+        const c = plankRGB(x, y);
+        set(x, y, yd > -2 ? [c[0] * 0.75, c[1] * 0.75, c[2] * 0.75] : c);
+      } else if (yd < 0) {
         const row = Math.floor(y / 5), off = (row % 2) * 3, col = Math.floor((x + off) / 6);
         let v = 0.5 + (hash2(col, row, seed + 21) - 0.5) * 0.3 + (hash2(x, y, seed + 22) - 0.5) * 0.1;
         if (y % 5 === 0 || (x + off) % 6 === 0) v = 0.15;

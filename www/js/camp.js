@@ -33,12 +33,11 @@ const CAMP_PIECES = {
     tower:       { role: 'tower',   name: 'Orkská veža',     spr: () => BSPR.orcTower },
     totem:       { role: 'totem',   name: 'Šamanský totem',  spr: (o, t) => BSPR.orcTotem[Math.floor(t * 3) % 2] },
     drum:        { role: 'drum',    name: 'Vojnový bubon',   spr: (o, t) => BSPR.orcDrum[Math.floor(t * 4) % 2] },
-    palisade:    { role: 'wall',    name: 'Palisáda',        spr: () => BSPR.palisade },
-    gate:        { role: 'wall',    name: 'Brána palisády',  spr: () => BSPR.palisadeGate },
-    stonewall:   { role: 'wall',    name: 'Kamenný múr',     spr: () => BSPR.orcWall, hp: 1.7 },
-    stonegate:   { role: 'wall',    name: 'Kamenná brána',   spr: () => BSPR.orcWallGate, hp: 1.7 },
-    stakes:      { role: 'wall',    name: 'Koly',            spr: () => BSPR.stakes, hp: 0.4 },
-    keep:        { role: 'keep',    name: 'Orkská pevnosť',  spr: () => BSPR.orcKeep, size: [3, 3] },
+    // hradba, brána a pevnosť ako stavby hráča za orkov: s úrovňou menia vzhľad (OBSPR), hradby sa spájajú
+    wall:        { role: 'wall',    name: 'Hradba',          spr: o => OBSPR.wall[campLvl(o)][o.mask != null ? o.mask : 10], hp: 1.1, dy: 2, lvlArt: true },
+    gatehouse:   { role: 'wall',    name: 'Brána',           spr: o => gateSprite(o.mask != null ? o.mask : 10, campLvl(o), true), hp: 1.5, dy: 2, lvlArt: true },
+    stakes:      { role: 'wall',    name: 'Koly',            spr: () => BSPR.stakes, hp: 0.4, fixed: true }, // koly sa nevylepšujú (ako v hre)
+    keep:        { role: 'keep',    name: 'Orkská pevnosť',  spr: o => OBSPR.hall[campLvl(o)], size: [3, 3], lvlArt: true },
   },
   human: { // všetky stavby, ktoré má hráč za ľudí
     // liahne vypúšťajú druhy z vĺn (unit), ktoré za orkov vyzerajú ako ľudské jednotky (label)
@@ -65,7 +64,7 @@ const CAMP_PIECES = {
 const campSize = pc => pc.size || [1, 1];
 // úroveň stavby hradu (1–5, v uložení q.l): ako budovy hráča – viac zdravia a sily; lvlArt = mení aj vzhľad, ostatné majú číslo
 const CAMP_MAX_LVL = 5;
-const campLvl = o => Math.max(1, Math.min(CAMP_MAX_LVL, (o && o.lvl) || 1)) - 1; // index 0–4
+const campLvl = o => Math.max(1, Math.min(CAMP_MAX_LVL, (o && o.lvl) || 1)) - 1; // index 0–4 (fixed stavby majú vždy úroveň 1)
 const campHpMul = lvl => 1 + 0.35 * ((lvl || 1) - 1);  // zdravie +35 % za úroveň (ako budovy hráča)
 const campPowMul = lvl => 1 + 0.4 * ((lvl || 1) - 1);  // sila striel a balvanov +40 % za úroveň
 const CAMP_EXTRA = 0.45; // misie s táborom majú bojisko o 45 % vyššie ako obrazovka (miesto na tábor aj na stavanie)
@@ -78,23 +77,26 @@ function campClearRects(list, G) {
   }
   return out;
 }
-// hradby a brány ľudí sa spájajú ako v hre: so susednými hradbami, bránami a vežami (na radnicu len z boku)
-const CAMP_JOIN = { wall: 1, gatehouse: 1, tower: 1, mage: 1, icetower: 1, ballista: 1, hall: 1 };
+// hradby a brány sa spájajú ako v hre: so susednými hradbami, bránami a vežami (na radnicu či pevnosť len z boku);
+// (obe rasy majú hradbu wall a bránu gatehouse)
+const CAMP_JOIN = { wall: 1, gatehouse: 1, tower: 1, mage: 1, icetower: 1, ballista: 1, hall: 1, keep: 1 };
+const CAMP_WALLS = { wall: 1, gatehouse: 1 }; // tieto potrebujú masku spojení
 // list = stavby hradu ({k|kind, c, r}); vráti masku spojení 1 hore, 2 vpravo, 4 dole, 8 vľavo
 function campWallMask(list, q) {
   const kindOf = o => o.k || o.kind;
-  const at = (c, r) => list.find(o => { const pc = CAMP_PIECES.human[kindOf(o)], [w, h] = pc ? campSize(pc) : [1, 1]; return c >= o.c && c < o.c + w && r >= o.r && r < o.r + h; });
-  const j = (c, r, vert) => { const o = at(c, r); return !!o && !!CAMP_JOIN[kindOf(o)] && !(vert && kindOf(o) === 'hall'); };
+  const at = (c, r) => list.find(o => { const pc = CAMP_PIECES.human[kindOf(o)] || CAMP_PIECES.orc[kindOf(o)], [w, h] = pc ? campSize(pc) : [1, 1]; return c >= o.c && c < o.c + w && r >= o.r && r < o.r + h; });
+  const j = (c, r, vert) => { const o = at(c, r); return !!o && !!CAMP_JOIN[kindOf(o)] && !(vert && (kindOf(o) === 'hall' || kindOf(o) === 'keep')); };
   return (j(q.c, q.r - 1, true) ? 1 : 0) | (j(q.c + 1, q.r) ? 2 : 0) | (j(q.c, q.r + 1, true) ? 4 : 0) | (j(q.c - 1, q.r) ? 8 : 0);
 }
 // brána = úsek hradby so strážnicou nad ním (ako v hre), pre každé napojenie raz zložená
 const GATE_SPR = {};
-function gateSprite(m, l) {
+function gateSprite(m, l, orc) {
   l = l || 0;
-  const key = m + ',' + l;
+  const key = m + ',' + l + (orc ? 'o' : '');
   if (!GATE_SPR[key]) {
+    const S = orc ? OBSPR : BSPR; // brána ľudí alebo orkov
     const c = document.createElement('canvas'); c.width = 16; c.height = 33;
-    const x = c.getContext('2d'); x.drawImage(BSPR.wall[l][m].c, 0, 9); x.drawImage(BSPR.gatehouse[l].c, 0, 0);
+    const x = c.getContext('2d'); x.drawImage(S.wall[l][m].c, 0, 9); x.drawImage(S.gatehouse[l].c, 0, 0);
     GATE_SPR[key] = spriteFromCanvas(c);
   }
   return GATE_SPR[key];
