@@ -1026,7 +1026,7 @@
   };
   const goldMul = () => 1 + DIFF.goldMission * (st.mission - 1);
   // ---- truhlica: zlatky na útok na hrad; plní sa v obranných misiách (podiel zo zabitých + neminuté zlato pri výhre) ----
-  const CHEST_KILL = 0.25;
+  const CHEST_KILL = 0.05; // 5 % odmeny za zabitého navyše do truhlice (neminuté zlato ide celé)
   function addChest(n) { n = Math.max(0, Math.round(n)); st.chest = (st.chest || 0) + n; saveJSON(sk('chest'), st.chest); updateChest(); return n; }
   const chestTxt = n => '<img class="chest" src="' + ICONS.chest + '">' + n;
   const updateChest = () => { const c = document.querySelector('#chestBox span'); if (c) c.textContent = st.chest || 0; };
