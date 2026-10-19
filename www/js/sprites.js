@@ -1090,22 +1090,20 @@ function buildHero8(spec) {
     const px = new Array(K8_W * K8_H).fill(null);
     const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < K8_W && y < K8_H && c) px[y * K8_W + x] = c; };
     const body = spec.body[view].concat(legRows), oy = K8_BY + (lunge ? 1 : 0);
-    // zástava na chrbte (náčelník orkov): žrď s kosteným hrotom a červené súkno s lebkou a vystrihnutým chvostom;
-    // zozadu je pred telom (s obrysom aj cez telo, aby sa oddelila od peleríny), spredu a zboku vytŕča spoza neho
+    // zástavy na chrbte (náčelník orkov): od pása vychádzajú dve žrde do V nahor, z vrcholu každej visí zvislo dole
+    // úzka oranžová zástava (na vonkajšiu stranu); zozadu sú pred telom (s obrysom aj cez telo), spredu a zboku vytŕčajú spoza neho
     const fl = spec.flag && spec.flag[view];
+    const ORA = ['#a84808', '#e87818', '#f8b048'].map(hexRGB);
     const drawFlag = over => {
-      // žrď v strede chrbta s kosteným hrotom, hore priečka a pod ňou súkno visiace nadol (w = šírka; zboku užšie);
-      // spodný okraj súkna je vystrihnutý do dvoch cípov, v strede lebka
-      const pts = [], cx = K8_BX + fl.x, top = oy + fl.y0, hw = (fl.w - 1) >> 1;
-      for (let y = fl.y0; y <= fl.y1; y++) pts.push([cx, oy + y, col(y === fl.y0 ? 'e' : y % 4 === 0 ? 'L' : 'l')]);
-      for (let i = -hw - 1; i <= hw + 1; i++) pts.push([cx + i, top + 1, col(i === -hw - 1 || i === hw + 1 ? 'e' : 'L')]);
-      for (let r = 0; r < 6; r++) for (let i = -hw; i <= hw; i++) {
-        if (r === 5 && i === 0) continue; // vystrihnutý chvost
-        const skull = hw >= 2 && (r === 1 || r === 2) && Math.abs(i) <= 1;
-        const c = skull ? (r === 2 && i !== 0 ? 'K' : 'e') : i === hw || r === 5 ? 'R' : 'r';
-        const k = pts.findIndex(q => q[0] === cx + i && q[1] === top + 2 + r);
-        if (k >= 0) pts.splice(k, 1);
-        pts.push([cx + i, top + 2 + r, col(c)]);
+      const pts = [], cx = K8_BX + fl.x, wy = oy + fl.y1, ty = oy + fl.y0, n = wy - ty;
+      const set = (x, y, c) => { const k = pts.findIndex(q => q[0] === x && q[1] === y); if (k >= 0) pts.splice(k, 1); pts.push([x, y, c]); };
+      for (const sg of [-1, 1]) {
+        const bx = cx + sg * fl.spread;                                   // vrchol žrde
+        for (let k = 0; k <= n; k++) set(Math.round(cx + (bx - cx) * k / n), wy - k, col(k === n ? 'e' : k % 4 === 0 ? 'L' : 'l'));
+        for (let r = 1; r <= 7; r++) for (let i = 1; i <= 2; i++) {      // úzka zástava visí zvislo dole s cípom na konci
+          if (r === 7 && i === 2) continue;
+          set(bx + sg * i, ty + r, i === 2 || r === 7 ? ORA[0] : r === 1 ? ORA[2] : ORA[1]);
+        }
       }
       const m = new Set(pts.map(([x, y]) => x + ',' + y));
       for (const [x, y] of pts) for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!m.has((x + ax) + ',' + (y + ay)) && (over || !px[(y + ay) * K8_W + x + ax])) put(x + ax, y + ay, K);
@@ -1830,12 +1828,16 @@ function outlineRows(rows) {
   return out.map(r => r.join(''));
 }
 const turnHead8 = (rows, n) => rows.map((r, i) => i < n ? '.' + r.slice(0, -1) : r);
+// čierny cop: zozadu stredom chrbta s kosteným korálikom, zboku visí z temena za hlavou (B tmavý, n lesk)
+const braid = (rows, col, from, to, bead) => rows.map((r, y) => y < from || y > to ? r : r.slice(0, col) + (y === bead ? 'e' : y % 2 ? 'B' : 'n') + r.slice(col + 1));
 const buildChief8 = () => {
-  const S = outlineRows(CH8_ART.S), E = outlineRows(CH8_ART.E), N = outlineRows(CH8_ART.N);
-  // žrď so zástavou v strede chrbta: x = stĺpec žrde v tele, y0..y1 = jej výška (záporné = nad hlavou), w = šírka súkna
-  const flag = { S: { x: 7, y0: -7, y1: 7, w: 5 }, SE: { x: 7, y0: -7, y1: 7, w: 5 }, E: { x: 4, y0: -7, y1: 8, w: 3 },
-    NE: { x: 7, y0: -7, y1: 8, w: 5, front: true }, N: { x: 7, y0: -7, y1: 8, w: 5, front: true } };
-  return buildHero8({ body: { S, SE: turnHead8(S, 7), E, NE: turnHead8(N, 7), N }, kneel: outlineRows(CH8_ART.kneel), weapon: 'axe', flag });
+  const N0 = braid(braid(CH8_ART.N, 5, 1, 9, 6), 6, 1, 8, -1), E0 = braid(CH8_ART.E, 3, 1, 7, 5);
+  const S = outlineRows(CH8_ART.S), E = outlineRows(E0), N = outlineRows(N0);
+  // dve žrde do V od pása: x = stĺpec pása v tele, y1 = výška pása, y0 = vrchol žrdí (záporné = nad hlavou), spread = rozostup vrcholov
+  const flag = { S: { x: 7, y0: -7, y1: 9, spread: 5 }, SE: { x: 7, y0: -7, y1: 9, spread: 5 }, E: { x: 4, y0: -7, y1: 9, spread: 2 },
+    NE: { x: 7, y0: -7, y1: 9, spread: 5, front: true }, N: { x: 7, y0: -7, y1: 9, spread: 5, front: true } };
+  return buildHero8({ body: { S, SE: turnHead8(S, 7), E, NE: turnHead8(N, 7), N }, kneel: outlineRows(CH8_ART.kneel), weapon: 'axe', flag,
+    pal: { B: '#1e1a22', n: '#3e3848' } });
 };
 
 // ---- šaman orkov (hrdina za orkov): čierny plášť s kapucňou cez hlavu, v tieni kapucne svietia červené oči a kly,
