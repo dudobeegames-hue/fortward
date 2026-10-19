@@ -154,7 +154,7 @@ window.SIM = (() => {
   function mission(m, opts) {
     opts = Object.assign({ volley: true, siege: true }, opts); // siege: false = hráč bez obliehacích strojov (na porovnanie)
     fillSlots();
-    F.startMission(m);
+    F.startMission(m, 0, opts.endless); // endless: nekonečná obrana (hrá, kým radnica nepadne)
     const waves = [];
     for (;;) {
       if (s.phase === 'build') { if (opts.siege) aiSiege(camp() ? 150 : 200); build(); if (opts.siege) aiSiege(0); F.startWave(); } // stroj sa kúpi pred stavbami, len ak ostane dosť zlata

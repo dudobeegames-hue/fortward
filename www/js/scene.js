@@ -44,6 +44,7 @@ const THEMES = [
   { key: 'ruins',  ground: 'grassDark', road: 'cobble', deco: 'ruins' },
   { key: 'ash',    ground: 'ash',   road: 'ashroad', deco: 'charred', anim: 'embers' },
   { key: 'orc',    ground: 'darkLit', road: 'ashroad', deco: 'orc' },
+  { key: 'frontier', ground: 'grass', road: 'cobble', deco: 'ruins', river: { y: 0.42, hw: 5, bridge: true } }, // nekonečná obrana: pohraničie s riekou a ruinami
 ];
 
 const TR = {

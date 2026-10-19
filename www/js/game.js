@@ -673,8 +673,8 @@
   // terén bojiska misie (podľa rozmerov, provincie a tábora protivníka); posledné tri sa pamätajú a terén vybranej misie
   // sa vyrobí vopred, kým hráč číta jej popis na mape – ťuk na Do boja je potom okamžitý
   const sceneCache = new Map();
-  function fieldGeom(m) {
-    const fh = H + (m > HOME_PROVINCES ? Math.round(H * CAMP_EXTRA) : 0), g2 = Object.assign({}, G);
+  function fieldGeom(m, endless) {
+    const fh = H + (m > HOME_PROVINCES && !endless ? Math.round(H * CAMP_EXTRA) : 0), g2 = Object.assign({}, G);
     g2.cols = Math.min(GRID_COLS, Math.floor(W / T)); g2.gx0 = Math.floor((W - g2.cols * T) / 2);
     g2.rows = Math.floor((fh - GROUND_PAD) / T); g2.gy0 = fh - GROUND_PAD - g2.rows * T;
     g2.hc0 = Math.floor(g2.cols / 2) - 1; g2.hr0 = g2.rows - 3;
@@ -682,9 +682,15 @@
     g2.zoneTopMax = g2.gy0 + (g2.rows - (5 + MAX_LVL)) * T;
     return { fh, g2 };
   }
-  function sceneFor(m) {
-    const { fh, g2 } = fieldGeom(m), key = W + 'x' + fh + ':' + nodeOf(m) + ':' + foeRace() + ':' + m;
+  function sceneFor(m, endless) {
+    const { fh, g2 } = fieldGeom(m, endless), key = W + 'x' + fh + ':' + nodeOf(m) + ':' + foeRace() + ':' + m + (endless ? ':endless' : '');
     if (sceneCache.has(key)) return sceneCache.get(key);
+    if (endless) { // nekonečná obrana: vlastná krajina, nádvorie radnice ako v obranných misiách
+      const sc = buildScene(W, fh, g2, 977, ENDLESS_THEME, [], isOrc() ? 'planks' : null);
+      sceneCache.set(key, sc);
+      if (sceneCache.size > 3) sceneCache.delete(sceneCache.keys().next().value);
+      return sc;
+    }
     const lay = typeof CASTLES !== 'undefined' && CASTLES[foeRace()] && CASTLES[foeRace()][m];
     const sc = buildScene(W, fh, g2, 7 + (nodeOf(m) + 1) * 13, nodeOf(m), campClearRects(lay, g2), m === MISSIONS.length ? 'none' : isOrc() ? 'planks' : null); // nádvorie pevnosti orkov z dosiek; pri útoku na hrad žiadne
     sceneCache.set(key, sc);
@@ -697,7 +703,7 @@
     prepT = setTimeout(() => { if (st.phase === 'map' && st.mapSel === m) sceneFor(m); }, 250);
   }
   function layoutField() {
-    FH = H + (st.mission > HOME_PROVINCES ? Math.round(H * CAMP_EXTRA) : 0); // misie s táborom: dlhšie bojisko, posúva sa prstom
+    FH = H + (st.mission > HOME_PROVINCES && !st.endless ? Math.round(H * CAMP_EXTRA) : 0); // misie s táborom: dlhšie bojisko, posúva sa prstom
     buf.width = W; buf.height = FH;
     const oldHc = G.hc0, oldHr = G.hr0, had = !!scene;
     // pevný počet stĺpcov na každom zariadení (zmestí sa aj do najužšej plochy 180 px) – zmena okna tak mriežku neposúva
@@ -706,7 +712,7 @@
     G.hc0 = Math.floor(G.cols / 2) - 1; G.hr0 = G.rows - 3;
     G.hallCx = tileX(G.hc0) + 1.5 * T; G.hallTop = tileY(G.hr0); G.hallBot = G.hallTop + 3 * T;
     G.zoneTopMax = tileY(G.rows - (5 + MAX_LVL));
-    scene = sceneFor(st.mission);
+    scene = sceneFor(st.mission, st.endless);
     if (had) { // posuň stavby, ak sa zmenila mriežka
       const dc = G.hc0 - oldHc, dr = G.hr0 - oldHr;
       for (const b of st.blds) { b.c += dc; b.r += dr; }
@@ -775,16 +781,22 @@
     for (let q = 0; q < 16; q++) part(st.king.x, st.king.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.6, ['#f8d048', '#ffffff'][q % 2], 40);
     AUDIO.play('upgrade'); renderBuild(); updateHud();
   }
-  function startMission(m, tier) {
+  function startMission(m, tier, endless) {
     st.run = (st.run || 0) + 1;
     st.mission = m;
     st.tier = tier || 0;
+    st.endless = !!endless; // nekonečná obrana: vlny bez konca, kým radnica stojí
     st.tech = techFor(Math.max(m, st.unlocked)); // platí všetko, čo hráč už odomkol
     layoutField(); // každá misia má vlastnú krajinu
     $('map').hidden = true;
     newGame();
-    banner('Misia ' + m + ': ' + missionDef(m).name + (st.tier ? ' · ' + TIERS[st.tier].name : ''));
+    banner(st.endless ? 'Nekonečná obrana' : 'Misia ' + m + ': ' + missionDef(m).name + (st.tier ? ' · ' + TIERS[st.tier].name : ''));
   }
+  // ---- nekonečná obrana: odomkne sa po dobytí hradu ostrova; vlny silnejú bez konca, rekord = najvyššia prežitá vlna ----
+  const ENDLESS_THEME = 10; // vlastná krajina (THEMES v scene.js)
+  const endlessOpen = () => st.unlocked > MISSIONS.length;
+  const endlessBest = () => loadJSON(sk('endlessBest'), 0);
+  const startEndless = () => startMission(MISSIONS.length, 0, true);
 
   // ---- tábor hordy (od misie 6): stavby protivníka hore na bojisku, mimo dostrelu veží (CAMP_ROLES a CAMP_PIECES sú v js/camp.js) ----
   function foeRace() { return isOrc() ? 'human' : 'orc'; } // za orkov stavajú tábory ľudia (zatiaľ bez rozloženia v editore)
@@ -804,6 +816,7 @@
   }
   // tábor misie z hradov editora (js/castles.js): stavby stoja v mriežke bojiska ako budovy hráča
   function makeCamp() {
+    if (st.endless) return null; // nekonečná obrana je bez tábora
     const race = foeRace(), lay = typeof CASTLES !== 'undefined' && CASTLES[race] && CASTLES[race][st.mission];
     if (!lay || !lay.length) return null;
     const pieces = CAMP_PIECES[race], mm = (1 + 0.2 * (st.mission - HOME_PROVINCES - 1)) * TIERS[st.tier || 0].hp;
@@ -1074,6 +1087,7 @@
     pArcher: 0.12, pBat: 0.12, pRam: 0.05, pShaman: 0.04, pSapper: 0.06, // podiel nových nepriateľov
   };
   const goldMul = () => 1 + DIFF.goldMission * (st.mission - 1);
+  const ENDLESS_HP = 1.09, ENDLESS_BASE = 0.55; // nekonečná obrana: horda začne na 55 % sily 10. misie a každá vlna pridá 9 % zdravia
   // ---- truhlica: zlatky na útok na hrad; plní sa v obranných misiách (podiel zo zabitých + neminuté zlato pri výhre) ----
   const CHEST_KILL = 0.05; // 5 % odmeny za zabitého navyše do truhlice (neminuté zlato ide celé)
   function addChest(n) { n = Math.max(0, Math.round(n)); st.chest = (st.chest || 0) + n; saveJSON(sk('chest'), st.chest); updateChest(); return n; }
@@ -1086,7 +1100,8 @@
     const tr = TIERS[st.tier || 0];
     const n = 6 + Math.round(w * DIFF.countWave + (m - 1) * DIFF.countMission) + tr.extra;
     const mHp = DIFF.missionHp ? DIFF.missionHp[m - 1] : 1 + DIFF.hpMission * (m - 1);
-    const hpMul = Math.pow(DIFF.hpWave + DIFF.hpWaveMission * (m - 1), w - 1) * mHp * (st.tier ? tr.hp : DIFF.copperHp[m - 1]);
+    // nekonečná obrana: začne ľahšie ako 10. misia (ENDLESS_BASE) a každá vlna pridá ENDLESS_HP – bez stropu
+    const hpMul = (st.endless ? ENDLESS_BASE * Math.pow(ENDLESS_HP, w - 1) : Math.pow(DIFF.hpWave + DIFF.hpWaveMission * (m - 1), w - 1)) * mHp * (st.tier ? tr.hp : DIFF.copperHp[m - 1]);
     const gap = Math.max(0.3, 1.3 - ew * 0.04);
     for (let i = 0; i < n; i++) {
       const r = Math.random();
@@ -1108,13 +1123,15 @@
       q.push({ type, gap: gap * (0.6 + Math.random() * 0.8), hpMul });
     }
     if (w % 5 === 0) { // boss v 5. a 10. vlne, v posledných misiách dvaja
-      const bossMul = (w === MISSION_WAVES ? DIFF.bossLast : 1) * (DIFF.bossBase + DIFF.bossMission * (m - 1)) * tr.hp;
-      const giants = (GIANTS[m] || {})[w] || [];
-      for (const type of giants) q.splice(Math.floor(q.length * 0.15), 0, { type, gap: 2.5, hpMul: tr.hp * (1 + 0.15 * (m - 7)) }); // obri vyrážajú skoro – sú pomalí
+      const tenth = st.endless ? w % 10 === 0 : w === MISSION_WAVES; // v nekonečnej obrane je každá 10. vlna ako posledná
+      const bossMul = (tenth ? DIFF.bossLast : 1) * (DIFF.bossBase + DIFF.bossMission * (m - 1)) * tr.hp * (st.endless ? ENDLESS_BASE * Math.pow(ENDLESS_HP, w - 5) : 1);
+      const giants = st.endless ? (w < 15 ? [] : w < 30 ? [w % 10 === 5 ? 'giantRam' : 'mammoth'] : ['giantRam', 'mammoth']) : (GIANTS[m] || {})[w] || [];
+      const eg = st.endless ? Math.pow(ENDLESS_HP, Math.max(0, w - 15)) : 1; // obri a veľkráľ rastú s vlnou nekonečnej obrany
+      for (const type of giants) q.splice(Math.floor(q.length * 0.15), 0, { type, gap: 2.5, hpMul: tr.hp * (1 + 0.15 * (m - 7)) * eg }); // obri vyrážajú skoro – sú pomalí
       // vojvodca je pomalý – vyrazí už po prvej pätine hordy, aby dorazil spolu s ňou (nie dlho po nej); v 5. vlne s obrom nejde
-      if (!(giants.length && w < MISSION_WAVES)) q.splice(Math.floor(q.length * 0.2), 0, { type: 'warlord', gap: 1.2, hpMul: bossMul });
-      if (w === MISSION_WAVES && m >= 8) q.splice(Math.floor(q.length * 0.45), 0, { type: 'warlord', gap: 1.2, hpMul: bossMul });
-      if (w === MISSION_WAVES && m === MISSIONS.length) q.splice(Math.floor(q.length * 0.6), 0, { type: 'orcKing', gap: 1.5, hpMul: tr.hp * 0.75, fromCamp: true }); // veľkráľ vyjde z tábora (popri dvoch vojvodcoch o štvrtinu slabší)
+      if (!(giants.length && !tenth)) q.splice(Math.floor(q.length * 0.2), 0, { type: 'warlord', gap: 1.2, hpMul: bossMul });
+      if (tenth && m >= 8) q.splice(Math.floor(q.length * 0.45), 0, { type: 'warlord', gap: 1.2, hpMul: bossMul });
+      if (tenth && m === MISSIONS.length) q.splice(Math.floor(q.length * 0.6), 0, { type: 'orcKing', gap: 1.5, hpMul: tr.hp * 0.75 * eg, fromCamp: true }); // veľkráľ vyjde z tábora (popri dvoch vojvodcoch o štvrtinu slabší)
     }
     return q;
   }
@@ -1170,7 +1187,7 @@
     st.viewUp = Math.max(0, (st.viewUp || 0) - panelLow()); // rovnaký pohľad aj bez panela
     $('build').hidden = true; $('bottom').hidden = false;
     for (const b of st.blds) if (UNIT_HOME[b.kind] || b.kind === 'range' || b.kind === 'falconry' || HELPERS[b.kind]) b.spawnT = HELPERS[b.kind] ? 0.6 : 0.3;
-    banner(isAssault() ? 'Do útoku!' : st.wave === MISSION_WAVES ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + MISSION_WAVES);
+    banner(isAssault() ? 'Do útoku!' : st.endless ? 'Vlna ' + st.wave : st.wave === MISSION_WAVES ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + MISSION_WAVES);
     syncStance();
     updateHud();
   }
@@ -1180,7 +1197,7 @@
     const bonus = Math.round((10 + st.wave * 4) * goldMul()) + 6 * tal('tax');
     st.gold += bonus;
     const lvl0 = kingMeta.lvl;
-    st.lastXp = gainKingXp(Math.round((8 + 2 * st.wave + (st.wave >= MISSION_WAVES ? 40 : 0)) * TIERS[st.tier || 0].xp));
+    st.lastXp = gainKingXp(Math.round((8 + 2 * st.wave + ((st.endless ? st.wave % 10 === 0 : st.wave >= MISSION_WAVES) ? 40 : 0)) * TIERS[st.tier || 0].xp));
     if (kingMeta.lvl > lvl0 && st.king) for (let k = 0; k < 24; k++) part(st.king.x, st.king.y - 8, (Math.random() - 0.5) * 50, -Math.random() * 60, 0.9, ['#f8d048', '#fff070', '#ffffff'][k % 3], 60);
     let mined = 0;
     for (const b of st.blds) if (b.kind === 'mine') {
@@ -1195,7 +1212,7 @@
     // rytieri sa po vlne vrátia do kasární, obliehacie stroje ostanú stáť na bojisku
     for (const sd of st.soldiers) if (!sd.siege) for (let k = 0; k < 5; k++) part(sd.x, sd.y - 5, (Math.random() - 0.5) * 20, -Math.random() * 20, 0.4, '#88b4ff', 30);
     st.soldiers = st.soldiers.filter(s => s.siege);
-    if (st.wave >= MISSION_WAVES) { missionWon(); return; }
+    if (st.wave >= MISSION_WAVES && !st.endless) { missionWon(); return; } // nekonečná obrana sa končí až pádom radnice
     AUDIO.play('cleared');
     later(() => { if (st.phase === 'pause') enterBuild(); }, 1000);
     updateHud();
@@ -1254,7 +1271,13 @@
     st.shake = 0.6;
     AUDIO.music(null); AUDIO.play('crumble'); setTimeout(() => AUDIO.play('lose'), 500);
     const chestLine = chestGain ? '<span class="chestGain">+' + chestTxt(chestGain) + '</span><br><small class="dim">späť do truhlice</small>' : '';
-    if (isAssault()) later(() => showOver(fell ? (isOrc() ? 'Pevnosť padla!' : 'Radnica padla!') : 'Útok zlyhal!', chestLine, false), 1200);
+    if (st.endless) { // nekonečná obrana: prežité vlny a rekord pozície
+      const best = endlessBest(), rec = survived > best;
+      if (rec) saveJSON(sk('endlessBest'), survived);
+      later(() => showOver(isOrc() ? 'Pevnosť padla!' : 'Radnica padla!', 'Prežité vlny: <b>' + survived + '</b><br>' +
+        (rec ? '<span class="newTech">Nový rekord!</span>' : '<small class="dim">Rekord: ' + best + '</small>') +
+        (chestGain ? '<br><span class="chestGain">+' + chestTxt(chestGain) + '</span><br><small class="dim">do truhlice</small>' : ''), false), 1200);
+    } else if (isAssault()) later(() => showOver(fell ? (isOrc() ? 'Pevnosť padla!' : 'Radnica padla!') : 'Útok zlyhal!', chestLine, false), 1200);
     else later(() => showOver(isOrc() ? 'Pevnosť padla!' : 'Radnica padla!', 'Misia ' + st.mission + ' · ' + missionDef(st.mission).name + (st.tier ? ' · ' + TIERS[st.tier].name.toLowerCase() + ' úroveň' : '') + '<br>Prežité vlny: <b>' + survived + ' / ' + MISSION_WAVES + '</b>' +
       (chestGain ? '<br><span class="chestGain">+' + chestTxt(chestGain) + '</span><br><small class="dim">do truhlice</small>' : ''), false), 1200);
     updateHud();
@@ -4353,7 +4376,7 @@
   }
 
   function updateHud() {
-    $('waveTxt').textContent = isAssault() ? 'Útok na hrad' : 'Vlna ' + Math.min(MISSION_WAVES, Math.max(1, st.phase === 'build' ? st.wave + 1 : st.wave)) + '/' + MISSION_WAVES;
+    $('waveTxt').textContent = isAssault() ? 'Útok na hrad' : st.endless ? 'Vlna ' + Math.max(1, st.phase === 'build' ? st.wave + 1 : st.wave) : 'Vlna ' + Math.min(MISSION_WAVES, Math.max(1, st.phase === 'build' ? st.wave + 1 : st.wave)) + '/' + MISSION_WAVES;
     $('goldTxt').textContent = st.gold;
     const gi = $('hud-gold').querySelector('img'), gsrc = isAssault() ? ICONS.chest : ICONS.coin; // pri útoku zlatky z truhlice
     if (gsrc && gi.getAttribute('src') !== gsrc) gi.src = gsrc;
@@ -5186,7 +5209,7 @@
   // ---- útok na hrad: posledná misia ostrova (za ľudí aj za orkov) ----
   // hráč nestavia: zlatkami z truhlice rozostaví vojsko do zóny radnice 1. úrovne a vyrazí na hrad;
   // radnicu hráč nemá; vyhrá, keď padne srdce hradu, prehrá, keď padne posledný vojak
-  function isAssault() { return st.mission === MISSIONS.length; }
+  function isAssault() { return st.mission === MISSIONS.length && !st.endless; }
   // oddiel na jedno políčko: n jednotiek za cenu cost (jednotky majú úroveň najlepších budov, ktoré hráč pozná)
   const ARMY = {
     knight: { home: 'barracks', n: 3, cost: 75 },
@@ -5407,7 +5430,7 @@
   }
   $('pauseBtn').addEventListener('click', ev => { ev.stopPropagation(); if (canPause()) { AUDIO.play('click'); setPaused(true); } });
   $('pauseGo').addEventListener('click', () => { AUDIO.play('click'); setPaused(false); });
-  $('pauseRestart').addEventListener('click', () => { AUDIO.play('click'); setPaused(false); assaultForfeit(); startMission(st.mission, st.tier); });
+  $('pauseRestart').addEventListener('click', () => { AUDIO.play('click'); setPaused(false); assaultForfeit(); startMission(st.mission, st.tier, st.endless); });
   $('pauseQuit').addEventListener('click', () => { AUDIO.play('click'); setPaused(false); assaultForfeit(); showMap(); });
   // keď hráč odíde z aplikácie (iné okno, zamknutý mobil), hra sa sama pozastaví
   document.addEventListener('visibilitychange', () => { if (document.hidden && canPause()) setPaused(true); });
@@ -5426,7 +5449,7 @@
     $('map').hidden = false;
     if (!st.mapAnim) st.mapSel = Math.min(st.unlocked, MISSIONS.length);
     setTab('map', true);
-    renderMapPanel(); updateChest();
+    renderMapPanel(); updateChest(); renderEndlessBtn();
     focusMapNode(st.mapAnim ? st.mapAnim.seg + 2 : st.mapSel, true);
     saveStats(); checkAch();
     if (!st.mapAnim) afterDeck(); // pri odomykaní hradu príde výber až po kartičkách
@@ -5799,7 +5822,18 @@
   }
 
   $('overMap').addEventListener('click', showMap);
-  $('overRetry').addEventListener('click', () => startMission(st.mission, st.tier));
+  $('overRetry').addEventListener('click', () => startMission(st.mission, st.tier, st.endless));
+  // tlačidlo nekonečnej obrany na mape: po dobytí hradu, s rekordom pozície
+  function renderEndlessBtn() {
+    const b = $('endlessBtn'), open = endlessOpen();
+    b.classList.toggle('locked', !open);
+    b.querySelector('small').textContent = open ? (endlessBest() ? 'rekord: ' + endlessBest() + ' vĺn' : 'koľko vĺn vydržíš?') : '🔒 po dobytí hradu';
+  }
+  $('endlessBtn').addEventListener('click', () => {
+    if (st.mapAnim) return;
+    if (!endlessOpen()) { AUDIO.play('deny'); toast('Nekonečná obrana sa odomkne po dobytí hradu ostrova'); return; }
+    AUDIO.play('click'); afterPress($('endlessBtn'), startEndless);
+  });
   $('mapPlay').addEventListener('click', () => {
     if (assaultLocked(st.mapSel)) { AUDIO.play('deny'); toast('V truhlici máš ' + (st.chest || 0) + ' zlatiek – na útok treba aspoň ' + ASSAULT_MIN); return; }
     if (!st.mapAnim && tierOpen(st.mapSel, st.mapTier || 0)) { AUDIO.play('click'); afterPress($('mapPlay'), () => startMission(st.mapSel, st.mapTier || 0)); } });
