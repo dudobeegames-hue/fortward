@@ -12,7 +12,7 @@ const CAMP_ROLES = {
   spawn:   { hp: 260, gold: 35, what: 'vychádzajú z nej jednotky jej druhu – keď padne, ten druh už v misii nepríde' },
   wall:    { hp: 220, gold: 8,  what: 'kryje tábor – vojaci ho musia najprv prelomiť' },
   keep:    { hp: 900, gold: 80, what: 'srdce tábora – keď padne, zrúti sa celý tábor' },
-  trap:    { hp: 120, gold: 10, what: 'pasca – zraní alebo zastaví vojakov, ktorí cez ňu prejdú (ožije pri hre za orkov)' },
+  trap:    { hp: 120, gold: 10, what: 'pasca – zraní alebo zastaví vojakov, ktorí cez ňu prejdú; nedá sa zničiť' },
   support: { hp: 200, gold: 30, what: 'pomocná stavba – zlato, opravy (ožije pri hre za orkov)' },
 };
 // stavby hradov podľa rasy protivníka: druh → úloha, meno, obrázok, veľkosť v políčkach mriežky (size, predvolene 1×1)

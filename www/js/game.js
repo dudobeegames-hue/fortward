@@ -593,7 +593,7 @@
 
   function rebuildOcc() {
     st.occ = new Array(G.cols * G.rows).fill(null);
-    for (let r = G.hr0; r < G.hr0 + 3; r++) for (let c = G.hc0; c < G.hc0 + 3; c++) st.occ[r * G.cols + c] = HALL;
+    if (!isAssault()) for (let r = G.hr0; r < G.hr0 + 3; r++) for (let c = G.hc0; c < G.hc0 + 3; c++) st.occ[r * G.cols + c] = HALL; // pri útoku na hrad radnica nie je
     for (const b of st.blds) st.occ[b.r * G.cols + b.c] = b;
     for (const b of st.blds) if (b.kind === 'wall') {
       let nb = 0;
@@ -603,11 +603,21 @@
     computeFlow();
   }
 
+  // políčka pod stojacimi hradbami tábora (brána je priechodná) – horda nimi neprejde
+  function campBlocks() {
+    const b = new Uint8Array(G.cols * G.rows);
+    if (st.camp) for (const o of st.camp.parts) if (o.hp > 0 && o.role === 'wall' && o.kind !== 'gatehouse') {
+      const [w, h] = campSize(o.skin);
+      for (let r = o.r; r < o.r + h; r++) for (let c = o.c; c < o.c + w; c++) if (c >= 0 && r >= 0 && c < G.cols && r < G.rows) b[r * G.cols + c] = 1;
+    }
+    return b;
+  }
   // Dijkstra od radnice; budovy na ceste sú drahé (treba ich rozbiť), takže horda radšej obchádza.
   function computeFlow() {
     const n = G.cols * G.rows;
     const dist = new Float32Array(n).fill(1e9), done = new Uint8Array(n);
-    for (let i = 0; i < n; i++) if (st.occ[i] === HALL) dist[i] = 0;
+    for (let i = 0; i < n; i++) if (st.occ[i] === HALL || (isAssault() && hallTile(i % G.cols, (i / G.cols) | 0))) dist[i] = 0;
+    const cb = campBlocks(); // hradby tábora horda neprejde – obchádza ich bránou
     for (;;) {
       let bi = -1, bd = 1e9;
       for (let i = 0; i < n; i++) if (!done[i] && dist[i] < bd) { bd = dist[i]; bi = i; }
@@ -618,7 +628,7 @@
         const nc = c + dc, nr = r + dr;
         if (nc < 0 || nr < 0 || nc >= G.cols || nr >= G.rows) continue;
         const ni = nr * G.cols + nc, o = st.occ[ni];
-        const cost = blocks(o) ? 1 + o.hp / 30 : 1;
+        const cost = cb[ni] ? 400 : blocks(o) ? 1 + o.hp / 30 : 1;
         if (bd + cost < dist[ni]) dist[ni] = bd + cost;
       }
     }
@@ -762,7 +772,7 @@
   // ---- tábor hordy (od misie 6): stavby protivníka hore na bojisku, mimo dostrelu veží (CAMP_ROLES a CAMP_PIECES sú v js/camp.js) ----
   function foeRace() { return isOrc() ? 'human' : 'orc'; } // za orkov stavajú tábory ľudia (zatiaľ bez rozloženia v editore)
   const CAMP_DRUM = 1.2, CAMP_TOTEM = 0.015; // bubon: horda o 20 % rýchlejšia; totem: lieči 1,5 % zdravia za sekundu
-  const campLive = () => st.camp ? st.camp.parts.filter(o => o.hp > 0) : [];
+  const campLive = () => st.camp ? st.camp.parts.filter(o => o.hp > 0 && o.role !== 'trap') : []; // pasce nie sú cieľ
   const campHas = role => !!st.camp && st.camp.parts.some(o => o.role === role && o.hp > 0);
   const campPow = () => (1 + 0.2 * (st.mission - HOME_PROVINCES - 1)) * Math.sqrt(TIERS[st.tier || 0].hp);
   // jednotka vlny vyjde z liahne svojho druhu v tábore; keď tábor také liahne mal a všetky padli, ten druh už nepríde
@@ -797,7 +807,7 @@
   const campAim = o => ({ x: o.x, y: o.y - Math.min(12, o.skin.spr(o, 0).h * 0.4) });
   // zásah stavby tábora; zničená stavba prinesie zlato
   function hitCamp(o, dmg) {
-    if (!o || o.hp <= 0) return;
+    if (!o || o.hp <= 0 || o.role === 'trap') return; // pasce sa zničiť nedajú
     o.hp -= dmg; o.flash = 0.08;
     if (o.role === 'keep' && isAssault()) updateHud(); // pruh srdca hradu
     for (let k = 0; k < 2; k++) part(o.x + (Math.random() - 0.5) * 10, o.y - 8, (Math.random() - 0.5) * 30, -10 - Math.random() * 20, 0.4, '#4a2e1a', 90);
@@ -806,8 +816,23 @@
     for (let k = 0; k < 26; k++) part(o.x + (Math.random() - 0.5) * 16, o.y - Math.random() * 18, (Math.random() - 0.5) * 60, -Math.random() * 50, 0.9, ['#3c3846', '#22202a', '#4a2e1a', '#f89838'][k % 4], 110);
     const gold = Math.round(CAMP_ROLES[o.role].gold * (1 + 0.1 * (st.mission - HOME_PROVINCES)));
     if (!isAssault()) { st.gold += gold; st.texts.push({ x: o.x, y: o.y - 22, s: '+' + gold, life: 1.4, max: 1.4 }); }
+    if (o.role === 'wall') { st.campV++; computeFlow(); } // zbúraná hradba otvorí horde cestu
     if (o.role === 'keep') { st.shake = 0.6; for (const q of campLive()) hitCamp(q, q.hp + 1); } // srdce padlo – zrúti sa celý tábor
     updateHud();
+  }
+  // pasca tábora: jama s ostňami zraní, ohnivá jama zapáli, medvedia pasca zraní a na chvíľu chytí (potom sa nastavuje)
+  function campTrap(o, dt) {
+    o.armT = Math.max(0, (o.armT || 0) - dt);
+    const V = o.victims || (o.victims = new Map()); // kto už pascu spustil: jama zraní každého raz, ohnivá jama znova až o 3 s
+    for (const [u, t] of V) if (t !== Infinity) { if (t - dt <= 0) V.delete(u); else V.set(u, t - dt); }
+    const [w, h] = campSize(o.skin), x0 = tileX(o.c), y0 = tileY(o.r), x1 = x0 + w * T, y1 = y0 + h * T, pw = campPow();
+    const us = st.king && !st.king.dead ? st.soldiers.concat([st.king]) : st.soldiers;
+    for (const u of us) {
+      if (u.dead || u.fly || V.has(u) || u.x < x0 + 2 || u.x >= x1 - 2 || u.y < y0 + 2 || u.y >= y1 - 2) continue;
+      if (o.kind === 'pit') { V.set(u, Infinity); hitUnit(u, 10 * pw); for (let k = 0; k < 4; k++) part(u.x, u.y - 2, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.3, '#bcc0cc', 80); }
+      else if (o.kind === 'firepit') { V.set(u, 3); u.burnT = 3; u.burnDps = 4 * pw; AUDIO.play('fire'); }
+      else if (o.kind === 'beartrap' && !(o.armT > 0)) { V.set(u, Infinity); hitUnit(u, 6 * pw); u.stunT = 2.5; o.armT = 6; o.flash = 0.1; AUDIO.play('clang'); }
+    }
   }
   // medzi vlnami horda stojace stavby tábora čiastočne opraví (zbúrané už nepostaví)
   const repairCamp = () => { for (const o of campLive()) o.hp = Math.min(o.max, o.hp + o.max * 0.25); };
@@ -815,9 +840,15 @@
     const C = st.camp;
     if (!C) return;
     const pw = campPow(), a = st.mission - HOME_PROVINCES;
+    for (const u of st.soldiers) if (u.burnT > 0 && !u.dead) { // vojak horí (ohnivá jama tábora)
+      u.burnT -= dt; u.hp -= u.burnDps * dt;
+      if (Math.random() < 0.3) part(u.x + (Math.random() - 0.5) * 4, u.y - Math.random() * 10, 0, -12, 0.4, Math.random() < 0.5 ? '#f89838' : '#d83818', -10);
+      if (u.hp <= 0) hitUnit(u, 1);
+    }
     for (const o of C.parts) {
       o.flash = Math.max(0, o.flash - dt); o.fired = Math.max(0, o.fired - dt);
       if (o.hp <= 0) continue;
+      if (o.role === 'trap') { campTrap(o, dt); continue; }
       o.cd -= dt;
       if (o.role === 'bombard' && o.cd <= 0) { // balvan na budovu najbližšie k táboru (hradby, veže…), inak na radnicu
         o.cd = Math.max(5, 8 - 0.5 * a);
@@ -1001,7 +1032,8 @@
     });
     rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
     st.camp = makeCamp(); // od misie 6 si horda hore na bojisku rozloží tábor
-    Object.assign(st, { deps: [], depN: 0, armyPick: null, assaultSpent: 0, assaultDone: false, assaultKing: false });
+    Object.assign(st, { deps: [], depN: 0, armyPick: null, assaultSpent: 0, assaultDone: false, assaultKing: false, campV: 0, ePaths: null });
+    rebuildOcc(); // cesta hordy už s hradbami tábora (a pri útoku bez radnice)
     if (isAssault()) st.gold = st.chest || 0; // útok na hrad: vojsko sa platí zlatkami z truhlice
     st.hallHp = hallMax();
     st.king = makeHero();
@@ -1428,7 +1460,7 @@
       if (Math.random() < 0.3) part(e.x + (Math.random() - 0.5) * e.w * 0.6, e.y - Math.random() * e.h, 0, -4, 0.5, Math.random() < 0.5 ? '#e0f4ff' : '#88c8ff', 0);
     }
     if (e.d.king && updateOrcKing(e, dt)) return;
-    if (e.d.charge) bearCharge(e, dt);
+    if (e.d.charge && !e.guard) bearCharge(e, dt); // obranca hradu sa nerozbieha cez hradby
     if (e.d.howdah) mammothAct(e, dt);
     if (e.venomT > 0) { // otrávený jedom z kotla: pomaly stráca zdravie, nad ním bublajú zelené bublinky
       e.venomT -= dt; e.hp -= e.venomDps * dt;
@@ -1438,7 +1470,7 @@
     }
     if (e.chillT > 0) { e.chillT -= dt; if (!(e.venomT > 0) && Math.random() < 0.2) part(e.x + (Math.random() - 0.5) * e.w * 0.5, e.y - Math.random() * e.h, 0, -6, 0.4, '#e0f4ff', 0); }
     if (e.guard && !armyNear(e, GUARD_R)) { // obranca hradu: kým sa vojsko nepriblíži, stojí na stráži pri svojej stavbe
-      if (Math.hypot(e.guard.x - e.x, e.guard.y - e.y) > 2) moveTo(e, e.guard.x, e.guard.y, e.spd, dt);
+      if (Math.hypot(e.guard.x - e.x, e.guard.y - e.y) > 2) { if (e.d.fly) moveTo(e, e.guard.x, e.guard.y, e.spd, dt); else campStep(e, e.guard.x, e.guard.y, e.spd, dt); }
       return;
     }
     const slow = (e.chillT > 0 ? 0.5 : 1) * (campHas('drum') ? CAMP_DRUM : 1); // vojnový bubon tábora hordu zrýchli
@@ -1448,7 +1480,7 @@
       if (e.atk <= 0) { e.atk = e.d.atkCd; e.lunge = 0.15; fn(); }
     };
     // vlčí jazdec: prebehne cez líniu (zastavia ho len kopijníci) a ide po lukostrelcoch mimo hradieb
-    if (e.d.flank) {
+    if (e.d.flank && !e.guard) {
       if (e.foe && e.foe.ktype !== 'spear' && !e.foe.archer) e.foe = null;
       if (!e.foe) {
         const zoneY = tileY(zoneTopRow());
@@ -1481,6 +1513,7 @@
         for (let k = 0; k < 8; k++) { const a = k / 8 * 6.28; part(e.x + Math.cos(a) * 10, e.y - 6 + Math.sin(a) * 6, 0, -6, 0.5, '#5aff8a', 0); }
       }
     }
+    if (e.guard) { assaultFoe(e, dt, e.spd * slow * (e.d.fly ? 1 : waterMul(e)), e.d.sapper ? () => explode(e) : attackFn); return; } // obranca hradu
     // netopiere letia priamo k radnici ponad všetko
     if (e.d.fly) {
       const hr0 = hallRect();
@@ -4221,7 +4254,7 @@
       else if (st.king && kingLying(st.king)) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
     }
     for (const e of st.enemies) {
-      objs.push({ y: dpt(e), id: 1e5 + (e._id || (e._id = ++enemyN)), f: () => { drawEnemy(e, time); if (e.healTgt && !e.healTgt.dead && foeSpr(e.d.spr) === 'monk') drawStaffGlow(e, time); } });
+      objs.push({ y: e.d.fly ? 9990 : dpt(e), id: 1e5 + (e._id || (e._id = ++enemyN)), f: () => { drawEnemy(e, time); if (e.healTgt && !e.healTgt.dead && foeSpr(e.d.spr) === 'monk') drawStaffGlow(e, time); } }); // letci (netopiere) sa kreslia ponad hradby a stavby
       const t = e.healTgt; // aura liečeného (ako pri mníchovi hráča)
       if (t && !t.dead && !e.dead && foeSpr(e.d.spr) === 'monk') objs.push({ y: t.y - healAuraH(t) - 1, f: () => drawHealAura(e, t, time) });
     }
@@ -5121,7 +5154,7 @@
   // ---- útok na hrad: posledná misia ostrova (za ľudí aj za orkov) ----
   // hráč nestavia: zlatkami z truhlice rozostaví vojsko do zóny radnice 1. úrovne a vyrazí na hrad;
   // radnicu hráč nemá; vyhrá, keď padne srdce hradu, prehrá, keď padne posledný vojak
-  const isAssault = () => st.mission === MISSIONS.length;
+  function isAssault() { return st.mission === MISSIONS.length; }
   // oddiel na jedno políčko: n jednotiek za cenu cost (jednotky majú úroveň najlepších budov, ktoré hráč pozná)
   const ARMY = {
     knight: { home: 'barracks', n: 3, cost: 75 },
@@ -5136,9 +5169,9 @@
     tower:  { siege: 'tower', n: 1, cost: 170 },
   };
   const ASSAULT_BACK = 0.5; // pri prehre sa vráti polovica minutých zlatiek
-  // na útok treba v truhlici aspoň 70 % sumy, za ktorú automatický hráč hrad spoľahlivo dobyl (dev/assault-sim.js: ~2500);
+  // na útok treba v truhlici aspoň 70 % sumy, za ktorú automatický hráč hrad spoľahlivo dobyl (dev/assault-sim.js: ~3500 s pascami a hradbami);
   // s menším vojskom by útok nemal zmysel, s minimom sa dá ešte vyhrať aj prehrať
-  const ASSAULT_NEED = 2500, ASSAULT_MIN = Math.round(ASSAULT_NEED * 0.7);
+  const ASSAULT_NEED = 3500, ASSAULT_MIN = Math.round(ASSAULT_NEED * 0.7);
   const assaultLocked = m => m === MISSIONS.length && (st.chest || 0) < ASSAULT_MIN;
   const GUARD_R = 100, GUARD_PER = 2; // obranca vyrazí na vojsko bližšie než GUARD_R; strážcov na jednu liaheň
   const armyNear = (e, rad) => (st.king && !st.king.dead && Math.hypot(st.king.x - e.x, st.king.y - e.y) < rad) ||
@@ -5195,6 +5228,14 @@
   function updateAssault(dt) {
     const C = st.camp;
     if (!C) return;
+    // poistka: obranca na zemi nikdy neostane v hradbe (postrčenie, odhodenie) – vráti sa na posledné voľné miesto
+    const cb = campBlocks();
+    for (const e of st.enemies) {
+      if (e.dead || e.d.fly || !e.guard) continue;
+      const t = tileAt(e.x, e.y);
+      if (!cb[t.r * G.cols + t.c]) { e.okX = e.x; e.okY = e.y; }
+      else if (e.okX != null) { e.x = e.okX; e.y = e.okY; e.kb = null; }
+    }
     const live = st.enemies.filter(e => !e.dead).length, spawns = C.parts.filter(o => o.role === 'spawn' && o.hp > 0);
     for (const o of spawns) { // každá liaheň drží pri sebe najviac GUARD_PER strážcov, padlých dopĺňa
       o.spT = (o.spT == null ? 1 + Math.random() * 3 : o.spT) - dt;
@@ -5202,8 +5243,9 @@
       o.spT = 10 + Math.random() * 4;
       if (live >= 4 * GUARD_PER + spawns.length || st.enemies.filter(e => !e.dead && e.from === o).length >= GUARD_PER) continue;
       const types = [].concat(o.skin.unit), e = spawnEnemy({ type: types[Math.floor(Math.random() * types.length)], hpMul: st.assaultHp });
-      e.x = o.x + (Math.random() - 0.5) * 6; e.y = o.y + 3; e.from = o;
+      e.x = o.x + (Math.random() - 0.5) * 6; e.y = o.y - 2; e.from = o; // vyjde v liahni (pod ňou môže byť hradba)
       e.guard = { x: Math.max(G.gx0 + 6, Math.min(G.gx0 + G.cols * T - 6, o.x + (Math.random() - 0.5) * 20)), y: o.y + 8 + Math.random() * 14 };
+      { const gt = tileAt(e.guard.x, e.guard.y), cb = campBlocks(); if (cb[gt.r * G.cols + gt.c]) e.guard = { x: o.x, y: o.y + 3 }; } // strážne miesto nie v hradbe
       for (let k = 0; k < 6; k++) part(o.x, o.y, (Math.random() - 0.5) * 24, -Math.random() * 12, 0.4, '#c6a272', 40);
     }
     const keep = C.parts.find(o => o.role === 'keep');
@@ -5214,6 +5256,44 @@
     }
     if (!C.parts.some(o => o.role === 'keep' && o.hp > 0)) { missionWon(); return; }
     if (!st.soldiers.some(u => !u.dead && !u.helper)) gameOver(); // padol posledný vojak (hrdina sám hrad nedobyje)
+  }
+  // obranca hradu: ide na najbližšiu jednotku vojska pri svojom strážnom mieste a bije sa s ňou (strelec strieľa),
+  // inak sa vráti na stráž; po zemi obchádza hradby tábora a chodí bránou, netopier letí ponad
+  function assaultFoe(e, dt, sp, attack) {
+    let tg = e.foe && !e.foe.dead && !(e.foe.down > 0) ? e.foe : null, td = tg ? Math.hypot(tg.x - e.x, tg.y - e.y) : 1e9;
+    if (!tg) {
+      const us = st.king && !st.king.dead ? st.soldiers.concat([st.king]) : st.soldiers;
+      for (const u of us) {
+        if (u.dead || (u.fly && !e.d.fly && !e.d.ranged) || Math.hypot(u.x - e.guard.x, u.y - e.guard.y) > GUARD_R * 1.4) continue;
+        const d = Math.hypot(u.x - e.x, u.y - e.y);
+        if (d < td) { td = d; tg = u; }
+      }
+    }
+    if (!tg) { e.foe = null; if (e.d.fly) moveTo(e, e.guard.x, e.guard.y, sp, dt); else campStep(e, e.guard.x, e.guard.y, sp, dt); return; }
+    e.aimP = { x: tg.x, y: tg.y };
+    if (e.d.ranged && td <= e.d.ranged) { attack(() => st.eproj.push({ x: e.x, y: e.y - 8, tx: tg.x, ty: tg.y - (tg.fly ? 16 : 6), tgt: tg, dmg: e.d.atk })); return; }
+    if (td < (tg.siege ? 17 : 12)) { e.foe = tg; attack(() => hitUnit(tg, e.d.atk * 0.7)); return; }
+    if (e.d.fly || tg.fly) { e.anim += dt * 8; moveTo(e, tg.x, tg.y, sp, dt); return; }
+    campStep(e, tg.x, tg.y, sp, dt);
+  }
+  // krok obrancu k bodu (tx, ty) po zemi: obchádza stojace hradby tábora a chodí bránou
+  function campStep(e, tx, ty, sp, dt) {
+    const a = tileAt(e.x, e.y), b = tileAt(tx, ty);
+    if (a.c === b.c && a.r === b.r) { moveTo(e, tx, ty, sp, dt); return; }
+    const P = st.ePaths && st.ePaths.v === st.campV ? st.ePaths : (st.ePaths = { v: st.campV, m: new Map(), pass: null });
+    if (!P.pass) { const cb = campBlocks(); P.pass = cb.map(v => v ? 0 : 1); }
+    const goal = b.r * G.cols + b.c;
+    let dist = P.m.get(goal);
+    if (!dist) { if (P.m.size > 60) P.m.clear(); dist = distField(goal, P.pass); P.m.set(goal, dist); }
+    let best = null, bd = dist[a.r * G.cols + a.c];
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nc = a.c + dc, nr = a.r + dr;
+      if (nc < 0 || nr < 0 || nc >= G.cols || nr >= G.rows) continue;
+      const v = dist[nr * G.cols + nc];
+      if (v < bd) { bd = v; best = { c: nc, r: nr }; }
+    }
+    if (!best) { moveTo(e, tx, ty, sp, dt); return; }
+    moveTo(e, tileX(best.c) + T / 2 + e.jx * 0.4, tileY(best.r) + T / 2 + 3, sp, dt);
   }
   // odchod z rozbehnutého útoku (pauza → Ukončiť či Reštart) sa ráta ako prehra: vráti sa polovica minutých zlatiek
   function assaultForfeit() {
