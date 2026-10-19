@@ -1690,17 +1690,6 @@
     }
   }
 
-  // pešiak búra stavbu tábora: obstúpi ju z bokov (podľa poradia, aby nestáli v jednom bode) a bije do nej
-  function strikeCamp(u, o, dt) {
-    u.flash = Math.max(0, u.flash - dt); u.cd = Math.max(0, u.cd - dt); u.swing = Math.max(0, (u.swing || 0) - dt);
-    const cry = st.cryT > 0, spd = (u.spd || 26) * (cry ? CRY_SPD : 1) * waterMul(u);
-    const side = u.x < o.x ? -1 : 1, reach = u.ktype === 'spear' ? 12 : 7 + (u.slot % 3) * 2;
-    const tx = o.x + side * reach, ty = o.y + 2 + ((u.slot % 3) - 1) * 3;
-    if (Math.hypot(tx - u.x, ty - u.y) > 2) { moveKnight(u, tx, ty, spd, dt); u.run = (u.run || 0) + spd * dt; return; }
-    if (u.cd > 0) return;
-    u.cd = 0.8; u.swing = 0.15; u.run = 0; AUDIO.play('clang');
-    hitCamp(o, u.dmg * (cry ? CRY_DMG : 1));
-  }
   // vlastní pešiaci sa navzájom jemne odtláčajú, aby nestáli jeden v druhom
   function separateSoldiers() {
     const us = st.soldiers.filter(s => !s.fly && !s.dead);
@@ -1991,10 +1980,12 @@
     b.spawnT = knightEvery(b);
     spawnKnight(b, false);
   }
+  // ľudské jednotky z budovy najvyššej úrovne majú zlaté brnenie (za orkov nie)
+  const goldArmor = b => !isOrc() && b.lvl >= MAX_LVL;
   function spawnKnight(b, extra) {
     const c = bCenter(b);
     const ktype = UNIT_HOME[b.kind] || 'knight', kt = KTYPES[ktype], khp = knightHp(b) * kt.hp;
-    st.soldiers.push({ home: b, extra, x: c.x + 1, y: tileY(b.r) + T + 1, hp: khp, max: khp, dmg: knightDmg(b) * kt.dmg, spd: kt.spd, spr: kt.spr, ktype, cd: 0, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
+    st.soldiers.push({ home: b, extra, gold: goldArmor(b), x: c.x + 1, y: tileY(b.r) + T + 1, hp: khp, max: khp, dmg: knightDmg(b) * kt.dmg, spd: kt.spd, spr: kt.spr, ktype, cd: 0, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
     for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
   }
 
@@ -2125,7 +2116,7 @@
   }
   function spawnArcher(b, extra) {
     const c = bCenter(b), hp = archerHp(b);
-    st.soldiers.push({ home: b, archer: true, extra, x: c.x + 1, y: tileY(b.r) + T + 1, hp, max: hp, dmg: archerDmg(b), spd: 24, spr: 'footArcher', cd: 0.3, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
+    st.soldiers.push({ home: b, archer: true, extra, gold: goldArmor(b), x: c.x + 1, y: tileY(b.r) + T + 1, hp, max: hp, dmg: archerDmg(b), spd: 24, spr: 'footArcher', cd: 0.3, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
     for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
   }
   // ---- formácie: lukostrelci stoja v rade vedľa seba, pešiaci pochodujú v šíkoch –
@@ -2747,8 +2738,9 @@
       if (s.stunT > 0) { s.stunT -= dt; s.flash = Math.max(0, s.flash - dt); continue; } // omráčený dupnutím veľkráľa
       if (s.helper) { updateHelper(s, dt); continue; }
       if (s.fly) { updateFalcon(s, dt); continue; }
-      if (s.archer) { updateArcher(s, dt); continue; }
+      if (s.archer) { if (isAssault() && armyAttacks()) assaultArcherSpot(s); updateArcher(s, dt); continue; }
       if (s.siege) { updateSiege(s, dt); continue; }
+      if (isAssault() && armyAttacks()) { assaultKnight(s, dt); continue; } // útok na hrad: bez šíku, každý bojuje alebo búra
       const prev = s.tgt;
       {
         // pešiak drží miesto v šíku a bije sa s tým, kto príde k jeho miestu; po zrážke šíku s hordou siaha ďalej,
@@ -2759,8 +2751,9 @@
         if (!s.tgt || s.tgt.dead) { const leak = nearestEnemyWhere(s.x, s.y, e => e.y > F.inf.y + 14 && e.y > 4, true); if (leak) s.tgt = leak; }
         if (s.tgt && !s.tgt.dead && s.tgt.y > F.inf.y + 14) aggro = 9999;
         // nikto z hordy na dosah zrážky a nikto neprerazil za šík – tlačí dopredu a búra tábor (hordu stretne cestou)
-        const cp = atk && (!s.tgt || s.tgt.dead) && !nearestEnemy(s.x, s.y, ENGAGE) ? nearestCampPart(s.x, s.y) : null;
-        if (cp) { s.tgt = null; strikeCamp(s, cp, dt); }
+        // búra len stavbu tábora, ku ktorej vedie cesta (najprv hradby a brány, potom to, čo sa za nimi otvorí)
+        const cp = atk && st.camp && (!s.tgt || s.tgt.dead) && !nearestEnemy(s.x, s.y, ENGAGE) ? nearestReachablePart(s, dt) : null;
+        if (cp) { s.tgt = null; strikeAt(s, cp.o, cp.sp, dt); }
         else updateFighter(s, dt, sl.x, sl.y, aggro, s.dmg, false, moveKnight);
       }
       if (s.tgt && s.tgt !== prev && !s.tgt.dead) s.tgt.atkN = (s.tgt.atkN || 0) + 1;
@@ -3198,7 +3191,8 @@
   function drawFighter(u, sprName) {
     if (u.siege) return drawSiege8(u, SPR[sprName + '8']);
     if (!u.isKing && SPR[sprName + '8']) {
-      const fr = unit8Frame(u, SPR[sprName + '8']), y = Math.round(u.y - fr.h) + U8_PB;
+      const set = (u.gold && SPR[sprName + 'G8']) || SPR[sprName + '8']; // zlaté brnenie z budovy najvyššej úrovne
+      const fr = unit8Frame(u, set), y = Math.round(u.y - fr.h) + U8_PB;
       shadow(u.x, u.y, 4);
       cryAura(u, false, true);
       g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), y);
@@ -5224,9 +5218,9 @@
     tower:  { siege: 'tower', n: 1, cost: 170 },
   };
   const ASSAULT_BACK = 0.5; // pri prehre sa vráti polovica minutých zlatiek
-  // na útok treba v truhlici aspoň 70 % sumy, za ktorú automatický hráč hrad spoľahlivo dobyl (dev/assault-sim.js: ~3500 s pascami a hradbami);
+  // na útok treba v truhlici aspoň 70 % sumy, za ktorú automatický hráč hrad spoľahlivo dobyl (dev/assault-sim.js: ~3000 za ľudí, ~2500 za orkov);
   // s menším vojskom by útok nemal zmysel, s minimom sa dá ešte vyhrať aj prehrať
-  const ASSAULT_NEED = 3500, ASSAULT_MIN = Math.round(ASSAULT_NEED * 0.7);
+  const ASSAULT_NEED = 3000, ASSAULT_MIN = Math.round(ASSAULT_NEED * 0.7);
   const assaultLocked = m => m === MISSIONS.length && (st.chest || 0) < ASSAULT_MIN;
   const GUARD_R = 100, GUARD_PER = 2; // obranca vyrazí na vojsko bližšie než GUARD_R; strážcov na jednu liaheň
   const armyNear = (e, rad) => (st.king && !st.king.dead && Math.hypot(st.king.x - e.x, st.king.y - e.y) < rad) ||
@@ -5349,6 +5343,72 @@
     }
     if (!best) { moveTo(e, tx, ty, sp, dt); return; }
     moveTo(e, tileX(best.c) + T / 2 + e.jx * 0.4, tileY(best.r) + T / 2 + 3, sp, dt);
+  }
+  // ---- vojsko pri útoku na hrad: bez šíku. Pešiak sa bije s obrancom pri sebe, inak búra najbližšiu stavbu hradu,
+  // ku ktorej vedie cesta (najprv hradby a brány, za nimi to, čo sa otvorí); lukostrelec podíde na dostrel ----
+  // políčka, kam sa vojsko dostane zo zóny (hradby a brány tábora neprejde); pamätá sa, kým sa nezbúra hradba
+  function armyReach() {
+    if (st.aReach && st.aReach.v === st.campV && st.aReach.camp === st.camp) return st.aReach.r;
+    const n = G.cols * G.rows, r = new Uint8Array(n), q = [];
+    for (let row = zoneTopRow(); row < G.rows; row++) for (let c = 0; c < G.cols; c++) if (knightPass(c, row)) { r[row * G.cols + c] = 1; q.push(row * G.cols + c); }
+    while (q.length) {
+      const i = q.pop(), c = i % G.cols, row = (i / G.cols) | 0;
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nc = c + dc, nr = row + dr, ni = nr * G.cols + nc;
+        if (nc < 0 || nr < 0 || nc >= G.cols || nr >= G.rows || r[ni] || !knightPass(nc, nr)) continue;
+        r[ni] = 1; q.push(ni);
+      }
+    }
+    st.aReach = { v: st.campV, camp: st.camp, r };
+    return r;
+  }
+  // stavba hradu, na ktorú vojak dosiahne: miesto vedľa nej (najradšej pod ňou), kam sa dá dôjsť; null = je za hradbou
+  function campSpot(o, u) {
+    const R = armyReach(), [w, h] = campSize(o.skin);
+    let best = null, bd = 1e9;
+    for (let r = o.r - 1; r <= o.r + h; r++) for (let c = o.c - 1; c <= o.c + w; c++) {
+      const inside = c >= o.c && c < o.c + w && r >= o.r && r < o.r + h, edge = !inside && (c === o.c - 1 || c === o.c + w) !== (r === o.r - 1 || r === o.r + h);
+      if ((!inside && !edge) || c < 0 || r < 0 || c >= G.cols || r >= G.rows || !R[r * G.cols + c]) continue;
+      const x = tileX(c) + T / 2, y = tileY(r) + T / 2 + 3, d = Math.hypot(x - u.x, y - u.y) + (inside ? 12 : 0); // radšej vedľa než na stavbe
+      if (d < bd) { bd = d; best = { x, y, d }; }
+    }
+    return best;
+  }
+  function nearestReachablePart(u, dt) { // cieľ sa prepočíta dvakrát za sekundu alebo keď padne
+    u.ptT = (u.ptT || 0) - (dt || 0);
+    if (u.pt && u.pt.o.hp > 0 && u.ptT > 0 && u.pt.v === st.campV) return u.pt;
+    u.ptT = 0.5;
+    let best = null, bd = 1e9;
+    for (const o of campLive()) { if (Math.hypot(o.x - u.x, o.y - u.y) > bd + 40) continue; const sp = campSpot(o, u); if (sp && sp.d < bd) { bd = sp.d; best = { o, sp, v: st.campV }; } }
+    return (u.pt = best);
+  }
+  function assaultKnight(u, dt) {
+    if (u.tgt && (u.tgt.dead || Math.hypot(u.tgt.x - u.x, u.tgt.y - u.y) > 70)) u.tgt = null;
+    if (!u.tgt) u.tgt = u.ktype === 'rider' ? priorityEnemy(u.x, u.y, 60, RIDER_PRIO) || nearestEnemy(u.x, u.y, ENGAGE + 10, true) : nearestEnemy(u.x, u.y, ENGAGE + 10, true);
+    if (u.tgt) { updateFighter(u, dt, u.x, u.y, 60, u.dmg, false, moveKnight); return; }
+    const t = nearestReachablePart(u, dt);
+    if (!t) { u.flash = Math.max(0, u.flash - dt); return; } // nič na dosah (všetko zbúrané)
+    u.campT = t.o;
+    strikeAt(u, t.o, t.sp, dt);
+  }
+  // úder do stavby hradu z miesta vedľa nej
+  function strikeAt(u, o, sp, dt) {
+    u.flash = Math.max(0, u.flash - dt); u.cd = Math.max(0, u.cd - dt); u.swing = Math.max(0, (u.swing || 0) - dt);
+    const cry = st.cryT > 0, spd = (u.spd || 26) * (cry ? CRY_SPD : 1) * waterMul(u);
+    const jx = ((u.slot || 0) % 3 - 1) * 4, jy = ((u.slot || 0) % 2) * 2; // viacerí pri jednej stavbe sa rozostúpia
+    if (Math.hypot(sp.x + jx - u.x, sp.y + jy - u.y) > 3) { moveKnight(u, sp.x + jx, sp.y + jy, spd, dt); u.run = (u.run || 0) + spd * dt; return; }
+    u.aimP = { x: o.x, y: o.y - 6 };
+    if (u.cd > 0) return;
+    u.cd = 0.8; u.swing = 0.15; u.run = 0; AUDIO.play('clang');
+    hitCamp(o, u.dmg * (cry ? CRY_DMG : 1));
+  }
+  // lukostrelec: keď nemá na dostrel nikoho ani žiadnu stavbu, podíde k najbližšej stavbe, na ktorú vedie cesta
+  function assaultArcherSpot(u) {
+    const near = st.enemies.some(e => !e.dead && e.y > 4 && Math.hypot(e.x - u.x, e.y - u.y) <= ARCHER_RANGE);
+    const part = nearestCampPart(u.x, u.y);
+    if (near || (part && Math.hypot(part.x - u.x, part.y - u.y) <= ARCHER_RANGE - 6)) { u.fslot = { x: u.x, y: u.y }; return; }
+    const t = nearestReachablePart(u, DT);
+    u.fslot = t ? { x: t.sp.x, y: t.sp.y } : { x: u.x, y: u.y };
   }
   // odchod z rozbehnutého útoku (pauza → Ukončiť či Reštart) sa ráta ako prehra: vráti sa polovica minutých zlatiek
   function assaultForfeit() {

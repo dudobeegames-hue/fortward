@@ -25,6 +25,11 @@ const PAL = {
   y: '#fff070', e: '#eee6cc', E: '#a8a088',           // žltá, kosť
 };
 
+// zlaté brnenie ľudských jednotiek z budov najvyššej úrovne: oceľ (w, m, M, D) nahradí zlato, látka ostáva modrá
+const PAL_GOLD_ARMOR = { w: '#fff6c0', m: '#f8d048', M: '#c8962c', D: '#7a5418' };
+// lukostrelec nosí kožu: zlatá kapucňa, tulec aj pozlátený luk (koža a drevo l, L, d)
+const PAL_GOLD_ARCHER = Object.assign({ l: '#e8b838', L: '#a87a24', d: '#5e4012' }, PAL_GOLD_ARMOR);
+
 // ---- Obrancovia (pohľad zozadu – pozerajú na hordu) ----
 const DEF_ARCHER = [
   '..KK......KK..',
@@ -648,11 +653,13 @@ function initSprites() {
   for (const k in RACE_ART) SPR['race_' + k] = [buildOutlined(RACE_ART[k], RACE_PAL[k])];
   // lukostrelec zo strelnice (pešia jednotka) – rovnaký vojak, druhá snímka s prekročenými nohami
   SPR.footArcher = [buildSprite(DEF_ARCHER), buildSprite(DEF_ARCHER.slice(0, 14).concat(['....KddK.KddK.', '....KKK...KKK.']))];
+  lazySpr('footArcherG8', () => Object.assign(buildArcher8(PAL_GOLD_ARCHER), { bow: true })); // zlaté brnenie (strelnica 5. úrovne)
   lazySpr('footArcher8', () => Object.assign(buildArcher8(), { bow: true })); // lukostrelec v 8 smeroch (luk pri boku, pri streľbe napnutá tetiva); bow: ako nepriateľ napína luk
   SPR.knight = [buildSprite(DEF_KNIGHT)];
   SPR.mage = [buildSprite(DEF_MAGE)];
   SPR.soldier = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l)));
-  lazySpr('soldier8', buildKnight8); // rytier v 8 smeroch (chôdza s pohupom tela, úder mečom)
+  lazySpr('soldierG8', () => buildKnight8(PAL_GOLD_ARMOR)); // zlaté brnenie (kasárne 5. úrovne)
+  lazySpr('soldier8', () => buildKnight8()); // rytier v 8 smeroch (chôdza s pohupom tela, úder mečom)
   SPR.king = KING_LEGS.map(l => buildSprite(KING_BODY.concat(l)));
   lazySpr('king8', buildKing8); // kráľ v 8 smeroch (chôdza, postoj, úder)
   lazySpr('paladin8', buildPaladin8); // paladin v 8 smeroch s bojovým kladivom
@@ -664,10 +671,12 @@ function initSprites() {
   SPR.paladin = PALADIN_LEGS.map(l => buildSprite(PALADIN_BODY.concat(l), PAL_PALADIN));
   SPR.sorc = SORC_LEGS.map(l => buildSprite(SORC_BODY.concat(l), PAL_SORC));
   SPR.spear = SOLDIER_LEGS.map(l => buildSprite(SPEAR_BODY.concat(l))); // ľudia vždy v modrom
-  lazySpr('spear8', buildSpear8); // kopijník v 8 smeroch (kopija opretá o zem, pri útoku sklopená a bodne)
+  lazySpr('spearG8', () => buildSpear8(PAL_GOLD_ARMOR)); // zlaté brnenie (zbrojnica 5. úrovne)
+  lazySpr('spear8', () => buildSpear8()); // kopijník v 8 smeroch (kopija opretá o zem, pri útoku sklopená a bodne)
   SPR.shield = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l), { c: '#d0d4dc', B: '#80869a', n: '#44485a' }));
   SPR.rider = RIDER_FRAMES.map(f => buildSprite(f));
-  lazySpr('rider8', buildRider8); // jazdec na koni v 8 smeroch (klus, kopija sklopená k útoku)
+  lazySpr('riderG8', () => buildRider8(PAL_GOLD_ARMOR)); // zlaté brnenie (stajne 5. úrovne)
+  lazySpr('rider8', () => buildRider8()); // jazdec na koni v 8 smeroch (klus, kopija sklopená k útoku)
   lazySpr('hknight8', buildHKnight8); // ťažký rytier (nepriateľ za orkov)
   lazySpr('captain8', buildCaptain8); // kapitán jazdy (boss za orkov)
   SPR.monk = MONK_LEGS.map(l => buildSprite(MONK_BODY.concat(l)));
@@ -1519,7 +1528,7 @@ function buildUnit8(spec) {
   all.stride = spec.stride || 3.2; // prejdená vzdialenosť na snímku chôdze
   return all;
 }
-const buildKnight8 = () => buildUnit8({ body: KN8_BODY, shield: KN8_SHIELD, legs: KN8_LEGS, hand: KN8_HAND, blade: 6 });
+const buildKnight8 = pal => buildUnit8({ pal, body: KN8_BODY, shield: KN8_SHIELD, legs: KN8_LEGS, hand: KN8_HAND, blade: 6 });
 
 // lukostrelec: kožená čiapka s červeným perom, modrá tunika, kožený opasok a remeň tulca; tulec so šípmi na chrbte
 const AR8_BODY = {
@@ -1594,7 +1603,7 @@ const legsCloth = L => {
   const re = r => r.replace(/m/g, 'B').replace(/[MD]/g, 'n');
   return { idle: L.idle.map(re), walk: L.walk.map(f => f.map(re)) };
 };
-const buildArcher8 = () => buildUnit8({ body: AR8_BODY, bow: AR8_BOW, hand: AR8_HAND, legs: { front: legsCloth(KN8_LEGS.front), side: legsCloth(KN8_LEGS.side) } });
+const buildArcher8 = pal => buildUnit8({ pal, body: AR8_BODY, bow: AR8_BOW, hand: AR8_HAND, legs: { front: legsCloth(KN8_LEGS.front), side: legsCloth(KN8_LEGS.side) } });
 
 // kopijník: oceľový klobúk so širokou strechou, krúžkový golier, modrý prešívaný kabec s koženým opaskom
 const SP8_BODY = {
@@ -1663,7 +1672,7 @@ const SP8_HAND = {
   SE: { x: 2,  y: 7, idle: -1.7,  ax: 7, ay: 5, aim: 0.75,  k: 0.75, legs: 'front' },
   S:  { x: 2,  y: 7, idle: -1.65, ax: 6, ay: 5, aim: 1.25,  k: 0.75, legs: 'front' },
 };
-const buildSpear8 = () => buildUnit8({ body: SP8_BODY, hand: SP8_HAND, spear: 10, legs: { front: legsCloth(KN8_LEGS.front), side: legsCloth(KN8_LEGS.side) } });
+const buildSpear8 = pal => buildUnit8({ pal, body: SP8_BODY, hand: SP8_HAND, spear: 10, legs: { front: legsCloth(KN8_LEGS.front), side: legsCloth(KN8_LEGS.side) } });
 
 // jazdec: hnedý kôň v modrej čabraku so zlatým lemom, na ňom rytier (prilba a trup ako pešiak) so štítom a kopijou.
 // Kôň: trup v riadkoch, hlava ako samostatná vrstva (spredu je pred jazdcom, zozadu za ním).
@@ -1766,7 +1775,7 @@ const RD8_HAND = {
   SE: { x: 1,  y: 6, idle: -1.7,  ax: 6,  ay: 6, aim: 0.75, k: 0.8,  legs: 'diag' },
   S:  { x: 1,  y: 6, idle: -1.65, ax: 4,  ay: 6, aim: 1.25, k: 0.75, legs: 'front' },
 };
-const buildRider8 = () => buildUnit8({ W: 40, H: 30, body: RD8_BODY, mount: RD8_HORSE, shield: KN8_SHIELD, hand: RD8_HAND, legs: RD8_LEGS, spear: 12, stride: 5 });
+const buildRider8 = pal => buildUnit8({ pal, W: 40, H: 30, body: RD8_BODY, mount: RD8_HORSE, shield: KN8_SHIELD, hand: RD8_HAND, legs: RD8_LEGS, spear: 12, stride: 5 });
 // nepriatelia za orkov (len jednotky z ľudských budov): ťažký rytier v tmavej oceli a kapitán jazdy v pozlátenej zbroji
 const PAL_HKNIGHT = { w: '#bcc0cc', m: '#80869a', M: '#4a4e60', D: '#2a2c38' };
 // kapitán: pozlátená zbroj, biely kôň, biely waffenrock s modrou (ľudia ostávajú modrí), biela kopija so zástavkou
