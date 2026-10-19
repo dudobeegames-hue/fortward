@@ -591,6 +591,14 @@
     65% { box-shadow: inset 0 0 0 2px #5cf0ff, inset 0 0 12px 4px rgba(70,200,255,.7); }
     100% { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
   }
+  /* za orkov oranžový neón namiesto modrého */
+  .orcs .pcard.newFlash .face { animation-name: neonFlashOrc; }
+  @keyframes neonFlashOrc {
+    0%, 10% { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+    30% { box-shadow: inset 0 0 0 2px #ffb050, inset 0 0 16px 5px rgba(255,140,30,.9); }
+    65% { box-shadow: inset 0 0 0 2px #ffb050, inset 0 0 12px 4px rgba(255,140,30,.7); }
+    100% { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+  }
   .tabCard.shop img { opacity: 1; }
   .tabCard.shop.on { background: linear-gradient(#a07a38, #5a4020); }
   /* obchod */

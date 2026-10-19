@@ -1068,7 +1068,6 @@
     st.hallHolyT = 0; for (const b of st.blds) b.holyT = 0;
     for (const s of st.soldiers) s.stunT = 0;
   }
-  const reviveSeen = () => !!loadJSON(sk('reviveSeen'), false); // hráč už videl, kde sa oživuje padnutý hrdina
   function enterBuild() {
     st.phase = 'build';
     st.moving = null;
@@ -1079,7 +1078,7 @@
     for (const s of st.soldiers) { s.hp = s.max; s.tgt = null; }
     clearHeroFx();
     if (st.king && st.king.dead) st.king.deadT = Math.max(st.king.deadT, 1); // padnutý hrdina ostane omráčený ležať aj počas stavby, kým ho hráč neoživí
-    if (st.king && st.king.dead && !reviveSeen()) st.sel = HALL; // hrdina padol prvý raz: stavanie začne s otvorenou radnicou
+    if (st.king && st.king.dead) st.sel = HALL; // padnutý hrdina: stavanie začne s otvorenou radnicou (tam sa oživuje)
     if (st.king && !st.king.dead) { st.king.hp = kingMax(); st.king.down = 0; st.king.tgt = null; st.king.flash = 0; st.king.swing = 0; st.king.tpBack = 0; } // domov dôjde sám (heroWalkHome)
     for (const b of st.blds) b.flash = 0;
     $('build').hidden = false;
@@ -2224,9 +2223,15 @@
     st.spellSel = id; AUDIO.play('click');
   }
   // ťuk na bojisko počas boja: zvolené kúzlo sa zošle na to miesto
+  let heroTap = null; // prvý ťuk dvojťuku na presun hrdinu
   function tapBattle(x, y) {
     const id = st.spellSel;
-    if (!id) { sendHero(x, y); return; }
+    if (!id) { // dvojťuk (do 0,4 s blízko seba) pošle hrdinu na to miesto, jeden ťuk nerobí nič
+      const now = performance.now();
+      if (heroTap && now - heroTap.t < 400 && Math.hypot(x - heroTap.x, y - heroTap.y) < 24) { heroTap = null; sendHero(x, y); }
+      else heroTap = { t: now, x, y };
+      return;
+    }
     if (castSpell(id, x, y)) st.spellSel = null;
   }
   // presun hrdinu počas vlny: ťuk na bojisko ho pošle na to miesto, kde bráni okolie (na radnicu ani mimo poľa nie)
@@ -4328,6 +4333,7 @@
   function applyRace() {
     BUILD_RACE = isOrc() ? 'orc' : 'human';
     UNLOCK_RACE = BUILD_RACE;
+    document.body.classList.toggle('orcs', isOrc()); // rozhranie v rase hráča (napr. oranžový neón noviniek)
     const U = isOrc() ? ORC_UNITS : HUMAN_UNITS;
     Object.assign(HEROES.king, U.king);
     for (const k in KTYPES) KTYPES[k].name = U.kt[k];
@@ -4523,7 +4529,7 @@
       const k = st.king;
       selRow(ICONS.hall, (isOrc() ? 'Pevnosť' : 'Radnica') + ' · úr. ' + st.hallLvl + ' (' + LVL_NAME[st.hallLvl] + ')', 'zdravie ' + Math.ceil(st.hallHp) + '/' + hallMax() + ' · ' + heroName().toLowerCase() + ' úr. ' + kingMeta.lvl + (k && k.dead ? (heroDef().fem ? ' · padla' : ' · padol') : '') + ' · vylepšenie rozšíri územie a dovolí vyššie stavby');
       upAct(st.hallLvl, hallCap(), hallUpCost(), () => { const c = hallUpCost(); st.gold -= c; st.hallLvl++; st.hallHp += 200; st.king.hp = kingMax(); }, null, bPreview({ kind: 'hall', lvl: st.hallLvl + 1 }), 'lvl' + (st.hallLvl + 1));
-      if (k && k.dead) { const c = reviveCost(); flashIf(act(heroIcon(st.hero), 'Oživiť', coinTxt(c), st.gold >= c, reviveKing, 'up'), !reviveSeen(), 'revive', () => saveJSON(sk('reviveSeen'), true)); } // prvý pád: karta oživenia preblikne
+      if (k && k.dead) { const c = reviveCost(); flashIf(act(heroIcon(st.hero), 'Oživiť', coinTxt(c), st.gold >= c, reviveKing, 'up'), true, 'revive' + st.mission + '.' + st.wave, () => saveJSON(sk('reviveSeen'), true)); } // karta oživenia raz preblikne v každom stavebnom kole
     } else if (selGroup()) {
       // hromadné akcie pre označenú skupinu (rad hradieb alebo všetky stavby jedného druhu)
       const grp = st.selGroup, kind = grp[0].kind, d = BUILD[kind], isWall = kind === 'wall', cap = bCap();
