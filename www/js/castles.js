@@ -1,7 +1,8 @@
 'use strict';
 // Fortward – hrady (tábory) protivníka pre misie 6–10. Súbor zapisuje editor hradov (www/dev/castle-editor.html).
 // Pre každú rasu protivníka a misiu zoznam stavieb: k = druh stavby rasy (CAMP_PIECES v js/camp.js),
-// c, r = ľavé horné políčko stavby v mriežke bojiska (stĺpec 0–10, riadok od hornej hrany).
+// c, r = ľavé horné políčko stavby v mriežke bojiska (stĺpec 0–10, riadok od hornej hrany),
+// l = úroveň stavby 2–5 (chýba = úroveň 1).
 const CASTLES = {
   human: {
     "6": [{"k": "wall", "c": 0, "r": 4}, {"k": "wall", "c": 1, "r": 4}, {"k": "wall", "c": 2, "r": 4}, {"k": "wall", "c": 3, "r": 4}, {"k": "wall", "c": 5, "r": 4}, {"k": "wall", "c": 6, "r": 4}, {"k": "wall", "c": 9, "r": 4}, {"k": "wall", "c": 8, "r": 4}, {"k": "wall", "c": 10, "r": 4}, {"k": "tower", "c": 8, "r": 3}, {"k": "tower", "c": 6, "r": 3}, {"k": "tower", "c": 3, "r": 3}, {"k": "barracks", "c": 0, "r": 1}, {"k": "barracks", "c": 10, "r": 1}, {"k": "armory", "c": 1, "r": 3}, {"k": "armory", "c": 3, "r": 1}, {"k": "armory", "c": 10, "r": 3}, {"k": "barracks", "c": 5, "r": 1}],

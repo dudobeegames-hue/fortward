@@ -23,6 +23,12 @@
   // pracovná kópia hradov; uloží sa celá naraz
   let data = JSON.parse(JSON.stringify(typeof CASTLES !== 'undefined' ? CASTLES : { orc: {}, human: {} }));
   for (const r of Object.keys(CAMP_PIECES)) data[r] = data[r] || {};
+  // záloha neuložených zmien v prehliadači (keby nebežal dev server alebo sa okno zavrelo)
+  const DRAFT = 'fortward-castle-draft';
+  const saveDraft = () => { try { localStorage.setItem(DRAFT, JSON.stringify(data)); } catch (e) { /* bez zálohy */ } };
+  const dropDraft = () => { try { localStorage.removeItem(DRAFT); } catch (e) { /* bez zálohy */ } };
+  let draft = null;
+  try { draft = localStorage.getItem(DRAFT); } catch (e) { /* bez zálohy */ }
   let mission = 6, race = 'orc', tool = null, sel = null, drag = null, dirty = false, scene = null, hover = null;
   const lay = () => (data[race][mission] = data[race][mission] || []);
   const $ = id => document.getElementById(id);
@@ -42,9 +48,12 @@
     setDirty(true); renderAll();
   }
 
-  function buildField() { scene = buildScene(W, H, G, 7 + mission * 13, mission - 1, campClearRects(lay(), G), race === 'human' ? 'planks' : null); }
+  // uzol mapy ako v hre (nodeOf): proti ľuďom hrá hráč za orkov opačnú kampaň, misia m leží na uzle 10 − m
+  const mDefs = () => race === 'human' ? ORC_MISSIONS : MISSIONS; // názvy misií podľa kampane, ktorú hráč hrá
+  const nodeAt = m => race === 'human' ? MISSIONS.length - m : m - 1;
+  function buildField() { scene = buildScene(W, H, G, 7 + (nodeAt(mission) + 1) * 13, nodeAt(mission), campClearRects(lay(), G), race === 'human' ? 'planks' : null); }
   let sceneTimer = 0; // po zmene hradu sa krajina prekreslí (pod stavbami nebudú stromy ani skaly)
-  const rebuildSoon = () => { clearTimeout(sceneTimer); sceneTimer = setTimeout(() => { buildField(); draw(); }, 200); };
+  const rebuildSoon = () => { clearTimeout(sceneTimer); sceneTimer = setTimeout(() => { buildField(); draw(); if (dirty) saveDraft(); }, 200); };
 
   // ---- mriežka: stavba zaberá w×h políčok, nesmie zasahovať do inej ani do zóny hráča ----
   function fits(k, c, r, skip) {
@@ -145,7 +154,7 @@
     }
   }
   function renderList() {
-    $('mLabel').textContent = mission + ' – ' + MISSIONS[mission - 1].name + ' (' + (race === 'orc' ? 'orkovia' : 'ľudia') + ')';
+    $('mLabel').textContent = mission + ' – ' + mDefs()[mission - 1].name + ' (' + (race === 'orc' ? 'orkovia' : 'ľudia') + ')';
     const list = $('list'); list.innerHTML = '';
     const L = lay();
     if (!L.length) list.innerHTML = '<span class="help">Hrad je prázdny – v misii nebude tábor.</span>';
@@ -165,7 +174,7 @@
   function renderMissions() {
     const box = $('missions'); box.innerHTML = '';
     for (let m = HOME_PROVINCES + 1; m <= MISSIONS.length; m++) {
-      const bt = document.createElement('button'); bt.textContent = m; bt.title = MISSIONS[m - 1].name;
+      const bt = document.createElement('button'); bt.textContent = m; bt.title = mDefs()[m - 1].name;
       bt.className = m === mission ? 'on' : '';
       bt.onclick = () => { mission = m; sel = null; buildField(); renderAll(); };
       box.appendChild(bt);
@@ -227,8 +236,8 @@
     try {
       const r = await fetch('/castles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
       if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
-      setDirty(false); status('Uložené do js/castles.js – obnov hru');
-    } catch (e) { status('Uloženie zlyhalo: ' + e.message + ' (beží tools/devserver.py?)'); }
+      dropDraft(); setDirty(false); status('Uložené do js/castles.js – obnov hru');
+    } catch (e) { saveDraft(); status('Uloženie zlyhalo: ' + e.message + ' – spusti Editor hradov.bat; zmeny sú zálohované v prehliadači'); }
   };
   $('revertBtn').onclick = async () => {
     if (dirty && !confirm('Zahodiť neuložené zmeny?')) return;
@@ -236,11 +245,17 @@
       const txt = await (await fetch('../js/castles.js?' + Date.now(), { cache: 'no-store' })).text();
       data = new Function(txt + '\nreturn CASTLES;')();
       for (const r of Object.keys(CAMP_PIECES)) data[r] = data[r] || {};
-      sel = null; setDirty(false); status('Načítané uložené hrady'); buildField(); renderAll();
+      dropDraft(); sel = null; setDirty(false); status('Načítané uložené hrady'); buildField(); renderAll();
     } catch (e) { status('Načítanie zlyhalo: ' + e.message); }
   };
-  window.addEventListener('beforeunload', ev => { if (dirty) { ev.preventDefault(); ev.returnValue = ''; } });
+  window.addEventListener('beforeunload', ev => { if (dirty) { saveDraft(); ev.preventDefault(); ev.returnValue = ''; } });
 
+  // rozpracovaná záloha z minula, ktorá sa nedostala do js/castles.js
+  if (draft && draft !== JSON.stringify(data) && confirm('Našli sa neuložené zmeny hradov z minula. Obnoviť ich?')) {
+    data = JSON.parse(draft);
+    for (const r of Object.keys(CAMP_PIECES)) data[r] = data[r] || {};
+    dirty = true; $('saveBtn').classList.add('dirty'); status('Obnovené neuložené zmeny – ulož ich');
+  } else if (draft) dropDraft();
   buildField(); renderAll();
   setInterval(draw, 250); // animované stavby (totem, bubon, brloh, dym chatrče)
 })();
