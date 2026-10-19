@@ -540,6 +540,10 @@
   /* okno misie po ťuknutí na hrad */
   #missionBox { z-index: 6; background: rgba(8,6,4,.55); }
   #missionBox[hidden] { display: none; }
+  .mCastle { display: block; width: 100%; max-height: 42vh; object-fit: cover; object-position: top; image-rendering: pixelated; border: 2px solid var(--ink); border-radius: 6px; margin: 6px 0; }
+  .mCastle[hidden] { display: none; }
+  #mapPlay.poor { filter: grayscale(1); opacity: .6; } /* málo zlatiek v truhlici na útok */
+  #mMeta img.chest { width: 14px; height: 14px; vertical-align: -2px; }
   #mapPanel {
     width: 100%; max-width: 380px; box-sizing: border-box;
     background: linear-gradient(var(--panel), #1e1611);
@@ -896,6 +900,7 @@
         </div>
         <div id="mTiers" class="mTiers"></div>
         <div id="mNew" class="mNew"></div>
+        <img id="mCastle" class="mCastle" alt="Hrad" hidden>
         <div class="brow backRow">
           <button id="mapClose" class="btn backBtn">Späť</button>
           <button id="mapPlay" class="primary">Hrať</button>

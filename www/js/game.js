@@ -579,7 +579,8 @@
   // ---------------- Mriežka ----------------
   const tileX = c => G.gx0 + c * T;
   const tileY = r => G.gy0 + r * T;
-  const inHall = (c, r) => c >= G.hc0 && c < G.hc0 + 3 && r >= G.hr0 && r < G.hr0 + 3;
+  const hallTile = (c, r) => c >= G.hc0 && c < G.hc0 + 3 && r >= G.hr0 && r < G.hr0 + 3;
+  const inHall = hallTile;
   const zoneTopRow = () => G.rows - zoneRows();
   const inZone = (c, r) => c >= 0 && c < G.cols && r >= zoneTopRow() && r <= G.rows - 1;
   const tileAt = (x, y) => ({
@@ -658,7 +659,7 @@
     const { fh, g2 } = fieldGeom(m), key = W + 'x' + fh + ':' + nodeOf(m) + ':' + foeRace() + ':' + m;
     if (sceneCache.has(key)) return sceneCache.get(key);
     const lay = typeof CASTLES !== 'undefined' && CASTLES[foeRace()] && CASTLES[foeRace()][m];
-    const sc = buildScene(W, fh, g2, 7 + (nodeOf(m) + 1) * 13, nodeOf(m), campClearRects(lay, g2), isOrc() ? 'planks' : null); // nádvorie pevnosti orkov z dosiek
+    const sc = buildScene(W, fh, g2, 7 + (nodeOf(m) + 1) * 13, nodeOf(m), campClearRects(lay, g2), m === MISSIONS.length ? 'none' : isOrc() ? 'planks' : null); // nádvorie pevnosti orkov z dosiek; pri útoku na hrad žiadne
     sceneCache.set(key, sc);
     if (sceneCache.size > 3) sceneCache.delete(sceneCache.keys().next().value);
     return sc;
@@ -798,12 +799,13 @@
   function hitCamp(o, dmg) {
     if (!o || o.hp <= 0) return;
     o.hp -= dmg; o.flash = 0.08;
+    if (o.role === 'keep' && isAssault()) updateHud(); // pruh srdca hradu
     for (let k = 0; k < 2; k++) part(o.x + (Math.random() - 0.5) * 10, o.y - 8, (Math.random() - 0.5) * 30, -10 - Math.random() * 20, 0.4, '#4a2e1a', 90);
     if (o.hp > 0) return;
     AUDIO.play('crumble'); st.shake = Math.max(st.shake, 0.2);
     for (let k = 0; k < 26; k++) part(o.x + (Math.random() - 0.5) * 16, o.y - Math.random() * 18, (Math.random() - 0.5) * 60, -Math.random() * 50, 0.9, ['#3c3846', '#22202a', '#4a2e1a', '#f89838'][k % 4], 110);
     const gold = Math.round(CAMP_ROLES[o.role].gold * (1 + 0.1 * (st.mission - HOME_PROVINCES)));
-    st.gold += gold; st.texts.push({ x: o.x, y: o.y - 22, s: '+' + gold, life: 1.4, max: 1.4 });
+    if (!isAssault()) { st.gold += gold; st.texts.push({ x: o.x, y: o.y - 22, s: '+' + gold, life: 1.4, max: 1.4 }); }
     if (o.role === 'keep') { st.shake = 0.6; for (const q of campLive()) hitCamp(q, q.hp + 1); } // srdce padlo – zrúti sa celý tábor
     updateHud();
   }
@@ -821,8 +823,11 @@
         o.cd = Math.max(5, 8 - 0.5 * a);
         let b = null, bd = 1e9;
         for (const q of st.blds) { if (!BUILD[q.kind].hp || TRAPS[q.kind]) continue; const c = bCenter(q), d = Math.hypot(c.x - o.x, c.y - o.y); if (d < bd) { bd = d; b = q; } }
-        const tx = b ? bCenter(b).x : G.hallCx + (Math.random() - 0.5) * 20, ty = b ? tileY(b.r) + 8 : G.hallTop + 6, sx = o.x, sy = o.y - 14;
-        C.rocks.push({ sx, sy, x: sx, y: sy, gy: sy, tx, ty, t: 0, dur: 1.4 + Math.hypot(tx - sx, ty - sy) / 240, h: 50, tgt: b || HALL, dmg: 26 * pw * campPowMul(o.lvl) });
+        let u = null; // pri útoku na hrad mieri na najbližší oddiel vojska
+        if (isAssault()) for (const q of st.soldiers) if (!q.dead && !q.fly && (!u || Math.hypot(q.x - o.x, q.y - o.y) < Math.hypot(u.x - o.x, u.y - o.y))) u = q;
+        if (u) b = null;
+        const tx = u ? u.x : b ? bCenter(b).x : G.hallCx + (Math.random() - 0.5) * 20, ty = u ? u.y : b ? tileY(b.r) + 8 : G.hallTop + 6, sx = o.x, sy = o.y - 14;
+        C.rocks.push({ sx, sy, x: sx, y: sy, gy: sy, tx, ty, t: 0, dur: 1.4 + Math.hypot(tx - sx, ty - sy) / 240, h: 50, tgt: u ? null : b || HALL, dmg: 26 * pw * campPowMul(o.lvl) });
         o.fired = 0.8; AUDIO.play('clang');
       } else if (o.role === 'tower' && o.cd <= 0) { // šíp na najbližšiu jednotku hráča v dosahu
         let tg = null, td = 84;
@@ -996,6 +1001,8 @@
     });
     rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
     st.camp = makeCamp(); // od misie 6 si horda hore na bojisku rozloží tábor
+    Object.assign(st, { deps: [], depN: 0, armyPick: null, assaultSpent: 0, assaultDone: false, assaultKing: false });
+    if (isAssault()) st.gold = st.chest || 0; // útok na hrad: vojsko sa platí zlatkami z truhlice
     st.hallHp = hallMax();
     st.king = makeHero();
     $('title').hidden = true; $('over').hidden = true;
@@ -1101,7 +1108,11 @@
     for (const id in SPELLS) st[SPELLS[id].cdKey] = 0; // každá vlna začína s nabitými schopnosťami hrdinu
     clearHeroFx();
     st.wave++;
-    st.spawnQ = buildWave(st.wave);
+    st.spawnQ = isAssault() ? [] : buildWave(st.wave);
+    if (isAssault()) { // vojsko vyrazí: minuté zlatky odídu z truhlice, zvyšok ostane
+      st.assaultHp = buildWave(3)[0].hpMul; st.assaultSpent = (st.chest || 0) - st.gold;
+      st.chest = st.gold; saveJSON(sk('chest'), st.chest); st.armyPick = null;
+    }
     st.spawnT = 1.2;
     st.phase = 'battle';
     launchSiege();
@@ -1110,7 +1121,7 @@
     st.viewUp = Math.max(0, (st.viewUp || 0) - panelLow()); // rovnaký pohľad aj bez panela
     $('build').hidden = true; $('bottom').hidden = false;
     for (const b of st.blds) if (UNIT_HOME[b.kind] || b.kind === 'range' || b.kind === 'falconry' || HELPERS[b.kind]) b.spawnT = HELPERS[b.kind] ? 0.6 : 0.3;
-    banner(st.wave === MISSION_WAVES ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + MISSION_WAVES);
+    banner(isAssault() ? 'Do útoku!' : st.wave === MISSION_WAVES ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + MISSION_WAVES);
     syncStance();
     updateHud();
   }
@@ -1154,7 +1165,9 @@
     const m = st.mission;
     if (st.hallHp >= hallMax()) stats.perfect++;
     st.phase = 'won';
-    const t = st.tier || 0, stars = starsFor(st.hallHp / hallMax()), prevStars = starsOf(m, t);
+    // útok na hrad: hviezdy podľa toho, koľko vojska prežilo (polovica a viac = 3, štvrtina = 2)
+    const left = isAssault() ? armyLeft() : 0, kept = isAssault() ? left / Math.max(1, st.assaultSpent) : 0;
+    const t = st.tier || 0, stars = isAssault() ? (kept >= 0.5 ? 3 : kept >= 0.25 ? 2 : 1) : starsFor(st.hallHp / hallMax()), prevStars = starsOf(m, t);
     if (stars > prevStars) { const a = (meta.stars[m - 1] || [0, 0, 0]).slice(); a[t] = stars; meta.stars[m - 1] = a; saveJSON(sk('stars'), meta.stars); }
     $('hud-boss').hidden = true; $('bottom').hidden = true;
     const first = t === 0 && m >= st.unlocked;
@@ -1166,7 +1179,8 @@
     AUDIO.music(null); AUDIO.play('win');
     for (let k = 0; k < 80; k++) part(Math.random() * W, camY + H * 0.3 + Math.random() * 30, (Math.random() - 0.5) * 60, -30 - Math.random() * 60, 1.4, ['#f8d048', '#fff070', '#88b4ff', '#e84838'][k % 4], 60);
     // výsledok misie: len hviezdy a zlatky, ktoré pribudnú do truhlice (podiel zo zabitých + neminuté zlato)
-    const chestGain = addChest(st.chestRun + st.gold);
+    st.assaultDone = true;
+    const chestGain = addChest(isAssault() ? left : st.chestRun + st.gold); // pri útoku sa vrátia zlatky za vojsko, ktoré prežilo
     const starLine = '<span class="bigStars">' + starSpan(stars, t) + '</span>';
     const chestLine = '<span class="chestGain">+' + chestTxt(chestGain) + '</span><br><small class="dim">do truhlice</small>';
     later(() => showOver(m === MISSIONS.length ? 'Víťazstvo!' : 'Misia splnená!', starLine + '<br>' + chestLine, true), 1200);
@@ -1177,17 +1191,22 @@
   function gameOver() {
     st.phase = 'over';
     saveStats();
-    const chestGain = addChest(st.chestRun); // podiel zo zabitých ostane v truhlici aj po prehre
-    st.hallHp = 0;
+    // podiel zo zabitých ostane v truhlici aj po prehre; pri útoku na hrad sa vráti polovica minutých zlatiek
+    const chestGain = isAssault() ? (st.assaultDone ? 0 : addChest(st.assaultSpent * ASSAULT_BACK)) : addChest(st.chestRun);
+    st.assaultDone = true;
+    const fell = !isAssault(); // pri útoku na hrad radnica nie je – prehráva sa pádom celého vojska
+    if (fell) st.hallHp = 0;
     const survived = st.wave - 1;
     $('hud-boss').hidden = true; $('bottom').hidden = true;
     const hr = hallRect();
-    for (let k = 0; k < 60; k++) {
+    if (fell) for (let k = 0; k < 60; k++) {
       part(hr.x0 + Math.random() * (hr.x1 - hr.x0), hr.y0 - 10 + Math.random() * 40, (Math.random() - 0.5) * 50, -Math.random() * 50, 1.3, ['#6a6a78', '#3e3e4c', '#f89838', '#d83818'][k % 4], 60);
     }
     st.shake = 0.6;
     AUDIO.music(null); AUDIO.play('crumble'); setTimeout(() => AUDIO.play('lose'), 500);
-    later(() => showOver(isOrc() ? 'Pevnosť padla!' : 'Radnica padla!', 'Misia ' + st.mission + ' · ' + missionDef(st.mission).name + (st.tier ? ' · ' + TIERS[st.tier].name.toLowerCase() + ' úroveň' : '') + '<br>Prežité vlny: <b>' + survived + ' / ' + MISSION_WAVES + '</b>' +
+    const chestLine = chestGain ? '<span class="chestGain">+' + chestTxt(chestGain) + '</span><br><small class="dim">späť do truhlice</small>' : '';
+    if (isAssault()) later(() => showOver(fell ? (isOrc() ? 'Pevnosť padla!' : 'Radnica padla!') : 'Útok zlyhal!', chestLine, false), 1200);
+    else later(() => showOver(isOrc() ? 'Pevnosť padla!' : 'Radnica padla!', 'Misia ' + st.mission + ' · ' + missionDef(st.mission).name + (st.tier ? ' · ' + TIERS[st.tier].name.toLowerCase() + ' úroveň' : '') + '<br>Prežité vlny: <b>' + survived + ' / ' + MISSION_WAVES + '</b>' +
       (chestGain ? '<br><span class="chestGain">+' + chestTxt(chestGain) + '</span><br><small class="dim">do truhlice</small>' : ''), false), 1200);
     updateHud();
   }
@@ -1229,9 +1248,11 @@
     e.dead = true;
     AUDIO.play('die'); AUDIO.play('coin');
     const gain = Math.round(e.d.gold * goldMul() * (1 + 0.04 * perk('loot')));
-    st.gold += gain;
-    st.chestRun += gain * CHEST_KILL; // podiel do truhlice navyše (zlato na stavanie sa nemení)
-    st.texts.push({ x: e.x, y: e.y - e.h, s: '+' + gain, life: 0.9, max: 0.9 });
+    if (!isAssault()) { // pri útoku na hrad sa za zabitých neplatí
+      st.gold += gain;
+      st.chestRun += gain * CHEST_KILL; // podiel do truhlice navyše (zlato na stavanie sa nemení)
+      st.texts.push({ x: e.x, y: e.y - e.h, s: '+' + gain, life: 0.9, max: 0.9 });
+    }
     const cols = [blood(e), isOrc() ? '#22337a' : '#305c22', '#6e4422', '#1c140e'];
     const n = quiet ? 0 : e.d.boss ? 50 : 12;
     for (let k = 0; k < n; k++) {
@@ -1284,6 +1305,7 @@
   }
 
   function hitHall(dmg, x) {
+    if (isAssault()) return; // pri útoku na hrad hráč radnicu nemá
     if (st.hallHolyT > 0 || shieldAt(x, G.hallTop + 4)) { if (Math.random() < 0.3) part(x, G.hallTop + 2, (Math.random() - 0.5) * 20, -10, 0.3, '#fff070', 0); return; }
     st.hallHp -= dmg;
     AUDIO.play('hallHit');
@@ -1415,6 +1437,10 @@
       if (e.hp <= 0) { kill(e); return; }
     }
     if (e.chillT > 0) { e.chillT -= dt; if (!(e.venomT > 0) && Math.random() < 0.2) part(e.x + (Math.random() - 0.5) * e.w * 0.5, e.y - Math.random() * e.h, 0, -6, 0.4, '#e0f4ff', 0); }
+    if (e.guard && !armyNear(e, GUARD_R)) { // obranca hradu: kým sa vojsko nepriblíži, stojí na stráži pri svojej stavbe
+      if (Math.hypot(e.guard.x - e.x, e.guard.y - e.y) > 2) moveTo(e, e.guard.x, e.guard.y, e.spd, dt);
+      return;
+    }
     const slow = (e.chillT > 0 ? 0.5 : 1) * (campHas('drum') ? CAMP_DRUM : 1); // vojnový bubon tábora hordu zrýchli
     const attackFn = (fn) => {
       e.attacking = true;
@@ -2789,7 +2815,8 @@
     st.blasts = (st.blasts || []).filter(bl => bl.t < bl.max);
     updateFx(dt);
     if (st.hexHold > 0) st.hexHold -= dt;
-    if (st.phase === 'battle' && !st.spawnQ.length && !st.enemies.length && !(st.hexHold > 0)) endWave();
+    if (isAssault()) { if (st.phase === 'battle') updateAssault(DT); }
+    else if (st.phase === 'battle' && !st.spawnQ.length && !st.enemies.length && !(st.hexHold > 0)) endWave();
   }
 
   function impact(p) {
@@ -3503,6 +3530,7 @@
     for (let x = G.gx0; x < G.gx0 + G.cols * T; x += 4) g.fillRect(x, yb, 2, 1);
     // mriežka: tenké čiary po okrajoch políčok, výraznejšie keď je zvolená stavba
     const lineCol = st.tool ? 'rgba(255,255,255,0.24)' : 'rgba(255,255,255,0.13)';
+    const inHall = (c, r) => !isAssault() && hallTile(c, r); // pri útoku na hrad radnica nie je – mriežka aj na jej mieste
     for (let r = zt; r <= G.rows - 1; r++) for (let c = 0; c < G.cols; c++) {
       if (inHall(c, r)) continue;
       const x = tileX(c), y = tileY(r), o = occAt(c, r);
@@ -4178,7 +4206,7 @@
       objs.push({ y: fw.y + 3, f: () => drawFireFlames(fw, time, true) });
     }
     if (playing) {
-      objs.push({ y: G.hallBot, f: () => drawHall(time) });
+      if (!isAssault()) objs.push({ y: G.hallBot, f: () => drawHall(time) });
       for (const b of st.blds) if (!TRAPS[b.kind]) objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), x: b.c, f: () => drawBuilding(b, time) });
       for (const s of st.soldiers) {
         const cast = s.helper === 'chapel' && s.working && s.tgt && !s.dead; // mních pri liečení zdvihne palicu
@@ -4263,12 +4291,15 @@
   }
 
   function updateHud() {
-    $('waveTxt').textContent = 'Vlna ' + Math.min(MISSION_WAVES, Math.max(1, st.phase === 'build' ? st.wave + 1 : st.wave)) + '/' + MISSION_WAVES;
+    $('waveTxt').textContent = isAssault() ? 'Útok na hrad' : 'Vlna ' + Math.min(MISSION_WAVES, Math.max(1, st.phase === 'build' ? st.wave + 1 : st.wave)) + '/' + MISSION_WAVES;
     $('goldTxt').textContent = st.gold;
-    const r = Math.max(0, st.hallHp / hallMax());
+    const gi = $('hud-gold').querySelector('img'), gsrc = isAssault() ? ICONS.chest : ICONS.coin; // pri útoku zlatky z truhlice
+    if (gsrc && gi.getAttribute('src') !== gsrc) gi.src = gsrc;
+    const keep = isAssault() && st.camp ? st.camp.parts.find(o => o.role === 'keep') : null; // pri útoku pruh ukazuje srdce hradu
+    const r = keep ? Math.max(0, keep.hp / keep.max) : Math.max(0, st.hallHp / hallMax());
     $('hallFill').style.width = (r * 100) + '%';
     $('hallFill').className = r < 0.3 ? 'low' : '';
-    $('hallTxt').textContent = (isOrc() ? 'Pevnosť ' : 'Radnica ') + Math.max(0, Math.ceil(st.hallHp)) + ' / ' + hallMax();
+    $('hallTxt').textContent = keep ? 'Srdce hradu ' + Math.max(0, Math.ceil(keep.hp)) + ' / ' + Math.ceil(keep.max) : (isOrc() ? 'Pevnosť ' : 'Radnica ') + Math.max(0, Math.ceil(st.hallHp)) + ' / ' + hallMax();
     $('kingLvl').textContent = kingMeta.lvl;
     $('hud-king').classList.toggle('swap', st.phase === 'build' && ownedHeroes().length > 1);
     $('xpFill').style.width = (kingMeta.lvl >= KING_MAX_LVL ? 100 : Math.min(100, kingMeta.xp / kingXpNeed(kingMeta.lvl) * 100)) + '%';
@@ -4392,6 +4423,8 @@
     const sp = k => SPR[raceSpr(k)][0];
     ICONS.u_knight = spriteURL(sp('soldier'), 3); ICONS.u_footArcher = spriteURL(sp('footArcher'), 3);
     ICONS.u_archer = spriteURL(sp('archer'), 3); ICONS.u_crossbow = spriteURL(sp('knight'), 3);
+    ICONS.u_spear = spriteURL(sp('spear'), 3); ICONS.u_rider = spriteURL(sp('rider'), 3); ICONS.u_monk = spriteURL(sp('monk'), 3); // oddiely pri útoku na hrad
+    ICONS.u_falcon = spriteURL(SPR[isOrc() ? 'bat' : 'falcon'][0], 3);
     for (const k of ['siegeRam', 'siegeCat', 'siegeFire', 'siegeTower']) ICONS['u_' + k] = spriteURL(trimmed(SPR[raceSpr(k) + '8'][1].idle), 2);
     ICONS.king = ICONS.hero_king = isOrc() ? heroPortrait(SPR.chief8, 12, 5, 18) : heroPortrait(SPR.king8, 12, 6, 18);
     ICONS.paving = spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3); // kamenná dlažba či orkské dosky
@@ -4546,6 +4579,24 @@
       st.soldiers = st.soldiers.filter(s => !s.dead);
       rebuildOcc();
     };
+    $('undoBtn').hidden = $('repairBtn').hidden = isAssault();
+    if (isAssault()) { // útok na hrad: namiesto stavieb oddiely vojska za zlatky z truhlice
+      const n = st.soldiers.filter(u => !u.dead).length;
+      selRow(ICONS.chest, 'Vojsko · ' + n + (n === 1 ? ' jednotka' : n && n < 5 ? ' jednotky' : ' jednotiek'),
+        st.armyPick ? 'ťukni do zóny · ťuk na oddiel ho vráti do truhlice' : 'vyber oddiel, ťukni do zóny a potom Do útoku');
+      for (const k in ARMY) {
+        const a = ARMY[k], name = armyName(k) + (a.n > 1 ? ' ×' + a.n : '');
+        if (!armyOpen(k)) { lockAct(armyIcon(k), name, armyUnlock(k), !!a.siege); continue; }
+        const full = a.siege && depSiege(k) >= SIEGE_MAX, picked = st.armyPick === k;
+        act(armyIcon(k), name + (a.siege ? ' ' + depSiege(k) + '/' + SIEGE_MAX : ''), full ? 'plné' : chestTxt(a.cost), !full && st.gold >= a.cost,
+          full ? null : () => { st.armyPick = picked ? null : k; }, 'pick' + (picked ? ' sel' : ''), !!a.siege);
+      }
+      $('nextWave').textContent = 'Do útoku!';
+      $('nextWave').disabled = !st.deps.length;
+      updateHud();
+      return;
+    }
+    $('nextWave').disabled = false;
 
     if (st.sel === HALL) {
       const k = st.king;
@@ -4868,6 +4919,7 @@
       return;
     }
     if (st.phase !== 'build') return;
+    if (isAssault()) { tapDeploy(p); return; } // útok na hrad: rozostavovanie vojska
     if (st.siegePick || (!st.tool && siegeAt(p.x, p.y))) { tapSiege(p.x, p.y); return; } // štartové miesto obliehacieho stroja
     const t = evTile(p);
     if (st.tool === 'paving' && inZone(t.c, t.r) && !inHall(t.c, t.r)) { // dlažba: ťuk = jedna (alebo zobrať), ťah = celá plocha
@@ -5066,6 +5118,108 @@
     tower: { cost: 150, siege: 'siegeTower', name: 'Obl. veža',     plural: 'obliehacie veže' },
   };
   const SIEGE_MAX = 2;
+  // ---- útok na hrad: posledná misia ostrova (za ľudí aj za orkov) ----
+  // hráč nestavia: zlatkami z truhlice rozostaví vojsko do zóny radnice 1. úrovne a vyrazí na hrad;
+  // radnicu hráč nemá; vyhrá, keď padne srdce hradu, prehrá, keď padne posledný vojak
+  const isAssault = () => st.mission === MISSIONS.length;
+  // oddiel na jedno políčko: n jednotiek za cenu cost (jednotky majú úroveň najlepších budov, ktoré hráč pozná)
+  const ARMY = {
+    knight: { home: 'barracks', n: 3, cost: 75 },
+    spear:  { home: 'armory',   n: 3, cost: 90 },
+    rider:  { home: 'stables',  n: 2, cost: 90 },
+    archer: { home: 'range',    n: 3, cost: 75 },
+    falcon: { home: 'falconry', n: 2, cost: 70 },
+    monk:   { home: 'chapel',   n: 1, cost: 60 },
+    ram:    { siege: 'ram',   n: 1, cost: 120 },
+    cat:    { siege: 'cat',   n: 1, cost: 150 },
+    fire:   { siege: 'fire',  n: 1, cost: 140 },
+    tower:  { siege: 'tower', n: 1, cost: 170 },
+  };
+  const ASSAULT_BACK = 0.5; // pri prehre sa vráti polovica minutých zlatiek
+  // na útok treba v truhlici aspoň 70 % sumy, za ktorú automatický hráč hrad spoľahlivo dobyl (dev/assault-sim.js: ~2500);
+  // s menším vojskom by útok nemal zmysel, s minimom sa dá ešte vyhrať aj prehrať
+  const ASSAULT_NEED = 2500, ASSAULT_MIN = Math.round(ASSAULT_NEED * 0.7);
+  const assaultLocked = m => m === MISSIONS.length && (st.chest || 0) < ASSAULT_MIN;
+  const GUARD_R = 100, GUARD_PER = 2; // obranca vyrazí na vojsko bližšie než GUARD_R; strážcov na jednu liaheň
+  const armyNear = (e, rad) => (st.king && !st.king.dead && Math.hypot(st.king.x - e.x, st.king.y - e.y) < rad) ||
+    st.soldiers.some(u => !u.dead && Math.hypot(u.x - e.x, u.y - e.y) < rad);
+  const armyName = k => ARMY[k].siege ? BUY[k].name : KTYPES[k] ? KTYPES[k].name
+    : { archer: isOrc() ? 'Goblin strelec' : 'Lukostrelec', falcon: isOrc() ? 'Netopier' : 'Sokol', monk: isOrc() ? 'Šaman' : 'Mních' }[k];
+  const armyIcon = k => ARMY[k].siege ? ICONS['u_' + BUY[k].siege] : ICONS['u_' + k];
+  const armyOpen = k => ARMY[k].siege ? st.tech.has(BUY[k].siege) : has(ARMY[k].home);
+  const armyUnlock = k => unlockMissionOf(ARMY[k].siege ? BUY[k].siege : ARMY[k].home);
+  const depAt = (c, r) => st.deps.find(d => d.c === c && d.r === r);
+  const depSiege = k => st.deps.filter(d => d.key === k).length;
+  // oddiel na políčku (c, r): jednotky stoja v zóne a vyrazia, keď hráč ťukne Do útoku
+  function deployArmy(k, c, r) {
+    const a = ARMY[k];
+    if (!inZone(c, r) || (occAt(c, r) && occAt(c, r) !== HALL) || depAt(c, r)) { AUDIO.play('deny'); return false; } // radnica tu nie je – aj jej políčka sú voľné
+    if (a.siege && depSiege(k) >= SIEGE_MAX) { toast('Najviac ' + SIEGE_MAX + '× ' + armyName(k).toLowerCase()); AUDIO.play('deny'); return false; }
+    if (st.gold < a.cost) { toast('V truhlici nie je dosť zlatiek'); AUDIO.play('deny'); return false; }
+    const id = ++st.depN, lvl = lvlCap(), b = { kind: a.home || 'barracks', lvl, c, r, army: true }, n0 = st.soldiers.length;
+    if (a.siege) { const p = siegeCellPos(c, r); spawnSiege(a.siege, p.x, p.y); }
+    else for (let i = 0; i < a.n; i++) {
+      if (k === 'archer') spawnArcher(b, true);
+      else if (k === 'falcon') { const hp = falconHp(b); st.soldiers.push({ home: b, fly: true, x: 0, y: 0, hp, max: hp, dmg: falconDmg(b), spd: 52, cd: 0.3, tgt: null, anim: Math.random() * 2, flash: 0, dead: false, slot: st.soldierN++ }); }
+      else if (k === 'monk') { const h = HELPERS.chapel, hp = h.hp * lvlMul(b, 0.3); st.soldiers.push({ home: b, helper: 'chapel', x: 0, y: 0, hp, max: hp, spd: h.spd, spr: h.spr, rate: h.rate(b), cd: 0, tgt: null, anim: 0, flash: 0, swing: 0, dead: false }); }
+      else spawnKnight(b, true);
+    }
+    const us = st.soldiers.slice(n0), cx = tileX(c) + T / 2, cy = tileY(r) + T / 2 + 3;
+    us.forEach((u, i) => { // oddiel stojí na svojom políčku vedľa seba
+      u.dep = id; u.val = a.cost / us.length;
+      if (!a.siege) { u.x = cx + (i - (us.length - 1) / 2) * 4; u.y = cy - (u.fly ? 10 : 0) + (i % 2) * 2; }
+    });
+    st.deps.push({ id, key: k, c, r, cost: a.cost });
+    st.gold -= a.cost;
+    AUDIO.play('build');
+    for (let q = 0; q < 8; q++) part(cx + (Math.random() - 0.5) * 12, cy, (Math.random() - 0.5) * 30, -Math.random() * 16, 0.4, '#c6a272', 50);
+    return true;
+  }
+  function undeploy(d) {
+    st.soldiers = st.soldiers.filter(u => u.dep !== d.id);
+    st.deps = st.deps.filter(q => q !== d);
+    st.gold += d.cost;
+    AUDIO.play('sell');
+  }
+  // ťuk do zóny počas rozostavovania: na oddiel = vráti ho do truhlice, na voľné políčko = postaví zvolený oddiel
+  function tapDeploy(p) {
+    const t = evTile(p), d = depAt(t.c, t.r);
+    if (d) undeploy(d);
+    else if (st.armyPick) { const k = st.armyPick; if (deployArmy(k, t.c, t.r) && (st.gold < ARMY[k].cost || (ARMY[k].siege && depSiege(k) >= SIEGE_MAX))) st.armyPick = null; }
+    else { toast('Vyber oddiel a ťukni do zóny'); return; }
+    renderBuild(); updateHud();
+  }
+  // zlatky zo živých jednotiek (pri výhre sa vrátia do truhlice)
+  const armyLeft = () => Math.round(st.soldiers.reduce((t, u) => t + (!u.dead && u.val ? u.val : 0), 0));
+  // obrancovia hradu: liahne priebežne vypúšťajú svoje jednotky, srdce pod polovicou zdravia privolá veľkráľa
+  function updateAssault(dt) {
+    const C = st.camp;
+    if (!C) return;
+    const live = st.enemies.filter(e => !e.dead).length, spawns = C.parts.filter(o => o.role === 'spawn' && o.hp > 0);
+    for (const o of spawns) { // každá liaheň drží pri sebe najviac GUARD_PER strážcov, padlých dopĺňa
+      o.spT = (o.spT == null ? 1 + Math.random() * 3 : o.spT) - dt;
+      if (o.spT > 0) continue;
+      o.spT = 10 + Math.random() * 4;
+      if (live >= 4 * GUARD_PER + spawns.length || st.enemies.filter(e => !e.dead && e.from === o).length >= GUARD_PER) continue;
+      const types = [].concat(o.skin.unit), e = spawnEnemy({ type: types[Math.floor(Math.random() * types.length)], hpMul: st.assaultHp });
+      e.x = o.x + (Math.random() - 0.5) * 6; e.y = o.y + 3; e.from = o;
+      e.guard = { x: Math.max(G.gx0 + 6, Math.min(G.gx0 + G.cols * T - 6, o.x + (Math.random() - 0.5) * 20)), y: o.y + 8 + Math.random() * 14 };
+      for (let k = 0; k < 6; k++) part(o.x, o.y, (Math.random() - 0.5) * 24, -Math.random() * 12, 0.4, '#c6a272', 40);
+    }
+    const keep = C.parts.find(o => o.role === 'keep');
+    if (keep && keep.hp > 0 && keep.hp < keep.max * 0.5 && !st.assaultKing) { // srdce pod polovicou: z hradu vyrazí veľkráľ
+      st.assaultKing = true;
+      const e = spawnEnemy({ type: 'orcKing', hpMul: TIERS[st.tier || 0].hp * 0.75 });
+      e.x = keep.x; e.y = keep.y + 4; e.guard = { x: keep.x, y: keep.y + 14 }; banner((isOrc() ? 'Veliteľ jazdy' : ENEMY.orcKing.name) + ' vyrazil z hradu!');
+    }
+    if (!C.parts.some(o => o.role === 'keep' && o.hp > 0)) { missionWon(); return; }
+    if (!st.soldiers.some(u => !u.dead && !u.helper)) gameOver(); // padol posledný vojak (hrdina sám hrad nedobyje)
+  }
+  // odchod z rozbehnutého útoku (pauza → Ukončiť či Reštart) sa ráta ako prehra: vráti sa polovica minutých zlatiek
+  function assaultForfeit() {
+    if (!isAssault() || st.phase !== 'battle' || st.assaultDone) return;
+    st.assaultDone = true; addChest(st.assaultSpent * ASSAULT_BACK);
+  }
   const siegeCount = kind => st.soldiers.filter(s => s.siege === kind && !s.dead).length + st.siegeOrder.filter(o => o.key === kind).length;
   const canSiege = key => st.tech.has(BUY[key].siege); // v každej misii, keď je stroj raz odomknutý
   // kúpa stroja na miesto (x, y); bez miesta postaví stroj vedľa radnice (simulácia)
@@ -5141,8 +5295,8 @@
   }
   $('pauseBtn').addEventListener('click', ev => { ev.stopPropagation(); if (canPause()) { AUDIO.play('click'); setPaused(true); } });
   $('pauseGo').addEventListener('click', () => { AUDIO.play('click'); setPaused(false); });
-  $('pauseRestart').addEventListener('click', () => { AUDIO.play('click'); setPaused(false); startMission(st.mission, st.tier); });
-  $('pauseQuit').addEventListener('click', () => { AUDIO.play('click'); setPaused(false); showMap(); });
+  $('pauseRestart').addEventListener('click', () => { AUDIO.play('click'); setPaused(false); assaultForfeit(); startMission(st.mission, st.tier); });
+  $('pauseQuit').addEventListener('click', () => { AUDIO.play('click'); setPaused(false); assaultForfeit(); showMap(); });
   // keď hráč odíde z aplikácie (iné okno, zamknutý mobil), hra sa sama pozastaví
   document.addEventListener('visibilitychange', () => { if (document.hidden && canPause()) setPaused(true); });
   function clearBattle() {
@@ -5170,6 +5324,23 @@
     }
   }
 
+  // náhľad hradu na mape (okno poslednej misie): krajina misie a stavby hradu z editora, orezané pod hrad
+  const castlePrev = {};
+  function castlePreview(m) {
+    const race = foeRace(), lay = typeof CASTLES !== 'undefined' && CASTLES[race] && CASTLES[race][m];
+    if (!lay || !lay.length) return null;
+    const key = race + ':' + m + ':' + W;
+    if (castlePrev[key]) return castlePrev[key];
+    const { g2 } = fieldGeom(m), sc = sceneFor(m), pieces = CAMP_PIECES[race];
+    const parts = lay.filter(q => pieces[q.k]).map(q => {
+      const pc = pieces[q.k], [w, h] = campSize(pc);
+      return { kind: q.k, skin: pc, lvl: pc.fixed ? 1 : q.l || 1, fired: 0, x: g2.gx0 + q.c * T + w * T / 2, y: g2.gy0 + (q.r + h) * T, mask: CAMP_WALLS[q.k] ? campWallMask(lay, q) : null };
+    }).sort((a, b) => a.y - b.y);
+    const c = document.createElement('canvas'); c.width = W; c.height = Math.min(sc.bg.height, Math.max(...parts.map(o => o.y)) + 10);
+    const x = c.getContext('2d'); x.drawImage(sc.bg, 0, 0);
+    for (const o of parts) { const sp = o.skin.spr(o, 0); x.drawImage(sp.c, Math.round(o.x - sp.w / 2), o.y - sp.h + (o.skin.dy || 0)); }
+    return (castlePrev[key] = c.toDataURL());
+  }
   function renderMapPanel() {
     const m = st.mapSel, def = missionDef(m);
     prepareScene(m); // terén misie sa pripraví vopred
@@ -5200,6 +5371,17 @@
       tb.appendChild(b);
     });
     $('mapPlay').textContent = starsOf(m, st.mapTier) ? 'Hrať znova' : 'Hrať';
+    $('mapPlay').classList.toggle('poor', assaultLocked(m));
+    // posledná misia ostrova: útok na hrad – náhľad hradu a zlatky v truhlici namiesto vĺn a noviniek
+    const atk = m === MISSIONS.length, prev = atk ? castlePreview(m) : null;
+    $('mCastle').hidden = !prev; if (prev) $('mCastle').src = prev;
+    if (atk) {
+      $('mMeta').innerHTML = 'Útok na hrad · v truhlici ' + chestTxt(st.chest || 0) + (done ? ' · <span class="ok">dobytý ✓</span>' : '');
+      $('mNew').innerHTML = assaultLocked(m)
+        ? '<span>Na útok treba v truhlici aspoň ' + chestTxt(ASSAULT_MIN) + '</span>'
+        : '<span>Postav vojsko zo zlatiek v truhlici a zbúraj srdce hradu.</span>';
+      $('mapPlay').textContent = 'Zaútočiť';
+    }
     $('mStars').innerHTML = '';
   }
   // spodné ikonky mapy: na Sieni počet voľných hviezd, na Trofejach počet získaných
@@ -5506,7 +5688,9 @@
 
   $('overMap').addEventListener('click', showMap);
   $('overRetry').addEventListener('click', () => startMission(st.mission, st.tier));
-  $('mapPlay').addEventListener('click', () => { if (!st.mapAnim && tierOpen(st.mapSel, st.mapTier || 0)) { AUDIO.play('click'); afterPress($('mapPlay'), () => startMission(st.mapSel, st.mapTier || 0)); } });
+  $('mapPlay').addEventListener('click', () => {
+    if (assaultLocked(st.mapSel)) { AUDIO.play('deny'); toast('V truhlici máš ' + (st.chest || 0) + ' zlatiek – na útok treba aspoň ' + ASSAULT_MIN); return; }
+    if (!st.mapAnim && tierOpen(st.mapSel, st.mapTier || 0)) { AUDIO.play('click'); afterPress($('mapPlay'), () => startMission(st.mapSel, st.mapTier || 0)); } });
   // Menu na mape aj Späť z pozícií vedú na úvodný obrázok (Hrať / Nastavenia)
   function showMenu() {
     setTab('map', true);
@@ -5810,5 +5994,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, HEROES, switchHero, setActiveHero, ownedHeroes, heroDef, heroWalkHome,
-    enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, orderSiege, SIEGE_BUY: BUY, knightsBlocked, applyRace };
+    enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, orderSiege, SIEGE_BUY: BUY, knightsBlocked, applyRace, deployArmy, ARMY, depAt };
 })();

@@ -78,7 +78,7 @@ function plankRGB(X, Y) {
 }
 
 // G: { T, gx0, gy0, cols, rows, hallCx, hallTop, hallBot, zoneTopMax }
-// clear = obdĺžniky [x0, y0, x1, y1] bez stromov a skál (stavby tábora hordy); yard = 'planks' – nádvorie z dosiek (orkovia)
+// clear = obdĺžniky [x0, y0, x1, y1] bez stromov a skál (stavby tábora hordy); yard = 'planks' – nádvorie z dosiek (orkovia), 'none' – bez nádvoria
 function buildScene(W, H, G, seed, themeIdx, clear, yard) {
   const th = THEMES[((themeIdx || 0) % THEMES.length + THEMES.length) % THEMES.length];
   const bg = document.createElement('canvas'); bg.width = W; bg.height = H;
@@ -105,7 +105,7 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard) {
   const roadHw = y => (th.cliffs ? 7 : 9) + Math.max(0, Math.min(1, y / G.hallTop)) * 7;
   const roadD = (x, y) => y > G.hallTop + 4 ? 99 : Math.abs(x - roadCx(y)) - roadHw(y) + (vnoise(x * 0.3, y * 0.3, seed + 3) - 0.5) * 5;
   const hx0 = G.hallCx - 22, hx1 = G.hallCx + 22;
-  const yardD = (x, y) => {
+  const yardD = yard === 'none' ? () => 99 : (x, y) => { // 'none' = bez nádvoria (útok na hrad – hráč nemá radnicu)
     const dx = Math.max(hx0 - x, 0, x - hx1), dy = Math.max(G.hallTop - y, 0, y - G.hallBot);
     return Math.hypot(dx, dy) - 3 + (vnoise(x * 0.25, y * 0.25, seed + 17) - 0.5) * 3;
   };
