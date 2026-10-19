@@ -43,7 +43,7 @@ const THEMES = [
   { key: 'pass',   ground: 'grassDark', road: 'dirt', deco: 'rocks',  cliffs: true, spawn: 'middle' },
   { key: 'ruins',  ground: 'grassDark', road: 'cobble', deco: 'ruins' },
   { key: 'ash',    ground: 'ash',   road: 'ashroad', deco: 'charred', anim: 'embers' },
-  { key: 'orc',    ground: 'dark',  road: 'ashroad', deco: 'orc',     lava: true, anim: 'lava' },
+  { key: 'orc',    ground: 'darkLit', road: 'ashroad', deco: 'orc' },
 ];
 
 const TR = {
@@ -54,6 +54,7 @@ const TR = {
   ash:    ['#161414', '#201e1e', '#2c2828', '#3a3434', '#4a4442', '#5c5452', '#6e6662', '#827a74'],
   ashroad:['#120e0c', '#1c1612', '#281e18', '#34281e', '#423224', '#52402c'],
   dark:   ['#120a08', '#1a0e0a', '#24140e', '#301a12', '#3e2216', '#4c2a1a', '#5a3420'],
+  darkLit:['#24160e', '#301e14', '#3e2618', '#4c301e', '#5a3a24', '#68442a', '#785032'], // pevnosť orkov: svetlejšia zem bez lávy
   lava:   ['#5a1008', '#a02810', '#e05018', '#f89838', '#fff070'],
   water:  ['#0c1e44', '#10285a', '#163a7a', '#1e5096', '#2a6ab0', '#3c88c8', '#5aa8d8', '#8ad0e8'],
   birch:  ['#28461e', '#3a6028', '#4e7a30', '#68943c', '#86ae4c', '#a6c862'],
@@ -108,7 +109,7 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard) {
     const dx = Math.max(hx0 - x, 0, x - hx1), dy = Math.max(G.hallTop - y, 0, y - G.hallBot);
     return Math.hypot(dx, dy) - 3 + (vnoise(x * 0.25, y * 0.25, seed + 17) - 0.5) * 3;
   };
-  const groundRamp = { grass: RAMP.grass, grassDark: RAMP.grass, dry: TR.dry, swamp: TR.swamp, ash: TR.ash, dark: TR.dark }[th.ground];
+  const groundRamp = { grass: RAMP.grass, grassDark: RAMP.grass, dry: TR.dry, swamp: TR.swamp, ash: TR.ash, dark: TR.dark, darkLit: TR.darkLit }[th.ground];
   const groundBias = th.ground === 'grassDark' ? -0.12 : th.ground === 'swamp' ? 0.1 : 0;
 
   // ---- podklad: zem, cesta, nádvorie ----
@@ -412,7 +413,7 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard) {
     }
   };
   const grassy = th.ground === 'grass' || th.ground === 'grassDark' || th.ground === 'dry';
-  const tuftRamp = th.ground === 'dry' ? TR.dry : th.ground === 'swamp' ? TR.swamp : th.ground === 'ash' ? TR.ash : th.ground === 'dark' ? TR.dark : RAMP.grass;
+  const tuftRamp = th.ground === 'dry' ? TR.dry : th.ground === 'swamp' ? TR.swamp : th.ground === 'ash' ? TR.ash : th.ground === 'dark' ? TR.dark : th.ground === 'darkLit' ? TR.darkLit : RAMP.grass;
   for (let k = 0; k < (W * H) / (grassy ? 90 : 220); k++) {
     const x = Math.floor(rnd() * W), y = Math.floor(rnd() * H);
     if (!free(x, y, 1)) continue;
@@ -509,17 +510,11 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard) {
       break;
     }
     case 'orc': {
-      const bone = hexRGB('#eee6cc'), bone2 = hexRGB('#a8a088'), pole = hexRGB('#3e2614'), red = hexRGB('#e84838'), red2 = hexRGB('#8c2018');
+      const bone = hexRGB('#eee6cc'), bone2 = hexRGB('#a8a088');
       scatter(area / 1400, (x, y) => { // hromádka kostí
         for (let k = 0; k < 5; k++) { const bx2 = x + Math.floor(rnd() * 6) - 3, by2 = y + Math.floor(rnd() * 3); set(bx2, by2, bone); set(bx2 + 1, by2, bone2); }
       }, 3);
-      scatter(area / 2600, (x, y) => { // orkská zástava na kolíku
-        for (let k = 0; k < 13; k++) set(x, y - k, pole);
-        for (let dy = 0; dy < 6; dy++) for (let dx = 1; dx <= 5 - (dy > 3 ? dy - 3 : 0); dx++) set(x + dx, y - 12 + dy, dx === 1 || dy === 0 ? red : red2);
-        set(x, y - 13, bone); set(x - 1, y - 12, bone2); set(x + 1, y - 13, bone2);
-        for (let dx = -1; dx < 4; dx++) darken(x + dx, y + 1, 0.6);
-      }, 8);
-      scatter(area / 1600, (x, y) => blob(x, y, 2, TR.dark, 0.5, K), 4);
+      scatter(area / 1600, (x, y) => blob(x, y, 2, TR.darkLit, 0.5, K), 4);
       break;
     }
   }
