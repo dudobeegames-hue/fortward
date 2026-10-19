@@ -1379,6 +1379,7 @@
     }
   }
 
+  const SIEGE_AGGRO = 34; // na takú diaľku horda zbadá obliehací stroj a vyrazí naň
   function updateEnemy(e, dt) {
     e.flash = Math.max(0, e.flash - dt);
     e.lunge = Math.max(0, e.lunge - dt);
@@ -1430,8 +1431,16 @@
         }
       }
     }
-    // šaman lieči okolie
-    if (e.d.heals) {
+    // šaman lieči okolie; ľudský mních (hráč za orkov) lieči ako mních hráča: priebežne, so svetlom na palici a aurou
+    if (e.d.heals && isOrc()) {
+      let tg = null, worst = 1;
+      for (const o of st.enemies) if (!o.dead && o !== e && o.hp < o.max && Math.hypot(o.x - e.x, o.y - e.y) < 34 && o.hp / o.max < worst) { worst = o.hp / o.max; tg = o; }
+      e.healTgt = tg;
+      if (tg) for (const o of st.enemies) if (!o.dead && o !== e && o.hp < o.max && Math.hypot(o.x - e.x, o.y - e.y) < 34) {
+        o.hp = Math.min(o.max, o.hp + o.max * 0.06 * dt);
+        if (o === tg && Math.random() < 0.2) part(o.x + (Math.random() - 0.5) * 8, o.y - 4 - Math.random() * 10, (Math.random() - 0.5) * 6, -14, 0.6, Math.random() < 0.5 ? '#bfe3ff' : '#ffffff', 0);
+      }
+    } else if (e.d.heals) {
       e.healT = (e.healT || 2) - dt;
       if (e.healT <= 0) {
         e.healT = 2;
@@ -1477,12 +1486,14 @@
     // súboj s rytierom / kráľom (beranidlo a podkopník rytierov ignorujú)
     if (e.d.ram || e.d.sapper) e.foe = null;
     if (e.foe && (e.foe.dead || e.foe.down > 0)) e.foe = null;
-    if (!e.foe && !e.d.ram && !e.d.sapper) for (const s of st.soldiers) if ((s.helper || s.archer || s.siege || s.hexbat) && (!s.fly || s.hexbat) && !s.dead && Math.hypot(s.x - e.x, s.y - e.y) < (s.siege ? 12 : 9)) { e.foe = s; break; } // aj obliehací stroj, okolo ktorého ide
+    if (!e.foe && !e.d.ram && !e.d.sapper) for (const s of st.soldiers) if ((s.helper || s.archer || (s.siege && !e.d.fly && !e.d.ranged) || s.hexbat) && (!s.fly || s.hexbat) && !s.dead && Math.hypot(s.x - e.x, s.y - e.y) < (s.siege ? SIEGE_AGGRO : 9)) { e.foe = s; break; } // aj obliehací stroj v okolí
     // čarodejka nikoho nenapadne mečom, preto si ju horda nájde sama, keď je blízko
     const sk0 = st.king;
     if (!e.foe && !e.d.ram && !e.d.sapper && !e.d.fly && sk0 && !sk0.dead && heroDef().range && Math.hypot(sk0.x - e.x, sk0.y - e.y) < 14) e.foe = sk0;
     if (e.foe) {
-      if (Math.hypot(e.foe.x - e.x, e.foe.y - e.y) < 12) { attack(() => hitUnit(e.foe, e.d.atk * 0.7 * 1)); return; }
+      const fd = Math.hypot(e.foe.x - e.x, e.foe.y - e.y);
+      if (fd < (e.foe.siege ? 17 : 12)) { attack(() => hitUnit(e.foe, e.d.atk * 0.7 * 1)); return; }
+      if (e.foe.siege && fd < SIEGE_AGGRO + 14) { moveTo(e, e.foe.x + (e.x < e.foe.x ? -10 : 10), e.foe.y + 2, spd, dt); return; } // beží k obliehaciemu stroju
       e.foe = null;
     }
     // goblin-lukostrelec: zastaví v dosahu a strieľa
@@ -2894,7 +2905,8 @@
     }
     const walking = !e.attacking && !e.foe;
     const fi = walking ? Math.floor(e.anim) % 2 : 0;
-    const fr = frames[fi];
+    const healing = e.healTgt && !e.healTgt.dead && SPR.monkCast && foeSpr(e.d.spr) === 'monk'; // ľudský mních lieči so zdvihnutou palicou
+    const fr = healing ? SPR.monkCast[0] : frames[fi];
     const x = Math.round(e.x - fr.w / 2);
     const y = Math.round(e.y - fr.h + (e.lunge > 0 ? 2 : 0) + (walking && fi ? 1 : 0));
     shadow(e.x, e.y, Math.ceil(fr.w * 0.35));
@@ -4176,7 +4188,11 @@
       if (st.king && !st.king.dead) objs.push({ y: st.king.y, f: () => drawFighter(st.king, heroDef().spr) });
       else if (st.king && kingLying(st.king)) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
     }
-    for (const e of st.enemies) objs.push({ y: dpt(e), id: 1e5 + (e._id || (e._id = ++enemyN)), f: () => drawEnemy(e, time) });
+    for (const e of st.enemies) {
+      objs.push({ y: dpt(e), id: 1e5 + (e._id || (e._id = ++enemyN)), f: () => { drawEnemy(e, time); if (e.healTgt && !e.healTgt.dead && foeSpr(e.d.spr) === 'monk') drawStaffGlow(e, time); } });
+      const t = e.healTgt; // aura liečeného (ako pri mníchovi hráča)
+      if (t && !t.dead && !e.dead && foeSpr(e.d.spr) === 'monk') objs.push({ y: t.y - healAuraH(t) - 1, f: () => drawHealAura(e, t, time) });
+    }
     for (const tm of st.totems || []) objs.push({ y: tm.y, f: () => drawTotem(tm, time) }); // totem duchov šamana
     if (st.camp) {
       for (const o of st.camp.parts) if (o.hp > 0) objs.push({ y: o.y, f: () => {
