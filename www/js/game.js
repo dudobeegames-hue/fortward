@@ -604,13 +604,30 @@
   }
 
   // políčka pod stojacimi hradbami tábora (brána je priechodná) – horda nimi neprejde
-  function campBlocks() {
+  // gate = true: aj brána (vojsko hráča ňou neprejde, horda áno)
+  function campBlocks(gate) {
     const b = new Uint8Array(G.cols * G.rows);
-    if (st.camp) for (const o of st.camp.parts) if (o.hp > 0 && o.role === 'wall' && o.kind !== 'gatehouse') {
+    if (st.camp) for (const o of st.camp.parts) if (o.hp > 0 && o.role === 'wall' && (gate || o.kind !== 'gatehouse')) {
       const [w, h] = campSize(o.skin);
       for (let r = o.r; r < o.r + h; r++) for (let c = o.c; c < o.c + w; c++) if (c >= 0 && r >= 0 && c < G.cols && r < G.rows) b[r * G.cols + c] = 1;
     }
     return b;
+  }
+  // políčka hradieb a brán tábora pre vojsko hráča (pamätá sa, kým sa nezbúra niektorá hradba)
+  function campWallAt(c, r) {
+    if (!st.camp || c < 0 || r < 0 || c >= G.cols || r >= G.rows) return false;
+    if (!st.pBlk || st.pBlk.v !== st.campV || st.pBlk.camp !== st.camp) st.pBlk = { v: st.campV, camp: st.camp, b: campBlocks(true) };
+    return !!st.pBlk.b[r * G.cols + c];
+  }
+  // poistka: vojak hráča (aj stroj a hrdina) nikdy neostane v hradbe či bráne tábora – vráti sa na posledné voľné miesto
+  function keepOutOfCamp() {
+    const us = st.king && !st.king.dead ? st.soldiers.concat([st.king]) : st.soldiers;
+    for (const u of us) {
+      if (u.dead || u.fly) continue;
+      const t = tileAt(u.x, u.y);
+      if (!campWallAt(t.c, t.r)) { u.okX = u.x; u.okY = u.y; }
+      else if (u.okX != null) { u.x = u.okX; u.y = u.okY; u.next = null; u.repath = 0; }
+    }
   }
   // Dijkstra od radnice; budovy na ceste sú drahé (treba ich rozbiť), takže horda radšej obchádza.
   function computeFlow() {
@@ -816,7 +833,7 @@
     for (let k = 0; k < 26; k++) part(o.x + (Math.random() - 0.5) * 16, o.y - Math.random() * 18, (Math.random() - 0.5) * 60, -Math.random() * 50, 0.9, ['#3c3846', '#22202a', '#4a2e1a', '#f89838'][k % 4], 110);
     const gold = Math.round(CAMP_ROLES[o.role].gold * (1 + 0.1 * (st.mission - HOME_PROVINCES)));
     if (!isAssault()) { st.gold += gold; st.texts.push({ x: o.x, y: o.y - 22, s: '+' + gold, life: 1.4, max: 1.4 }); }
-    if (o.role === 'wall') { st.campV++; computeFlow(); } // zbúraná hradba otvorí horde cestu
+    if (o.role === 'wall') { st.campV++; computeFlow(); } // zbúraná hradba či brána otvorí cestu
     if (o.role === 'keep') { st.shake = 0.6; for (const q of campLive()) hitCamp(q, q.hp + 1); } // srdce padlo – zrúti sa celý tábor
     updateHud();
   }
@@ -1754,6 +1771,7 @@
 
   // vlastné budovy (veže, bane, kaplnky…) rytieri prejdú – hradby len cez bránu, radnicou len jej horným radom
   const knightPass = (c, r) => {
+    if (campWallAt(c, r)) return false; // hradba či brána tábora – treba ju zbúrať
     const o = occAt(c, r);
     if (o === HALL) return r === G.hr0;
     return !o || o.kind !== 'wall' || o.gate;
@@ -2726,6 +2744,7 @@
     }
     st.soldiers = st.soldiers.filter(s => !s.dead);
     separateSoldiers();
+    if (st.camp) keepOutOfCamp();
     // kráľ
     const k = st.king;
     if (k.dead) k.deadT += dt;
@@ -4224,6 +4243,7 @@
     const playing = st.phase !== 'title';
     if (playing) for (const key in st.paving) { const [pc, pr] = key.split(','), px = tileX(+pc), py = tileY(+pr); g.drawImage(paveAt(px, py), px, py); } // dlažba pod všetkým
     if (playing) for (const b of st.blds) if (TRAPS[b.kind]) drawPit(b, time);
+    if (playing && st.camp) for (const o of st.camp.parts) if (o.role === 'trap') drawPit({ kind: o.kind, c: o.c, r: o.r, lvl: 1, armT: o.armT }, time); // pasce tábora tiež na zemi
     if (st.phase === 'build') drawBuildOverlay(time);
     for (const m of st.marks) drawMark(m);
     if (st.king && st.king.post && !st.king.dead && st.phase === 'battle') drawPost(st.king.post, time);
@@ -4260,7 +4280,7 @@
     }
     for (const tm of st.totems || []) objs.push({ y: tm.y, f: () => drawTotem(tm, time) }); // totem duchov šamana
     if (st.camp) {
-      for (const o of st.camp.parts) if (o.hp > 0) objs.push({ y: o.y, f: () => {
+      for (const o of st.camp.parts) if (o.hp > 0 && o.role !== 'trap') objs.push({ y: o.y, f: () => {
         const sp = o.skin.spr(o, time); shadow(o.x, o.y, 8); g.drawImage(sp.c, Math.round(o.x - sp.w / 2) + hitJit(o.flash), o.y - sp.h + (o.skin.dy || 0));
         if (o.lvl > 1 && !o.skin.lvlArt) pxText(g, String(o.lvl), Math.round(o.x + sp.w / 2) - 4, o.y - 7, '#f8d048'); // úroveň stavby bez vlastného vzhľadu
       } });
@@ -4663,16 +4683,17 @@
       act(ICONS.coin, 'Predať ' + grp.length + '×', '+' + refund, true, sellAll(grp, refund), 'sell', true);
       if (isWall) {
         const bare = grp.filter(w => !w.spikes), plain = grp.filter(w => w.spikes && !w.spikeType);
-        if (bare.length) {
+        if (bare.length && !isOrc()) { // ostnaté hradby majú len ľudia
           if (!has('spikes')) lockAct(after(bare[0], { spikes: true, unit: null, gate: false }), 'Ostne', unlockMissionOf('spikes'));
           else bulk(after(bare[0], { spikes: true, spikeType: null, unit: null, gate: false }), 'Ostne', bare, () => SPIKE_COST, w => { st.gold -= SPIKE_COST; w.spent += SPIKE_COST; w.spikes = true; }, '', true);
         }
-        if (plain.length) {
+        if (plain.length && !isOrc()) {
           if (!has('spikeTypes')) lockAct(after(plain[0], { spikeType: 'fire', unit: null, gate: false }), 'Ohnivé/ľadové', unlockMissionOf('spikeTypes'));
           else for (const k in SPIKE_TYPES) bulk(after(plain[0], { spikeType: k, unit: null, gate: false }), SPIKE_TYPES[k].name.split(' ')[0], plain, () => SPIKE_TYPE_COST, w => { st.gold -= SPIKE_TYPE_COST; w.spent += SPIKE_TYPE_COST; w.spikeType = k; }, '', true);
         }
         const free = grp.filter(w => !w.gate && !w.unit); // strelci na hradbách sa nevylepšujú
         if (has('wallArcher') && free.length) for (const type in WUNIT) {
+          if (type === 'crossbow' && isOrc()) continue; // kušník na hradbách je len pre ľudí
           const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
           if (!has(tid)) { lockAct(ICONS['u_' + type], wd.name, unlockMissionOf(tid)); continue; }
           bulk(after(free[0], { unit: { type, lvl: 1 }, gate: false }), wd.name, free, () => wd.cost, w => { st.gold -= wd.cost; w.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit');
@@ -4723,6 +4744,7 @@
           const ur = Math.floor(u.spent * sellShare());
           act(I.actDown, 'Odvolať', '+' + ur, true, () => { st.gold += ur; b.unit = null; }, 'sell', true);
         } else if (!b.gate && has('wallArcher')) for (const type in WUNIT) {
+          if (type === 'crossbow' && isOrc()) continue; // kušník na hradbách je len pre ľudí
           const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
           if (!has(tid)) { lockAct(ICONS['u_' + type], wd.name, unlockMissionOf(tid)); continue; }
           shineTech(act(after(b, { unit: { type, lvl: 1 } }), wd.name, coinTxt(wd.cost), st.gold >= wd.cost, () => { st.gold -= wd.cost; b.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit'), tid);
@@ -4732,7 +4754,7 @@
           if (!has('gate')) lockAct(after(b, { gate: true }), 'Brána', unlockMissionOf('gate'));
           else { const gc = gateCost(); shineTech(act(after(b, { gate: true }), 'Brána', coinTxt(gc), st.gold >= gc, () => { st.gold -= gc; b.spent += gc; b.gate = true; }), 'gate'); }
         }
-        if (!b.spikes) {
+        if (isOrc()) { /* ostnaté hradby majú len ľudia */ } else if (!b.spikes) {
           if (has('spikes')) shineTech(act(after(b, { spikes: true }), 'Ostne', coinTxt(SPIKE_COST), st.gold >= SPIKE_COST, () => { st.gold -= SPIKE_COST; b.spent += SPIKE_COST; b.spikes = true; }, '', true), 'spikes');
           else lockAct(after(b, { spikes: true }), 'Ostne', unlockMissionOf('spikes'));
         } else if (!b.spikeType) {

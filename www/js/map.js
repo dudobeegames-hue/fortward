@@ -270,7 +270,8 @@ const ORC_ENEMY_INTRO = {
 };
 // za orkov sa jedový kotol (icetower) odomyká ako druhá veža (misia 2) a ohnivý totem (mage) až v misii 3
 let UNLOCK_RACE = 'human';
-const ORC_UNLOCKS = UNLOCKS.map(l => l.map(u => Object.assign({}, u)));
+// kušník na hradbách a ostnaté hradby majú len ľudia
+const ORC_UNLOCKS = UNLOCKS.map(l => l.filter(u => !['wallCrossbow', 'spikes', 'spikeTypes'].includes(u.id)).map(u => Object.assign({}, u)));
 (() => {
   const a = ORC_UNLOCKS[1], b = ORC_UNLOCKS[2], i = a.findIndex(u => u.id === 'mage'), j = b.findIndex(u => u.id === 'icetower');
   [a[i], b[j]] = [b[j], a[i]];
