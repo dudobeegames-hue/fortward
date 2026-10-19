@@ -826,6 +826,7 @@
       } else if (o.role === 'tower' && o.cd <= 0) { // šíp na najbližšiu jednotku hráča v dosahu
         let tg = null, td = 84;
         for (const u of st.soldiers) { if (u.dead) continue; const d = Math.hypot(u.x - o.x, u.y - (o.y - 24)); if (d < td) { td = d; tg = u; } }
+        const kk = st.king; if (kk && !kk.dead && !(kk.tpBack > 0) && Math.hypot(kk.x - o.x, kk.y - (o.y - 24)) < td) tg = kk; // aj na hrdinu
         if (!tg) { o.cd = 0.3; continue; }
         o.cd = 1.5;
         st.eproj.push({ x: o.x, y: o.y - 28, tx: tg.x, ty: tg.y - (tg.fly ? 16 : 6), tgt: tg, dmg: 5 * pw * campPowMul(o.lvl) });
@@ -1789,7 +1790,39 @@
         st.proj.push({ k: heroDef().proj || 'fire', x: k.x + tip.x, y: k.y + tip.y, tgt: t, tx: t.x, ty: t.y - t.h * 0.5, dmg: kingDmg(), spd: 150, splash: 8, vx: 0, vy: -1 });
         AUDIO.play('fire');
       }
-    } else { const h = heroPos(k); if (Math.hypot(h.x - k.x, h.y - k.y) > 2) { moveKnight(k, h.x, h.y, k.spd * waterMul(k), dt); k.anim += dt * 6; } }
+    } else {
+      const cp = heroCampTarget(k, rng); // bez nepriateľa strieľa na stavbu tábora v dostrele od svojho miesta
+      if (cp && Math.hypot(cp.x - k.x, cp.y - k.y) > rng) { moveKnight(k, cp.x, cp.y, k.spd * waterMul(k), dt); k.anim += dt * 6; }
+      else if (cp) {
+        if (k.cd <= 0) {
+          k.cd = heroDef().cd * (1 - 0.12 * tal('swift')) * (st.cryT > 0 ? 0.6 : 1); k.swing = 0.15;
+          const set = hero8(heroDef().spr), a = campAim(cp);
+          if (set) k.face8 = dir8(cp.x - k.x, cp.y - k.y);
+          const tip = set ? set[k.face8].tip : { x: 5, y: -15 };
+          st.proj.push({ k: heroDef().proj || 'fire', x: k.x + tip.x, y: k.y + tip.y, tgt: null, tx: a.x, ty: a.y, campT: cp, dmg: kingDmg(), spd: 150, splash: 8, vx: 0, vy: -1 });
+          AUDIO.play('fire');
+        }
+      } else { const h = heroPos(k); if (Math.hypot(h.x - k.x, h.y - k.y) > 2) { moveKnight(k, h.x, h.y, k.spd * waterMul(k), dt); k.anim += dt * 6; } }
+    }
+  }
+  // stavba tábora, ktorú hrdina môže búrať: najbližšia živá v dosahu R od miesta, ktoré bráni (stanovište či radnica)
+  function heroCampTarget(k, R) {
+    const h = heroPos(k);
+    let best = null, bd = 1e9;
+    for (const o of campLive()) { const d = Math.hypot(o.x - h.x, o.y - h.y); if (d <= R + 8 && d < bd) { bd = d; best = o; } }
+    return best;
+  }
+  const heroFoeNear = aggro => st.enemies.some(e => !e.dead && !e.d.fly && heroReaches(e, aggro)); // nepriateľ, na ktorého by hrdina vyrazil
+  // hrdina na blízko búra stavbu tábora: dôjde k nej z boku a udiera (kým nemá nepriateľa)
+  function heroStrikeCamp(k, o, dt) {
+    k.flash = Math.max(0, k.flash - dt); k.cd = Math.max(0, k.cd - dt); k.swing = Math.max(0, (k.swing || 0) - dt);
+    k.tgt = null; k.aim = o; // natočí sa k stavbe
+    const side = k.x < o.x ? -1 : 1, tx = o.x + side * 9, ty = o.y + 3;
+    if (Math.hypot(tx - k.x, ty - k.y) > 2) { moveKnight(k, tx, ty, k.spd * waterMul(k), dt); k.anim += dt * 6; return; }
+    if (k.cd > 0) return;
+    k.cd = heroDef().cd * (1 - 0.12 * tal('swift')) * rageMul(k); k.swing = 0.3; AUDIO.play('kingHit');
+    hitCamp(o, kingDmg() * (st.cryT > 0 ? CRY_DMG : 1) * (k.feastT > 0 ? 1.3 : 1));
+    for (let q = 0; q < 4; q++) part(o.x + side * 4, o.y - 8, (Math.random() - 0.5) * 30, -10 - Math.random() * 20, 0.35, '#c6a272', 80);
   }
   // rytier alebo kráľ: nájdi nepriateľa v okruhu domova, bojuj, inak sa vráť
   function updateFighter(u, dt, homeX, homeY, aggro, dmg, cleave, mover) {
@@ -2629,7 +2662,12 @@
         }
       } else if (k.charge) updateCharge(k, dt);
       else if (hd.range) updateSorc(k, dt);
-      else { const h = heroPos(k); updateFighter(k, dt, h.x, h.y, hd.reach + T + 10 * tal('reach'), kingDmg(), true, moveKnight); } // vyráža o políčko pred stavebnú zónu (či od stanovišťa), chodí len cez brány
+      else {
+        const h = heroPos(k), aggro = hd.reach + T + 10 * tal('reach');
+        const cp = (!k.tgt || k.tgt.dead) && !heroFoeNear(aggro) ? heroCampTarget(k, aggro) : null; // bez nepriateľa búra tábor pri sebe
+        if (cp) heroStrikeCamp(k, cp, dt);
+        else { k.aim = null; updateFighter(k, dt, h.x, h.y, aggro, kingDmg(), true, moveKnight); } // vyráža o políčko pred stavebnú zónu (či od stanovišťa), chodí len cez brány
+      }
       if (tal('regen') && k.hp < kingMax()) k.hp = Math.min(kingMax(), k.hp + kingMax() * 0.015 * tal('regen') * dt);
       if (hd.aura) { // paladin lieči rytierov okolo seba
         const rate = hd.aura * (1 + 0.5 * tal('aura'));
