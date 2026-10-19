@@ -522,6 +522,7 @@
     Object.assign(meta.perks, loadJSON(sk('perks9'), {})); // sieň s 9 úrovňami; staré bonusy (sk 'perks') sa nepreberú – hviezdy sa vrátia
     for (const k in meta.perks) if (!PERKS.some(p => p.id === k)) delete meta.perks[k];
     st.race = loadJSON(sk('race'), 'Ľudia'); applyRace();
+    st.chest = Math.max(0, Math.round(loadJSON(sk('chest'), 0)) || 0); // truhlica zlatiek na útok na hrad (pozícia = jedna rasa)
     st.hero = null; setActiveHero(loadJSON(sk('hero'), 'king'));
     Object.assign(stats, { kills: 0, builds: 0, bosses: 0, orcKings: 0, perfect: 0, maxGold: 0 }, loadJSON(sk('stats'), {}));
     for (const k in ach) delete ach[k];
@@ -988,7 +989,7 @@
   function newGame() {
     undoStack = [];
     Object.assign(st, {
-      wave: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.05 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, shake: 0, soldierN: 0,
+      wave: 0, chestRun: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.05 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, shake: 0, soldierN: 0,
       blds: [], paving: {}, enemies: [], soldiers: [], form: null, proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
       cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, shieldCd: 0, healCd: 0, fwCd: 0, tpCd: 0, rageCd: 0, roarCd: 0, axeCd: 0, axes: [], totemCd: 0, poisonCd: 0, hexCd: 0, totems: [], clouds: [], pools: [], chargeCd: 0, hideCd: 0, feastCd: 0, shields: [], fireWalls: [], heroDead: {},
       spellSel: null, siegeOrder: [], siegePick: null, fallFx: [], blasts: [], healFx: [], bolts: [], hallHolyT: 0, stance: 'attack', introPan: null,
@@ -1017,6 +1018,11 @@
     pArcher: 0.12, pBat: 0.12, pRam: 0.05, pShaman: 0.04, pSapper: 0.06, // podiel nových nepriateľov
   };
   const goldMul = () => 1 + DIFF.goldMission * (st.mission - 1);
+  // ---- truhlica: zlatky na útok na hrad; plní sa v obranných misiách (podiel zo zabitých + neminuté zlato pri výhre) ----
+  const CHEST_KILL = 0.25;
+  function addChest(n) { n = Math.max(0, Math.round(n)); st.chest = (st.chest || 0) + n; saveJSON(sk('chest'), st.chest); updateChest(); return n; }
+  const chestTxt = n => '<img class="chest" src="' + ICONS.chest + '">' + n;
+  const updateChest = () => { const c = document.querySelector('#chestBox span'); if (c) c.textContent = st.chest || 0; };
 
   function buildWave(w) {
     const m = st.mission, ew = w + (m - 1) * DIFF.typeShift;
@@ -1149,10 +1155,7 @@
     if (st.hallHp >= hallMax()) stats.perfect++;
     st.phase = 'won';
     const t = st.tier || 0, stars = starsFor(st.hallHp / hallMax()), prevStars = starsOf(m, t);
-    const nextWasOpen = t < 2 && tierOpen(m, t + 1);
     if (stars > prevStars) { const a = (meta.stars[m - 1] || [0, 0, 0]).slice(); a[t] = stars; meta.stars[m - 1] = a; saveJSON(sk('stars'), meta.stars); }
-    const tierNote = t >= 2 ? '' : !nextWasOpen && tierOpen(m, t + 1) ? '<br><span class="newTech">Odomkla sa ' + TIERS[t + 1].name.toLowerCase() + ' úroveň!</span>'
-      : !tierOpen(m, t + 1) ? '<br><small class="dim">Za 3 hviezdy (radnica nad 80 % zdravia) sa odomkne ' + TIERS[t + 1].name.toLowerCase() + ' úroveň.</small>' : '';
     $('hud-boss').hidden = true; $('bottom').hidden = true;
     const first = t === 0 && m >= st.unlocked;
     if (first) {
@@ -1162,13 +1165,11 @@
     banner('Misia splnená!');
     AUDIO.music(null); AUDIO.play('win');
     for (let k = 0; k < 80; k++) part(Math.random() * W, camY + H * 0.3 + Math.random() * 30, (Math.random() - 0.5) * 60, -30 - Math.random() * 60, 1.4, ['#f8d048', '#fff070', '#88b4ff', '#e84838'][k % 4], 60);
-    const text = m === MISSIONS.length
-      ? 'Porazil si poslednú hordu. <b>Ostrov je oslobodený!</b>'
-      : 'Misia ' + m + ' · ' + missionDef(m).name + ' · ' + TIERS[t].name.toLowerCase() + ' úroveň<br>Všetkých ' + MISSION_WAVES + ' vĺn odrazených.' + (first ? '<br>Odomkla sa misia ' + (m + 1) + '.<br><span class="newTech">Nové: ' + unlocksOf()[m].map(unlockName).join(', ') + '</span>' : '');
-    const starLine = '<span class="bigStars">' + starSpan(stars, t) + '</span>' +
-      (stars > prevStars ? '<br><span class="newTech">+' + (stars - prevStars) + ' ★ do Kráľovskej siene</span>' : '') + tierNote;
-    const xpLine = st.lastXp ? '<br><span class="newTech">' + heroName() + ' +' + st.lastXp + ' XP' + (kingMeta.pending ? ' · nová úroveň ' + kingMeta.lvl + '!' : '') + '</span>' : '';
-    later(() => showOver(m === MISSIONS.length ? 'Víťazstvo!' : 'Misia splnená!', starLine + '<br>' + text + xpLine, true), 1200);
+    // výsledok misie: len hviezdy a zlatky, ktoré pribudnú do truhlice (podiel zo zabitých + neminuté zlato)
+    const chestGain = addChest(st.chestRun + st.gold);
+    const starLine = '<span class="bigStars">' + starSpan(stars, t) + '</span>';
+    const chestLine = '<span class="chestGain">+' + chestTxt(chestGain) + '</span><br><small class="dim">do truhlice</small>';
+    later(() => showOver(m === MISSIONS.length ? 'Víťazstvo!' : 'Misia splnená!', starLine + '<br>' + chestLine, true), 1200);
     saveStats(); later(checkAch, 2200);
     updateHud();
   }
@@ -1176,6 +1177,7 @@
   function gameOver() {
     st.phase = 'over';
     saveStats();
+    const chestGain = addChest(st.chestRun); // podiel zo zabitých ostane v truhlici aj po prehre
     st.hallHp = 0;
     const survived = st.wave - 1;
     $('hud-boss').hidden = true; $('bottom').hidden = true;
@@ -1185,7 +1187,8 @@
     }
     st.shake = 0.6;
     AUDIO.music(null); AUDIO.play('crumble'); setTimeout(() => AUDIO.play('lose'), 500);
-    later(() => showOver(isOrc() ? 'Pevnosť padla!' : 'Radnica padla!', 'Misia ' + st.mission + ' · ' + missionDef(st.mission).name + (st.tier ? ' · ' + TIERS[st.tier].name.toLowerCase() + ' úroveň' : '') + '<br>Prežité vlny: <b>' + survived + ' / ' + MISSION_WAVES + '</b>', false), 1200);
+    later(() => showOver(isOrc() ? 'Pevnosť padla!' : 'Radnica padla!', 'Misia ' + st.mission + ' · ' + missionDef(st.mission).name + (st.tier ? ' · ' + TIERS[st.tier].name.toLowerCase() + ' úroveň' : '') + '<br>Prežité vlny: <b>' + survived + ' / ' + MISSION_WAVES + '</b>' +
+      (chestGain ? '<br><span class="chestGain">+' + chestTxt(chestGain) + '</span><br><small class="dim">do truhlice</small>' : ''), false), 1200);
     updateHud();
   }
 
@@ -1227,6 +1230,7 @@
     AUDIO.play('die'); AUDIO.play('coin');
     const gain = Math.round(e.d.gold * goldMul() * (1 + 0.04 * perk('loot')));
     st.gold += gain;
+    st.chestRun += gain * CHEST_KILL; // podiel do truhlice navyše (zlato na stavanie sa nemení)
     st.texts.push({ x: e.x, y: e.y - e.h, s: '+' + gain, life: 0.9, max: 0.9 });
     const cols = [blood(e), isOrc() ? '#22337a' : '#305c22', '#6e4422', '#1c140e'];
     const n = quiet ? 0 : e.d.boss ? 50 : 12;
@@ -4430,6 +4434,8 @@
       charge: 'sp_charge', hide: 'sp_hide', feast: 'sp_feast' };
     document.querySelectorAll('.spell').forEach(b => { b.querySelector('img').src = ICONS[SPI[b.dataset.spell]]; });
     ICONS.gem = spriteURL(SPR.gem[0], 4);
+    ICONS.chest = spriteURL(SPR.chest[0], 4);
+    document.querySelectorAll('img.chest').forEach(i => { i.src = ICONS.chest; });
     document.querySelectorAll('img.coin').forEach(i => { i.src = ICONS.coin; });
     document.querySelectorAll('img.gem').forEach(i => { i.src = ICONS.gem; });
   }
@@ -5154,7 +5160,7 @@
     $('map').hidden = false;
     if (!st.mapAnim) st.mapSel = Math.min(st.unlocked, MISSIONS.length);
     setTab('map', true);
-    renderMapPanel();
+    renderMapPanel(); updateChest();
     focusMapNode(st.mapAnim ? st.mapAnim.seg + 2 : st.mapSel, true);
     saveStats(); checkAch();
     if (!st.mapAnim) afterDeck(); // pri odomykaní hradu príde výber až po kartičkách
@@ -5559,6 +5565,7 @@
   $('setBack').addEventListener('click', () => setSettings(setView === 'lang' ? 'main' : 'closed'));
   syncSound();
   $('gemBox').addEventListener('click', () => toast('Obchod s gemami pripravujeme'));
+  $('chestBox').addEventListener('click', () => toast('Truhlica: zlatky na útok na hrad v poslednej misii'));
 
   const RACES = [
     { name: 'Ľudia',   spr: 'race_humans', state: 'open',                desc: 'Rytieri, kamenné hradby a odvážni hrdinovia.' },

@@ -457,6 +457,19 @@ const ICON_COIN = [
   'KGGGK',
   '.KKK.',
 ];
+const ICON_CHEST = [ // truhlica zlatiek: drevo so zlatým kovaním a zámkou, navrchu kôpka mincí
+  '...KKK.KK..',
+  '..KygKKygK.',
+  '.KKgGKgGGKK',
+  'KGLLLgLLLGK',
+  'KGlllglllGK',
+  'KKKKKKKKKKK',
+  'KGlllglllGK',
+  'KGllKgKllGK',
+  'KGLLKGKLLGK',
+  'KGdddddddGK',
+  'KKKKKKKKKKK',
+];
 
 // Vojvodca (boss) = surovec s inou paletou: tmavočervená koža, zlaté rohy.
 const PAL_WARLORD = {
@@ -671,6 +684,7 @@ function initSprites() {
   SPR.warlord = BRUTE_LEGS.map(l => buildSprite(BRUTE_BODY.concat(l), PAL_WARLORD));
   SPR.gem = [buildSprite(ICON_GEM)];
   SPR.coin = [buildSprite(ICON_COIN)];
+  SPR.chest = [buildSprite(ICON_CHEST)];
 }
 
 // Zásah nepriateľa: namiesto bielej siluety jemný červený nádych (obrys a kresba ostanú), verzia sa vyrobí raz a zapamätá

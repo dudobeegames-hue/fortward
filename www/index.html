@@ -104,6 +104,10 @@
   .bar.xp i { width: 0; background: linear-gradient(#cdeaff, #7ab8ee); transition: width .5s; }
   #hallTxt { font-size: 11px; color: var(--muted); text-align: center; line-height: 1; }
   img.coin, img.gem { width: 16px; height: 16px; }
+  img.chest { width: 22px; height: 22px; image-rendering: pixelated; }
+  .chestGain { display: inline-flex; align-items: center; gap: 6px; font-size: 26px; font-weight: 700; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
+  .chestGain img.chest { width: 33px; height: 33px; }
+  #chestBox { gap: 5px; font-weight: 700; color: var(--gold); }
   #goldTxt { color: var(--gold); }
 
 
@@ -872,6 +876,7 @@
   <div id="map" hidden>
     <div class="mapHead">
       <button id="mapHome" class="mapIc" title="Menu" aria-label="Menu"><img id="icoHome" alt=""></button>
+      <div id="chestBox" class="pill" title="Truhlica"><img class="chest" alt=""><span>0</span></div>
     </div>
     <!-- spodný riadok kariet: Boj (mapa), Sieň, Hrdinovia, Trofeje; zvolená karta je povysunutá -->
     <div id="mapBar">
