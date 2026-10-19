@@ -538,6 +538,7 @@
     }
     if (fixed) saveJSON(sk('stars'), meta.stars);
     st.mapSel = null; st.mapTierFor = null; st.mapAnim = null; st.provAnim = null;
+    mapStyle = 'live'; // pozícia sa otvára so živou mapou
     slotLoaded = true;
   }
   // súhrn pozície pre menu (bez prepnutia)
@@ -3997,14 +3998,53 @@
     c.drawImage(own[i], 0, 0);
     if (state === 'attacked') { c.globalAlpha = 0.35; c.drawImage(foe[i], 0, 0); c.globalAlpha = 1; } // napadnutá: cez vlastný pás presvitá farba útočníka
   }
-  // aktuálna misia: okraje jej územia výrazne blikajú farbou hráča (ľudia modrou, orkovia oranžovou) – na oboch mapách
+  // aktuálna misia: okraje územia žiaria farbou hráča (ľudia modrou, orkovia oranžovou) – mäkká žiara dovnútra, svetlé jadro
+  // na hranici, plynulé dýchanie a prúžok svetla, ktorý obieha okolo provincie; na živej aj námorníckej mape
+  function blinkData(i) {
+    const B = island.blink || (island.blink = []);
+    if (B[i]) return B[i];
+    const P = island.prov, nd = island.nodes[i], R = 6;
+    let x0 = W, y0 = H, x1 = 0, y1 = 0;
+    for (let k = 0; k < P.length; k++) if (P[k] === i) { const x = k % W, y = (k / W) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, dist = new Uint8Array(w * h).fill(255), q = [];
+    const inP = (x, y) => x >= 0 && y >= 0 && x < W && y < H && P[y * W + x] === i;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      if (!inP(x, y)) continue;
+      if (!inP(x + 1, y) || !inP(x - 1, y) || !inP(x, y + 1) || !inP(x, y - 1)) { dist[(y - y0) * w + x - x0] = 0; q.push((y - y0) * w + x - x0); }
+    }
+    for (let hd = 0; hd < q.length; hd++) {
+      const k = q[hd], x = k % w, y = (k / w) | 0, v = dist[k] + 1;
+      if (v >= R) continue;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy, nk = ny * w + nx;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h || dist[nk] <= v || !inP(nx + x0, ny + y0)) continue;
+        dist[nk] = v; q.push(nk);
+      }
+    }
+    const pts = [];
+    for (let k = 0; k < w * h; k++) if (dist[k] < R) { const x = k % w + x0, y = ((k / w) | 0) + y0; pts.push(k, dist[k], Math.atan2(y - nd.y, x - nd.x)); }
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    return (B[i] = { x0, y0, w, h, pts, c, ctx: c.getContext('2d'), id: c.getContext('2d').createImageData(w, h) });
+  }
   function drawMissionBlink(time) {
     const pa = st.provAnim;
     for (let i = 0; i < island.nodes.length; i++) {
       if (missionAt(i) !== st.unlocked || provState(i) === 'ours' || (pa && pa.i === i)) continue;
-      const L = provLayers(), own = isOrc() ? L.red : L.blue, p = 0.5 + 0.5 * Math.sin(time * 5);
-      g.globalAlpha = 0.15 + 0.85 * p; g.drawImage(own[i], 0, 0); g.drawImage(own[i], 0, 0); // dvakrát = sýtejší pás
-      g.globalAlpha = 1;
+      const D = blinkData(i), d = D.id.data, [r, gg, b] = PROV_COL[isOrc() ? 'red' : 'blue'];
+      const br = 0.5 - 0.5 * Math.cos(time * 2.6), breath = br * br * (3 - 2 * br); // plynulé dýchanie (ease in-out)
+      const sweep = time * 1.4;                                                     // prúžok svetla obieha okolo hradu
+      d.fill(0);
+      for (let n = 0; n < D.pts.length; n += 3) {
+        const k = D.pts[n], dd = D.pts[n + 1], an = D.pts[n + 2];
+        const da = Math.atan2(Math.sin(an - sweep), Math.cos(an - sweep)), shine = Math.pow(Math.max(0, Math.cos(da)), 14);
+        const glow = Math.pow(1 - dd / 6, 2.2) * (0.28 + 0.62 * breath);           // žiara dovnútra slabne s hĺbkou
+        const core = dd === 0 ? 0.35 + 0.55 * breath : dd === 1 ? 0.15 + 0.3 * breath : 0; // svetlé jadro na hranici
+        const wht = Math.min(1, core * 0.5 + shine * (dd < 2 ? 0.9 : 0.35));        // biely nádych jadra a prúžku
+        const al = Math.min(1, glow + core * 0.5 + shine * 0.6 * (1 - dd / 6));
+        d[k * 4] = r + (255 - r) * wht; d[k * 4 + 1] = gg + (255 - gg) * wht; d[k * 4 + 2] = b + (255 - b) * wht; d[k * 4 + 3] = al * 255;
+      }
+      D.ctx.putImageData(D.id, 0, 0);
+      g.drawImage(D.c, D.x0, D.y0);
     }
   }
   // podklad mapy: ostrov, chodník a farby provincií, ktoré sa nehýbu, sa zložia raz do jedného obrázka
@@ -4171,7 +4211,7 @@
   }
   // ---- papierová námornícka mapa: ten istý ostrov ako starý pergamen, regióny vyfarbené podľa rasy, ktorá ich drží
   // (ľudia bledomodrí, orkovia oranžoví); nehýbe sa – bez vĺn, lodí a ohňov. Hráč ju prepína ikonkou vľavo dole ----
-  let mapStyle = (() => { try { return localStorage.getItem('fortward.mapStyle') || 'live'; } catch (e) { return 'live'; } })();
+  let mapStyle = 'live'; // každá nová aj načítaná hra začína živou mapou; námornícka platí len do ďalšieho načítania
   // rasa, ktorá provinciu drží (nie strana hráča): za orkov je „horda“ protivník, teda ľudia
   const provRace = i => { const foe = provOwner(i) === 1; return foe !== isOrc() ? 'orc' : 'human'; };
   // tóny papierovej mapy (od tieňa k svetlu) – všetko sa kreslí po bodoch a ditheruje (Bayer 4×4) do týchto rámp
@@ -6183,7 +6223,6 @@
   $('icoEndless').src = UI_ICONS.endless; $('icoMapStyle').src = UI_ICONS.mapPaper;
   $('mapStyleBtn').addEventListener('click', () => { // pohyblivá farebná mapa ↔ papierová námornícka mapa
     mapStyle = mapStyle === 'paper' ? 'live' : 'paper';
-    try { localStorage.setItem('fortward.mapStyle', mapStyle); } catch (e) { }
     AUDIO.play('click'); renderEndlessBtn();
     toast(mapStyle === 'paper' ? 'Námornícka mapa' : 'Farebná mapa');
   });
