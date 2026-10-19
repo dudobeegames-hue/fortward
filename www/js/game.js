@@ -3283,6 +3283,14 @@
     g.fillStyle = '#7a7286'; g.fillRect(x, y, 2, 1); g.fillRect(x, y + 1, 1, 1);
     g.fillStyle = '#22202a'; g.fillRect(x + 2, y + 2, 1, 1);
   }
+  // zdravie radnice: pruh pod radnicou, široký ako radnica (3 políčka); farba podľa zdravia
+  function drawHallBar() {
+    const r = Math.max(0, Math.min(1, st.hallHp / hallMax())), w = 3 * T - 4, x = Math.round(G.hallCx - w / 2), y = G.hallBot + 3;
+    g.fillStyle = PAL.K; g.fillRect(x - 1, y - 1, w + 2, 4);
+    g.fillStyle = '#3a1410'; g.fillRect(x, y, w, 2);
+    g.fillStyle = r < 0.3 ? '#e84838' : r < 0.6 ? '#f8a838' : '#7cd04a'; g.fillRect(x, y, Math.round(w * r), 2);
+    if (r > 0) { g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(x, y, Math.round(w * r), 1); } // lesk
+  }
   function bar(cx, y, w, ratio, col) {
     const x = Math.round(cx - w / 2);
     g.fillStyle = PAL.K; g.fillRect(x - 1, y - 1, w + 2, 3);
@@ -4295,6 +4303,7 @@
     for (const b of st.blds) if (BUILD[b.kind].hp && b.hp < bMaxHp(b)) bar(tileX(b.c) + T / 2, b.kind === 'wall' ? tileY(b.r) - 9 : tileY(b.r) + T - bsprOf(b.kind, b.lvl).h - 2, 12, b.hp / bMaxHp(b), '#9cd45a');
     for (const s of st.soldiers) if (s.hp < s.max) bar(s.x, Math.round(s.y - 17), 8, s.hp / s.max, '#88b4ff');
     for (const o of campLive()) if (o.hp < o.max) bar(o.x, o.y - o.skin.spr(o, 0).h - 4, 14, o.hp / o.max, '#e84838');
+    if (!isAssault() && (st.phase === 'build' || st.phase === 'battle' || st.phase === 'pause')) drawHallBar(); // zdravie radnice pod radnicou
     if (st.king && !st.king.dead && st.king.hp < kingMax()) bar(st.king.x, Math.round(st.king.y - 19), 10, st.king.hp / kingMax(), '#f8d048');
     for (const p of st.proj) drawProj(p);
     for (const p of st.eproj) { // šíp goblina (tmavý)
@@ -4349,6 +4358,7 @@
     const gi = $('hud-gold').querySelector('img'), gsrc = isAssault() ? ICONS.chest : ICONS.coin; // pri útoku zlatky z truhlice
     if (gsrc && gi.getAttribute('src') !== gsrc) gi.src = gsrc;
     const keep = isAssault() && st.camp ? st.camp.parts.find(o => o.role === 'keep') : null; // pri útoku pruh ukazuje srdce hradu
+    $('hud-wall').style.visibility = keep ? '' : 'hidden'; // zdravie radnice je pod radnicou na bojisku
     const r = keep ? Math.max(0, keep.hp / keep.max) : Math.max(0, st.hallHp / hallMax());
     $('hallFill').style.width = (r * 100) + '%';
     $('hallFill').className = r < 0.3 ? 'low' : '';
