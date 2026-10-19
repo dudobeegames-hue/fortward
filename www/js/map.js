@@ -112,6 +112,7 @@ function buildIsland(W, H, seed) {
   const foam = [], trees = [];
   // provincia každého kúska súše = najbližší hrad (so šumom, aby hranice neboli rovné); 255 = more
   const prov = new Uint8Array(W * H).fill(255);
+  const terr = new Uint8Array(W * H); // druh terénu pre papierovú mapu: 0 more, 1 pláž, 2 tráva, 3 les, 4 hory, 5 sneh
   const provOf = (x, y) => {
     let best = 0, bd = 1e9;
     const jx = (fbm(x * 0.05, y * 0.05, seed + 31) - 0.5) * 18, jy = (fbm(x * 0.05, y * 0.05, seed + 37) - 0.5) * 18;
@@ -133,6 +134,7 @@ function buildIsland(W, H, seed) {
       if (depth < 0.035) { v = 0.95; if (depth < 0.018) foam.push({ x, y, ph: hash2(x, y, 7) * 6.28 }); }
       set(x, y, pickRamp(SEA, Math.max(0.22, v), x, y));
     } else if (dd > 0.92) {
+      terr[y * W + x] = 1;
       set(x, y, pickRamp(SAND, 0.6 + (hash2(x, y, seed + 8) - 0.5) * 0.3 - (dd - 0.92) * 3, x, y));
     } else {
       const e = elev(x, y);
@@ -140,6 +142,7 @@ function buildIsland(W, H, seed) {
         // hory – tieňovanie podľa sklonu (svetlo zľava zhora)
         const sl = (elev(x - 1, y - 1) - elev(x + 1, y + 1)) * 9;
         const v = 0.4 + sl + (e - 0.8) * 1.4;
+        terr[y * W + x] = e > 0.97 ? 5 : 4;
         if (e > 0.97) set(x, y, pickRamp(SNOW, 0.6 + sl, x, y)); // sneh len na vrcholoch
         else set(x, y, pickRamp(RAMP.stone, v, x, y));
       } else {
@@ -149,6 +152,7 @@ function buildIsland(W, H, seed) {
         const pd = pathD[y * W + x], fn = fbm(x * 0.07, y * 0.07, seed + 9);
         const nearPath = pd < 14, forest = dd < 0.85 && pd >= 4 && nodeD[y * W + x] >= 13 && (nearPath ? fn > 0.4 : fn > 0.58 && nb < 0.15);
         if (forest) { v -= 0.2; if ((x % (nearPath ? 4 : 5) === 0) && (y % 4 === 0) && hash2(x, y, seed + 10) > (nearPath ? 0.15 : 0.3)) { const tx = x + Math.floor(hash2(x, y, 11) * 3); if (pathD[y * W + Math.min(W - 1, tx)] >= 5) trees.push({ x: tx, y }); } }
+        terr[y * W + x] = forest ? 3 : 2;
         set(x, y, pickRamp(RAMP.grass, v, x, y));
       }
     }
@@ -185,7 +189,7 @@ function buildIsland(W, H, seed) {
     }
     return pts;
   });
-  return { bg: c, foam, waves, segs, nodes: L.nodes, prov, fires, fort: makeOrcFort(), castle: makeMiniCastle(false), castleLocked: makeMiniCastle(true) };
+  return { bg: c, foam, waves, segs, nodes: L.nodes, prov, terr, fires, fort: makeOrcFort(), castle: makeMiniCastle(false), castleLocked: makeMiniCastle(true) };
 }
 
 // pevnosť orkov pri misii 10

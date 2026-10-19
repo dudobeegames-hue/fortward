@@ -4144,7 +4144,262 @@
       }
     });
   }
+  // ---- papierová námornícka mapa: ten istý ostrov ako starý pergamen, regióny vyfarbené podľa rasy, ktorá ich drží
+  // (ľudia bledomodrí, orkovia oranžoví); nehýbe sa – bez vĺn, lodí a ohňov. Hráč ju prepína ikonkou vľavo dole ----
+  let mapStyle = (() => { try { return localStorage.getItem('fortward.mapStyle') || 'live'; } catch (e) { return 'live'; } })();
+  // rasa, ktorá provinciu drží (nie strana hráča): za orkov je „horda“ protivník, teda ľudia
+  const provRace = i => { const foe = provOwner(i) === 1; return foe !== isOrc() ? 'orc' : 'human'; };
+  // tóny papierovej mapy (od tieňa k svetlu) – všetko sa kreslí po bodoch a ditheruje (Bayer 4×4) do týchto rámp
+  const PR = Object.fromEntries(Object.entries({
+    paper:  ['#4a3420', '#664a2c', '#84653c', '#a2804e', '#bc9a62', '#d0b276', '#dfc68c', '#ead6a2', '#f3e4b8'],
+    sea:    ['#463a28', '#5e4e36', '#7a6646', '#947e58', '#aa946a', '#bea87c', '#ccb88c', '#d8c69c', '#e2d2aa'],
+    human:  ['#3a4a66', '#506484', '#6880a2', '#829abc', '#9cb2d0', '#b4c6de', '#c8d6e8', '#d8e2ee', '#e4eaf0'],
+    humanS: ['#22305a', '#30447c', '#40589c', '#5270b6', '#6a8ac8', '#84a2d6', '#a0b8e0', '#b8cae6', '#ccd8ec'],
+    orc:    ['#5e3618', '#7e4a22', '#9c622e', '#b87a3c', '#cc9250', '#daa868', '#e6be86', '#eecea2', '#f4dcb8'],
+    orcS:   ['#52240c', '#743412', '#944618', '#b45a1e', '#cc7028', '#dc8834', '#e6a04c', '#ecb468', '#f0c688'],
+    seaT:   ['#2e3e3a', '#3e5450', '#526c66', '#68847a', '#7e988c', '#94aa9c', '#a8baa8', '#bac8b2', '#cad4bc'], // modrozelený pás pri brehu
+  }).map(([k, v]) => [k, v.map(hexRGB)]));
+  const INK = hexRGB('#2a1c10'), INK2 = hexRGB('#5a4028'), INKR = hexRGB('#8a2614'), INKR2 = hexRGB('#b44a2a'), SNOWP = hexRGB('#fbf4dc'), OLIVE = hexRGB('#5c6438');
+  // perom kreslené značky: K = tuš, k = šrafa (tuš len na párnych stĺpcoch), L = svetlá strana, S = sneh, g = olivová koruna stromu
+  const P_MOUNT = [
+    '.....K.....',
+    '....KLK....',
+    '...KLLkK...',
+    '..KLLLkkK..',
+    '.KLLLLkkkK.',
+    'KLLLLLkkkkK',
+  ];
+  const P_MOUNT_S = [ // zasnežený štít
+    '.....K.....',
+    '....KSK....',
+    '...KSSkK...',
+    '..KLSLkkK..',
+    '.KLLLLkkkK.',
+    'KLLLLLkkkkK',
+  ];
+  const P_HILL = [
+    '..KKK..',
+    '.KLLkK.',
+    'KLLLkkK',
+  ];
+  const P_TREE = [
+    '.K.',
+    'KgK',
+    'KgK',
+    '.K.',
+  ];
+  // veterná ružica: hroty osvetlené zľava zhora (ľavá a horná polovica svetlá), sever červený, okolo krúžok; nad ňou N
+  const P_ROSE = [
+    '.........K.........',
+    '........KnK........',
+    '........KnK........',
+    '.......KNnnK.......',
+    '......oKNnnKo......',
+    '.....o.KNnnK.o.....',
+    '....o.KNNnnnK.o....',
+    '...KKKKNNnnnKKKK...',
+    '.KKLLLLLNnnLLLLLKK.',
+    'KDDDDDDDDWDDDDDDDDK',
+    '.KKDDDDDLDDDDDDDKK.',
+    '...KKKKLLDDDKKKK...',
+    '....o.KLLDDDK.o....',
+    '.....o.KLDDK.o.....',
+    '......oKLDDKo......',
+    '.......KLDDK.......',
+    '........KDK........',
+    '........KDK........',
+    '.........K.........',
+  ];
+  const P_N = ['K..K', 'KK.K', 'K.KK', 'K..K'];
+  const P_SHIP = [
+    '.....K.....',
+    '.....KK....',
+    '....KLK....',
+    '...KLLK.K..',
+    '..KLLLK.KK.',
+    '.KLLLLK.KLK',
+    '.KKKKKKKKKK',
+    'KKLLLLLLLKK',
+    '.KKKKKKKKK.',
+  ];
+  // farba z rampy plynulo (bez ditheringu) – pre akvarel regiónov
+  const rampAt = (ramp, v) => { const f = v * (ramp.length - 1), i = Math.min(ramp.length - 2, Math.floor(f)), t = f - i; return [0, 1, 2].map(c => ramp[i][c] + (ramp[i + 1][c] - ramp[i][c]) * t); };
+  function paperBase() {
+    const n = island.nodes.length, races = [], hit = [];
+    for (let i = 0; i < n; i++) { races[i] = provRace(i); hit[i] = provState(i) === 'attacked'; }
+    const key = W + 'x' + H + ':' + st.unlocked + ':' + races.map((r, i) => r[0] + (hit[i] ? '!' : '')).join('');
+    if (island.paperKey === key && island.paper) return island.paper;
+    const P = island.prov, Tr = island.terr || new Uint8Array(W * H).fill(2), N = W * H;
+    const c = island.paper || document.createElement('canvas'); c.width = W; c.height = H;
+    const x2 = c.getContext('2d'), id = x2.createImageData(W, H), d = id.data;
+    const sea = i => P[i] === 255;
+    // vzdialenostné polia (BFS): more od brehu, súš od brehu, súš od hranice regiónu (aj breh je hranica)
+    const bfs = (seed, ok, max) => {
+      const dist = new Uint8Array(N).fill(255), q = [];
+      for (let i = 0; i < N; i++) if (seed(i)) { dist[i] = 0; q.push(i); }
+      for (let h = 0; h < q.length; h++) {
+        const i = q[h], x = i % W, y = (i / W) | 0, v = dist[i] + 1;
+        if (v > max) continue;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = x + dx, ny = y + dy, ni = ny * W + nx;
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H || dist[ni] <= v || !ok(ni)) continue;
+          dist[ni] = v; q.push(ni);
+        }
+      }
+      return dist;
+    };
+    const nbDiff = (i, f) => { const x = i % W, y = (i / W) | 0; return (x > 0 && f(i - 1)) || (x < W - 1 && f(i + 1)) || (y > 0 && f(i - W)) || (y < H - 1 && f(i + W)); };
+    const sd = bfs(i => !sea(i), sea, 24);
+    const bd = bfs(i => !sea(i) && nbDiff(i, j => P[j] !== P[i]), i => !sea(i), 14);
+    // miesta bez kreslených značiek: okolo hradov a pozdĺž chodníka
+    const keep = new Uint8Array(N);
+    const stampK = (px, py, r) => { for (let y = Math.max(0, py - r | 0); y <= Math.min(H - 1, py + r); y++) for (let x = Math.max(0, px - r | 0); x <= Math.min(W - 1, px + r); x++) if (Math.hypot(x - px, y - py) <= r) keep[y * W + x] = 1; };
+    island.nodes.forEach(nd => stampK(nd.x, nd.y - 4, 14));
+    island.segs.forEach(pts => { for (let k = 0; k < pts.length; k += 2) stampK(pts[k].x, pts[k].y, 3); });
+    // UI: domček vľavo hore, truhlica vpravo hore, ikonky vľavo dole a karty dole – tam sa ružica ani lode nedávajú
+    const yb = Math.max(H * 0.6, H - Math.round(($('mapBar').offsetHeight || 0) * DPR / S)); // spodok viditeľnej mapy nad kartami
+    const uiBand = (x, y) => (x < 40 && y < 36) || (x > W - 50 && y < 30) || (x < 42 && y > yb - 40) || y > yb - 3;
+
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x, k = i * 4;
+      // jas papiera: veľké vlny zrna, jemné zrno, kávové škvrny s tmavším okrajom, prehyby a opálené okraje
+      let v = 0.7 + (fbm(x * 0.03, y * 0.03, 101) - 0.5) * 0.22 + (fbm(x * 0.15, y * 0.15, 103) - 0.5) * 0.08 + (hash2(x, y, 105) - 0.5) * 0.05;
+      const stain = fbm(x * 0.018, y * 0.022, 107);
+      if (stain > 0.64) v -= (stain - 0.64) * 0.9;
+      if (Math.abs(stain - 0.64) < 0.006) v -= 0.1; // okraj škvrny
+      const fx = W >> 1, fy1 = Math.round(H / 3), fy2 = Math.round(H * 2 / 3);
+      if (x === fx || y === fy1 || y === fy2) v -= 0.07; else if (x === fx + 1 || y === fy1 + 1 || y === fy2 + 1) v += 0.05; // prehyby
+      const e = Math.min(x, y, W - 1 - x, yb - 1 - y) + (fbm(x * 0.08, y * 0.08, 109) - 0.5) * 12; // opálené okraje papiera
+      if (e < 22) v -= Math.pow((22 - e) / 22, 2.2) * 0.75;
+      const vx = (x - W / 2) / (W / 2), vy = (y - yb / 2) / (yb / 2);
+      v -= Math.pow(Math.min(1, vx * vx * 0.7 + vy * vy * 0.9), 2) * 0.16; // tieň k okrajom (vinetácia)
+      let ramp = PR.paper, col = null;
+      if (sea(i)) {
+        ramp = PR.sea;
+        const s = sd[i];
+        if (s <= 9 && BAYER4[(y & 3) * 4 + (x & 3)] < 1 - s / 10 + (fbm(x * 0.06, y * 0.06, 129) - 0.5) * 0.3) ramp = PR.seaT; // akvarel pri brehu
+        v += 0.04 + Math.min(1, s / 24) * 0.06; // more pri brehu tmavšie (tieň pobrežia), ďalej svetlejšie
+        if (s === 1) v -= 0.22;
+        else if (s === 2) v -= 0.12;
+        if (s === 4 || (s === 7 && (x + y) % 2 === 0) || (s === 11 && (x + y) % 3 === 0) || (s === 16 && (x + 2 * y) % 5 === 0)) col = INK2; // vlnovky pobrežia
+        else if (s > 18 && y % 9 === 0 && (x + ((y / 9) | 0) * 11) % 17 < 4) col = INK2;                                                   // šrafy vĺn na šírom mori
+      } else {
+        const pv = P[i], race = races[pv], b = bd[i], t = Tr[i];
+        if (t === 1) v -= 0.08;                              // pláž
+        if (t === 4) v -= 0.04; else if (t === 5) v += 0.06; // hory a sneh v podklade
+        if (sd[i] === 0 && nbDiff(i, sea)) col = INK;        // pobrežie perom
+        // akvarel: sýty pás tesne pri hranici, ďalej sa farba nerovnomerne vytráca do papiera – plynulo, bez šrafovania (ditheringu)
+        const vv = Math.max(0, Math.min(1, v + (b > 2 ? 0.05 : 0)));
+        if (!col) {
+          if (b <= 2) col = rampAt(PR[race + 'S'], vv);
+          else {
+            const wash = Math.max(0, Math.min(1, 0.95 - Math.min(b, 16) / 16 * 0.55 + (fbm(x * 0.07, y * 0.07, 131) - 0.5) * 0.45));
+            const a = rampAt(PR.paper, vv), r = rampAt(PR[race], vv);
+            col = [0, 1, 2].map(ch => a[ch] + (r[ch] - a[ch]) * wash);
+          }
+        }
+        if (sd[i] !== 0 || !nbDiff(i, sea)) if (b === 0 && nbDiff(i, j => !sea(j) && P[j] !== pv)) { // hranica regiónov: medzi rasami front, inak bodkovaná
+          const front = nbDiff(i, j => !sea(j) && P[j] !== pv && races[P[j]] !== race);
+          if (front) col = (x + y) % 4 === 3 ? INKR2 : INKR;
+          else if ((x + y) % 3 !== 0) col = INK2;
+        }
+      }
+      if (!col) col = pickRamp(ramp, Math.max(0, Math.min(1, v)), x, y);
+      d[k] = col[0]; d[k + 1] = col[1]; d[k + 2] = col[2]; d[k + 3] = 255;
+    }
+    // ---- kreslené značky (rovno do toho istého rastra) ----
+    const put = (x, y, col) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const k = (y * W + x) * 4; d[k] = col[0]; d[k + 1] = col[1]; d[k + 2] = col[2]; };
+    const lit = (x, y, f) => { const k = (y * W + x) * 4; return [Math.min(255, d[k] * f), Math.min(255, d[k + 1] * f), Math.min(255, d[k + 2] * f)]; };
+    const stamp = (glyph, gx, gy) => glyph.forEach((row, j) => { for (let q = 0; q < row.length; q++) {
+      const ch = row[q], x = gx + q, y = gy + j;
+      if (ch === '.' || x < 0 || y < 0 || x >= W || y >= H) continue;
+      if (ch === 'K') put(x, y, INK);
+      else if (ch === 'k') put(x, y, (x & 1) ? INK2 : lit(x, y, 0.82));
+      else if (ch === 'L') put(x, y, lit(x, y, 1.12));
+      else if (ch === 'S') put(x, y, SNOWP);
+      else if (ch === 'g') put(x, y, OLIVE);
+    } });
+    const fits = (glyph, gx, gy, okT) => { // značka celá na súši daného terénu a mimo hradov a chodníka
+      for (let j = 0; j < glyph.length; j++) for (let q = 0; q < glyph[0].length; q++) {
+        const x = gx + q, y = gy + j; if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1) return false;
+        const i = y * W + x; if (sea(i) || keep[i] || bd[i] <= 1 || !okT(Tr[i])) return false;
+      }
+      return true;
+    };
+    const used = new Uint8Array(N), free = (gx, gy, w, h) => { for (let y = gy - 1; y <= gy + h; y++) for (let x = gx - 1; x <= gx + w; x++) if (x >= 0 && y >= 0 && x < W && y < H && used[y * W + x]) return false; return true; };
+    const mark = (gx, gy, w, h) => { for (let y = gy; y < gy + h; y++) for (let x = gx; x < gx + w; x++) if (x >= 0 && y >= 0 && x < W && y < H) used[y * W + x] = 1; };
+    // pohoria zhora nadol (nižšie prekryjú vyššie), potom pahorky a lesy
+    for (let y = 2; y < H - 8; y += 3) for (let x = 1 + ((y / 3 | 0) % 3) * 3; x < W - 12; x += 6) {
+      const jx = x + Math.floor(hash2(x, y, 111) * 3) - 1, jy = y + Math.floor(hash2(y, x, 113) * 2);
+      const snow = Tr[(jy + 1) * W + jx + 5] === 5, g0 = snow ? P_MOUNT_S : P_MOUNT;
+      const base = [1, 5, 9].filter(q => { const t = Tr[(jy + 5) * W + jx + q]; return t === 4 || t === 5; }).length;
+      if (base >= 2 && fits(g0, jx, jy, t => t >= 2) && free(jx, jy, 11, 6)) { stamp(g0, jx, jy); mark(jx, jy, 11, 5); } // štíty sa môžu prekrývať ako reťaz
+    }
+    for (let y = 2; y < H - 4; y += 5) for (let x = 2 + ((y / 5 | 0) & 1) * 4; x < W - 8; x += 9) {
+      const jx = x + Math.floor(hash2(x, y, 115) * 4), jy = y + Math.floor(hash2(y, x, 117) * 3);
+      if (hash2(jx, jy, 119) < 0.75 && fits(P_HILL, jx, jy, t => t === 2 || t === 4) && free(jx, jy, 7, 3) && Tr[jy * W + jx + 3] !== 3) {
+        if (Tr[(jy + 2) * W + jx + 3] === 4 || hash2(jx, jy, 121) < 0.12) { stamp(P_HILL, jx, jy); mark(jx, jy, 7, 3); }
+      }
+    }
+    for (let y = 1; y < H - 4; y += 3) for (let x = 1 + ((y / 3 | 0) % 2) * 2; x < W - 3; x += 4) {
+      const jx = x + Math.floor(hash2(x, y, 123) * 2), jy = y;
+      if (fits(P_TREE, jx, jy, t => t === 3) && free(jx, jy, 3, 4) && hash2(jx, jy, 125) > 0.2) { stamp(P_TREE, jx, jy); mark(jx, jy, 3, 3); }
+    }
+    // cesta medzi hradmi: prejdené úseky červenou čiarou, ďalšie bodkovanou tušou
+    island.segs.forEach((pts, j) => {
+      const kk = isOrc() ? MISSIONS.length - 2 - j : j, done = kk + 2 <= st.unlocked;
+      let last = null;
+      pts.forEach((pt, m) => {
+        const x = Math.round(pt.x), y = Math.round(pt.y);
+        if (last && last[0] === x && last[1] === y) return;
+        last = [x, y];
+        if (done ? m % 5 < 3 : m % 4 === 0) put(x, y, done ? INKR : INK2);
+      });
+    });
+    // veterná ružica s kurzovými čiarami na voľnom mori (najďalej od UI a ostrova)
+    const seaBox = (cx, cy, r) => { for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) { if (x < 0 || y < 0 || x >= W || y >= H) return false; const i = y * W + x; if (!sea(i) || sd[i] < 3 || uiBand(x, y)) return false; } return true; };
+    let rose = null; // veterná ružica dole napravo od ostrova
+    for (let y = Math.round(yb) - 30; y > H * 0.45 && !rose; y -= 2) for (let x = W - 13; x > W * 0.5 && !rose; x -= 2) if (seaBox(x, y, 10) && seaBox(x, y - 6, 9)) rose = [x, y];
+    if (!rose) for (let y = 12; y < H - 12 && !rose; y += 2) for (let x = 12; x < W - 12 && !rose; x += 2) if (seaBox(x, y, 9)) rose = [x, y];
+    if (rose) {
+      const [cx, cy] = rose;
+      for (let a = 0; a < 16; a++) { // kurzové čiary (portolán): z ružice cez more, bodkované
+        const an = a * Math.PI / 8, dx = Math.cos(an), dy = Math.sin(an);
+        for (let r = 12; r < 400; r += 2) {
+          const x = Math.round(cx + dx * r), y = Math.round(cy + dy * r);
+          if (x < 0 || y < 0 || x >= W || y >= H) break;
+          const i = y * W + x; if (sea(i) && sd[i] > 3 && (r % 6 !== 0)) put(x, y, lit(x, y, a % 2 ? 0.9 : 0.84));
+        }
+      }
+      const ox = cx - 9, oy = cy - 9;
+      P_ROSE.forEach((row, j) => { for (let q = 0; q < row.length; q++) {
+        const ch = row[q], x = ox + q, y = oy + j;
+        if (ch === '.') continue;
+        put(x, y, ch === 'K' ? INK : ch === 'D' || ch === 'o' ? INK2 : ch === 'N' ? INKR2 : ch === 'n' ? INKR : ch === 'W' ? SNOWP : lit(x, y, 1.18));
+      } });
+      P_N.forEach((row, j) => { for (let q = 0; q < 4; q++) if (row[q] === 'K') put(cx - 1 + q, oy - 6 + j, INK); });
+    }
+    // lode perom na mori
+    let ships = 0;
+    for (let y = 20; y < H - 20 && ships < 2; y += 37) for (let x = 6; x < W - 16 && ships < 2; x += 23) {
+      const ok = () => { for (let j = -2; j < 11; j++) for (let q = -2; q < 13; q++) { const xx = x + q, yy = y + j; if (xx < 0 || yy < 0 || xx >= W || yy >= H) return false; const i = yy * W + xx; if (!sea(i) || sd[i] < 4 || uiBand(xx, yy)) return false; } return !rose || Math.hypot(x - rose[0], y - rose[1]) > 26; };
+      if (hash2(x, y, 127) < 0.5 && ok()) { stamp(P_SHIP, x, y); for (let q = -1; q < 12; q += 2) put(x + q, y + 10, INK2); ships++; y += 60; }
+    }
+    x2.putImageData(id, 0, 0);
+    island.paper = c; island.paperKey = key;
+    return c;
+  }
+  function renderPaperMap(time) {
+    g.drawImage(paperBase(), 0, 0);
+    island.nodes.forEach((n, i) => drawMapNode(i, n, time));
+    for (const q of st.parts) {
+      g.globalAlpha = Math.min(1, q.life / q.max * 2);
+      g.fillStyle = q.col; g.fillRect(Math.round(q.x), Math.round(q.y), 1, 1);
+    }
+    g.globalAlpha = 1;
+  }
   function renderMap(time) {
+    if (mapStyle === 'paper') { renderPaperMap(time); return; }
     drawProvinces(time); // ostrov s provinciami (podklad je v drawProvinces)
     // príboj
     g.fillStyle = 'rgba(240,250,255,0.85)';
@@ -5501,7 +5756,7 @@
 
   function showMap() {
     st.run = (st.run || 0) + 1; // časovače rozohranej misie sa zrušia
-    if (island) island.baseKey = island.borderKey = null; // pozícia môže byť za inú rasu – farby provincií a chodník sa prekreslia
+    if (island) island.baseKey = island.borderKey = island.paperKey = null; // pozícia môže byť za inú rasu – farby provincií a chodník sa prekreslia
     clearBattle();
     st.phase = 'map';
     AUDIO.music('map');
@@ -5718,6 +5973,13 @@
   // ---- Trofeje ----
   function renderTrophies() {
     const list = $('trophyList'); list.innerHTML = '';
+    { // nekonečná obrana: rekord prežitých vĺn tejto pozície
+      const c = document.createElement('div'), best = endlessBest(), open = endlessOpen();
+      c.className = 'trophy record' + (best ? ' got' : '');
+      c.innerHTML = '<span class="pic"><img src="' + UI_ICONS.endless + '" alt=""></span><b>Nekonečná obrana</b><small>' +
+        (!open ? 'Odomkne sa po dobytí hradu ostrova' : best ? 'Rekord: <b>' + best + '</b> ' + (best === 1 ? 'vlna' : best < 5 ? 'vlny' : 'vĺn') : 'Zatiaľ bez rekordu – koľko vĺn vydržíš?') + '</small>';
+      list.appendChild(c);
+    }
     for (const a of ACH) {
       const c = document.createElement('div'); c.className = 'trophy' + (ach[a.id] ? ' got' : '') + (ach[a.id] > achSeen ? ' fresh' : '');
       c.innerHTML = '<span class="pic"><img src="' + achIcon(a) + '" alt=""></span><b>' + a.name + '</b><small>' + a.desc + '</small>' + (ach[a.id] > achSeen ? '<em class="newTag">Nové</em>' : '');
@@ -5885,10 +6147,16 @@
   $('overRetry').addEventListener('click', () => startMission(st.mission, st.tier, st.endless));
   // tlačidlo nekonečnej obrany na mape: po dobytí hradu, s rekordom pozície
   function renderEndlessBtn() {
-    const b = $('endlessBtn'), open = endlessOpen();
-    b.classList.toggle('locked', !open);
-    b.querySelector('small').textContent = open ? (endlessBest() ? 'rekord: ' + endlessBest() + ' vĺn' : 'koľko vĺn vydržíš?') : '🔒 po dobytí hradu';
+    $('endlessBtn').classList.toggle('locked', !endlessOpen());
+    $('mapStyleBtn').classList.toggle('on', mapStyle === 'paper');
   }
+  $('icoEndless').src = UI_ICONS.endless; $('icoMapStyle').src = UI_ICONS.mapPaper;
+  $('mapStyleBtn').addEventListener('click', () => { // pohyblivá farebná mapa ↔ papierová námornícka mapa
+    mapStyle = mapStyle === 'paper' ? 'live' : 'paper';
+    try { localStorage.setItem('fortward.mapStyle', mapStyle); } catch (e) { }
+    AUDIO.play('click'); renderEndlessBtn();
+    toast(mapStyle === 'paper' ? 'Námornícka mapa' : 'Farebná mapa');
+  });
   $('endlessBtn').addEventListener('click', () => {
     if (st.mapAnim) return;
     if (!endlessOpen()) { AUDIO.play('deny'); toast('Nekonečná obrana sa odomkne po dobytí hradu ostrova'); return; }

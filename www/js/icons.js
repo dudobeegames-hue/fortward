@@ -650,6 +650,41 @@ const UI_ICONS = (() => {
     'SSSSSSSSSSSSSS',
   ], TABP);
 
+  // nekonečná obrana: zlatá slučka nekonečna s obrysom
+  const endless = fromMap([
+    '..............',
+    '..............',
+    '..............',
+    '..KKK....KKK..',
+    '.KYYYK..KYYYK.',
+    'KYOKKYKKYKKOYK',
+    'KYK..KYYK..KYK',
+    'KYK..KYYK..KYK',
+    'KYOKKYKKYKKOYK',
+    '.KYYYK..KYYYK.',
+    '..KKK....KKK..',
+    '..............',
+    '..............',
+    '..............',
+  ], PAL);
+  // prepínač mapy: papierová mapa s modrým a oranžovým územím
+  const mapPaper = fromMap([
+    '..............',
+    '.KKKKKKKKKKKK.',
+    '.KPPPPPPPPPpK.',
+    '.KPRRRPPPPPpK.',
+    '.KPRRRRPPKPpK.',
+    '.KPPRRRPPPPpK.',
+    '.KPPPPPPBBPpK.',
+    '.KPKPPPBBBBpK.',
+    '.KPPPPBBBBPpK.',
+    '.KPPPPPBBPPpK.',
+    '.KPPPPPPPPPpK.',
+    '.KppppppppppK.',
+    '.KKKKKKKKKKKK.',
+    '..............',
+  ], { K: '#1c140e', P: '#ecdcb0', p: '#b89c68', R: '#ec9234', B: '#8cb6e2' });
+
   // poradie jazykov v Nastaveniach; zatiaľ hrá len slovenčina, ostatné prídu s prekladom
   const langs = [
     { id: 'sk', name: 'Slovenčina', ready: true },
@@ -665,5 +700,5 @@ const UI_ICONS = (() => {
   // papier a tyče zvitku sa pre rovnakú veľkosť kreslia len raz (menu sa otvára opakovane)
   const memo = fn => { const m = new Map(); return (...a) => { const k = a.join('x'); if (!m.has(k)) m.set(k, fn(...a)); return m.get(k); }; };
   return { pix, music, sound, plus, home, hall, trophy, star, swords, shieldDefend, chest, spellVolley, spellFire, spellFrost, spellBolt, spellHorn, spellShield, spellHeal, spellFirewall, spellTeleport, spellRage, spellRoar, spellAxe, spellTotem, spellPoison, spellHex, spellCharge, spellHide, spellFeast, scrollPaper: memo(scrollPaper), scrollRod: memo(scrollRod), scrollTag, flags, langs,
-    actDown, actRepair, actSpec, tabs, homeTab, tierStars };
+    actDown, actRepair, actSpec, tabs, homeTab, tierStars, endless, mapPaper };
 })();

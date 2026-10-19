@@ -540,13 +540,10 @@
   /* okno misie po ťuknutí na hrad */
   #missionBox { z-index: 6; background: rgba(8,6,4,.55); }
   #missionBox[hidden] { display: none; }
-  .endlessBtn { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 8;
-    display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 16px; border: 2px solid var(--ink); border-radius: 8px;
-    background: linear-gradient(#6a3c9c, #3e2266); box-shadow: inset 0 -3px 0 #26143e, inset 0 2px 0 rgba(230,200,255,.25); color: #fff; font-family: inherit; }
-  .endlessBtn b { font-size: 15px; text-shadow: 1px 1px 0 var(--ink); }
-  .endlessBtn small { font-size: 11px; color: #e0c8ff; }
-  .endlessBtn.locked { filter: grayscale(1); opacity: .7; }
-  .endlessBtn:active { transform: translateX(-50%) translateY(2px); }
+  #mapSide { position: absolute; left: 12px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 8; display: flex; flex-direction: column; gap: 8px; }
+  #mapSide .mapIc.locked img { filter: grayscale(1); opacity: .55; }
+  #mapSide .mapIc.on { border-color: var(--gold); }
+  .trophy.record { grid-column: 1 / -1; }
   .mCastle { display: block; width: 100%; max-height: 42vh; object-fit: cover; object-position: top; image-rendering: pixelated; border: 2px solid var(--ink); border-radius: 6px; margin: 6px 0; }
   .mCastle[hidden] { display: none; }
   #mapPlay.poor { filter: grayscale(1); opacity: .6; } /* málo zlatiek v truhlici na útok */
@@ -897,7 +894,11 @@
       <button class="tabCard" data-tab="trophies" title="Trofeje"><img id="icoTrophy" alt="Trofeje"><em id="trophyTxt" class="badge" hidden>0</em></button>
       <button class="tabCard shop shine" data-tab="shop" title="Nákupy"><img id="icoShop" alt="Nákupy"></button>
     </div>
-    <button id="endlessBtn" class="endlessBtn"><b>∞ Nekonečná obrana</b><small></small></button>
+    <!-- vľavo dole: prepínač vzhľadu mapy a nekonečná obrana -->
+    <div id="mapSide">
+      <button id="mapStyleBtn" class="mapIc" title="Vzhľad mapy" aria-label="Vzhľad mapy"><img id="icoMapStyle" alt=""></button>
+      <button id="endlessBtn" class="mapIc" title="Nekonečná obrana" aria-label="Nekonečná obrana"><img id="icoEndless" alt=""></button>
+    </div>
     <!-- okno misie: zjaví sa až po ťuknutí na hrad -->
     <div id="missionBox" class="screenOverlay" hidden>
       <div id="mapPanel">
