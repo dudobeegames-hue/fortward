@@ -1160,6 +1160,7 @@
     if (st.king && st.king.dead) st.sel = HALL; // padnutý hrdina: stavanie začne s otvorenou radnicou (tam sa oživuje)
     if (st.king && !st.king.dead) { st.king.hp = kingMax(); st.king.down = 0; st.king.tgt = null; st.king.flash = 0; st.king.swing = 0; st.king.tpBack = 0; } // domov dôjde sám (heroWalkHome)
     for (const b of st.blds) b.flash = 0;
+    if (st.camp) for (const o of st.camp.parts) o.flash = 0; // zásah z boja by stavbu tábora triasol aj počas stavania
     $('build').hidden = false;
     renderBuild();
     updateHud();
@@ -2738,7 +2739,7 @@
       if (s.stunT > 0) { s.stunT -= dt; s.flash = Math.max(0, s.flash - dt); continue; } // omráčený dupnutím veľkráľa
       if (s.helper) { updateHelper(s, dt); continue; }
       if (s.fly) { updateFalcon(s, dt); continue; }
-      if (s.archer) { if (isAssault() && armyAttacks()) assaultArcherSpot(s); updateArcher(s, dt); continue; }
+      if (s.archer) { if (armyAttacks() && st.camp && (isAssault() || !nearestFoe(s.x, s.y, true))) assaultArcherSpot(s); updateArcher(s, dt); continue; }
       if (s.siege) { updateSiege(s, dt); continue; }
       if (isAssault() && armyAttacks()) { assaultKnight(s, dt); continue; } // útok na hrad: bez šíku, každý bojuje alebo búra
       const prev = s.tgt;
@@ -5139,6 +5140,7 @@
     const rb = $('repairBtn');
     rb.innerHTML = '<span>Opraviť všetko</span>' + (rc ? '<span class="cost"><img class="coin" src="' + ICONS.coin + '">' + rc + '</span>' : '');
     rb.disabled = !rc || st.gold < rc;
+    rb.classList.toggle('neon', !!rc && st.gold >= rc); // poškodené budovy: tlačidlo bliká neónom ako karta Oživiť (ľudia modrý, orkovia oranžový)
     updateHud();
   }
 
