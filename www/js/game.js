@@ -3936,15 +3936,33 @@
 
   // ---- provincie: juh (1–5) ľudia, sever (6–10) horda; neobránené južné sú napadnuté ----
   const provState = i => { const num = missionAt(i), won = num < st.unlocked; return won ? 'ours' : num <= HOME_PROVINCES ? 'attacked' : 'horde'; };
-  const PROV_COL = { blue: [70, 120, 230, 0.24], red: [210, 40, 30, 0.3] };
-  function provLayers() { // farebné vrstvy jednotlivých provincií + hranice (počíta sa raz pre ostrov)
+  // živá mapa: územie sa neprefarbuje celé – pozdĺž hraníc provincie je pás vo farbe rasy, ktorá ju drží
+  // (blue = ľudia, red = orkovia; pri hranici sýty, o 3 body dnu sa stratí), pobrežie bez pásu
+  const PROV_COL = { blue: [96, 176, 255], red: [255, 140, 42] }, BAND_A = [0.9, 0.5, 0.2];
+  function provLayers() { // pásy pri hraniciach jednotlivých provincií (počíta sa raz pre ostrov)
     if (island.layers) return island.layers;
     const mk = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; };
-    const P = island.prov, n = island.nodes.length;
+    const P = island.prov, n = island.nodes.length, N = W * H;
+    // vzdialenosť od hranice s inou provinciou (len po súši, najviac 3 body)
+    const dist = new Uint8Array(N).fill(255), q = [];
+    for (let k = 0; k < N; k++) {
+      const v = P[k]; if (v === 255) continue;
+      const x = k % W, y = (k / W) | 0;
+      if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= H) return false; const o = P[ny * W + nx]; return o !== 255 && o !== v; })) { dist[k] = 0; q.push(k); }
+    }
+    for (let h = 0; h < q.length; h++) {
+      const k = q[h], x = k % W, y = (k / W) | 0, dv = dist[k] + 1;
+      if (dv >= BAND_A.length) continue;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy, ni = ny * W + nx;
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H || P[ni] !== P[k] || dist[ni] <= dv) continue;
+        dist[ni] = dv; q.push(ni);
+      }
+    }
     const L = { blue: [], red: [] };
     for (let i = 0; i < n; i++) for (const key of ['blue', 'red']) {
-      const c = mk(), x = c.getContext('2d'), id = x.createImageData(W, H), [r, gg, b, a] = PROV_COL[key];
-      for (let k = 0; k < P.length; k++) if (P[k] === i) { id.data[k * 4] = r; id.data[k * 4 + 1] = gg; id.data[k * 4 + 2] = b; id.data[k * 4 + 3] = a * 255; }
+      const c = mk(), x = c.getContext('2d'), id = x.createImageData(W, H), [r, gg, b] = PROV_COL[key];
+      for (let k = 0; k < N; k++) if (P[k] === i && dist[k] < BAND_A.length) { id.data[k * 4] = r; id.data[k * 4 + 1] = gg; id.data[k * 4 + 2] = b; id.data[k * 4 + 3] = BAND_A[dist[k]] * 255; }
       x.putImageData(id, 0, 0); L[key][i] = c;
     }
     island.layers = L;
@@ -3956,32 +3974,37 @@
     if (pa && pa.i === i) return pa.from === 'horde' ? 1 : 0;
     return provState(i) === 'horde' ? 1 : 0;
   };
-  // hranice: tenké prerušované medzi provinciami, hrubá červená na fronte ľudia × horda (prepočíta sa, keď sa front posunie)
+  // hranice: tenká tmavá čiara medzi provinciami – farebné pásy rás po jej stranách ich oddelia (front je modrá × oranžová)
   function borderLayer() {
-    const n = island.nodes.length, key = Array.from({ length: n }, (_, i) => provOwner(i)).join('');
-    if (island.borderKey === key) return island.border;
-    const P = island.prov, own = v => key.charCodeAt(v) - 48;
-    const c = island.border || document.createElement('canvas'); c.width = W; c.height = H;
+    if (island.border && island.borderKey === 'lines') return island.border;
+    const P = island.prov, c = island.border || document.createElement('canvas'); c.width = W; c.height = H;
     const bx = c.getContext('2d'), bd = bx.createImageData(W, H);
     for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
       const v = P[y * W + x]; if (v === 255) continue;
       const nbs = [P[y * W + x + 1], P[(y + 1) * W + x]];
       if (!nbs.some(q => q !== 255 && q !== v)) continue;
-      const front = nbs.some(q => q !== 255 && own(q) !== own(v)); // hranica ľudia × horda
-      const k = (y * W + x) * 4;
-      if (front) { bd.data[k] = 120; bd.data[k + 1] = 20; bd.data[k + 2] = 16; bd.data[k + 3] = 220; }
-      else if ((x + y) % 3) { bd.data[k] = 28; bd.data[k + 1] = 20; bd.data[k + 2] = 14; bd.data[k + 3] = 120; } // prerušovaná
+      const k = (y * W + x) * 4; bd.data[k] = 24; bd.data[k + 1] = 18; bd.data[k + 2] = 12; bd.data[k + 3] = 150;
     }
     bx.putImageData(bd, 0, 0);
-    island.border = c; island.borderKey = key;
+    island.border = c; island.borderKey = 'lines';
     return c;
   }
   function drawProvince(i, state, time, ctx) {
     const L = provLayers(), c = ctx || g;
-    const own = isOrc() ? L.red : L.blue, foe = isOrc() ? L.blue : L.red; // za orkov je územie hráča červené a ľudí modré
+    const own = isOrc() ? L.red : L.blue, foe = isOrc() ? L.blue : L.red; // za orkov je územie hráča oranžové a ľudí modré
     if (state === 'horde') { c.drawImage(foe[i], 0, 0); return; }
     c.drawImage(own[i], 0, 0);
-    if (state === 'attacked') { c.globalAlpha = missionAt(i) === st.unlocked ? 0.35 + 0.3 * Math.sin(time * 3) : 0.35; c.drawImage(foe[i], 0, 0); c.globalAlpha = 1; } // pulzuje len najbližšia misia
+    if (state === 'attacked') { c.globalAlpha = 0.35; c.drawImage(foe[i], 0, 0); c.globalAlpha = 1; } // napadnutá: cez vlastný pás presvitá farba útočníka
+  }
+  // aktuálna misia: okraje jej územia výrazne blikajú farbou hráča (ľudia modrou, orkovia oranžovou) – na oboch mapách
+  function drawMissionBlink(time) {
+    const pa = st.provAnim;
+    for (let i = 0; i < island.nodes.length; i++) {
+      if (missionAt(i) !== st.unlocked || provState(i) === 'ours' || (pa && pa.i === i)) continue;
+      const L = provLayers(), own = isOrc() ? L.red : L.blue, p = 0.5 + 0.5 * Math.sin(time * 5);
+      g.globalAlpha = 0.15 + 0.85 * p; g.drawImage(own[i], 0, 0); g.drawImage(own[i], 0, 0); // dvakrát = sýtejší pás
+      g.globalAlpha = 1;
+    }
   }
   // podklad mapy: ostrov, chodník a farby provincií, ktoré sa nehýbu, sa zložia raz do jedného obrázka
   // a prepočítajú sa, len keď sa zmení vlastník provincie alebo sa chodník vyšliapava; živé (pulzujúca, práve dobytá) sa kreslia každý snímok
@@ -3999,7 +4022,7 @@
   }
   function drawProvinces(time) {
     const n = island.nodes.length, pa = st.provAnim;
-    const live = i => (pa && pa.i === i) || (provState(i) === 'attacked' && missionAt(i) === st.unlocked);
+    const live = i => pa && pa.i === i;
     g.drawImage(mapBase(live), 0, 0);
     for (let i = 0; i < n; i++) {
       if (!live(i)) continue;
@@ -4010,6 +4033,7 @@
       } else drawProvince(i, provState(i), time);
     }
     g.drawImage(borderLayer(), 0, 0);
+    drawMissionBlink(time);
   }
   // ohne, dym a šípky útoku v napadnutých provinciách
   function drawWarFx(time) {
@@ -4154,9 +4178,7 @@
     paper:  ['#4a3420', '#664a2c', '#84653c', '#a2804e', '#bc9a62', '#d0b276', '#dfc68c', '#ead6a2', '#f3e4b8'],
     sea:    ['#463a28', '#5e4e36', '#7a6646', '#947e58', '#aa946a', '#bea87c', '#ccb88c', '#d8c69c', '#e2d2aa'],
     human:  ['#3a4a66', '#506484', '#6880a2', '#829abc', '#9cb2d0', '#b4c6de', '#c8d6e8', '#d8e2ee', '#e4eaf0'],
-    humanS: ['#22305a', '#30447c', '#40589c', '#5270b6', '#6a8ac8', '#84a2d6', '#a0b8e0', '#b8cae6', '#ccd8ec'],
     orc:    ['#5e3618', '#7e4a22', '#9c622e', '#b87a3c', '#cc9250', '#daa868', '#e6be86', '#eecea2', '#f4dcb8'],
-    orcS:   ['#52240c', '#743412', '#944618', '#b45a1e', '#cc7028', '#dc8834', '#e6a04c', '#ecb468', '#f0c688'],
     seaT:   ['#2e3e3a', '#3e5450', '#526c66', '#68847a', '#7e988c', '#94aa9c', '#a8baa8', '#bac8b2', '#cad4bc'], // modrozelený pás pri brehu
   }).map(([k, v]) => [k, v.map(hexRGB)]));
   const INK = hexRGB('#2a1c10'), INK2 = hexRGB('#5a4028'), INKR = hexRGB('#8a2614'), INKR2 = hexRGB('#b44a2a'), SNOWP = hexRGB('#fbf4dc'), OLIVE = hexRGB('#5c6438');
@@ -4224,13 +4246,14 @@
   ];
   // farba z rampy plynulo (bez ditheringu) – pre akvarel regiónov
   const rampAt = (ramp, v) => { const f = v * (ramp.length - 1), i = Math.min(ramp.length - 2, Math.floor(f)), t = f - i; return [0, 1, 2].map(c => ramp[i][c] + (ramp[i + 1][c] - ramp[i][c]) * t); };
-  function paperBase() {
-    const n = island.nodes.length, races = [], hit = [];
-    for (let i = 0; i < n; i++) { races[i] = provRace(i); hit[i] = provState(i) === 'attacked'; }
+  // ovr = provincia, ktorá je už dobytá (stav po animácii dobytia) – kreslí sa do zvláštneho obrázka
+  function paperBase(ovr) {
+    const n = island.nodes.length, races = [], hit = [], slot = ovr == null ? 'paper' : 'paperNext';
+    for (let i = 0; i < n; i++) { races[i] = i === ovr ? (isOrc() ? 'orc' : 'human') : provRace(i); hit[i] = i !== ovr && provState(i) === 'attacked'; }
     const key = W + 'x' + H + ':' + st.unlocked + ':' + races.map((r, i) => r[0] + (hit[i] ? '!' : '')).join('');
-    if (island.paperKey === key && island.paper) return island.paper;
+    if (island[slot + 'Key'] === key && island[slot]) return island[slot];
     const P = island.prov, Tr = island.terr || new Uint8Array(W * H).fill(2), N = W * H;
-    const c = island.paper || document.createElement('canvas'); c.width = W; c.height = H;
+    const c = island[slot] || document.createElement('canvas'); c.width = W; c.height = H;
     const x2 = c.getContext('2d'), id = x2.createImageData(W, H), d = id.data;
     const sea = i => P[i] === 255;
     // vzdialenostné polia (BFS): more od brehu, súš od brehu, súš od hranice regiónu (aj breh je hranica)
@@ -4251,6 +4274,7 @@
     const nbDiff = (i, f) => { const x = i % W, y = (i / W) | 0; return (x > 0 && f(i - 1)) || (x < W - 1 && f(i + 1)) || (y > 0 && f(i - W)) || (y < H - 1 && f(i + W)); };
     const sd = bfs(i => !sea(i), sea, 24);
     const bd = bfs(i => !sea(i) && nbDiff(i, j => P[j] !== P[i]), i => !sea(i), 14);
+    const pd = bfs(i => !sea(i) && nbDiff(i, j => !sea(j) && P[j] !== P[i]), i => !sea(i), 4); // len hranice medzi provinciami (pásy rás)
     // miesta bez kreslených značiek: okolo hradov a pozdĺž chodníka
     const keep = new Uint8Array(N);
     const stampK = (px, py, r) => { for (let y = Math.max(0, py - r | 0); y <= Math.min(H - 1, py + r); y++) for (let x = Math.max(0, px - r | 0); x <= Math.min(W - 1, px + r); x++) if (Math.hypot(x - px, y - py) <= r) keep[y * W + x] = 1; };
@@ -4288,20 +4312,17 @@
         if (t === 1) v -= 0.08;                              // pláž
         if (t === 4) v -= 0.04; else if (t === 5) v += 0.06; // hory a sneh v podklade
         if (sd[i] === 0 && nbDiff(i, sea)) col = INK;        // pobrežie perom
-        // akvarel: sýty pás tesne pri hranici, ďalej sa farba nerovnomerne vytráca do papiera – plynulo, bez šrafovania (ditheringu)
-        const vv = Math.max(0, Math.min(1, v + (b > 2 ? 0.05 : 0)));
+        // akvarel: farba rasy sa od hraníc nerovnomerne vytráca do papiera – plynulo, bez šrafovania
+        const vv = Math.max(0, Math.min(1, v + 0.05));
         if (!col) {
-          if (b <= 2) col = rampAt(PR[race + 'S'], vv);
-          else {
-            const wash = Math.max(0, Math.min(1, 0.95 - Math.min(b, 16) / 16 * 0.55 + (fbm(x * 0.07, y * 0.07, 131) - 0.5) * 0.45));
-            const a = rampAt(PR.paper, vv), r = rampAt(PR[race], vv);
-            col = [0, 1, 2].map(ch => a[ch] + (r[ch] - a[ch]) * wash);
-          }
-        }
-        if (sd[i] !== 0 || !nbDiff(i, sea)) if (b === 0 && nbDiff(i, j => !sea(j) && P[j] !== pv)) { // hranica regiónov: medzi rasami front, inak bodkovaná
-          const front = nbDiff(i, j => !sea(j) && P[j] !== pv && races[P[j]] !== race);
-          if (front) col = (x + y) % 4 === 3 ? INKR2 : INKR;
-          else if ((x + y) % 3 !== 0) col = INK2;
+          const wash = Math.max(0, Math.min(1, 0.95 - Math.min(b, 16) / 16 * 0.55 + (fbm(x * 0.07, y * 0.07, 131) - 0.5) * 0.45));
+          const a = rampAt(PR.paper, vv), r = rampAt(PR[race], vv);
+          col = [0, 1, 2].map(ch => a[ch] + (r[ch] - a[ch]) * wash);
+          // hranice ako na živej mape: pás vo farbe rasy, ktorá provinciu drží (napadnutá: farba útočníka), v strede tenká tmavá čiara
+          const pb = pd[i];
+          if (pb < BAND_A.length) { const bc = PROV_COL[(hit[pv] ? race !== 'orc' : race === 'orc') ? 'red' : 'blue'], al = BAND_A[pb]; col = [0, 1, 2].map(ch => col[ch] + (bc[ch] - col[ch]) * al); }
+          const x1 = x < W - 1 ? P[i + 1] : 255, y1 = y < H - 1 ? P[i + W] : 255;
+          if ((x1 !== 255 && x1 !== pv) || (y1 !== 255 && y1 !== pv)) col = col.map((c, ch) => c + ([24, 18, 12][ch] - c) * 0.59);
         }
       }
       if (!col) col = pickRamp(ramp, Math.max(0, Math.min(1, v)), x, y);
@@ -4386,11 +4407,17 @@
       if (hash2(x, y, 127) < 0.5 && ok()) { stamp(P_SHIP, x, y); for (let q = -1; q < 12; q += 2) put(x + q, y + 10, INK2); ships++; y += 60; }
     }
     x2.putImageData(id, 0, 0);
-    island.paper = c; island.paperKey = key;
+    island[slot] = c; island[slot + 'Key'] = key;
     return c;
   }
   function renderPaperMap(time) {
     g.drawImage(paperBase(), 0, 0);
+    const pa = st.provAnim;
+    if (pa) { // práve dobytá provincia: nová farba sa rozleje od hradu (ako na živej mape)
+      const nd = island.nodes[pa.i], r = Math.max(1, Math.min(1, pa.t) * 90);
+      g.save(); g.beginPath(); g.arc(nd.x, nd.y, r, 0, 6.283); g.clip(); g.drawImage(paperBase(pa.i), 0, 0); g.restore();
+    }
+    drawMissionBlink(time);
     island.nodes.forEach((n, i) => drawMapNode(i, n, time));
     for (const q of st.parts) {
       g.globalAlpha = Math.min(1, q.life / q.max * 2);
@@ -4631,6 +4658,7 @@
     if (gsrc && gi.getAttribute('src') !== gsrc) gi.src = gsrc;
     const keep = isAssault() && st.camp ? st.camp.parts.find(o => o.role === 'keep') : null; // pri útoku pruh ukazuje srdce hradu
     $('hud-wall').style.visibility = keep ? '' : 'hidden'; // zdravie radnice je pod radnicou na bojisku
+    $('hud-boss').style.gridArea = keep ? '' : 'wall'; // zdravie bossa hore na mieste pruhu radnice
     const r = keep ? Math.max(0, keep.hp / keep.max) : Math.max(0, st.hallHp / hallMax());
     $('hallFill').style.width = (r * 100) + '%';
     $('hallFill').className = r < 0.3 ? 'low' : '';
@@ -5756,7 +5784,7 @@
 
   function showMap() {
     st.run = (st.run || 0) + 1; // časovače rozohranej misie sa zrušia
-    if (island) island.baseKey = island.borderKey = island.paperKey = null; // pozícia môže byť za inú rasu – farby provincií a chodník sa prekreslia
+    if (island) island.baseKey = island.borderKey = island.paperKey = island.paperNextKey = null; // pozícia môže byť za inú rasu – farby provincií a chodník sa prekreslia
     clearBattle();
     st.phase = 'map';
     AUDIO.music('map');
@@ -6043,7 +6071,7 @@
 
   // animácia cestičky k novoodomknutej misii
   function mapTick(dt) {
-    if (st.provAnim && st.phase === 'map') { st.provAnim.t += dt / 1.3; if (st.provAnim.t >= 1) st.provAnim = null; }
+    if (st.provAnim && st.phase === 'map') { st.provAnim.t += dt / 1.3; if (st.provAnim.t >= 1) st.provAnim = null; return; } // chodník a kartičky až po prefarbení
     const a = st.mapAnim;
     if (!a || st.phase !== 'map') return;
     a.t += dt / 1.4;
