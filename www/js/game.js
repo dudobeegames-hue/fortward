@@ -4030,11 +4030,12 @@
     if (state === 'attacked') { c.globalAlpha = 0.35; c.drawImage(foe[i], 0, 0); c.globalAlpha = 1; } // napadnutá: cez vlastný pás presvitá farba útočníka
   }
   // aktuálna misia: okraje územia žiaria farbou hráča (ľudia modrou, orkovia oranžovou) – mäkká žiara dovnútra, svetlé jadro
-  // na hranici, plynulé dýchanie a prúžok svetla, ktorý obieha okolo provincie; na živej aj námorníckej mape
+  // na hranici a plynulé dýchanie celého okraja naraz; na živej aj námorníckej mape
+  const BLINK_R = 14; // ako hlboko do regiónu žiara siaha (body)
   function blinkData(i) {
     const B = island.blink || (island.blink = []);
     if (B[i]) return B[i];
-    const P = island.prov, nd = island.nodes[i], R = 6;
+    const P = island.prov, R = BLINK_R;
     let x0 = W, y0 = H, x1 = 0, y1 = 0;
     for (let k = 0; k < P.length; k++) if (P[k] === i) { const x = k % W, y = (k / W) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
     const w = x1 - x0 + 1, h = y1 - y0 + 1, dist = new Uint8Array(w * h).fill(255), q = [];
@@ -4053,7 +4054,7 @@
       }
     }
     const pts = [];
-    for (let k = 0; k < w * h; k++) if (dist[k] < R) { const x = k % w + x0, y = ((k / w) | 0) + y0; pts.push(k, dist[k], Math.atan2(y - nd.y, x - nd.x)); }
+    for (let k = 0; k < w * h; k++) if (dist[k] < R) pts.push(k, dist[k]);
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     return (B[i] = { x0, y0, w, h, pts, c, ctx: c.getContext('2d'), id: c.getContext('2d').createImageData(w, h) });
   }
@@ -4062,16 +4063,14 @@
     for (let i = 0; i < island.nodes.length; i++) {
       if (missionAt(i) !== st.unlocked || provState(i) === 'ours' || (pa && pa.i === i)) continue;
       const D = blinkData(i), d = D.id.data, [r, gg, b] = PROV_COL[isOrc() ? 'red' : 'blue'];
-      const br = 0.5 - 0.5 * Math.cos(time * 2.6), breath = br * br * (3 - 2 * br); // plynulé dýchanie (ease in-out)
-      const sweep = time * 1.4;                                                     // prúžok svetla obieha okolo hradu
+      const br = 0.5 - 0.5 * Math.cos(time * 1.7), breath = br * br * (3 - 2 * br); // plynulé dýchanie (ease in-out), celý okraj naraz
       d.fill(0);
-      for (let n = 0; n < D.pts.length; n += 3) {
-        const k = D.pts[n], dd = D.pts[n + 1], an = D.pts[n + 2];
-        const da = Math.atan2(Math.sin(an - sweep), Math.cos(an - sweep)), shine = Math.pow(Math.max(0, Math.cos(da)), 14);
-        const glow = Math.pow(1 - dd / 6, 2.2) * (0.28 + 0.62 * breath);           // žiara dovnútra slabne s hĺbkou
+      for (let n = 0; n < D.pts.length; n += 2) {
+        const k = D.pts[n], dd = D.pts[n + 1];
+        const glow = Math.pow(1 - dd / BLINK_R, 1.8) * (0.18 + 0.6 * breath);              // žiara dovnútra slabne s hĺbkou
         const core = dd === 0 ? 0.35 + 0.55 * breath : dd === 1 ? 0.15 + 0.3 * breath : 0; // svetlé jadro na hranici
-        const wht = Math.min(1, core * 0.5 + shine * (dd < 2 ? 0.9 : 0.35));        // biely nádych jadra a prúžku
-        const al = Math.min(1, glow + core * 0.5 + shine * 0.6 * (1 - dd / 6));
+        const wht = core * 0.5;                                                          // biely nádych jadra
+        const al = Math.min(1, glow + core * 0.5);
         d[k * 4] = r + (255 - r) * wht; d[k * 4 + 1] = gg + (255 - gg) * wht; d[k * 4 + 2] = b + (255 - b) * wht; d[k * 4 + 3] = al * 255;
       }
       D.ctx.putImageData(D.id, 0, 0);
@@ -4387,7 +4386,8 @@
         // akvarel: farba rasy sa od hraníc nerovnomerne vytráca do papiera – plynulo, bez šrafovania
         const vv = Math.max(0, Math.min(1, v + 0.05));
         if (!col) {
-          const wash = Math.max(0, Math.min(1, 0.95 - Math.min(b, 16) / 16 * 0.55 + (fbm(x * 0.07, y * 0.07, 131) - 0.5) * 0.45));
+          let wash = Math.max(0, Math.min(1, 0.95 - Math.min(b, 16) / 16 * 0.55 + (fbm(x * 0.07, y * 0.07, 131) - 0.5) * 0.45));
+          wash = hit[pv] ? wash * 0.45 : Math.min(1, wash * 1.1 + 0.2); // oslobodené a držané regióny sýtejšie, okupované (napadnuté) bledšie
           const a = rampAt(PR.paper, vv), r = rampAt(PR[race], vv);
           col = [0, 1, 2].map(ch => a[ch] + (r[ch] - a[ch]) * wash);
           // hranice ako na živej mape: pás vo farbe rasy, ktorá provinciu drží (napadnutá: farba útočníka), v strede tenká tmavá čiara
@@ -6134,12 +6134,14 @@
 
   function tapMap(x, y) {
     if (st.mapAnim) return;
-    island.nodes.forEach((n, i) => {
-      if (Math.hypot(n.x - x, n.y - 5 - y) > 14) return;
-      const num = missionAt(i);
-      if (num > st.unlocked) { toast('Najprv dobi misiu ' + (num - 1)); AUDIO.play('deny'); return; }
-      st.mapSel = num; AUDIO.play('click'); openMission();
-    });
+    // ťuk na hrad alebo kamkoľvek do jeho regiónu otvorí misiu toho regiónu (hrad má prednosť pred susedným regiónom)
+    const px = Math.round(x), py = Math.round(y), reg = px >= 0 && py >= 0 && px < W && py < H ? island.prov[py * W + px] : 255;
+    let i = island.nodes.findIndex(n => Math.hypot(n.x - x, n.y - 5 - y) <= 14);
+    if (i < 0) i = reg === 255 ? -1 : reg;
+    if (i < 0) return;
+    const num = missionAt(i);
+    if (num > st.unlocked) { toast('Najprv dobi misiu ' + (num - 1)); AUDIO.play('deny'); return; }
+    st.mapSel = num; AUDIO.play('click'); openMission();
   }
 
   // animácia cestičky k novoodomknutej misii
