@@ -685,7 +685,7 @@ const UI_ICONS = (() => {
     '..............',
   ];
   const mapPaper = fromMap(MAP_ICON, { K: '#1c140e', P: '#ecdcb0', p: '#b89c68', R: '#ec9234', B: '#8cb6e2' });
-  const mapPaperOn = fromMap(MAP_ICON, { K: '#1c140e', P: '#8ee06a', p: '#4c9a38', R: '#ec9234', B: '#8cb6e2' });
+  const mapPaperOn = fromMap(MAP_ICON, { K: '#1c140e', P: '#56923a', p: '#36662a', R: '#ec9234', B: '#8cb6e2' });
 
   // poradie jazykov v Nastaveniach; zatiaľ hrá len slovenčina, ostatné prídu s prekladom
   const langs = [

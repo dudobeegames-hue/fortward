@@ -3941,8 +3941,8 @@
       const fx = n.x, fy = top - 6;
       g.fillStyle = '#4a4e60'; g.fillRect(fx, fy, 1, 7);
       const wv = Math.floor(time * 5 + i) % 2;
-      g.fillStyle = isOrc() ? '#8c2018' : '#3c64c8'; g.fillRect(fx + 1, fy + wv, 5, 3); // zástava hráča: modrá ľudia, červená orkovia
-      g.fillStyle = isOrc() ? '#e84838' : '#88b4ff'; g.fillRect(fx + 1, fy + wv, 2, 1);
+      g.fillStyle = isOrc() ? '#c05a18' : '#3c64c8'; g.fillRect(fx + 1, fy + wv, 5, 3); // zástava hráča: modrá ľudia, oranžová orkovia
+      g.fillStyle = isOrc() ? '#f89838' : '#88b4ff'; g.fillRect(fx + 1, fy + wv, 2, 1);
       g.fillStyle = '#f8d048'; g.fillRect(fx + 5, fy + 1 - wv, 1, 1);
     } else if (status === 'open') { // skákajúca šípka
       const ay = top - 8 + Math.round(Math.abs(Math.sin(time * 4)) * -3);
@@ -4324,7 +4324,7 @@
     const n = island.nodes.length, races = [], hit = [], slot = ovr == null ? 'paper' : 'paperNext';
     const pa = st.provAnim; // počas prefarbenia ukazuje starý obrázok dobytý región ešte v pôvodnom stave (napadnutý či hordy)
     for (let i = 0; i < n; i++) { races[i] = i === ovr ? (isOrc() ? 'orc' : 'human') : provRace(i); hit[i] = i !== ovr && (pa && pa.i === i ? pa.from === 'attacked' : provState(i) === 'attacked'); }
-    const key = MW + 'x' + MH + ':' + st.unlocked + ':' + races.map((r, i) => r[0] + (hit[i] ? '!' : '')).join('');
+    const key = W + ':' + mapOX() + ':' + MW + 'x' + MH + ':' + st.unlocked + ':' + races.map((r, i) => r[0] + (hit[i] ? '!' : '')).join('');
     if (island[slot + 'Key'] === key && island[slot]) return island[slot];
     const P = island.prov, Tr = island.terr || new Uint8Array(MW * MH).fill(2), N = MW * MH;
     const c = island[slot] || document.createElement('canvas'); c.width = MW; c.height = MH;
@@ -4355,22 +4355,12 @@
     island.nodes.forEach(nd => stampK(nd.x, nd.y - 4, 14));
     island.segs.forEach(pts => { for (let k = 0; k < pts.length; k += 2) stampK(pts[k].x, pts[k].y, 3); });
     // UI: domček vľavo hore, truhlica vpravo hore, ikonky vľavo dole a karty dole – tam sa ružica ani lode nedávajú
-    const yb = Math.max(MH * 0.6, Math.min(MH, Math.round(mapViewBottom()))); // spodok viditeľnej mapy nad kartami (pri posunutí nadol)
+    const yb = paperYB(), oxs = mapOX(); // spodok viditeľnej mapy a posun ostrova na obrazovke (okraje papiera sú okraje obrazovky)
     const uiBand = (x, y) => (x < 40 && y < 36) || (x > MW - 50 && y < 30) || (x < 42 && y > yb - 40) || y > yb - 3;
 
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
       const i = y * MW + x, k = i * 4;
-      // jas papiera: veľké vlny zrna, jemné zrno, kávové škvrny s tmavším okrajom, prehyby a opálené okraje
-      let v = 0.7 + (fbm(x * 0.03, y * 0.03, 101) - 0.5) * 0.22 + (fbm(x * 0.15, y * 0.15, 103) - 0.5) * 0.08 + (hash2(x, y, 105) - 0.5) * 0.05;
-      const stain = fbm(x * 0.018, y * 0.022, 107);
-      if (stain > 0.64) v -= (stain - 0.64) * 0.9;
-      if (Math.abs(stain - 0.64) < 0.006) v -= 0.1; // okraj škvrny
-      const fx = MW >> 1, fy1 = Math.round(MH / 3), fy2 = Math.round(MH * 2 / 3);
-      if (x === fx || y === fy1 || y === fy2) v -= 0.07; else if (x === fx + 1 || y === fy1 + 1 || y === fy2 + 1) v += 0.05; // prehyby
-      const e = Math.min(x, y, MW - 1 - x, yb - 1 - y) + (fbm(x * 0.08, y * 0.08, 109) - 0.5) * 12; // opálené okraje papiera
-      if (e < 22) v -= Math.pow((22 - e) / 22, 2.2) * 0.75;
-      const vx = (x - MW / 2) / (MW / 2), vy = (y - yb / 2) / (yb / 2);
-      v -= Math.pow(Math.min(1, vx * vx * 0.7 + vy * vy * 0.9), 2) * 0.16; // tieň k okrajom (vinetácia)
+      let v = paperV(x, y, x + oxs, yb);
       let ramp = PR.paper, col = null;
       if (sea(i)) {
         ramp = PR.sea;
@@ -4486,6 +4476,36 @@
     island[slot] = c; island[slot + 'Key'] = key;
     return c;
   }
+  // jas pergamenu v bode (x, y) ostrova; X = stĺpec na obrazovke – opálené okraje a tieň k okrajom sú na okrajoch obrazovky,
+  // takže papier prechádza cez celú šírku bez pásov
+  const paperYB = () => Math.max(MH * 0.6, Math.min(MH, Math.round(mapViewBottom()))); // spodok viditeľnej mapy (pri posunutí nadol)
+  function paperV(x, y, X, yb) {
+    let v = 0.7 + (fbm(x * 0.03, y * 0.03, 101) - 0.5) * 0.22 + (fbm(x * 0.15, y * 0.15, 103) - 0.5) * 0.08 + (hash2(x, y, 105) - 0.5) * 0.05;
+    const stain = fbm(x * 0.018, y * 0.022, 107);
+    if (stain > 0.64) v -= (stain - 0.64) * 0.9;
+    if (Math.abs(stain - 0.64) < 0.006) v -= 0.1; // okraj škvrny
+    const fx = MW >> 1, fy1 = Math.round(MH / 3), fy2 = Math.round(MH * 2 / 3);
+    if (x === fx || y === fy1 || y === fy2) v -= 0.07; else if (x === fx + 1 || y === fy1 + 1 || y === fy2 + 1) v += 0.05; // prehyby
+    const e = Math.min(X, y, W - 1 - X, yb - 1 - y) + (fbm(x * 0.08, y * 0.08, 109) - 0.5) * 12; // opálené okraje
+    if (e < 22) v -= Math.pow((22 - e) / 22, 2.2) * 0.75;
+    const vx = (X - W / 2) / (W / 2), vy = (y - yb / 2) / (yb / 2);
+    return v - Math.pow(Math.min(1, vx * vx * 0.7 + vy * vy * 0.9), 2) * 0.16; // tieň k okrajom (vinetácia)
+  }
+  // pergamen s morom vedľa ostrova (širší displej) – rovnaký papier a šrafy vĺn ako na šírom mori mapy
+  function paperSurround(ox, hgt) {
+    const key = W + 'x' + hgt + ':' + ox + ':' + Math.round(mapViewBottom());
+    if (island.paperSurKey === key) return island.paperSur;
+    const c = island.paperSur || document.createElement('canvas'); c.width = W; c.height = hgt;
+    const x2 = c.getContext('2d'), id = x2.createImageData(W, hgt), d = id.data, yb = paperYB();
+    for (let y = 0; y < hgt; y++) for (let X = 0; X < W; X++) {
+      const x = X - ox; if (x >= 0 && x < MW && y < MH) continue; // tu leží papier ostrova
+      const col = y % 9 === 0 && (x + ((y / 9) | 0) * 11 + 1700) % 17 < 4 ? hexRGB('#5a4028') : pickRamp(PR.sea, Math.max(0, Math.min(1, paperV(x, y, X, yb) + 0.1)), x & 255, y);
+      const k = (y * W + X) * 4; d[k] = col[0]; d[k + 1] = col[1]; d[k + 2] = col[2]; d[k + 3] = 255;
+    }
+    x2.putImageData(id, 0, 0);
+    island.paperSur = c; island.paperSurKey = key;
+    return c;
+  }
   function renderPaperMap(time) {
     g.drawImage(paperBase(), 0, 0);
     const pa = st.provAnim;
@@ -4515,7 +4535,7 @@
   function renderMap(time) {
     if (buf.height < MH) buf.height = MH; // plátno aspoň na výšku mapy – pri posunutí nadol by inak dole ostal čierny pás
     const ox = mapOX(), hgt = Math.max(MH, buf.height);
-    if (mapStyle === 'paper') { g.fillStyle = '#140c06'; g.fillRect(0, 0, W, hgt); } // okolo pergamenu tma
+    if (mapStyle === 'paper') g.drawImage(paperSurround(ox, hgt), 0, 0); // pergamen pokračuje aj vedľa ostrova
     else g.drawImage(mapSurround(ox, hgt), 0, 0);
     g.save(); g.translate(ox, 0);
     drawMapScene(time);
