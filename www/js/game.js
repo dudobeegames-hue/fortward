@@ -620,13 +620,14 @@
     if (!st.pBlk || st.pBlk.v !== st.campV || st.pBlk.camp !== st.camp) st.pBlk = { v: st.campV, camp: st.camp, b: campBlocks(true) };
     return !!st.pBlk.b[r * G.cols + c];
   }
-  // poistka: vojak hráča (aj stroj a hrdina) nikdy neostane v hradbe či bráne tábora – vráti sa na posledné voľné miesto
-  function keepOutOfCamp() {
+  // poistka: vojak hráča (aj stroj a hrdina) nikdy neostane v hradbe – vlastnej (mimo brány) ani tábora, ani v radnici;
+  // keď ho tam niečo zatlačí (odtláčanie v tlačenici, odhodenie), vráti sa na posledné voľné miesto – hradbami sa chodí len bránou
+  function keepOutOfWalls() {
     const us = st.king && !st.king.dead ? st.soldiers.concat([st.king]) : st.soldiers;
     for (const u of us) {
       if (u.dead || u.fly) continue;
       const t = tileAt(u.x, u.y);
-      if (!campWallAt(t.c, t.r)) { u.okX = u.x; u.okY = u.y; }
+      if (knightPass(t.c, t.r)) { u.okX = u.x; u.okY = u.y; }
       else if (u.okX != null) { u.x = u.okX; u.y = u.okY; u.next = null; u.repath = 0; }
     }
   }
@@ -1918,11 +1919,23 @@
     return best;
   }
   const heroFoeNear = aggro => st.enemies.some(e => !e.dead && !e.d.fly && heroReaches(e, aggro)); // nepriateľ, na ktorého by hrdina vyrazil
-  // hrdina na blízko búra stavbu tábora: dôjde k nej z boku a udiera (kým nemá nepriateľa)
-  function heroStrikeCamp(k, o, dt) {
+  // hrdina na blízko: najbližšia stavba tábora pri jeho mieste, ku ktorej vedie cesta (ako pre vojakov – hradby neprejde)
+  function heroMeleeCampTarget(k, R) {
+    const h = heroPos(k);
+    let best = null, bd = 1e9;
+    for (const o of campLive()) {
+      if (Math.hypot(o.x - h.x, o.y - h.y) > R + 8) continue;
+      const sp = campSpot(o, k);
+      if (sp && sp.d < bd) { bd = sp.d; best = { o, sp }; }
+    }
+    return best;
+  }
+  // hrdina na blízko búra stavbu tábora: dôjde na voľné miesto vedľa nej a udiera (kým nemá nepriateľa)
+  function heroStrikeCamp(k, t, dt) {
+    const o = t.o;
     k.flash = Math.max(0, k.flash - dt); k.cd = Math.max(0, k.cd - dt); k.swing = Math.max(0, (k.swing || 0) - dt);
     k.tgt = null; k.aim = o; // natočí sa k stavbe
-    const side = k.x < o.x ? -1 : 1, tx = o.x + side * 9, ty = o.y + 3;
+    const side = k.x < o.x ? -1 : 1, tx = t.sp.x, ty = t.sp.y;
     if (Math.hypot(tx - k.x, ty - k.y) > 2) { moveKnight(k, tx, ty, k.spd * waterMul(k), dt); k.anim += dt * 6; return; }
     if (k.cd > 0) return;
     k.cd = heroDef().cd * (1 - 0.12 * tal('swift')) * rageMul(k); k.swing = 0.3; AUDIO.play('kingHit');
@@ -2146,6 +2159,18 @@
     const a = us.slice().sort((p, q) => p.x - q.x || p.slot - q.slot), b = slots.slice().sort((p, q) => p.x - q.x || p.y - q.y);
     a.forEach((u, i) => { u.fslot = b[i]; });
   }
+  // miesto v šíku, ktoré padne do hradby (či radnice), sa posunie na najbližšie priechodné políčko – radšej dozadu k zóne
+  function passSlot(sl) {
+    if (!sl) return sl;
+    const t = tileAt(sl.x, sl.y);
+    if (knightPass(t.c, t.r)) return sl;
+    const ox = sl.x - tileX(t.c), oy = sl.y - tileY(t.r);
+    for (let d = 1; d <= 3; d++) for (const [dc, dr] of [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      const c = t.c + dc * d, r = t.r + dr * d;
+      if (c >= 0 && r >= 0 && c < G.cols && r < G.rows && knightPass(c, r)) return { x: tileX(c) + ox, y: tileY(r) + oy };
+    }
+    return sl;
+  }
   // plynulý posun bodu šíku k cieľu (šík pochoduje, neskáče)
   function stepAnchor(a, tx, ty, dt) {
     const dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy), s = Math.min(d, FORM_SPD * dt);
@@ -2190,6 +2215,7 @@
         u.fslot = { x: Math.max(formLeft(), Math.min(formRight(), x)), y: F.inf.y + (k % 2) * 4 };
       });
       infBack = F.inf.y + (kRows + formRows(spears.length)) * FORM_ROW;
+      for (const u of knights.concat(spears, riders)) u.fslot = passSlot(u.fslot);
       // zrazil sa šík s hordou? potom sa pešiaci pustia aj do nepriateľov o kus ďalej
       F.contact = live.some(s => s.ktype && s.tgt && !s.tgt.dead && Math.hypot(s.tgt.x - s.x, s.tgt.y - s.y) < 14);
     }
@@ -2202,6 +2228,7 @@
       else if (cp) { tx = cp.x; ty = cp.y + ARCHER_RANGE - 12; } // horda nikde – rad lukostrelcov na dostrel od tábora
       stepAnchor(F.arc, tx, ty, dt);
       assignSlots(archers, formSlots(archers.length, F.arc.x, F.arc.y));
+      for (const u of archers) u.fslot = passSlot(u.fslot);
     }
   }
 
@@ -2643,7 +2670,11 @@
     const c = k.charge, dx = c.tx - k.x, dy = c.ty - k.y, d = Math.hypot(dx, dy), v = 110 * dt;
     k.flash = Math.max(0, k.flash - dt); k.anim += dt * 12;
     if (d <= v) { k.x = c.tx; k.y = c.ty; k.charge = null; st.shake = Math.max(st.shake, 0.2); AUDIO.play('thud'); }
-    else { k.x += dx / d * v; k.y += dy / d * v; }
+    else {
+      const nx = k.x + dx / d * v, ny = k.y + dy / d * v, t = tileAt(nx, ny);
+      if (!knightPass(t.c, t.r)) { k.charge = null; st.shake = Math.max(st.shake, 0.2); AUDIO.play('thud'); } // nápor sa zastaví o hradbu
+      else { k.x = nx; k.y = ny; }
+    }
     if (Math.random() < 0.7) part(k.x + (Math.random() - 0.5) * 12, k.y, (Math.random() - 0.5) * 20, -6 - Math.random() * 10, 0.4, '#b8a890', 0); // prach spod láb
     const ux = d > 0.5 ? dx / d : 0, uy = d > 0.5 ? dy / d : -1;
     for (const e of st.enemies) {
@@ -2762,7 +2793,7 @@
     }
     st.soldiers = st.soldiers.filter(s => !s.dead);
     separateSoldiers();
-    if (st.camp) keepOutOfCamp();
+    keepOutOfWalls();
     // kráľ
     const k = st.king;
     if (k.dead) k.deadT += dt;
@@ -2780,7 +2811,7 @@
       else if (hd.range) updateSorc(k, dt);
       else {
         const h = heroPos(k), aggro = hd.reach + T + 10 * tal('reach');
-        const cp = (!k.tgt || k.tgt.dead) && !heroFoeNear(aggro) ? heroCampTarget(k, aggro) : null; // bez nepriateľa búra tábor pri sebe
+        const cp = (!k.tgt || k.tgt.dead) && !heroFoeNear(aggro) ? heroMeleeCampTarget(k, aggro) : null; // bez nepriateľa búra tábor pri sebe
         if (cp) heroStrikeCamp(k, cp, dt);
         else { k.aim = null; updateFighter(k, dt, h.x, h.y, aggro, kingDmg(), true, moveKnight); } // vyráža o políčko pred stavebnú zónu (či od stanovišťa), chodí len cez brány
       }
@@ -6431,8 +6462,7 @@
     if (!k || k.dead || !(st.phase === 'pause' || st.phase === 'build')) return;
     k.tgt = null; k.flash = Math.max(0, (k.flash || 0) - dt); k.swing = Math.max(0, (k.swing || 0) - dt);
     if (Math.hypot(k.hx - k.x, k.hy - k.y) <= 1) return;
-    moveKnight(k, k.hx, k.hy, (k.spd || 26) * 1.15, dt);
-    if (!k.next) moveTo(k, k.hx, k.hy, (k.spd || 26) * 1.15, dt); // cesta zatarasená – ide priamo
+    moveKnight(k, k.hx, k.hy, (k.spd || 26) * 1.15, dt); // len po ceste ako vojaci – cez hradby neprejde
   }
   // ---- strážca plátien: prehliadač môže v karte na pozadí uspať plátna (šetrí grafickú pamäť) a pri návrate ich vrátiť
   // prázdne – ostrov, hrady, budovy a jednotky sa potom nevykreslia a ostane len to, čo sa kreslí priamo (čísla, hviezdy).

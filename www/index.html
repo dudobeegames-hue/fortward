@@ -245,14 +245,18 @@
     flex: 0 0 calc((100% - 18px) / 4); scroll-snap-align: start;
     padding: 0; border: 0; background: none; perspective: 500px;
   }
-  .pcard .pin { display: grid; transition: transform .35s ease; transform-style: preserve-3d; }
+  .pcard .pin { position: relative; display: grid; transition: transform .35s ease; transform-style: preserve-3d; }
   .pcard .face {
     grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden;
     background: #1a120d; border: 2px solid var(--ink); border-radius: 8px; padding: 4px 2px 3px;
     display: flex; flex-direction: column; align-items: center; gap: 1px;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
   }
-  .pcard .back { transform: rotateY(180deg); justify-content: center; gap: 3px; padding: 4px 5px; text-align: center; }
+  /* zadná strana (popis) leží na prednej v rovnakej veľkosti – výšku karty určuje vždy predná strana, aby panel neposkakoval;
+     dlhší popis sa dá posúvať prstom */
+  .pcard .back { position: absolute; inset: 0; transform: rotateY(180deg); justify-content: safe center; gap: 3px; padding: 4px 5px; text-align: center;
+    overflow-y: auto; scrollbar-width: none; }
+  .pcard .back::-webkit-scrollbar { display: none; }
   .pcard .back b { font-size: 11px; color: var(--gold); line-height: 1.1; }
   .pcard .back small { font-size: 9px; line-height: 1.2; color: var(--text); }
   .pcard.flipped .pin { transform: rotateY(180deg); }
