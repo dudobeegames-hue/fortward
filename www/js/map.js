@@ -189,7 +189,7 @@ function buildIsland(W, H, seed) {
     }
     return pts;
   });
-  return { bg: c, foam, waves, segs, nodes: L.nodes, prov, terr, fires, fort: makeOrcFort(), castle: makeMiniCastle(false), castleLocked: makeMiniCastle(true) };
+  return { bg: c, foam, waves, segs, nodes: L.nodes, prov, terr, fires, fort: makeOrcFort(), castle: makeMiniCastle(false) };
 }
 
 // pevnosť orkov pri misii 10
