@@ -560,8 +560,9 @@
   }
   let island = null;
   // mapa ostrova má pevné rozmery (rovnaký ostrov pre všetkých); na obrazovke sa vycentruje, okolo pokračuje more
-  const MW = 190, MH = 400;
+  const MAP_PAD = 32, MW = 190, MH = 400 + 2 * MAP_PAD; // ostrov 190 × 400 a nad aj pod ním pás mora
   const mapOX = () => Math.round((W - MW) / 2);
+  const mapViewBottom = () => mapCamMax() + H - $('mapBar').offsetHeight * DPR / S; // najnižší viditeľný riadok mapy (pri posunutí nadol)
   // hra za orkov: kampaň ide po mape opačne (orkská misia 1 = pevnosť orkov hore, uzol 10)
   const isOrc = () => st.race === 'Orkovia';
   const nodeOf = m => isOrc() ? MISSIONS.length - m : m - 1;     // index uzla (provincie) mapy pre misiu m
@@ -671,7 +672,7 @@
     screen.style.width = cw + 'px'; screen.style.height = ch + 'px';
     const game = $('game');
     game.style.width = cw + 'px'; game.style.height = ch + 'px';
-    island = buildIsland(MW, MH, 21); island.ships = null; // ostrov má pevné rozmery – na každom zariadení rovnaký
+    island = buildIsland(MW, 400, 21, MAP_PAD); island.ships = null; // ostrov má pevné rozmery – na každom zariadení rovnaký
     layoutField();
   }
   // mriežka a krajina bojiska (výška závisí od misie)
@@ -4177,7 +4178,7 @@
     let tries = 0;
     for (const [kind, south] of want) {
       while (tries++ < 4000) {
-        const low = MH - $('mapBar').offsetHeight * DPR / S - 18;       // nie pod kartami dole
+        const low = Math.min(MH, mapViewBottom()) - 16;                 // len na vode, ktorú vidno (nie pod kartami dole)
         const x = 8 + Math.random() * (MW - 24), y = 14 + Math.random() * (low - 14);
         if ((y > midY) !== !!south || (x < 34 && y < 34)) continue;   // ani pri domčeku vľavo hore
         let ok = true;
@@ -4354,7 +4355,7 @@
     island.nodes.forEach(nd => stampK(nd.x, nd.y - 4, 14));
     island.segs.forEach(pts => { for (let k = 0; k < pts.length; k += 2) stampK(pts[k].x, pts[k].y, 3); });
     // UI: domček vľavo hore, truhlica vpravo hore, ikonky vľavo dole a karty dole – tam sa ružica ani lode nedávajú
-    const yb = Math.max(MH * 0.6, MH - Math.round(($('mapBar').offsetHeight || 0) * DPR / S)); // spodok viditeľnej mapy nad kartami
+    const yb = Math.max(MH * 0.6, Math.min(MH, Math.round(mapViewBottom()))); // spodok viditeľnej mapy nad kartami (pri posunutí nadol)
     const uiBand = (x, y) => (x < 40 && y < 36) || (x > MW - 50 && y < 30) || (x < 42 && y > yb - 40) || y > yb - 3;
 
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
@@ -4512,6 +4513,7 @@
     return c;
   }
   function renderMap(time) {
+    if (buf.height < MH) buf.height = MH; // plátno aspoň na výšku mapy – pri posunutí nadol by inak dole ostal čierny pás
     const ox = mapOX(), hgt = Math.max(MH, buf.height);
     if (mapStyle === 'paper') { g.fillStyle = '#140c06'; g.fillRect(0, 0, W, hgt); } // okolo pergamenu tma
     else g.drawImage(mapSurround(ox, hgt), 0, 0);
@@ -4560,8 +4562,8 @@
   function mapCamMax() {
     if (!island) return 0;
     const panelLow = $('mapBar').offsetHeight * DPR / S;
-    const lowest = Math.max(...island.nodes.map(n => n.y)) + 22; // hrad + tabuľka s hviezdami
-    return Math.max(0, lowest - (H - panelLow) + 4);
+    const lowest = Math.max(Math.max(...island.nodes.map(n => n.y)) + 22, island.landBot + 14); // hrad s tabuľkou aj voda pod južným pobrežím
+    return Math.max(0, Math.min(MH, lowest) - (H - panelLow));
   }
   const clampMap = v => Math.max(0, Math.min(mapCamMax(), v));
   function focusMapNode(num, instant) {
@@ -6273,13 +6275,12 @@
   // tlačidlo nekonečnej obrany na mape: po dobytí hradu, s rekordom pozície
   function renderEndlessBtn() {
     $('endlessBtn').classList.toggle('locked', !endlessOpen());
-    $('mapStyleBtn').classList.toggle('on', mapStyle === 'paper');
+    $('icoMapStyle').src = mapStyle === 'paper' ? UI_ICONS.mapPaperOn : UI_ICONS.mapPaper; // zapnutá námornícka mapa: zelená ikonka
   }
   $('icoEndless').src = UI_ICONS.endless; $('icoMapStyle').src = UI_ICONS.mapPaper;
   $('mapStyleBtn').addEventListener('click', () => { // pohyblivá farebná mapa ↔ papierová námornícka mapa
     mapStyle = mapStyle === 'paper' ? 'live' : 'paper';
     AUDIO.play('click'); renderEndlessBtn();
-    toast(mapStyle === 'paper' ? 'Námornícka mapa' : 'Farebná mapa');
   });
   $('endlessBtn').addEventListener('click', () => {
     if (st.mapAnim) return;

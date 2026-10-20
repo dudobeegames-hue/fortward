@@ -72,36 +72,39 @@ function mapPaths(nodes, seed) {
   return segs;
 }
 
-function buildIsland(W, H, seed) {
+// pad = pás mora nad aj pod ostrovom (body): ostrov je rovnaký, len plátno je vyššie a všetko sa posunie o pad nadol
+function buildIsland(W, H, seed, pad) {
+  pad = pad || 0;
+  const CH = H + 2 * pad, at = (x, y) => (y + pad) * W + x; // y je v súradniciach rozloženia (0 = pôvodný vrch)
   const L = mapLayout(W, H);
   const segs = mapPaths(L.nodes, seed);
-  const c = document.createElement('canvas'); c.width = W; c.height = H;
-  const cx = c.getContext('2d'), img = cx.createImageData(W, H), d = img.data;
+  const c = document.createElement('canvas'); c.width = W; c.height = CH;
+  const cx = c.getContext('2d'), img = cx.createImageData(W, CH), d = img.data;
   const set = (x, y, col) => {
     x |= 0; y |= 0;
-    if (x < 0 || y < 0 || x >= W || y >= H) return;
-    const i = (y * W + x) * 4; d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255;
+    if (x < 0 || y < -pad || x >= W || y >= H + pad) return;
+    const i = at(x, y) * 4; d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255;
   };
   const K = hexRGB(PAL.K);
 
   // blízkosť cesty a bodov (aby boli vždy na súši a bez stromov/hôr)
-  const near = new Float32Array(W * H);
+  const near = new Float32Array(W * CH);
   const stamp = (px, py, r) => {
-    for (let y = Math.max(0, Math.floor(py - r)); y <= Math.min(H - 1, py + r); y++)
+    for (let y = Math.max(-pad, Math.floor(py - r)); y <= Math.min(H + pad - 1, py + r); y++)
       for (let x = Math.max(0, Math.floor(px - r)); x <= Math.min(W - 1, px + r); x++) {
         const v = 1 - Math.hypot(x - px, y - py) / r;
-        if (v > near[y * W + x]) near[y * W + x] = v;
+        if (v > near[at(x, y)]) near[at(x, y)] = v;
       }
   };
   for (const s of segs) for (let k = 0; k < s.length; k += 3) stamp(s[k].x, s[k].y, 16);
   for (const n of L.nodes) stamp(n.x, n.y, 26);
   // presná vzdialenosť od cesty a od hradov (lesy smú až k chodníku, ale nie naň ani na hrad)
-  const pathD = new Float32Array(W * H).fill(99), nodeD = new Float32Array(W * H).fill(99);
+  const pathD = new Float32Array(W * CH).fill(99), nodeD = new Float32Array(W * CH).fill(99);
   const dist = (arr, px, py, r) => {
-    for (let y = Math.max(0, Math.floor(py - r)); y <= Math.min(H - 1, py + r); y++)
+    for (let y = Math.max(-pad, Math.floor(py - r)); y <= Math.min(H + pad - 1, py + r); y++)
       for (let x = Math.max(0, Math.floor(px - r)); x <= Math.min(W - 1, px + r); x++) {
         const v = Math.hypot(x - px, y - py);
-        if (v < arr[y * W + x]) arr[y * W + x] = v;
+        if (v < arr[at(x, y)]) arr[at(x, y)] = v;
       }
   };
   for (const s of segs) for (let k = 0; k < s.length; k += 2) dist(pathD, s[k].x, s[k].y, 14);
@@ -121,29 +124,29 @@ function buildIsland(W, H, seed) {
   const elev = (x, y) => fbm(x * 0.045, y * 0.045, seed + 3) + (1 - (y - L.top) / (L.bot - L.top)) * 0.28;
   const foam = [], trees = [];
   // provincia každého kúska súše = najbližší hrad (so šumom, aby hranice neboli rovné); 255 = more
-  const prov = new Uint8Array(W * H).fill(255);
-  const terr = new Uint8Array(W * H); // druh terénu pre papierovú mapu: 0 more, 1 pláž, 2 tráva, 3 les, 4 hory, 5 sneh
+  const prov = new Uint8Array(W * CH).fill(255);
+  const terr = new Uint8Array(W * CH); // druh terénu pre papierovú mapu: 0 more, 1 pláž, 2 tráva, 3 les, 4 hory, 5 sneh
   const provOf = (x, y) => {
     let best = 0, bd = 1e9;
     const jx = (fbm(x * 0.05, y * 0.05, seed + 31) - 0.5) * 18, jy = (fbm(x * 0.05, y * 0.05, seed + 37) - 0.5) * 18;
     L.nodes.forEach((n, i) => { const d = Math.hypot(x + jx - n.x, (y + jy - n.y) * 1.15); if (d < bd) { bd = d; best = i; } });
     return best;
   };
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const nb = near[y * W + x];
+  for (let y = -pad; y < H + pad; y++) for (let x = 0; x < W; x++) {
+    const nb = near[at(x, y)];
     const dd = Math.hypot((x - icx) / rx, (y - icy) / ry) + (fbm(x * 0.035, y * 0.035, seed) - 0.5) * 0.42 - nb * 0.35;
-    if (dd <= 1) prov[y * W + x] = provOf(x, y);
+    if (dd <= 1) prov[at(x, y)] = provOf(x, y);
     if (dd > 1) {
       const depth = dd - 1;
       if (depth < 0.018) foam.push({ x, y, ph: hash2(x, y, 7) * 6.28 });
       set(x, y, seaRGB(x, y, depth));
     } else if (dd > 0.92) {
-      terr[y * W + x] = 1;
+      terr[at(x, y)] = 1;
       set(x, y, pickRamp(SAND, 0.6 + (hash2(x, y, seed + 8) - 0.5) * 0.3 - (dd - 0.92) * 3, x, y));
     } else {
       const e = elev(x, y);
       if (e > 0.8 && nb < 0.2) {
-        terr[y * W + x] = e > 0.97 ? 5 : 4;
+        terr[at(x, y)] = e > 0.97 ? 5 : 4;
         // hory = stolové skaly z pieskovca: široké plošiny podľa výšky, svetlá horná hrana, tmavá stena útesu pod vyššou plošinou
         const band = (xx, yy) => Math.floor((elev(xx, yy) - 0.8) / 0.06), bd = band(x, y);
         let v = 0.42 + bd * 0.13 + (fbm(x * 0.25, y * 0.25, seed + 65) - 0.5) * 0.12;
@@ -156,10 +159,10 @@ function buildIsland(W, H, seed) {
         let v = 0.55 + (fbm(x * 0.06, y * 0.06, seed + 4) - 0.5) * 0.5 + (hash2(x, y, seed + 2) - 0.5) * 0.18;
         if (e > 0.72) v -= 0.12; // úpätie hôr
         // lesy: v krajine aj popri ceste (tam hustejšie), no s voľným pásom okolo chodníka a hradov
-        const pd = pathD[y * W + x], fn = fbm(x * 0.07, y * 0.07, seed + 9);
-        const nearPath = pd < 14, forest = dd < 0.85 && pd >= 4 && nodeD[y * W + x] >= 13 && (nearPath ? fn > 0.4 : fn > 0.58 && nb < 0.15);
+        const pd = pathD[at(x, y)], fn = fbm(x * 0.07, y * 0.07, seed + 9);
+        const nearPath = pd < 14, forest = dd < 0.85 && pd >= 4 && nodeD[at(x, y)] >= 13 && (nearPath ? fn > 0.4 : fn > 0.58 && nb < 0.15);
         if (forest) { v -= 0.2; if ((x % (nearPath ? 4 : 5) === 0) && (y % 4 === 0) && hash2(x, y, seed + 10) > (nearPath ? 0.15 : 0.3)) { const tx = x + Math.floor(hash2(x, y, 11) * 3); if (pathD[y * W + Math.min(W - 1, tx)] >= 5) trees.push({ x: tx, y }); } }
-        terr[y * W + x] = forest ? 3 : 2;
+        terr[at(x, y)] = forest ? 3 : 2;
         set(x, y, pickRamp(RAMP.grass, v, x, y));
       }
     }
@@ -179,7 +182,7 @@ function buildIsland(W, H, seed) {
   const waves = [];
   for (let k = 0; k < 900 && waves.length < 140; k++) {
     const wx = Math.floor(hash2(k, 3, seed + 51) * (W - 8)), wy = Math.floor(hash2(k, 5, seed + 53) * (H - 2));
-    if (prov[wy * W + wx] !== 255 || prov[wy * W + Math.min(W - 1, wx + 6)] !== 255) continue;
+    if (prov[at(wx, wy)] !== 255 || prov[at(Math.min(W - 1, wx + 6), wy)] !== 255) continue;
     const dd = Math.hypot((wx - icx) / rx, (wy - icy) / ry);
     if (dd < 1.08) continue;                                                           // nie v príboji
     waves.push({ x: wx, y: wy, len: 3 + Math.floor(hash2(k, 7, seed + 55) * 4), ph: hash2(k, 9, seed + 57) * 6.28 });
@@ -190,15 +193,20 @@ function buildIsland(W, H, seed) {
     for (let k = 0; k < 40 && pts.length < 3; k++) {
       const a = hash2(i, k, seed + 41) * 6.283, r = 12 + hash2(k, i, seed + 43) * 14;
       const fx = Math.round(n.x + Math.cos(a) * r), fy = Math.round(n.y + Math.sin(a) * r * 0.8);
-      if (fx < 2 || fy < 2 || fx >= W - 2 || fy >= H - 2 || prov[fy * W + fx] !== i) continue;
+      if (fx < 2 || fy < 2 || fx >= W - 2 || fy >= H + pad - 2 || prov[at(fx, fy)] !== i) continue;
       if (Math.abs(fx - n.x) < 10 && fy > n.y - 18 && fy < n.y + 12) continue; // nie cez hrad a tabuľku
       pts.push({ x: fx, y: fy, ph: hash2(k, k, seed + 47) * 6.28 });
     }
     return pts;
   });
   // farba mora v ľubovoľnom bode okolo ostrova (aj mimo jeho plátna) – na plynulé rozšírenie mora na širšie displeje
-  const seaAround = (x, y) => seaRGB(x, y, Math.max(0, Math.hypot((x - icx) / rx, (y - icy) / ry) + (fbm(x * 0.035, y * 0.035, seed) - 0.5) * 0.42 - 1));
-  return { bg: c, seaAround, foam, waves, segs, nodes: L.nodes, prov, terr, fires, fort: makeOrcFort(), castle: makeMiniCastle(false) };
+  // (x, y) v súradniciach plátna ostrova
+  const seaAround = (x, y) => { y -= pad; return seaRGB(x, y, Math.max(0, Math.hypot((x - icx) / rx, (y - icy) / ry) + (fbm(x * 0.035, y * 0.035, seed) - 0.5) * 0.42 - 1)); };
+  // výstupné súradnice (hrady, chodník, príboj, vlny, ohne) do plátna – posun o pás mora; najvyšší a najnižší riadok súše
+  if (pad) { for (const n of L.nodes) n.y += pad; for (const sg of segs) for (const pt of sg) pt.y += pad; for (const o of foam.concat(waves)) o.y += pad; for (const fl of fires) for (const o of fl) o.y += pad; }
+  let landTop = CH, landBot = 0;
+  for (let k = 0; k < prov.length; k++) if (prov[k] !== 255) { const ry2 = (k / W) | 0; if (ry2 < landTop) landTop = ry2; if (ry2 > landBot) landBot = ry2; }
+  return { bg: c, seaAround, landTop, landBot, foam, waves, segs, nodes: L.nodes, prov, terr, fires, fort: makeOrcFort(), castle: makeMiniCastle(false) };
 }
 
 // pevnosť orkov pri misii 10

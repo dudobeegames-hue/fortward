@@ -667,8 +667,8 @@ const UI_ICONS = (() => {
     '..............',
     '..............',
   ], PAL);
-  // prepínač mapy: papierová mapa s modrým a oranžovým územím
-  const mapPaper = fromMap([
+  // prepínač mapy: papierová mapa s modrým a oranžovým územím; zapnutá námornícka mapa má papier zelený
+  const MAP_ICON = [
     '..............',
     '.KKKKKKKKKKKK.',
     '.KPPPPPPPPPpK.',
@@ -683,7 +683,9 @@ const UI_ICONS = (() => {
     '.KppppppppppK.',
     '.KKKKKKKKKKKK.',
     '..............',
-  ], { K: '#1c140e', P: '#ecdcb0', p: '#b89c68', R: '#ec9234', B: '#8cb6e2' });
+  ];
+  const mapPaper = fromMap(MAP_ICON, { K: '#1c140e', P: '#ecdcb0', p: '#b89c68', R: '#ec9234', B: '#8cb6e2' });
+  const mapPaperOn = fromMap(MAP_ICON, { K: '#1c140e', P: '#8ee06a', p: '#4c9a38', R: '#ec9234', B: '#8cb6e2' });
 
   // poradie jazykov v Nastaveniach; zatiaľ hrá len slovenčina, ostatné prídu s prekladom
   const langs = [
@@ -700,5 +702,5 @@ const UI_ICONS = (() => {
   // papier a tyče zvitku sa pre rovnakú veľkosť kreslia len raz (menu sa otvára opakovane)
   const memo = fn => { const m = new Map(); return (...a) => { const k = a.join('x'); if (!m.has(k)) m.set(k, fn(...a)); return m.get(k); }; };
   return { pix, music, sound, plus, home, hall, trophy, star, swords, shieldDefend, chest, spellVolley, spellFire, spellFrost, spellBolt, spellHorn, spellShield, spellHeal, spellFirewall, spellTeleport, spellRage, spellRoar, spellAxe, spellTotem, spellPoison, spellHex, spellCharge, spellHide, spellFeast, scrollPaper: memo(scrollPaper), scrollRod: memo(scrollRod), scrollTag, flags, langs,
-    actDown, actRepair, actSpec, tabs, homeTab, tierStars, endless, mapPaper };
+    actDown, actRepair, actSpec, tabs, homeTab, tierStars, endless, mapPaper, mapPaperOn };
 })();
