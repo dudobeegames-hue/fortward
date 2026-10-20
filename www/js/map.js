@@ -38,7 +38,7 @@ const MAP_NODES = [
 ];
 
 const SEA = ['#08142e', '#0c1e44', '#10285a', '#163a7a', '#1e5096', '#2a6ab0', '#3c88c8', '#5aa8d8', '#8ad0e8'].map(hexRGB);
-const SNOW = ['#8a90a0', '#b4bcc8', '#dce4ee', '#ffffff'].map(hexRGB);
+const SANDSTONE = ['#2a1810', '#422618', '#5c3620', '#784a2a', '#946036', '#ae7a46', '#c6965c', '#dcb47c', '#ecd09e'].map(hexRGB); // hory: stolové skaly z pieskovca
 const SAND = ['#6e5838', '#8a7048', '#a88a5a', '#c4a670', '#dcc08a', '#ecd8a8'].map(hexRGB);
 
 function mapLayout(W, H) {
@@ -108,6 +108,16 @@ function buildIsland(W, H, seed) {
   for (const n of L.nodes) dist(nodeD, n.x, n.y - 5, 16);
 
   const icx = W / 2, icy = (L.top + L.bot) / 2, rx = W * 0.47, ry = (L.bot - L.top) / 2 + 18;
+  // more: plytčina pri brehu svetlá, ďalej postupne hlbšie, ale nikdy nie čierna; vlnenie z fbm (rovnako aj mimo plátna ostrova)
+  const seaRGB = (x, y, depth) => {
+    let v = 0.78 - Math.min(1, depth / 0.35) * 0.32 - Math.min(1, depth / 1.2) * 0.12;
+    v += (fbm(x * 0.05, y * 0.05, seed + 5) - 0.5) * 0.22 + (fbm(x * 0.18, y * 0.12, seed + 12) - 0.5) * 0.08;
+    const swell = Math.sin(x * 0.11 + y * 0.045 + fbm(x * 0.03, y * 0.03, seed + 13) * 6);
+    if (swell > 0.82) v += 0.07; else if (swell < -0.9) v -= 0.05;                  // dlhé vlny
+    if (depth < 0.06) v += (0.06 - depth) * 2.5;                                     // tyrkysová plytčina
+    if (depth < 0.035) v = 0.95;
+    return pickRamp(SEA, Math.max(0.22, v), x, y);
+  };
   const elev = (x, y) => fbm(x * 0.045, y * 0.045, seed + 3) + (1 - (y - L.top) / (L.bot - L.top)) * 0.28;
   const foam = [], trees = [];
   // provincia každého kúska súše = najbližší hrad (so šumom, aby hranice neboli rovné); 255 = more
@@ -125,26 +135,23 @@ function buildIsland(W, H, seed) {
     if (dd <= 1) prov[y * W + x] = provOf(x, y);
     if (dd > 1) {
       const depth = dd - 1;
-      // plytčina pri brehu svetlá, ďalej postupne hlbšie, ale nikdy nie čierna; vlnenie z fbm
-      let v = 0.78 - Math.min(1, depth / 0.35) * 0.32 - Math.min(1, depth / 1.2) * 0.12;
-      v += (fbm(x * 0.05, y * 0.05, seed + 5) - 0.5) * 0.22 + (fbm(x * 0.18, y * 0.12, seed + 12) - 0.5) * 0.08;
-      const swell = Math.sin(x * 0.11 + y * 0.045 + fbm(x * 0.03, y * 0.03, seed + 13) * 6);
-      if (swell > 0.82) v += 0.07; else if (swell < -0.9) v -= 0.05;                  // dlhé vlny
-      if (depth < 0.06) v += (0.06 - depth) * 2.5;                                     // tyrkysová plytčina
-      if (depth < 0.035) { v = 0.95; if (depth < 0.018) foam.push({ x, y, ph: hash2(x, y, 7) * 6.28 }); }
-      set(x, y, pickRamp(SEA, Math.max(0.22, v), x, y));
+      if (depth < 0.018) foam.push({ x, y, ph: hash2(x, y, 7) * 6.28 });
+      set(x, y, seaRGB(x, y, depth));
     } else if (dd > 0.92) {
       terr[y * W + x] = 1;
       set(x, y, pickRamp(SAND, 0.6 + (hash2(x, y, seed + 8) - 0.5) * 0.3 - (dd - 0.92) * 3, x, y));
     } else {
       const e = elev(x, y);
       if (e > 0.8 && nb < 0.2) {
-        // hory – tieňovanie podľa sklonu (svetlo zľava zhora)
-        const sl = (elev(x - 1, y - 1) - elev(x + 1, y + 1)) * 9;
-        const v = 0.4 + sl + (e - 0.8) * 1.4;
         terr[y * W + x] = e > 0.97 ? 5 : 4;
-        if (e > 0.97) set(x, y, pickRamp(SNOW, 0.6 + sl, x, y)); // sneh len na vrcholoch
-        else set(x, y, pickRamp(RAMP.stone, v, x, y));
+        // hory = stolové skaly z pieskovca: široké plošiny podľa výšky, svetlá horná hrana, tmavá stena útesu pod vyššou plošinou
+        const band = (xx, yy) => Math.floor((elev(xx, yy) - 0.8) / 0.06), bd = band(x, y);
+        let v = 0.42 + bd * 0.13 + (fbm(x * 0.25, y * 0.25, seed + 65) - 0.5) * 0.12;
+        if (band(x, y - 1) < bd) v += 0.2;                                        // horná hrana plošiny na svetle
+        const cliff = band(x, y - 1) > bd || band(x, y - 2) > bd || band(x, y - 3) > bd; // stena pod vyššou plošinou
+        if (cliff) v = 0.18 + (y % 2 ? 0.05 : 0) + (hash2(x, y, seed + 66) - 0.5) * 0.08;
+        if (band(x - 1, y) > bd && !cliff) v -= 0.12;                            // tieň zboku
+        set(x, y, pickRamp(SANDSTONE, v, x, y));
       } else {
         let v = 0.55 + (fbm(x * 0.06, y * 0.06, seed + 4) - 0.5) * 0.5 + (hash2(x, y, seed + 2) - 0.5) * 0.18;
         if (e > 0.72) v -= 0.12; // úpätie hôr
@@ -189,7 +196,9 @@ function buildIsland(W, H, seed) {
     }
     return pts;
   });
-  return { bg: c, foam, waves, segs, nodes: L.nodes, prov, terr, fires, fort: makeOrcFort(), castle: makeMiniCastle(false) };
+  // farba mora v ľubovoľnom bode okolo ostrova (aj mimo jeho plátna) – na plynulé rozšírenie mora na širšie displeje
+  const seaAround = (x, y) => seaRGB(x, y, Math.max(0, Math.hypot((x - icx) / rx, (y - icy) / ry) + (fbm(x * 0.035, y * 0.035, seed) - 0.5) * 0.42 - 1));
+  return { bg: c, seaAround, foam, waves, segs, nodes: L.nodes, prov, terr, fires, fort: makeOrcFort(), castle: makeMiniCastle(false) };
 }
 
 // pevnosť orkov pri misii 10
