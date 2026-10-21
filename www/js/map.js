@@ -249,7 +249,7 @@ function makeOrcFort() {
 
 // ---- Odomykanie: čo prináša každá misia (misia 1 = základná výbava) ----
 const UNLOCKS = [
-  [{ id: 'paving', name: 'Dlažba', icon: 'paving' }, { id: 'tower', name: 'Strážna veža', icon: 'tower' }, { id: 'wall', name: 'Hradby', icon: 'wall' }, { id: 'pit', name: 'Jama s ostňami', icon: 'pit' }, { id: 'gate', name: 'Brána', icon: 'gate', desc: 'Prerob hradbu na bránu – tvoji rytieri cez ňu prejdú, horda nie.' }],
+  [{ id: 'paving', name: 'Dlažba', icon: 'paving' }, { id: 'cobble', name: 'Kamenná cesta', icon: 'cobble' }, { id: 'hedge', name: 'Živý plot', icon: 'hedge' },{ id: 'tower', name: 'Strážna veža', icon: 'tower' }, { id: 'wall', name: 'Hradby', icon: 'wall' }, { id: 'pit', name: 'Jama s ostňami', icon: 'pit' }, { id: 'gate', name: 'Brána', icon: 'gate', desc: 'Prerob hradbu na bránu – tvoji rytieri cez ňu prejdú, horda nie.' }],
   [{ id: 'lvl2', name: 'Radnica a stavby úrovne 2', icon: 'hall', desc: 'Vylepši radnicu na kameň – a s ňou všetky stavby a strelcov.' }, { id: 'mine', name: 'Zlatá baňa', icon: 'mine' }, { id: 'mage', name: 'Veža mága', icon: 'mage' }, { id: 'wallArcher', name: 'Lukostrelec na hradbách', icon: 'u_archer', desc: 'Postav lukostrelca priamo na hradbu – strieľa rýchle šípy na hordu.' }],
   [{ id: 'icetower', name: 'Ľadová veža', icon: 'icetower' }, { id: 'workshop', name: 'Dielňa remeselníka', icon: 'workshop' }],
   [{ id: 'lvl3', name: 'Radnica a stavby úrovne 3', icon: 'hall', desc: 'Vylepši radnicu na kameň s kovaním – a s ňou všetky stavby a strelcov.' }, { id: 'barracks', name: 'Kasárne a rytieri', icon: 'barracks' }],

@@ -270,14 +270,17 @@
   .pcard .pic img.px { height: 36px; width: auto; max-width: 56px; image-rendering: pixelated; }
   .pcard.act.sell .cost { color: #9cd45a; }
   .pcard.act.max .front { opacity: .6; }
+  .pcard.info { cursor: default; } /* informačná karta v záložke Radnica */
+  .pcard.info .cost { color: #ff9a80; }
   /* horný riadok panela: záložky druhov stavieb alebo názov označenej stavby – vždy rovnako vysoký */
   #selRow { display: flex; gap: 4px; height: 40px; flex: 0 0 40px; }
   .btab { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0;
     background: #1a120d; border: 2px solid var(--ink); border-radius: 8px; color: var(--muted); font: inherit; font-size: 11px; font-weight: 700; }
-  .btab img { height: 26px; width: auto; image-rendering: pixelated; opacity: .7; }
+  /* ikonky záložiek: obrysové vektory (farba = currentColor), aktívna záložka zlatá */
+  .btab svg { width: 27px; height: 27px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; color: #b89a70; filter: drop-shadow(1px 1px 0 var(--ink)); }
   .btab.on { border-color: var(--gold); background: #2c2016; box-shadow: 0 0 0 1px var(--gold2); }
-  .btab.on img { opacity: 1; filter: brightness(1.25); }
-  .btab.locked img { opacity: .3; }
+  .btab.on svg { color: var(--gold); }
+  .btab.locked svg { opacity: .3; }
   .selLine { flex: 1; min-width: 0; display: grid; grid-template-columns: 32px 1fr 32px; align-items: center; gap: 6px;
     background: rgba(0,0,0,.22); border-radius: 8px; padding: 0 4px 0 6px; }
   .selLine img { max-width: 32px; max-height: 34px; object-fit: contain; }

@@ -557,81 +557,8 @@ const UI_ICONS = (() => {
   ], { K: '#1c140e', F: col, H: '#8a5a2a', W: '#e8ecf4' });
   const actSpec = { fire: arrow('#f89838'), rapid: arrow('#9cd45a'), sniper: arrow('#c8a0ff') };
 
-  // ikonky záložiek stavebného panela: len hnedé tóny (ladia so záložkami), bez farieb z hry
+  // hnedé tóny pre domček na mape
   const TABP = { L: '#c8a478', M: '#9a7650', S: '#6a4e34' };
-  const tabTowers = fromMap([
-    'LL..LLL..LL',
-    'LLLLLLLLLLM',
-    'MMMMMMMMMMS',
-    '.LMMMMMMMS.',
-    '.LMMM.MMMS.',
-    '.LMMM.MMMS.',
-    '.LMMMMMMMS.',
-    '.LMMMMMMMS.',
-    '.LMMMMMMMS.',
-    '.LMM...MMS.',
-    '.LMM...MMS.',
-    'LLMM...MMSS',
-  ], TABP);
-  const tabWalls = fromMap([
-    'LL..LL..LL..LL',
-    'LL..LL..LL..LL',
-    'LLLLLLLLLLLLLL',
-    'MMMSMMMMMSMMMM',
-    'SSSSSSSSSSSSSS',
-    'MSMMMMMSMMMMMM',
-    'SSSSSSSSSSSSSS',
-    'MMMSMMMMMSMMMM',
-    'SSSSSSSSSSSSSS',
-    'MSMMMMMSMMMMMM',
-  ], TABP);
-  const tabArmy = (() => { // meč šikmo za štítom s krížom
-    const N = 16, g = [...Array(N)].map(() => Array(N).fill(null));
-    const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < N && y < N) g[y][x] = TABP[c]; };
-    for (let t = 0; t <= 10; t++) { put(14 - t, t, 'L'); put(15 - t, t, 'M'); put(14 - t, t + 1, 'S'); } // čepeľ
-    for (let k = -2; k <= 2; k++) { put(4 + k, 10 + k, 'M'); put(5 + k, 10 + k, 'S'); } // záštita
-    put(3, 12, 'M'); put(2, 13, 'M'); put(3, 13, 'S'); put(1, 14, 'L'); put(2, 14, 'S'); // rukoväť a hlavica
-    for (let y = 4; y <= 15; y++) { // štít vpredu
-      const hw = y < 11 ? 4 : Math.max(0, 4 - Math.round((y - 10) * 0.9));
-      for (let x = 10 - hw; x <= 10 + hw; x++) put(x, y, x === 10 - hw || y === 4 ? 'L' : x === 10 + hw ? 'S' : x < 10 ? 'M' : 'S');
-    }
-    for (let y = 6; y <= 13; y++) put(10, y, 'L'); // kríž na štíte
-    for (let x = 7; x <= 13; x++) put(x, 8, 'L');
-    return pix(N, N, (x, y) => g[y][x]);
-  })();
-  const tabSiege = fromMap([
-    '..........LMS..',
-    '.........LMMMS.',
-    '.........SMMS..',
-    '........MS.....',
-    '.......MS......',
-    '......MS.......',
-    '.....MS..L.....',
-    '....MS..LMS....',
-    '...MS..LMMMS...',
-    'LLLLLLLLLLLLLLS',
-    'MMMMMMMMMMMMMMS',
-    '.LMS......LMS..',
-    '.SSS......SSS..',
-  ], TABP);
-  const tabSupport = fromMap([ // kladivo remeselníka
-    '.LLLLLLLLLLM.',
-    '.LMMMMMMMMMS.',
-    '.LMMMMMMMMMS.',
-    '.LMMMMMMMMMS.',
-    '.SSSSSSSSSSS.',
-    '.....LMS.....',
-    '.....LMS.....',
-    '.....LMS.....',
-    '.....LMS.....',
-    '.....SSS.....',
-    '.....LMS.....',
-    '.....SSS.....',
-    '.....LMS.....',
-    '.....LMS.....',
-    '.....SSS.....',
-  ], TABP);
-  const tabs = { towers: tabTowers, walls: tabWalls, army: tabArmy, siege: tabSiege, support: tabSupport };
   // domček na mape (menu) v rovnakom štýle ako záložky: len hnedé tóny, okno a dvere sú priehľadné
   const homeTab = fromMap([
     '......LM..LM..',
@@ -702,5 +629,5 @@ const UI_ICONS = (() => {
   // papier a tyče zvitku sa pre rovnakú veľkosť kreslia len raz (menu sa otvára opakovane)
   const memo = fn => { const m = new Map(); return (...a) => { const k = a.join('x'); if (!m.has(k)) m.set(k, fn(...a)); return m.get(k); }; };
   return { pix, music, sound, plus, home, hall, trophy, star, swords, shieldDefend, chest, spellVolley, spellFire, spellFrost, spellBolt, spellHorn, spellShield, spellHeal, spellFirewall, spellTeleport, spellRage, spellRoar, spellAxe, spellTotem, spellPoison, spellHex, spellCharge, spellHide, spellFeast, scrollPaper: memo(scrollPaper), scrollRod: memo(scrollRod), scrollTag, flags, langs,
-    actDown, actRepair, actSpec, tabs, homeTab, tierStars, endless, mapPaper, mapPaperOn };
+    actDown, actRepair, actSpec, homeTab, tierStars, endless, mapPaper, mapPaperOn };
 })();
