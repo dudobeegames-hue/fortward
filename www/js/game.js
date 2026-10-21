@@ -3357,14 +3357,15 @@
     g.fillStyle = '#7a7286'; g.fillRect(x, y, 2, 1); g.fillRect(x, y + 1, 1, 1);
     g.fillStyle = '#22202a'; g.fillRect(x + 2, y + 2, 1, 1);
   }
-  // zdravie radnice: tenký pruh pod radnicou, široký ako radnica (3 políčka); farba podľa zdravia, vpravo číslo „zdravie/max“
+  // zdravie radnice: pruh pod radnicou, široký ako radnica (3 políčka); farba podľa zdravia, v strede drobné číslo „zdravie/max“
   function drawHallBar() {
-    const hp = Math.max(0, Math.ceil(st.hallHp)), max = hallMax(), r = Math.min(1, hp / max), w = 3 * T - 4, x = Math.round(G.hallCx - w / 2), y = G.hallBot + 5;
-    g.fillStyle = PAL.K; g.fillRect(x - 1, y - 1, w + 2, 4);
-    g.fillStyle = '#3a1410'; g.fillRect(x, y, w, 2);
-    g.fillStyle = r < 0.3 ? '#e84838' : r < 0.6 ? '#f8a838' : '#7cd04a'; g.fillRect(x, y, Math.round(w * r), 2);
+    const hp = Math.max(0, Math.ceil(st.hallHp)), max = hallMax(), r = Math.min(1, hp / max), w = 3 * T - 4, x = Math.round(G.hallCx - w / 2), y = G.hallBot + 4, bh = 4;
+    g.fillStyle = PAL.K; g.fillRect(x - 1, y - 1, w + 2, bh + 2);
+    g.fillStyle = '#3a1410'; g.fillRect(x, y, w, bh);
+    g.fillStyle = r < 0.3 ? '#e84838' : r < 0.6 ? '#f8a838' : '#7cd04a'; g.fillRect(x, y, Math.round(w * r), bh);
     if (r > 0) { g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(x, y, Math.round(w * r), 1); } // lesk
-    pxText(g, hp + '/' + max, x + w + 4, y - 1, '#fff2d0');
+    const s = hp + '/' + max;
+    pxTextTiny(g, s, Math.round(x + (w - (s.length * 4 - 1)) / 2), y, '#fff2d0');
   }
   function bar(cx, y, w, ratio, col) {
     const x = Math.round(cx - w / 2);
