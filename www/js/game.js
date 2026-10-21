@@ -3357,15 +3357,14 @@
     g.fillStyle = '#7a7286'; g.fillRect(x, y, 2, 1); g.fillRect(x, y + 1, 1, 1);
     g.fillStyle = '#22202a'; g.fillRect(x + 2, y + 2, 1, 1);
   }
-  // zdravie radnice: pruh pod radnicou, široký ako radnica (3 políčka); farba podľa zdravia, v strede číslo „zdravie/max“
+  // zdravie radnice: tenký pruh pod radnicou, široký ako radnica (3 políčka); farba podľa zdravia, vpravo číslo „zdravie/max“
   function drawHallBar() {
-    const hp = Math.max(0, Math.ceil(st.hallHp)), max = hallMax(), r = Math.min(1, hp / max), w = 3 * T - 4, x = Math.round(G.hallCx - w / 2), y = G.hallBot + 4, bh = 5;
-    g.fillStyle = PAL.K; g.fillRect(x - 1, y - 1, w + 2, bh + 2);
-    g.fillStyle = '#3a1410'; g.fillRect(x, y, w, bh);
-    g.fillStyle = r < 0.3 ? '#a83020' : r < 0.6 ? '#b87820' : '#4e9030'; g.fillRect(x, y, Math.round(w * r), bh);
-    if (r > 0) { g.fillStyle = 'rgba(255,255,255,0.3)'; g.fillRect(x, y, Math.round(w * r), 1); } // lesk
-    const s = hp + '/' + max;
-    pxText(g, s, Math.round(G.hallCx - (s.length * 4 - 1) / 2), y, '#fff2d0');
+    const hp = Math.max(0, Math.ceil(st.hallHp)), max = hallMax(), r = Math.min(1, hp / max), w = 3 * T - 4, x = Math.round(G.hallCx - w / 2), y = G.hallBot + 5;
+    g.fillStyle = PAL.K; g.fillRect(x - 1, y - 1, w + 2, 4);
+    g.fillStyle = '#3a1410'; g.fillRect(x, y, w, 2);
+    g.fillStyle = r < 0.3 ? '#e84838' : r < 0.6 ? '#f8a838' : '#7cd04a'; g.fillRect(x, y, Math.round(w * r), 2);
+    if (r > 0) { g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(x, y, Math.round(w * r), 1); } // lesk
+    pxText(g, hp + '/' + max, x + w + 4, y - 1, '#fff2d0');
   }
   function bar(cx, y, w, ratio, col) {
     const x = Math.round(cx - w / 2);
@@ -5059,7 +5058,7 @@
 
   // záložky stavebného panela (druhy stavieb); riadok záložiek a riadok označenej stavby majú rovnakú výšku, aby obrazovka neskákala
   const BUILD_TABS = [
-    { id: 'hall',    name: 'Radnica', kinds: ['paving', 'cobble', 'hedge'] }, // radnica a hrdina (to isté ako ťuk na radnicu) a ozdoby
+    { id: 'hall',    name: 'Radnica', kinds: ['paving', 'cobble', 'hedge'] }, // hrdina (a oživenie) a ozdoby
     { id: 'towers',  name: 'Veže',    kinds: ['tower', 'mage', 'icetower', 'ballista'] },
     { id: 'walls',   name: 'Hradby',  kinds: ['wall', 'stake', 'pit', 'firepit', 'beartrap'] },
     { id: 'army',    name: 'Vojsko',  kinds: ['barracks', 'range', 'stables', 'armory', 'falconry'] },
@@ -5075,8 +5074,7 @@
     siege: '<path d="M3 18h18"/><circle cx="7" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/><path d="M9 18l3-7 3 7"/><path d="M6 15L17.5 6"/><path d="M15.5 5.5a2.5 2.5 0 1 0 4.5 1.5"/>',
     support: '<path d="M11.4 10l-7.4 7.4a2.1 2.1 0 0 0 3 3l7.4-7.4"/><path d="M18.1 15.3l2.6-2.6a1 1 0 0 0 0-1.4l-7.6-7.6a1 1 0 0 0-1.4 0l-2.6 2.6a1 1 0 0 0 0 1.4l7.6 7.6a1 1 0 0 0 1.4 0z"/>',
   };
-  const hallTabNew = () => st.hallLvl < hallCap() && isNew('lvl' + (st.hallLvl + 1));
-  const tabShine = t => (t.id === 'hall' && hallTabNew()) || t.kinds.some(isNew);
+  const tabShine = t => t.kinds.some(isNew);
   function refreshTabShine() {
     for (const tb of document.querySelectorAll('.btab[data-tab]')) {
       const t = BUILD_TABS.find(t => t.id === tb.dataset.tab);
@@ -5148,10 +5146,11 @@
     $('nextWave').disabled = false;
 
     // karty radnice: vylepšenie a oživenie padnutého hrdinu (po ťuku na radnicu aj v záložke Radnica)
+    // karta oživenia padnutého hrdinu raz preblikne v každom stavebnom kole
+    const reviveAct = () => { const k = st.king; if (k && k.dead) { const c = reviveCost(); flashIf(act(heroIcon(st.hero), 'Oživiť', coinTxt(c), st.gold >= c, reviveKing, 'up'), true, 'revive' + st.mission + '.' + st.wave, () => saveJSON(sk('reviveSeen'), true)); } };
     const hallActs = () => {
-      const k = st.king;
       upAct(st.hallLvl, hallCap(), hallUpCost(), () => { const c = hallUpCost(); st.gold -= c; st.hallLvl++; st.hallHp += 200; st.king.hp = kingMax(); }, null, bPreview({ kind: 'hall', lvl: st.hallLvl + 1 }), 'lvl' + (st.hallLvl + 1));
-      if (k && k.dead) { const c = reviveCost(); flashIf(act(heroIcon(st.hero), 'Oživiť', coinTxt(c), st.gold >= c, reviveKing, 'up'), true, 'revive' + st.mission + '.' + st.wave, () => saveJSON(sk('reviveSeen'), true)); } // karta oživenia raz preblikne v každom stavebnom kole
+      reviveAct();
     };
     // informačná karta (nedá sa na ňu ťuknúť): obrázok, názov a údaj namiesto ceny
     const infoCard = (icon, label, sub) => {
@@ -5288,10 +5287,9 @@
         });
         row.appendChild(tb);
       }
-      if (tab.id === 'hall') {
+      if (tab.id === 'hall') { // hrdina (a oživenie); radnica sa vylepšuje ťukom na ňu
         const k = st.king;
-        infoCard(ICONS.hall, 'Úr. ' + st.hallLvl, '♥ ' + Math.ceil(st.hallHp) + '/' + hallMax());
-        hallActs();
+        reviveAct();
         if (k) infoCard(heroIcon(st.hero), heroName() + ' ' + kingMeta.lvl, k.dead ? (heroDef().fem ? 'padla' : 'padol') : '♥ ' + Math.ceil(k.hp) + '/' + Math.round(kingMax()));
       }
       const order = isOrc() ? ORC_ORDER : BUILD_ORDER; // za orkov kotol ako druhá veža
