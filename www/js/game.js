@@ -110,6 +110,19 @@
     workshop: { spr: 'craft', hp: 36, spd: 22, rate: b => craftRate(b),      col: '#f8d048' },
   };
   const HELPER_RESPAWN = 5;
+  // limity stavieb: vojenské budovy a bane podľa úrovne radnice (vojenské spolu, nezáleží na druhu), kaplnky a dielne najviac 3
+  const MILITARY = { barracks: 1, range: 1, stables: 1, armory: 1, falconry: 1 };
+  const MILITARY_MAX = [0, 4, 5, 6, 7, 8]; // index = úroveň radnice
+  const HELPER_MAX = 3;
+  const bldLimit = kind => MILITARY[kind] ? MILITARY_MAX[Math.min(st.hallLvl, MILITARY_MAX.length - 1)] : kind === 'mine' ? st.hallLvl : HELPERS[kind] ? HELPER_MAX : Infinity;
+  const bldCount = kind => st.blds.filter(b => MILITARY[kind] ? MILITARY[b.kind] : b.kind === kind).length;
+  const bldFull = kind => bldCount(kind) >= bldLimit(kind);
+  function limitMsg(kind) {
+    const n = bldLimit(kind), hall = (isOrc() ? 'Pevnosť' : 'Radnica') + ' úr. ' + st.hallLvl + ': ';
+    if (MILITARY[kind]) return hall + 'max ' + n + (n === 1 ? ' vojenská budova' : n < 5 ? ' vojenské budovy' : ' vojenských budov');
+    if (kind === 'mine') return hall + 'max ' + n + (n === 1 ? ' baňa' : n < 5 ? ' bane' : ' baní');
+    return BUILD[kind].short + ': max ' + n;
+  }
   const GATE_COST = 20;
   // strelci na hradbách – vylepšujú sa zvlášť od hradby
   const WUNIT = {
@@ -152,10 +165,10 @@
   const bRange = b => (isTreb(b) ? TREB.range : 1) * (BUILD[b.kind].range + 4 * (b.lvl - 1) + (b.spec ? SPECS[b.spec].range : 0)) * (1 + 0.02 * perk('lookouts'));
   const bMaxHp = b => Math.round((BUILD[b.kind].hp || 1) * lvlMul(b, 0.35) * (b.kind === 'wall' ? 1 + WALL_LINK * (b.nb || 0) : 1) * (1 + 0.06 * perk('carpenters')));
   const bUpCost = b => Math.round(BUILD[b.kind].cost * 0.9 * Math.pow(1.6, b.lvl - 1) * (1 - 0.04 * perk('architects')));
-  const knightCap = b => 2 + b.lvl;
+  const knightCap = b => b.lvl; // z vojenskej budovy vyjde naraz toľko vojakov, aká je jej úroveň
   const knightEvery = b => Math.max(3, 7 - 0.8 * (b.lvl - 1)) * (1 - 0.04 * perk('recruits'));
   // lukostrelci zo strelnice: menej zdravia, strieľajú z diaľky (aj na netopiere), držia sa za rytiermi
-  const archerCap = b => 2 + b.lvl;
+  const archerCap = b => b.lvl;
   const archerEvery = b => Math.max(4, 8 - 0.8 * (b.lvl - 1)) * (1 - 0.04 * perk('recruits'));
   const archerHp = b => 28 * lvlMul(b, 0.3) * (1 + 0.05 * perk('drill')) * (1 + 0.1 * tal('command'));
   const archerDmg = b => 5 * lvlMul(b, 0.4) * (1 + 0.04 * perk('fletching')) * (1 + 0.1 * tal('command'));
@@ -1193,7 +1206,7 @@
     AUDIO.play('horn'); AUDIO.music('battle');
     st.viewUp = Math.max(0, (st.viewUp || 0) - panelLow()); // rovnaký pohľad aj bez panela
     $('build').hidden = true; $('bottom').hidden = false;
-    for (const b of st.blds) if (UNIT_HOME[b.kind] || b.kind === 'range' || b.kind === 'falconry' || HELPERS[b.kind]) b.spawnT = HELPERS[b.kind] ? 0.6 : 0.3;
+    for (const b of st.blds) if (UNIT_HOME[b.kind] || b.kind === 'range' || b.kind === 'falconry' || HELPERS[b.kind]) { b.spawnT = HELPERS[b.kind] ? 0.6 : 0.3; b.squadUp = true; }
     banner(isAssault() ? 'Do útoku!' : st.endless ? 'Vlna ' + st.wave : st.wave === MISSION_WAVES ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + MISSION_WAVES);
     syncStance();
     updateHud();
@@ -1990,21 +2003,28 @@
     u.swing = Math.max(0, (u.swing || 0) - dt);
   }
 
-  // kasárne v intervaloch vyšlú rytiera, ktorý ide oproti horde
-  function updateBarracks(b, dt) {
+  // vojenská budova vyšle celý oddiel naraz (toľko vojakov, aká je jej úroveň); ďalší oddiel vyjde až keď padne
+  // posledný z predošlého (a uplynie čas na nábor). Na začiatku vlny vyjde oddiel hneď (b.squadUp nastaví startWave).
+  function squadDue(b, dt, every) {
     b.spawnT -= dt;
-    if (b.spawnT > 0) return;
-    const alive = st.soldiers.filter(s => s.home === b && !s.extra).length;
-    if (alive >= knightCap(b)) { b.spawnT = 0.5; return; }
-    b.spawnT = knightEvery(b);
-    spawnKnight(b, false);
+    if (b.spawnT > 0) return false;
+    b.spawnT = 0.5;
+    if (st.soldiers.some(s => s.home === b && !s.extra && !s.dead)) { b.squadUp = false; return false; }
+    if (!b.squadUp) { b.squadUp = true; b.spawnT = every; return false; } // oddiel padol – nábor nového
+    b.squadUp = false;
+    return true;
+  }
+  const squadDx = (i, n) => (i - (n - 1) / 2) * 5; // vojaci oddielu vyjdú vedľa seba
+  function updateBarracks(b, dt) {
+    if (!squadDue(b, dt, knightEvery(b))) return;
+    for (let i = 0, n = knightCap(b); i < n; i++) spawnKnight(b, false, squadDx(i, n));
   }
   // ľudské jednotky z budovy najvyššej úrovne majú zlaté brnenie (za orkov nie)
   const goldArmor = b => !isOrc() && b.lvl >= MAX_LVL;
-  function spawnKnight(b, extra) {
+  function spawnKnight(b, extra, dx) {
     const c = bCenter(b);
     const ktype = UNIT_HOME[b.kind] || 'knight', kt = KTYPES[ktype], khp = knightHp(b) * kt.hp;
-    st.soldiers.push({ home: b, extra, gold: goldArmor(b), x: c.x + 1, y: tileY(b.r) + T + 1, hp: khp, max: khp, dmg: knightDmg(b) * kt.dmg, spd: kt.spd, spr: kt.spr, ktype, cd: 0, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
+    st.soldiers.push({ home: b, extra, gold: goldArmor(b), x: c.x + 1 + (dx || 0), y: tileY(b.r) + T + 1, hp: khp, max: khp, dmg: knightDmg(b) * kt.dmg, spd: kt.spd, spr: kt.spr, ktype, cd: 0, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
     for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
   }
 
@@ -2082,16 +2102,13 @@
 
   // ---- sokoly: lietajú ponad všetko, lovia letcov, šamanov a podkopníkov; pechota na ne nedosiahne ----
   const FALCON_PRIO = e => e.d.fly || e.d.heals || e.d.sapper;
-  const falconCap = b => 1 + b.lvl;
+  const falconCap = b => b.lvl;
   const falconHp = b => 22 * lvlMul(b, 0.3) * (1 + 0.05 * perk('drill'));
   const falconDmg = b => 5 * lvlMul(b, 0.35) * (1 + 0.05 * perk('drill'));
   function updateFalconry(b, dt) {
-    b.spawnT -= dt;
-    if (b.spawnT > 0) return;
-    if (st.soldiers.filter(s => s.home === b).length >= falconCap(b)) { b.spawnT = 0.5; return; }
-    b.spawnT = Math.max(4, 8 - 0.8 * (b.lvl - 1));
+    if (!squadDue(b, dt, Math.max(4, 8 - 0.8 * (b.lvl - 1)))) return;
     const c = bCenter(b), hp = falconHp(b);
-    st.soldiers.push({ home: b, fly: true, x: c.x, y: tileY(b.r) + 4, hp, max: hp, dmg: falconDmg(b), spd: 52, cd: 0.3, tgt: null, anim: Math.random() * 2, flash: 0, dead: false, slot: st.soldierN++ });
+    for (let i = 0, n = falconCap(b); i < n; i++) st.soldiers.push({ home: b, fly: true, x: c.x + squadDx(i, n), y: tileY(b.r) + 4, hp, max: hp, dmg: falconDmg(b), spd: 52, cd: 0.3, tgt: null, anim: Math.random() * 2, flash: 0, dead: false, slot: st.soldierN++ });
     for (let k = 0; k < 5; k++) part(c.x, tileY(b.r), (Math.random() - 0.5) * 20, -Math.random() * 20, 0.4, '#d8c0a0', 20);
   }
   function updateFalcon(u, dt) {
@@ -2125,17 +2142,14 @@
     g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), Math.round(u.y - 14 + bob - (u.swing > 0 ? -3 : 0)));
   }
 
-  // strelnica v intervaloch vyšle lukostrelca (najviac archerCap naraz)
+  // strelnica vyšle oddiel lukostrelcov naraz (archerCap), ďalší až keď padnú všetci
   function updateRange(b, dt) {
-    b.spawnT -= dt;
-    if (b.spawnT > 0) return;
-    if (st.soldiers.filter(s => s.home === b && !s.extra).length >= archerCap(b)) { b.spawnT = 0.5; return; }
-    b.spawnT = archerEvery(b);
-    spawnArcher(b, false);
+    if (!squadDue(b, dt, archerEvery(b))) return;
+    for (let i = 0, n = archerCap(b); i < n; i++) spawnArcher(b, false, squadDx(i, n));
   }
-  function spawnArcher(b, extra) {
+  function spawnArcher(b, extra, dx) {
     const c = bCenter(b), hp = archerHp(b);
-    st.soldiers.push({ home: b, archer: true, extra, gold: goldArmor(b), x: c.x + 1, y: tileY(b.r) + T + 1, hp, max: hp, dmg: archerDmg(b), spd: 24, spr: 'footArcher', cd: 0.3, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
+    st.soldiers.push({ home: b, archer: true, extra, gold: goldArmor(b), x: c.x + 1 + (dx || 0), y: tileY(b.r) + T + 1, hp, max: hp, dmg: archerDmg(b), spd: 24, spr: 'footArcher', cd: 0.3, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
     for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
   }
   // ---- formácie: lukostrelci stoja v rade vedľa seba, pešiaci pochodujú v šíkoch –
@@ -3339,7 +3353,7 @@
   }
   // zdravie radnice: pruh pod radnicou, široký ako radnica (3 políčka); farba podľa zdravia
   function drawHallBar() {
-    const r = Math.max(0, Math.min(1, st.hallHp / hallMax())), w = 3 * T - 4, x = Math.round(G.hallCx - w / 2), y = G.hallBot + 3;
+    const r = Math.max(0, Math.min(1, st.hallHp / hallMax())), w = 3 * T - 4, x = Math.round(G.hallCx - w / 2), y = G.hallBot + 5;
     g.fillStyle = PAL.K; g.fillRect(x - 1, y - 1, w + 2, 4);
     g.fillStyle = '#3a1410'; g.fillRect(x, y, w, 2);
     g.fillStyle = r < 0.3 ? '#e84838' : r < 0.6 ? '#f8a838' : '#7cd04a'; g.fillRect(x, y, Math.round(w * r), 2);
@@ -4778,7 +4792,7 @@
     const r = keep ? Math.max(0, keep.hp / keep.max) : Math.max(0, st.hallHp / hallMax());
     $('hallFill').style.width = (r * 100) + '%';
     $('hallFill').className = r < 0.3 ? 'low' : '';
-    $('hallTxt').textContent = keep ? 'Srdce hradu ' + Math.max(0, Math.ceil(keep.hp)) + ' / ' + Math.ceil(keep.max) : (isOrc() ? 'Pevnosť ' : 'Radnica ') + Math.max(0, Math.ceil(st.hallHp)) + ' / ' + hallMax();
+    $('hallTxt').textContent = keep ? 'Srdce hradu ' + Math.max(0, Math.ceil(keep.hp)) + '\u00a0/\u00a0' + Math.ceil(keep.max) : (isOrc() ? 'Pevnosť ' : 'Radnica ') + Math.max(0, Math.ceil(st.hallHp)) + '\u00a0/\u00a0' + hallMax();
     $('kingLvl').textContent = kingMeta.lvl;
     $('hud-king').classList.toggle('swap', st.phase === 'build' && ownedHeroes().length > 1);
     $('xpFill').style.width = (kingMeta.lvl >= KING_MAX_LVL ? 100 : Math.min(100, kingMeta.xp / kingXpNeed(kingMeta.lvl) * 100)) + '%';
@@ -4814,7 +4828,7 @@
     if (B && !B.dead && st.phase === 'battle') {
       bb.hidden = false;
       $('bossFill').style.width = (Math.max(0, B.hp / B.max) * 100) + '%';
-      $('bossTxt').textContent = bossName(B.d) + ' ' + Math.max(0, Math.ceil(B.hp)) + ' / ' + Math.ceil(B.max);
+      $('bossTxt').textContent = bossName(B.d) + ' ' + Math.max(0, Math.ceil(B.hp)) + '\u00a0/\u00a0' + Math.ceil(B.max);
     } else bb.hidden = true;
   }
 
@@ -5220,15 +5234,18 @@
           continue;
         }
         if (st.flip && st.flip !== st.tool) st.flip = null;
-        b.className = 'pcard' + (st.tool === kind ? ' sel' : '') + (st.flip === kind ? ' flipped' : '') + (st.gold < costOf(kind) ? ' poor' : '');
+        const full = bldFull(kind), lim = bldLimit(kind);
+        b.className = 'pcard' + (st.tool === kind ? ' sel' : '') + (st.flip === kind ? ' flipped' : '') + (full || st.gold < costOf(kind) ? ' poor' : '');
         const tip = kind === 'wall' || kind === 'stake' ? ' Ťahaj prstom pre celý rad.' : kind === 'paving' ? ' Ťahaj prstom pre celú plochu.' : '';
+        const costHtml = full ? 'plné ' + bldCount(kind) + '/' + lim : '<img class="coin" src="' + ICONS.coin + '">' + costOf(kind) + (lim < Infinity ? ' · ' + bldCount(kind) + '/' + lim : '');
         b.innerHTML = '<span class="pin">' +
-          '<span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost"><img class="coin" src="' + ICONS.coin + '">' + costOf(kind) + '</span></span>' +
+          '<span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost">' + costHtml + '</span></span>' +
           '<span class="face back"><b>' + d.name + '</b><small>' + d.desc + '.' + tip + '</small></span></span>';
         flashIf(b, isNew(kind), kind, () => markSeen(kind));
-        b.addEventListener('pointerdown', ev => { if (st.phase === 'build') cardPress = { kind, x: ev.clientX, y: ev.clientY }; });
+        b.addEventListener('pointerdown', ev => { if (st.phase === 'build' && !bldFull(kind)) cardPress = { kind, x: ev.clientX, y: ev.clientY }; });
         b.addEventListener('click', () => {
           if (suppressCardClick) { suppressCardClick = false; return; } // bol to ťah, nie ťuk
+          if (bldFull(kind)) { toast(limitMsg(kind)); AUDIO.play('deny'); return; }
           AUDIO.play('click');
           if (st.tool === kind) { // druhý ťuk na vybranú kartu ju otočí (vzadu je popis), ďalší ju otočí späť
             st.flip = st.flip === kind ? null : kind;
@@ -5301,6 +5318,7 @@
     const dc = costOf(kind);
     if (!inZone(c, r)) { dropTool(); return false; }
     if (!canPlace(c, r)) { AUDIO.play('deny'); return false; } // políčko je obsadené
+    if (bldFull(kind)) { toast(limitMsg(kind)); AUDIO.play('deny'); st.tool = null; renderBuild(); return false; }
     if (st.gold < dc) { toast('Nedostatok zlata'); AUDIO.play('deny'); return false; }
     snapshot();
     st.gold -= dc;
@@ -5308,7 +5326,7 @@
     AUDIO.play('build');
     const cx = tileX(c) + T / 2, cy = tileY(r) + T / 2;
     for (let k = 0; k < 8; k++) part(cx + (Math.random() - 0.5) * 12, cy + 4, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.4, '#c6a272', 60);
-    if (st.gold < dc) st.tool = null;
+    if (st.gold < dc || bldFull(kind)) st.tool = null;
     renderBuild();
     return true;
   }
@@ -6612,5 +6630,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, HEROES, switchHero, setActiveHero, ownedHeroes, heroDef, heroWalkHome,
-    enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, orderSiege, SIEGE_BUY: BUY, knightsBlocked, applyRace, deployArmy, ARMY, depAt, get island() { return island; }, mapOX };
+    enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, showTalentPick, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, orderSiege, SIEGE_BUY: BUY, knightsBlocked, applyRace, placeAt, bldLimit, deployArmy, ARMY, depAt, get island() { return island; }, mapOX };
 })();

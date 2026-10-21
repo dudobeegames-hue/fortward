@@ -45,7 +45,7 @@
   #hud {
     position: absolute; left: 0; right: 0; top: 0;
     padding: calc(env(safe-area-inset-top) + 8px) 10px 0;
-    display: grid; grid-template-columns: 96px 1fr 96px; grid-template-areas: 'wave wall gold' 'king boss pause'; /* pevné krajné stĺpce – pásiky sa nehýbu, keď pribudne číslica */
+    display: grid; grid-template-columns: 96px minmax(0, 1fr) 96px; grid-template-areas: 'wave wall gold' 'king boss pause'; /* pevné krajné stĺpce – pásiky sa nehýbu, keď pribudne číslica; stredný stĺpec sa nesmie rozťahovať podľa textu, inak vytlačí zlatky a pauzu k pravému okraju */
     gap: 6px 8px; align-items: center;
     pointer-events: none; z-index: 5;
   }
@@ -56,7 +56,7 @@
   #hud-boss { grid-area: boss; align-self: start; flex-direction: column; align-items: stretch; gap: 2px; padding: 4px 8px; }
   #hud-boss[hidden] { display: none; }
   #hud-boss .bar i { background: linear-gradient(#ff7a5a, #c83020); }
-  #bossTxt { font-size: 11px; color: #ffb090; text-align: center; line-height: 1; }
+  #bossTxt { font-size: 11px; color: #ffb090; text-align: center; line-height: 1; white-space: normal; }
   #hud-gold { grid-area: gold; justify-content: center; }
   /* pauza pod zlatkami */
   #pauseBtn { grid-area: pause; justify-self: end; align-self: start; pointer-events: auto; width: 38px; height: 38px; padding: 0; display: grid; place-items: center;
@@ -102,7 +102,7 @@
   .bar i.low { background: linear-gradient(#ff7a5a, #c83020); }
   .bar.xp { background: #16222e; }
   .bar.xp i { width: 0; background: linear-gradient(#cdeaff, #7ab8ee); transition: width .5s; }
-  #hallTxt { font-size: 11px; color: var(--muted); text-align: center; line-height: 1; }
+  #hallTxt { font-size: 11px; color: var(--muted); text-align: center; line-height: 1; white-space: normal; } /* úzky telefón: radšej dva riadky než pretečenie */
   img.coin, img.gem { width: 16px; height: 16px; }
   img.chest { width: 22px; height: 22px; image-rendering: pixelated; }
   .chestGain { display: inline-flex; align-items: center; gap: 6px; font-size: 26px; font-weight: 700; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
