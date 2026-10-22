@@ -153,6 +153,12 @@ window.SIM = (() => {
     const k = F.kingMeta;
     k.slots = k.slots || [null, null, null];
     k.slots.forEach((v, i) => { if (!v && k.lvl >= F.KING_SLOT_LVL[i]) k.slots[i] = F.heroDef().powers.find(p => !k.slots.includes(p)); }); // schopnosti nasadeného hrdinu
+    // body na schopnosti (1 za úroveň hrdinu): vždy do nasadenej schopnosti s najnižšou úrovňou
+    if (SIM.abilPoints !== false) {
+      k.sk = k.sk || {};
+      const lv = id => k.sk[id] || 1, free = () => k.lvl - 1 - Object.values(k.sk).reduce((a, l) => a + l - 1, 0);
+      for (;;) { const on = k.slots.filter(Boolean).filter(id => lv(id) < 10).sort((a, b) => lv(a) - lv(b)); if (!on.length || free() <= 0) break; k.sk[on[0]] = lv(on[0]) + 1; }
+    }
   }
   function mission(m, opts) {
     opts = Object.assign({ volley: true, siege: true }, opts); // siege: false = hráč bez obliehacích strojov (na porovnanie)

@@ -78,7 +78,11 @@
   #hud-king img { height: 34px; }
   #hud-king .kLvl { display: flex; flex-direction: column; align-items: center; line-height: 1; }
   #hud-king .kLvl small { font-size: 9px; color: var(--muted); text-transform: uppercase; }
-  #hud-king .kLvl b { font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 20px; color: var(--gold); text-shadow: 1px 1px 0 var(--ink); }
+  #hud-king .kLvl b { font-size: 17px; font-weight: 700; color: var(--gold); } /* rovnaké písmo ako počet vĺn */
+  /* pri stavaní sa na panel hrdinu dá ťuknúť (okno hrdinu); keď má hrdina nový bonus či body, žiari ako novinka */
+  #hud-king.tap { pointer-events: auto; cursor: pointer; }
+  #hud-king.neon { animation: neonFlash 2.8s ease-in-out infinite; }
+  .orcs #hud-king.neon { animation-name: neonFlashOrc; }
   #hud-king .kRow { display: flex; align-items: center; gap: 4px; }
   #hud-king .kRow b { font-size: 9px; line-height: 1; width: 14px; color: var(--muted); }
   #hud-king .kRow .bar { flex: 1; height: 5px; }
@@ -668,7 +672,6 @@
   #heroOpts { display: flex; flex-direction: column; gap: 8px; width: 100%; }
   .skillOpt img.hp { width: 42px; height: 42px; object-fit: contain; }
   .skillOpt.dead img { filter: grayscale(1) brightness(.6); }
-  #hud-king.swap { cursor: pointer; box-shadow: 0 0 0 2px var(--gold2); }
   .hero.sel.off { border-color: var(--ink); background: rgba(0,0,0,.28); box-shadow: none; }
   .hero .buy { margin-top: 4px; }
   .hero .buy img { width: 16px; height: 16px; }
@@ -762,15 +765,38 @@
   @keyframes blink { 50% { opacity: .35; } }
   @media (prefers-reduced-motion: reduce) { .uCard.deal { animation: none; } .udHint { animation: none; } }
 
-  /* ---- Výber vylepšenia kráľa ---- */
-  #talentPick {
-    position: absolute; inset: 0; z-index: 31; padding: 0 16px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
-    background: radial-gradient(circle at 50% 45%, rgba(40,28,14,.6), rgba(6,4,2,.86));
-    animation: udIn .3s ease-out;
-  }
-  .tpSub { font-size: 14px; color: var(--muted); margin-top: -6px; }
-  #tpList { display: flex; flex-direction: column; gap: 10px; width: min(100%, 340px); }
+  /* ---- Okno hrdinu (ťuk na panel hrdinu pri stavaní): bonus pri novej úrovni, schopnosti a ich úrovne ---- */
+  #heroUp { z-index: 30; justify-content: flex-start; overflow-y: auto; touch-action: pan-y; }
+  #skillPick { z-index: 32; } /* výber schopnosti sa otvára nad oknom hrdinu */
+  .huCard { max-width: 360px; gap: 12px; text-align: left; align-items: stretch; margin-top: 8vh; } /* ukotvené hore: zmena obsahu posúva len spodok, okno neposkočí */
+  .huHead { display: grid; grid-template-columns: 52px 1fr; gap: 12px; align-items: center; }
+  .askCard .huHead img { width: 52px; height: 52px; object-fit: contain; }
+  .huHead b { font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 22px; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
+  .huHead small { font-size: 12px; color: var(--muted); }
+  .huSec { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: -4px; }
+  .huSec em { font-style: normal; color: var(--gold); text-transform: none; letter-spacing: 0; font-size: 14px; }
+  #huBonus, #huSkills { display: flex; flex-direction: column; gap: 8px; }
+  #huBonus .tpCard { padding: 9px 12px; grid-template-columns: 40px 1fr; }
+  #huBonus .tpCard img { width: 38px; }
+  #huBonus .tpCard b { font-size: 15px; }
+  #huBonus.done .tpCard:not(.pick) { opacity: 0; transform: scale(.92); }
+  .huSkill { display: grid; grid-template-columns: 38px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; border: 2px solid var(--ink); background: rgba(0,0,0,.28); }
+  .askCard .huSkill img { width: 34px; height: 34px; }
+  .huSkill .i { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .huSkill b { font-size: 15px; color: var(--text); }
+  .huSkill small { font-size: 12px; color: var(--muted); line-height: 1.3; min-height: 2.6em; } /* vždy dva riadky – výška riadku sa nemení */
+  .huSkill .lv { display: flex; gap: 2px; margin: 2px 0; }
+  .huSkill .lv i { width: 9px; height: 5px; border-radius: 1px; background: #3a2c22; border: 1px solid var(--ink); }
+  .huSkill .lv i.on { background: var(--gold); }
+  .huSkill.lock { opacity: .55; }
+  .huPlus { min-width: 52px; height: 44px; padding: 0 6px; border-radius: 9px; border: 2px solid var(--ink); background: linear-gradient(#5a86e8, var(--blue)); color: #fff; font-weight: 700; font-size: 13px; line-height: 1.1;
+    box-shadow: inset 0 -3px 0 var(--blue2), inset 0 2px 0 rgba(255,255,255,.3); }
+  .huPlus b { display: block; font-size: 18px; }
+  .huPlus:disabled { background: #3a3430; box-shadow: none; color: #8a8070; }
+  .huPlus.pick { background: linear-gradient(#7ee05e, #3fae3a 55%, #2c8a2c); box-shadow: inset 0 -3px 0 #1f6420, inset 0 2px 0 rgba(255,255,255,.35); }
+  .huBtns { display: flex; gap: 10px; }
+  .huBtns button { flex: 1; justify-content: center; }
+  .huBtns .primary { padding: 11px; }
   .tpCard {
     display: grid; grid-template-columns: 52px 1fr; gap: 12px; align-items: center; text-align: left;
     padding: 12px 14px; border-radius: 12px; border: 3px solid var(--ink);
@@ -786,7 +812,6 @@
   .tpCard small { font-size: 13px; color: var(--muted); line-height: 1.3; }
   .tpCard .pips { color: var(--gold); font-size: 10px; letter-spacing: 1px; margin-left: 4px; }
   .tpCard .pips i { color: #4a3a2c; font-style: normal; }
-  #talentPick.done .tpCard:not(.pick) { opacity: 0; transform: scale(.92); }
   .tpCard.pick { transform: scale(1.06); filter: brightness(1.3); box-shadow: inset 0 0 0 2px var(--gold), 0 0 22px rgba(248,208,72,.55); }
   .kingRow { grid-template-columns: 36px 1fr; background: rgba(248,208,72,.08); }
   .xpBar { display: block; height: 6px; margin: 3px 0; background: #3a2c22; border: 1px solid var(--ink); border-radius: 2px; overflow: hidden; }
@@ -933,10 +958,14 @@
     <div class="udHint">Ťukni na kartu</div>
   </div>
 
-  <div id="talentPick" hidden>
-    <div class="udHead">Kráľ – úroveň <span id="tpLvl">2</span>!</div>
-    <div class="tpSub">Vyber si jedno vylepšenie</div>
-    <div id="tpList"></div>
+  <div id="heroUp" class="screenOverlay" hidden>
+    <div class="askCard huCard">
+      <div class="huHead"><img id="huImg" alt=""><div><b id="huName"></b><span class="xpBar"><i id="huXp"></i></span><small id="huXpTxt"></small></div></div>
+      <div id="huBonus"></div>
+      <div class="huSec"><span>Schopnosti</span><em id="huPts"></em></div>
+      <div id="huSkills"></div>
+      <div class="huBtns"><button id="huSwap" class="btn">Vymeniť hrdinu</button><button id="huClose" class="primary">Hotovo</button></div>
+    </div>
   </div>
 
   <div id="perks" class="screenOverlay perksScreen tabScreen" hidden>
