@@ -5086,7 +5086,7 @@
     towers: '<path d="M7 21V10"/><path d="M17 21V10"/><path d="M5.5 10h13"/><path d="M5.5 10V4.5h2.5v2h2.5v-2h3v2H16v-2h2.5V10"/><path d="M5 21h14"/><path d="M12 13v3"/>',
     walls: '<path d="M3 7h18v13H3z"/><path d="M3 11.3h18"/><path d="M3 15.6h18"/><path d="M8 7v4.3"/><path d="M15 7v4.3"/><path d="M11.5 11.3v4.3"/><path d="M7 15.6V20"/><path d="M17 15.6V20"/><path d="M3 7V4h3v3"/><path d="M10.5 7V4h3v3"/><path d="M18 7V4h3v3"/>',
     army: '<path d="M12 3l7 2.8v5.4c0 4.6-3 8-7 9.8-4-1.8-7-5.2-7-9.8V5.8z"/><path d="M12 7.5v8"/><path d="M8.5 11h7"/>',
-    siege: '<path d="M3 18h18"/><circle cx="7" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/><path d="M9 18l3-7 3 7"/><path d="M6 15L17.5 6"/><path d="M15.5 5.5a2.5 2.5 0 1 0 4.5 1.5"/>',
+    siege: '<path d="M3 14.5h16v3H3z"/><circle cx="7" cy="19.5" r="2"/><circle cx="15" cy="19.5" r="2"/><path d="M9.5 14.5l2.5-5 2.5 5"/><path d="M7.5 12.5l9-6.2"/><path d="M15.8 5v.8a2.2 2.2 0 0 0 4.4 0V5"/><circle cx="18" cy="3.6" r="1.4"/>', // katapult: voz na kolesách, rameno s kameňom
     support: '<path d="M11.4 10l-7.4 7.4a2.1 2.1 0 0 0 3 3l7.4-7.4"/><path d="M18.1 15.3l2.6-2.6a1 1 0 0 0 0-1.4l-7.6-7.6a1 1 0 0 0-1.4 0l-2.6 2.6a1 1 0 0 0 0 1.4l7.6 7.6a1 1 0 0 0 1.4 0z"/>',
   };
   const tabShine = t => t.kinds.some(isNew);

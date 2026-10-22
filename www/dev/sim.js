@@ -6,8 +6,11 @@ window.SIM = (() => {
   const cost = k => F.costOf(k);
   const free = (c, r) => F.inZone(c, r) && !F.inHall(c, r) && !F.occAt(c, r);
   const count = k => s.blds.filter(b => b.kind === k).length;
+  // limity ako v hre: vojenské budovy spolu a bane podľa radnice, kaplnky a dielne najviac 3
+  const MIL = ['barracks', 'range', 'stables', 'armory', 'falconry'];
+  const full = k => (MIL.includes(k) ? s.blds.filter(b => MIL.includes(b.kind)).length : count(k)) >= F.bldLimit(k);
   function place(kind, c, r) {
-    if (!F.has(kind) || !free(c, r) || s.gold < cost(kind)) return false;
+    if (!F.has(kind) || full(kind) || !free(c, r) || s.gold < cost(kind)) return false;
     s.gold -= cost(kind); F.addBuilding(kind, c, r); return true;
   }
 
