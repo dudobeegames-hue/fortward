@@ -76,6 +76,7 @@
     const x = Math.round(tileX(q.c) + w * T / 2 - sp.w / 2), y = tileY(q.r + h) - sp.h + (pc.dy || 0);
     b.globalAlpha = alpha || 1;
     b.fillStyle = 'rgba(0,0,0,0.25)'; b.beginPath(); b.ellipse(tileX(q.c) + w * T / 2, tileY(q.r + h) - 1, Math.min(sp.w, w * T) * 0.4, 2, 0, 0, 6.29); b.fill();
+    if (CAMP_WALLS[q.k]) campWallSlices(b, o, campWallBld(lay(), q), tileX(q.c), tileY(q.r + h), CAMP_PIECES[race].wall); // napojenie na susednú vežu
     b.drawImage(sp.c, x, y);
     if ((q.l || 1) > 1 && !pc.lvlArt) pxText(b, String(q.l), Math.round(tileX(q.c) + w * T) - 5, tileY(q.r + h) - 7, '#f8d048'); // úroveň stavby bez vlastného vzhľadu
     b.globalAlpha = 1;

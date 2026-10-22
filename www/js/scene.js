@@ -107,7 +107,8 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard) {
   const roadD = (x, y) => y > G.hallTop + 4 ? 99 : Math.abs(x - roadCx(y)) - roadHw(y) + (vnoise(x * 0.3, y * 0.3, seed + 3) - 0.5) * 5;
   const hx0 = G.hallCx - 22, hx1 = G.hallCx + 22;
   const yardD = yard === 'none' ? () => 99 : (x, y) => { // 'none' = bez nádvoria (útok na hrad – hráč nemá radnicu)
-    const dx = Math.max(hx0 - x, 0, x - hx1), dy = Math.max(G.hallTop - y, 0, y - G.hallBot);
+    if (y >= G.hallBot) return 99; // pod radnicou nádvorie nie je (je tam pruh zdravia)
+    const dx = Math.max(hx0 - x, 0, x - hx1), dy = Math.max(G.hallTop - y, 0);
     return Math.hypot(dx, dy) - 3 + (vnoise(x * 0.25, y * 0.25, seed + 17) - 0.5) * 3;
   };
   const groundRamp = { grass: RAMP.grass, grassDark: RAMP.grass, dry: TR.dry, swamp: TR.swamp, ash: TR.ash, dark: TR.dark, darkLit: TR.darkLit }[th.ground];

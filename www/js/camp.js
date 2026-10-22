@@ -86,11 +86,24 @@ function campClearRects(list, G) {
 const CAMP_JOIN = { wall: 1, gatehouse: 1, tower: 1, mage: 1, icetower: 1, ballista: 1, hall: 1 };
 const CAMP_WALLS = { wall: 1, gatehouse: 1 }; // tieto potrebujú masku spojení
 // list = stavby hradu ({k|kind, c, r}); vráti masku spojení 1 hore, 2 vpravo, 4 dole, 8 vľavo
+const campKindOf = o => o.k || o.kind;
+const campAt = (list, c, r) => list.find(o => { const pc = CAMP_PIECES.human[campKindOf(o)] || CAMP_PIECES.orc[campKindOf(o)], [w, h] = pc ? campSize(pc) : [1, 1]; return c >= o.c && c < o.c + w && r >= o.r && r < o.r + h; });
 function campWallMask(list, q) {
-  const kindOf = o => o.k || o.kind;
-  const at = (c, r) => list.find(o => { const pc = CAMP_PIECES.human[kindOf(o)] || CAMP_PIECES.orc[kindOf(o)], [w, h] = pc ? campSize(pc) : [1, 1]; return c >= o.c && c < o.c + w && r >= o.r && r < o.r + h; });
-  const j = (c, r, vert) => { const o = at(c, r); return !!o && !!CAMP_JOIN[kindOf(o)] && !(vert && kindOf(o) === 'hall'); };
+  const j = (c, r, vert) => { const o = campAt(list, c, r); return !!o && !!CAMP_JOIN[campKindOf(o)] && !(vert && campKindOf(o) === 'hall'); };
   return (j(q.c, q.r - 1, true) ? 1 : 0) | (j(q.c + 1, q.r) ? 2 : 0) | (j(q.c, q.r + 1, true) ? 4 : 0) | (j(q.c - 1, q.r) ? 8 : 0);
+}
+// napojenie hradby na susednú vežu či radnicu vľavo/vpravo (2 vpravo, 8 vľavo): tam sa hradba dokreslí prúžkom
+// až do susedného políčka, inak by medzi hradbou a užšou vežou ostala medzera (ako pri hradbách hráča v hre)
+function campWallBld(list, q) {
+  const j = (c, r) => { const o = campAt(list, c, r); return !!o && !!CAMP_JOIN[campKindOf(o)] && !CAMP_WALLS[campKindOf(o)]; };
+  return (j(q.c + 1, q.r) ? 2 : 0) | (j(q.c - 1, q.r) ? 8 : 0);
+}
+// o = stavba hradby {lvl, mask}, left = ľavý okraj jej políčka, bottom = spodok políčka, wallPc = hradba rasy (CAMP_PIECES[rasa].wall)
+function campWallSlices(ctx, o, bld, left, bottom, wallPc) {
+  if (!bld) return;
+  const flat = wallPc.spr({ lvl: o.lvl, fired: 0, mask: (o.mask || 0) | 10 }), y = bottom - flat.h + (wallPc.dy || 0);
+  if (bld & 2) ctx.drawImage(flat.c, 6, 0, 4, flat.h, left + 16, y, 4, flat.h);
+  if (bld & 8) ctx.drawImage(flat.c, 6, 0, 4, flat.h, left - 4, y, 4, flat.h);
 }
 // brána = úsek hradby so strážnicou nad ním (ako v hre), pre každé napojenie raz zložená
 const GATE_SPR = {};

@@ -849,7 +849,7 @@
       parts: lay.filter(q => pieces[q.k]).map((q, i) => {
         const pc = pieces[q.k], lvl = pc.fixed ? 1 : q.l || 1, hp = CAMP_ROLES[pc.role].hp * (pc.hp || 1) * mm * campHpMul(lvl), [w, h] = campSize(pc);
         return { kind: q.k, role: pc.role, skin: pc, lvl, c: q.c, r: q.r, x: tileX(q.c) + w * T / 2, y: tileY(q.r + h), hp, max: hp, cd: 3 + i * 1.5, flash: 0, fired: 0,
-          mask: CAMP_WALLS[q.k] ? campWallMask(lay, q) : null }; // hradby a palisády sa spájajú ako v hre
+          mask: CAMP_WALLS[q.k] ? campWallMask(lay, q) : null, bld: CAMP_WALLS[q.k] ? campWallBld(lay, q) : 0 }; // hradby a palisády sa spájajú ako v hre (aj s vežami)
       }),
     };
   }
@@ -3085,9 +3085,9 @@
     }
   }
 
-  // kladivo remeselníka: pri chôdzi na pleci, pri oprave sa napriahne do strany a švihne do budovy
-  function drawHammer(u, x, y) {
-    const hx = x + 11, hy = y + 6;                                  // ruka v sprite
+  // kladivo remeselníka (za orkov goblina): pri chôdzi na pleci, pri oprave sa napriahne do strany a švihne do budovy
+  // hx, hy = ruka postavy na bojisku
+  function drawHammer(u, hx, hy) {
     // pri oprave: náprah = kladivo stiahnuté do strany, úder = švih hore do budovy pred ním (hra ho ukazuje zozadu)
     const wind = u.working && u.cd >= 0.13, hit = u.working && u.cd < 0.13;
     const px = (cx, cy, col) => { g.fillStyle = col; g.fillRect(cx, cy, 1, 1); };
@@ -3249,10 +3249,13 @@
     if (u.siege) return drawSiege8(u, SPR[sprName + '8']);
     if (!u.isKing && SPR[sprName + '8']) {
       const set = (u.gold && SPR[sprName + 'G8']) || SPR[sprName + '8']; // zlaté brnenie z budovy najvyššej úrovne
-      const fr = unit8Frame(u, set), y = Math.round(u.y - fr.h) + U8_PB;
+      const repair = u.helper === 'workshop'; // goblin-opravár (za orkov) nosí kladivo, pri oprave stojí chrbtom a klepe do budovy
+      if (repair && u.working) u.face8 = 6;
+      const fr = repair && u.working ? set[6].idle : unit8Frame(u, set), y = Math.round(u.y - fr.h) + U8_PB;
       shadow(u.x, u.y, 4);
       cryAura(u, false, true);
       g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), y);
+      if (repair) drawHammer(u, Math.round(u.x) + 3, Math.round(u.y) - 6);
       cryAura(u, false);
       if (u.stunT > 0) { // hviezdičky nad omráčeným
         const t = performance.now() / 1000;
@@ -3277,7 +3280,7 @@
     shadow(u.x, u.y, 4);
     cryAura(u, !!u.isKing, true);
     g.drawImage(u.flash > 0 ? fr.f : fr.c, x, y);
-    if (sprName === 'craft') drawHammer(u, x, y);
+    if (sprName === 'craft') drawHammer(u, x + 11, y + 6);
     if (sprName === 'sorc' && Math.random() < 0.25) part(x + 12, y + 1, (Math.random() - 0.5) * 4, -8 - Math.random() * 6, 0.35, Math.random() < 0.5 ? '#fff070' : '#f87830', 0); // plamienok na palici
     cryAura(u, !!u.isKing); // pokrik
     if (u.stunT > 0) { // hviezdičky nad omráčeným
@@ -3357,15 +3360,16 @@
     g.fillStyle = '#7a7286'; g.fillRect(x, y, 2, 1); g.fillRect(x, y + 1, 1, 1);
     g.fillStyle = '#22202a'; g.fillRect(x + 2, y + 2, 1, 1);
   }
-  // zdravie radnice: pruh pod radnicou, široký ako radnica (3 políčka); farba podľa zdravia, v strede drobné číslo „zdravie/max“
+  // zdravie radnice: tenký pruh pod radnicou, široký ako radnica (3 políčka); farba podľa zdravia.
+  // Číslo „zdravie/max“ nie je pixelové – kreslí ho present() hladkým písmom v plnom rozlíšení obrazovky (hallLbl)
+  let hallLbl = null;
   function drawHallBar() {
-    const hp = Math.max(0, Math.ceil(st.hallHp)), max = hallMax(), r = Math.min(1, hp / max), w = 3 * T - 4, x = Math.round(G.hallCx - w / 2), y = G.hallBot + 4, bh = 4;
-    g.fillStyle = PAL.K; g.fillRect(x - 1, y - 1, w + 2, bh + 2);
-    g.fillStyle = '#3a1410'; g.fillRect(x, y, w, bh);
-    g.fillStyle = r < 0.3 ? '#e84838' : r < 0.6 ? '#f8a838' : '#7cd04a'; g.fillRect(x, y, Math.round(w * r), bh);
+    const hp = Math.max(0, Math.ceil(st.hallHp)), max = hallMax(), r = Math.min(1, hp / max), w = 3 * T - 4, x = Math.round(G.hallCx - w / 2), y = G.hallBot + 5;
+    g.fillStyle = PAL.K; g.fillRect(x - 1, y - 1, w + 2, 4);
+    g.fillStyle = '#3a1410'; g.fillRect(x, y, w, 2);
+    g.fillStyle = r < 0.3 ? '#e84838' : r < 0.6 ? '#f8a838' : '#7cd04a'; g.fillRect(x, y, Math.round(w * r), 2);
     if (r > 0) { g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(x, y, Math.round(w * r), 1); } // lesk
-    const s = hp + '/' + max;
-    pxTextTiny(g, s, Math.round(x + (w - (s.length * 4 - 1)) / 2), y, '#fff2d0');
+    hallLbl = { s: hp + '/' + max, x: G.hallCx, y: y + 1 };
   }
   function bar(cx, y, w, ratio, col) {
     const x = Math.round(cx - w / 2);
@@ -4628,6 +4632,13 @@
     sctx.imageSmoothingEnabled = false;
     sctx.fillStyle = '#000'; sctx.fillRect(0, 0, screen.width, screen.height);
     sctx.drawImage(buf, 0, 0, W, buf.height, sx * S, (sy - Math.round(camY)) * S, W * S, buf.height * S);
+    if (hallLbl) { // číslo zdravia radnice: hladké písmo s tmavým obrysom, v strede tenkého pruhu
+      const lx = (hallLbl.x + sx) * S, ly = (hallLbl.y + sy - Math.round(camY)) * S;
+      sctx.font = '700 ' + (3.4 * S).toFixed(1) + 'px Rubik, sans-serif';
+      sctx.textAlign = 'center'; sctx.textBaseline = 'middle'; sctx.lineJoin = 'round';
+      sctx.lineWidth = Math.max(2, S * 0.7); sctx.strokeStyle = PAL.K; sctx.strokeText(hallLbl.s, lx, ly);
+      sctx.fillStyle = '#fff2d0'; sctx.fillText(hallLbl.s, lx, ly);
+    }
   }
   // cieľový posun kamery: v stavaní o výšku panela, v boji o spodné tlačidlá
   // ---- posúvanie mapy prstom ----
@@ -4713,6 +4724,7 @@
   }
 
   function render(time) {
+    hallLbl = null; // nastaví ho drawHallBar, keď je pruh radnice na obrazovke
     if (st.phase === 'map') { renderMap(time); present(); return; }
     if (st.phase === 'title') return; // menu má za pozadím úvodný obrázok, plátno sa nekreslí
     g.drawImage(scene.bg, 0, 0);
@@ -4758,7 +4770,9 @@
     for (const tm of st.totems || []) objs.push({ y: tm.y, f: () => drawTotem(tm, time) }); // totem duchov šamana
     if (st.camp) {
       for (const o of st.camp.parts) if (o.hp > 0 && o.role !== 'trap') objs.push({ y: o.y, f: () => {
-        const sp = o.skin.spr(o, time); shadow(o.x, o.y, 8); g.drawImage(sp.c, Math.round(o.x - sp.w / 2) + hitJit(o.flash), o.y - sp.h + (o.skin.dy || 0));
+        const sp = o.skin.spr(o, time); shadow(o.x, o.y, 8);
+        campWallSlices(g, o, o.bld, o.x - T / 2, o.y, CAMP_PIECES[foeRace()].wall); // napojenie hradby na susednú vežu
+        g.drawImage(sp.c, Math.round(o.x - sp.w / 2) + hitJit(o.flash), o.y - sp.h + (o.skin.dy || 0));
         if (o.lvl > 1 && !o.skin.lvlArt) pxText(g, String(o.lvl), Math.round(o.x + sp.w / 2) - 4, o.y - 7, '#f8d048'); // úroveň stavby bez vlastného vzhľadu
       } });
       for (const r of st.camp.rocks) objs.push({ y: 9999, f: () => drawRock(r) });
@@ -6031,11 +6045,11 @@
     const { g2 } = fieldGeom(m), sc = sceneFor(m), pieces = CAMP_PIECES[race];
     const parts = lay.filter(q => pieces[q.k]).map(q => {
       const pc = pieces[q.k], [w, h] = campSize(pc);
-      return { kind: q.k, skin: pc, lvl: pc.fixed ? 1 : q.l || 1, fired: 0, x: g2.gx0 + q.c * T + w * T / 2, y: g2.gy0 + (q.r + h) * T, mask: CAMP_WALLS[q.k] ? campWallMask(lay, q) : null };
+      return { kind: q.k, skin: pc, lvl: pc.fixed ? 1 : q.l || 1, fired: 0, x: g2.gx0 + q.c * T + w * T / 2, y: g2.gy0 + (q.r + h) * T, mask: CAMP_WALLS[q.k] ? campWallMask(lay, q) : null, bld: CAMP_WALLS[q.k] ? campWallBld(lay, q) : 0 };
     }).sort((a, b) => a.y - b.y);
     const c = document.createElement('canvas'); c.width = W; c.height = Math.min(sc.bg.height, Math.max(...parts.map(o => o.y)) + 10);
     const x = c.getContext('2d'); x.drawImage(sc.bg, 0, 0);
-    for (const o of parts) { const sp = o.skin.spr(o, 0); x.drawImage(sp.c, Math.round(o.x - sp.w / 2), o.y - sp.h + (o.skin.dy || 0)); }
+    for (const o of parts) { const sp = o.skin.spr(o, 0); campWallSlices(x, o, o.bld, o.x - T / 2, o.y, pieces.wall); x.drawImage(sp.c, Math.round(o.x - sp.w / 2), o.y - sp.h + (o.skin.dy || 0)); }
     return (castlePrev[key] = c.toDataURL());
   }
   function renderMapPanel() {
