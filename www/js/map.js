@@ -249,7 +249,7 @@ function makeOrcFort() {
 
 // ---- Odomykanie: čo prináša každá misia (misia 1 = základná výbava) ----
 const UNLOCKS = [
-  [{ id: 'paving', name: 'Dlažba', icon: 'paving' }, { id: 'cobble', name: 'Kamenná cesta', icon: 'cobble' }, { id: 'tower', name: 'Strážna veža', icon: 'tower' }, { id: 'wall', name: 'Hradby', icon: 'wall' }, { id: 'pit', name: 'Jama s ostňami', icon: 'pit' }, { id: 'gate', name: 'Brána', icon: 'gate', desc: 'Prerob hradbu na bránu – tvoji rytieri cez ňu prejdú, horda nie.' }],
+  [{ id: 'paving', name: 'Dlažba', icon: 'paving' }, { id: 'tower', name: 'Strážna veža', icon: 'tower' }, { id: 'wall', name: 'Hradby', icon: 'wall' }, { id: 'pit', name: 'Jama s ostňami', icon: 'pit' }, { id: 'gate', name: 'Brána', icon: 'gate', desc: 'Prerob hradbu na bránu – tvoji rytieri cez ňu prejdú, horda nie.' }],
   [{ id: 'lvl2', name: 'Radnica a stavby úrovne 2', icon: 'hall', desc: 'Vylepši radnicu na kameň – a s ňou všetky stavby a strelcov.' }, { id: 'mine', name: 'Zlatá baňa', icon: 'mine' }, { id: 'mage', name: 'Veža mága', icon: 'mage' }, { id: 'wallArcher', name: 'Lukostrelec na hradbách', icon: 'u_archer', desc: 'Postav lukostrelca priamo na hradbu – strieľa rýchle šípy na hordu.' }],
   [{ id: 'icetower', name: 'Ľadová veža', icon: 'icetower' }, { id: 'workshop', name: 'Dielňa remeselníka', icon: 'workshop' }],
   [{ id: 'hedge', name: 'Živý plot', icon: 'hedge' }, { id: 'lvl3', name: 'Radnica a stavby úrovne 3', icon: 'hall', desc: 'Vylepši radnicu na kameň s kovaním – a s ňou všetky stavby a strelcov.' }, { id: 'barracks', name: 'Kasárne a rytieri', icon: 'barracks' }],
@@ -288,8 +288,9 @@ const ORC_ENEMY_INTRO = {
 };
 // za orkov sa jedový kotol (icetower) odomyká ako druhá veža (misia 2) a ohnivý totem (mage) až v misii 3
 let UNLOCK_RACE = 'human';
-// kušník na hradbách a ostnaté hradby majú len ľudia
-const ORC_UNLOCKS = UNLOCKS.map(l => l.filter(u => !['wallCrossbow', 'spikes', 'spikeTypes'].includes(u.id)).map(u => Object.assign({}, u)));
+// kušník na hradbách, ostnaté hradby a živý plot majú len ľudia
+const ORC_UNLOCKS = UNLOCKS.map(l => l.filter(u => !['wallCrossbow', 'spikes', 'spikeTypes', 'hedge'].includes(u.id)).map(u => Object.assign({}, u)));
+ORC_UNLOCKS[3].unshift({ id: 'mud', name: 'Bahno', icon: 'mud' }); // orkovia majú namiesto živého plota bahno (misia 4)
 (() => {
   const a = ORC_UNLOCKS[1], b = ORC_UNLOCKS[2], i = a.findIndex(u => u.id === 'mage'), j = b.findIndex(u => u.id === 'icetower');
   [a[i], b[j]] = [b[j], a[i]];
