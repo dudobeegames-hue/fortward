@@ -40,7 +40,7 @@ const THEMES = [
   { key: 'ford',   ground: 'grass', road: 'dirt',    deco: 'rocks',   river: { y: 0.42, hw: 8, ford: true } },
   { key: 'hill',   ground: 'dry',   road: 'dirt',    deco: 'outcrop' },
   { key: 'swamp',  ground: 'swamp', road: 'mud',     deco: 'swamp',   anim: 'fog' },
-  { key: 'pass',   ground: 'grassDark', road: 'dirt', deco: 'rocks',  cliffs: true, spawn: 'middle' },
+  { key: 'heath',  ground: 'grassDark', road: 'dirt', deco: 'heath' }, // vresovisko: ploché fialové škvrny vresu a nízke kríky (skalné steny a kamene tu boli, jednotky cez ne chodili)
   { key: 'ruins',  ground: 'grassDark', road: 'cobble', deco: 'ruins' },
   { key: 'ash',    ground: 'ash',   road: 'ashroad', deco: 'charred', anim: 'embers' },
   { key: 'orc',    ground: 'darkLit', road: 'ashroad', deco: 'orc' },
@@ -449,6 +449,21 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard) {
       const white = hexRGB('#eee6cc'), dark = hexRGB('#2a2420');
       scatter(area / 380, (x, y) => tree(x, y, TR.birch, k => (k % 2 ? dark : white), 3 + Math.floor(rnd() * 2)), 7);
       scatter(area / 2000, (x, y) => blob(x, y, 3, RAMP.bush, 0.6, RAMP.bush[0]), 6);
+      break;
+    }
+    case 'heath': { // vres: ploché nepravidelné škvrny s fialovými kvietkami, okraj sa stráca do trávy; pár nízkych kríkov
+      const heathCols = ['#7a4a8a', '#9a5aa8', '#c88ad8', '#5e3a5a'].map(hexRGB), base = ['#2c3a22', '#34442a'].map(hexRGB);
+      scatter(area / 1700, (x, y) => {
+        const rx = 6 + Math.floor(rnd() * 8), ry = 3 + Math.floor(rnd() * 3);
+        for (let dy = -ry - 1; dy <= ry + 1; dy++) for (let dx = -rx - 1; dx <= rx + 1; dx++) {
+          const q = (dx / rx) ** 2 + (dy / ry) ** 2 + (vnoise((x + dx) * 0.35, (y + dy) * 0.35, seed + 91) - 0.5) * 0.7;
+          if (q > 1) continue;
+          const h = hash2(x + dx, y + dy, seed + 93);
+          if (q > 0.75 && h < 0.5) continue; // okraj sa rozpadá do trávy
+          set(x + dx, y + dy, h < (q > 0.75 ? 0.75 : 0.42) ? heathCols[Math.floor(hash2(x + dx, y + dy, seed + 95) * heathCols.length)] : base[h < 0.8 ? 0 : 1]);
+        }
+      }, 6);
+      scatter(area / 3200, (x, y) => blob(x, y, 2 + Math.floor(rnd() * 2), RAMP.bush, 0.55, RAMP.bush[0]), 6);
       break;
     }
     case 'rocks':

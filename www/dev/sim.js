@@ -49,7 +49,7 @@ window.SIM = (() => {
       s.blds.forEach(b => { if (F.BUILD[b.kind].hp) b.hp = F.bMaxHp(b); }); F.rebuildOcc();
     }
     if (s.king.dead && s.gold >= F.reviveCost()) F.reviveKing();
-    if (s.hallLvl < F.hallCap() && s.gold >= F.hallUpCost() + 60) { s.gold -= F.hallUpCost(); s.hallLvl++; s.hallHp += 200; s.king.hp = F.kingMax(); F.rebuildOcc(); }
+    if (s.hallLvl < F.hallCap() && s.gold >= F.hallUpCost() + 60) { s.gold -= F.hallUpCost(); s.hallLvl++; s.hallHp = F.hallMax(); s.king.hp = F.kingMax(); F.rebuildOcc(); }
     // najprv aspoň 3 veže, až potom hradby
     for (const c of order) { if (count('tower') >= 3) break; if (c !== hc) place('tower', c, towerRow); }
     if (count('tower') >= 3) for (const c of order) place('wall', c, wallRow);
@@ -153,7 +153,7 @@ window.SIM = (() => {
     const k = F.kingMeta;
     k.slots = k.slots || [null, null, null];
     k.slots.forEach((v, i) => { if (!v && k.lvl >= F.KING_SLOT_LVL[i]) k.slots[i] = F.heroDef().powers.find(p => !k.slots.includes(p)); }); // schopnosti nasadeného hrdinu
-    // body na schopnosti (1 za úroveň hrdinu): vždy do nasadenej schopnosti s najnižšou úrovňou
+    // voľné body (1 za úroveň hrdinu): vždy do nasadenej schopnosti s najnižšou úrovňou
     if (SIM.abilPoints !== false) {
       k.sk = k.sk || {};
       const lv = id => k.sk[id] || 1, free = () => k.lvl - 1 - Object.values(k.sk).reduce((a, l) => a + l - 1, 0);

@@ -4928,7 +4928,7 @@
     $('kingLvl').textContent = kingMeta.lvl;
     const hk = $('hud-king'), bld = st.phase === 'build' && !isAssault();
     hk.classList.toggle('tap', bld);
-    hk.classList.toggle('neon', bld && heroTodo()); // nový bonus, voľný slot či body na schopnosti
+    hk.classList.toggle('neon', bld && heroTodo()); // nový bonus, voľný slot či voľné body
     $('xpFill').style.width = (kingMeta.lvl >= KING_MAX_LVL ? 100 : Math.min(100, kingMeta.xp / kingXpNeed(kingMeta.lvl) * 100)) + '%';
   }
 
@@ -5238,11 +5238,11 @@
     }
     $('nextWave').disabled = false;
 
-    // karty radnice: vylepšenie a oživenie padnutého hrdinu (po ťuku na radnicu aj v záložke Radnica)
+    // karty radnice: vylepšenie (radnica je potom celá, s plným zdravím) a oživenie padnutého hrdinu (po ťuku na radnicu aj v záložke Radnica)
     // karta oživenia padnutého hrdinu raz preblikne v každom stavebnom kole
     const reviveAct = () => { const k = st.king; if (k && k.dead) { const c = reviveCost(); flashIf(act(heroIcon(st.hero), 'Oživiť', coinTxt(c), st.gold >= c, reviveKing, 'up'), true, 'revive' + st.mission + '.' + st.wave, () => saveJSON(sk('reviveSeen'), true)); } };
     const hallActs = () => {
-      upAct(st.hallLvl, hallCap(), hallUpCost(), () => { const c = hallUpCost(); st.gold -= c; st.hallLvl++; st.hallHp += 200; st.king.hp = kingMax(); }, null, bPreview({ kind: 'hall', lvl: st.hallLvl + 1 }), 'lvl' + (st.hallLvl + 1));
+      upAct(st.hallLvl, hallCap(), hallUpCost(), () => { const c = hallUpCost(); st.gold -= c; st.hallLvl++; st.hallHp = hallMax(); st.king.hp = kingMax(); }, null, bPreview({ kind: 'hall', lvl: st.hallLvl + 1 }), 'lvl' + (st.hallLvl + 1));
       reviveAct();
     };
     // informačná karta (nedá sa na ňu ťuknúť): obrázok, názov a údaj namiesto ceny
@@ -6492,7 +6492,7 @@
     }
     // schopnosti: tri sloty (odomknú sa na úrovni 2, 5, 9), úroveň schopnosti 1–10 za body
     const free = ptsFree();
-    $('huPts').textContent = 'body na schopnosti: ' + free; // riadok ostáva aj pri 0, nech sa okno neposúva
+    $('huPts').textContent = 'voľné body: ' + free; // riadok ostáva aj pri 0, nech sa okno neposúva
     const sk = $('huSkills'); sk.innerHTML = '';
     m.slots.forEach((sid, i) => {
       const r = document.createElement('div');
