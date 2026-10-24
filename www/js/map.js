@@ -41,9 +41,9 @@ const SEA = ['#08142e', '#0c1e44', '#10285a', '#163a7a', '#1e5096', '#2a6ab0', '
 const SANDSTONE = ['#2a1810', '#422618', '#5c3620', '#784a2a', '#946036', '#ae7a46', '#c6965c', '#dcb47c', '#ecd09e'].map(hexRGB); // hory: stolové skaly z pieskovca
 const SAND = ['#6e5838', '#8a7048', '#a88a5a', '#c4a670', '#dcc08a', '#ecd8a8'].map(hexRGB);
 
-function mapLayout(W, H) {
-  const top = 40, bot = H - 112;
-  const nodes = MAP_NODES.map(([nx, ny]) => ({ x: Math.round(W * (0.1 + nx * 0.8)), y: Math.round(top + ny * (bot - top)) }));
+function mapLayout(W, H, pts, botM) {
+  const top = 40, bot = H - (botM == null ? 112 : botM); // dole miesto na spodné karty mapy (iné územia ho nepotrebujú)
+  const nodes = (pts || MAP_NODES).map(([nx, ny]) => ({ x: Math.round(W * (0.1 + nx * 0.8)), y: Math.round(top + ny * (bot - top)) }));
   return { top, bot, nodes };
 }
 
@@ -73,10 +73,11 @@ function mapPaths(nodes, seed) {
 }
 
 // pad = pás mora nad aj pod ostrovom (body): ostrov je rovnaký, len plátno je vyššie a všetko sa posunie o pad nadol
-function buildIsland(W, H, seed, pad) {
-  pad = pad || 0;
+// opts (iné územia sveta): nodes = rozloženie hradov (0..1, zdola nahor), rx = šírka ostrova (podiel šírky plátna)
+function buildIsland(W, H, seed, pad, opts) {
+  pad = pad || 0; opts = opts || {};
   const CH = H + 2 * pad, at = (x, y) => (y + pad) * W + x; // y je v súradniciach rozloženia (0 = pôvodný vrch)
-  const L = mapLayout(W, H);
+  const L = mapLayout(W, H, opts.nodes, opts.bot);
   const segs = mapPaths(L.nodes, seed);
   const c = document.createElement('canvas'); c.width = W; c.height = CH;
   const cx = c.getContext('2d'), img = cx.createImageData(W, CH), d = img.data;
@@ -110,7 +111,7 @@ function buildIsland(W, H, seed, pad) {
   for (const s of segs) for (let k = 0; k < s.length; k += 2) dist(pathD, s[k].x, s[k].y, 14);
   for (const n of L.nodes) dist(nodeD, n.x, n.y - 5, 16);
 
-  const icx = W / 2, icy = (L.top + L.bot) / 2, rx = W * 0.47, ry = (L.bot - L.top) / 2 + 18;
+  const icx = W / 2, icy = (L.top + L.bot) / 2, rx = W * (opts.rx || 0.47), ry = (L.bot - L.top) / 2 + 18;
   // more: plytčina pri brehu svetlá, ďalej postupne hlbšie, ale nikdy nie čierna; vlnenie z fbm (rovnako aj mimo plátna ostrova)
   const seaRGB = (x, y, depth) => {
     let v = 0.78 - Math.min(1, depth / 0.35) * 0.32 - Math.min(1, depth / 1.2) * 0.12;

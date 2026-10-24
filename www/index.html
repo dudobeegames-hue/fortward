@@ -318,6 +318,10 @@
   .bigStars { font-size: 34px; color: var(--gold); letter-spacing: 4px; text-shadow: 2px 2px 0 var(--ink); }
   .screenOverlay.perksScreen { justify-content: flex-start; background: linear-gradient(#1e1611, #120c09); gap: 10px; overflow-y: auto; z-index: 8; touch-action: pan-y; }
   .perkHead { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+  /* nadpis s počtom voľných hviezd ostáva pri posúvaní navrchu (prilepený k hornému okraju, na pozadí obrazovky) */
+  .perksScreen .perkHead { position: sticky; top: calc(-16px - env(safe-area-inset-top)); z-index: 2; flex-shrink: 0;
+    margin: calc(-16px - env(safe-area-inset-top)) -18px 0; padding: calc(10px + env(safe-area-inset-top)) 18px 8px; width: calc(100% + 36px);
+    background: #1e1611; box-shadow: 0 6px 8px -4px rgba(0,0,0,.6); }
   .perkHead b { font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 24px; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
   .perkNote { margin: 0; font-size: 13px; color: var(--muted); }
   #perkList { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
@@ -553,10 +557,14 @@
   #missionBox[hidden] { display: none; }
   #mapSide { position: absolute; left: 12px; bottom: calc(128px + env(safe-area-inset-bottom)); z-index: 8; display: flex; flex-direction: column; gap: 8px; }
   #mapSide .mapIc.locked img { filter: grayscale(1); opacity: .55; }
+  /* mapa sveta: zemeguľa (obrys), zapnutá = zlatý rám */
+  #worldBtn svg { width: 28px; height: 28px; fill: none; stroke: #e8d4a8; stroke-width: 1.8; stroke-linecap: round; filter: drop-shadow(1px 1px 0 var(--ink)); }
+  #worldBtn.on { border-color: var(--gold); }
+  #worldBtn.on svg { stroke: var(--gold); }
+  #mapTitle { flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; font-size: 17px; }
   .trophy.record { grid-column: 1 / -1; }
   .mCastle { display: block; width: 100%; max-height: 42vh; object-fit: cover; object-position: top; image-rendering: pixelated; border: 2px solid var(--ink); border-radius: 6px; margin: 6px 0; }
   .mCastle[hidden] { display: none; }
-  #mapPlay.poor { filter: grayscale(1); opacity: .6; } /* málo zlatiek v truhlici na útok */
   #mMeta img.chest { width: 14px; height: 14px; vertical-align: -2px; }
   #mapPanel {
     width: 100%; max-width: 380px; box-sizing: border-box;
@@ -918,6 +926,7 @@
   <div id="map" hidden>
     <div class="mapHead">
       <button id="mapHome" class="mapIc" title="Menu" aria-label="Menu"><img id="icoHome" alt=""></button>
+      <b id="mapTitle"></b>
       <div id="chestBox" class="pill" title="Truhlica"><img class="chest" alt=""><span>0</span></div>
     </div>
     <!-- spodný riadok kariet: Boj (mapa), Sieň, Hrdinovia, Trofeje; zvolená karta je povysunutá -->
@@ -930,6 +939,7 @@
     </div>
     <!-- vľavo dole: prepínač vzhľadu mapy a nekonečná obrana -->
     <div id="mapSide">
+      <button id="worldBtn" class="mapIc" title="Mapa sveta" aria-label="Mapa sveta" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M11.5 3a17 17 0 0 0 0 18"/><path d="M12.5 3a17 17 0 0 1 0 18"/></svg></button>
       <button id="mapStyleBtn" class="mapIc" title="Vzhľad mapy" aria-label="Vzhľad mapy"><img id="icoMapStyle" alt=""></button>
       <button id="endlessBtn" class="mapIc" title="Nekonečná obrana" aria-label="Nekonečná obrana"><img id="icoEndless" alt=""></button>
     </div>
@@ -1025,7 +1035,7 @@
 <script>
   // hra sa načíta až po vykreslení úvodnej obrazovky (inak by ťažké skripty zdržali jej prvé zobrazenie)
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    const list = ['audio', 'sprites', 'orcs8', 'scene', 'buildings', 'siege', 'map', 'camp', 'castles', 'icons', 'game'];
+    const list = ['audio', 'sprites', 'orcs8', 'scene', 'buildings', 'siege', 'map', 'camp', 'castles', 'world', 'icons', 'game'];
     list.forEach((n, i) => {
       const s = document.createElement('script'); s.src = 'js/' + n + '.js?v=__BUILD__'; s.async = false; // verziu doplní nasadenie, mobil tak nevezme starý skript z pamäte
       document.body.appendChild(s);
