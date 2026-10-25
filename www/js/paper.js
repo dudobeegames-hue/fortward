@@ -201,7 +201,7 @@ const PAPER = (() => {
       if (bio === 'ice') t = e > 0.54 ? 4 : 8; // ľad: stolové ľadové hory; popol a úľ sú bez hôr
       else if (beach && bio !== 'hive') t = 1;
       else if (bio === 'grass') t = e > 0.74 ? (e > 0.86 ? 5 : 4) : fo > 0.6 ? 3 : 2;
-      else if (bio === 'tundra') t = e > 0.7 ? (e > 0.8 ? 5 : 4) : fo > 0.52 ? 9 : 2;
+      else if (bio === 'tundra') t = fo > 0.52 ? 9 : 2; // neutrálne zeme: bez hôr, len ihličnaté lesy
       else if (bio === 'jungle') t = fo < 0.3 ? 2 : 7; // prales bez hôr
       else if (bio === 'forest') t = e > 0.76 ? 4 : fo < 0.32 ? 2 : 3;
       else if (bio === 'desert') t = e > 0.61 ? 4 : 6; // púšť: stolové hory z pieskovca

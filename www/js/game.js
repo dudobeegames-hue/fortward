@@ -4744,6 +4744,16 @@
       prov[y * w + x] = node[pj]; if (y < landTop) landTop = y; if (y > landBot) landBot = y;
     }
     const nodes = order.map(j => ({ x: geom.provs[j].x - PPX, y: geom.provs[j].y - PPY + 4 }));
+    // hrady tesne nad sebou (hrad by zakryl hviezdičky toho nad ním) sa rozostúpia do strán – len ak ostanú na súši
+    const onLand = (x, y) => [-8, 0, 8].every(d => { const px = Math.round(x + d), py = Math.round(y - 4); return px >= 0 && px < w && py >= 0 && py < h && prov[py * w + px] !== 255; });
+    for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j], dx = b.x - a.x;
+      if (Math.abs(b.y - a.y) >= 34 || Math.abs(dx) >= 24) continue;
+      const half = (24 - Math.abs(dx)) / 2, sg = dx >= 0 ? 1 : -1;
+      if (onLand(a.x - sg * half, a.y) && onLand(b.x + sg * half, b.y)) { a.x -= sg * half; b.x += sg * half; }
+      else if (onLand(b.x + sg * half * 2, b.y)) b.x += sg * half * 2;
+      else if (onLand(a.x - sg * half * 2, a.y)) a.x -= sg * half * 2;
+    }
     return { seaMap: true, builtH: H, // námornícke územie (island.paper je obrázok námorníckej mapy domovského ostrova); builtH = výška obrazovky pri výrobe
       land: l, w, h, geom, order, node, prov, nodes, segs: [], landTop, landBot, foam: [], waves: [], fires: nodes.map(() => []),
       bg: { height: h }, fort: makeOrcFort(), castle: makeMiniCastle(false) };
@@ -4780,7 +4790,12 @@
     edgeImg = c; edgeKey = key;
     return c;
   }
-  const drawPaperEdges = () => { const hv = Math.max(60, Math.round(H - $('mapBar').offsetHeight * DPR / S)); g.drawImage(paperEdges(hv), 0, Math.round(camY)); };
+  // mapy území: okraje stoja na obrazovke (mapa sa pod nimi posúva); mapa sveta je celá jeden papier – okraje idú s ňou
+  const drawPaperEdges = world => {
+    const hv = Math.max(60, Math.round(H - $('mapBar').offsetHeight * DPR / S));
+    if (world) g.drawImage(paperEdges(Math.max(hv, WORLD_H + 8)), 0, 0);
+    else g.drawImage(paperEdges(hv), 0, Math.round(camY));
+  };
   const PAPER_BG = 'rgb(' + PR.sea[5].join(',') + ')';
   let mapRose = null; // kompas (obrázok v plnom rozlíšení cez present)
   function renderPaperLand(time) {
@@ -4850,7 +4865,7 @@
     const ringL = st.sail ? landById(st.sail.to) : landReached(next) ? next : null; // územie na rade (počas plavby to, kam sa pláva)
     if (ringL) drawWorldRing(ringL, time);
     g.restore();
-    drawPaperEdges();
+    drawPaperEdges(true);
     worldLbls = lbl;
     if (img.rose) mapRose = { x: ox - PPX + img.rose[0], y: img.rose[1] - PPY };
   }
