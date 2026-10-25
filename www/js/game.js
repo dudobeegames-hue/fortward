@@ -5647,6 +5647,7 @@
         if (k) infoCard(heroIcon(st.hero), heroName() + ' ' + kingMeta.lvl, k.dead ? (heroDef().fem ? 'padla' : 'padol') : '♥ ' + Math.ceil(k.hp) + '/' + Math.round(kingMax()));
       }
       const order = isOrc() ? ORC_ORDER : BUILD_ORDER; // za orkov kotol ako druhá veža
+      let newCard = null; // novo odomknutá stavba, ktorá práve prvý raz bliká – karty sa k nej posunú
       for (const kind of order.filter(k => tab.kinds.includes(k) && (!BUILD[k].orc || isOrc()) && (!BUILD[k].human || !isOrc()))) {
         const d = BUILD[kind];
         const b = document.createElement('button');
@@ -5666,6 +5667,7 @@
         b.innerHTML = '<span class="pin">' +
           '<span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost">' + costHtml + '</span></span>' +
           '<span class="face back"><b>' + d.name + '</b><small>' + d.desc + '.' + tip + '</small></span></span>';
+        if (!newCard && isNew(kind) && !flashedNew.has(kind)) newCard = b;
         flashIf(b, isNew(kind), kind, () => markSeen(kind));
         b.addEventListener('pointerdown', ev => { if (st.phase === 'build' && !bldFull(kind)) cardPress = { kind, x: ev.clientX, y: ev.clientY }; });
         b.addEventListener('click', () => {
@@ -5681,6 +5683,10 @@
         });
         pal.appendChild(b);
       }
+      if (newCard) requestAnimationFrame(() => {
+        const pr = pal.getBoundingClientRect(), cr = newCard.getBoundingClientRect();
+        pal.scrollBy({ left: cr.left + cr.width / 2 - (pr.left + pr.width / 2), behavior: 'smooth' });
+      });
       if (tab.id === 'siege') for (const key in BUY) { // obliehacie stroje: vyrazia so začiatkom vlny
         const u = BUY[key], icon = ICONS['u_' + u.siege];
         if (!st.tech.has(u.siege)) { lockAct(icon, u.name, unlockMissionOf(u.siege), true); continue; }
