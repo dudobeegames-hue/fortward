@@ -4907,7 +4907,6 @@
     $('worldBtn').hidden = false; // mapa sveta je prístupná od začiatku
     $('worldBtn').classList.toggle('on', !!st.world);
     $('mapStyleBtn').hidden = !!st.world;
-    $('endlessBtn').hidden = !!st.world;
     $('mapTitle').textContent = st.world ? 'Svet · dobyté ' + worldPct() + ' %' : curLand().name;
   }
 
@@ -6351,7 +6350,7 @@
     $('map').hidden = false;
     const cl = curLand(); if (!st.mapAnim) st.mapSel = Math.max(cl.first, Math.min(st.unlocked, landLast(cl)));
     setTab('map', true);
-    renderMapPanel(); updateChest(); renderEndlessBtn();
+    renderMapPanel(); updateChest(); renderMapStyleBtn();
     focusMapNode(st.mapAnim ? st.mapAnim.seg + 2 : st.mapSel, true);
     if (st.sailTo) { const to = st.sailTo; st.sailTo = null; setTimeout(() => { if (st.phase === 'map') startSail(to); }, st.provAnim ? 2100 : 300); } // územie dobyté: plavba k ďalšiemu
     updateMapUi();
@@ -6558,7 +6557,7 @@
   $('heroPick').addEventListener('click', ev => { if (ev.target === $('heroPick')) $('heroPick').hidden = true; });
   $('skillPick').addEventListener('click', ev => { if (ev.target === $('skillPick')) $('skillPick').hidden = true; });
 
-  // ---- Trofeje ----
+  // ---- Trofeje (na začiatku nekonečná obrana: rekord pozície a po dobytí hradu ostrova tlačidlo Hrať) ----
   function renderTrophies() {
     const list = $('trophyList'); list.innerHTML = '';
     { // nekonečná obrana: rekord prežitých vĺn tejto pozície
@@ -6566,6 +6565,11 @@
       c.className = 'trophy record' + (best ? ' got' : '');
       c.innerHTML = '<span class="pic"><img src="' + UI_ICONS.endless + '" alt=""></span><b>Nekonečná obrana</b><small>' +
         (!open ? 'Odomkne sa po dobytí hradu ostrova' : best ? 'Rekord: <b>' + best + '</b> ' + (best === 1 ? 'vlna' : best < 5 ? 'vlny' : 'vĺn') : 'Zatiaľ bez rekordu – koľko vĺn vydržíš?') + '</small>';
+      if (open) {
+        const b = document.createElement('button'); b.className = 'primary'; b.textContent = 'Hrať';
+        b.addEventListener('click', () => { AUDIO.play('click'); afterPress(b, () => { setTab('map', true); startEndless(); }); });
+        c.appendChild(b);
+      }
       list.appendChild(c);
     }
     for (const a of ACH) {
@@ -6792,21 +6796,15 @@
 
   $('overMap').addEventListener('click', showMap);
   $('overRetry').addEventListener('click', () => startMission(st.mission, st.tier, st.endless));
-  // tlačidlo nekonečnej obrany na mape: po dobytí hradu, s rekordom pozície
-  function renderEndlessBtn() {
-    $('endlessBtn').classList.toggle('locked', !endlessOpen());
+  // ikonka vzhľadu mapy
+  function renderMapStyleBtn() {
     $('icoMapStyle').src = mapStyle === 'paper' ? UI_ICONS.mapPaperOn : UI_ICONS.mapPaper; // zapnutá námornícka mapa: zelená ikonka
   }
-  $('icoEndless').src = UI_ICONS.endless; $('icoMapStyle').src = UI_ICONS.mapPaper;
+  $('icoMapStyle').src = UI_ICONS.mapPaper;
   $('worldBtn').addEventListener('click', () => { AUDIO.play('click'); if (st.world) { if (!st.sail) enterLand(st.land); } else openWorld(); });
   $('mapStyleBtn').addEventListener('click', () => { // pohyblivá farebná mapa ↔ papierová námornícka mapa
     mapStyle = mapStyle === 'paper' ? 'live' : 'paper';
-    AUDIO.play('click'); renderEndlessBtn();
-  });
-  $('endlessBtn').addEventListener('click', () => {
-    if (st.mapAnim) return;
-    if (!endlessOpen()) { AUDIO.play('deny'); toast('Nekonečná obrana sa odomkne po dobytí hradu ostrova'); return; }
-    AUDIO.play('click'); afterPress($('endlessBtn'), startEndless);
+    AUDIO.play('click'); renderMapStyleBtn();
   });
   $('mapPlay').addEventListener('click', () => {
     if (!st.mapAnim && tierOpen(st.mapSel, st.mapTier || 0)) { AUDIO.play('click'); afterPress($('mapPlay'), () => startMission(st.mapSel, st.mapTier || 0)); } });

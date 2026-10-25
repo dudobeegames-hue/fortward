@@ -562,6 +562,7 @@
   #worldBtn.on svg { stroke: var(--gold); }
   #mapTitle { flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; font-size: 17px; }
   .trophy.record { grid-column: 1 / -1; }
+  .trophy.record .primary { margin-top: 4px; padding: 6px 22px; }
   .mCastle { display: block; width: 100%; max-height: 42vh; object-fit: cover; object-position: top; image-rendering: pixelated; border: 2px solid var(--ink); border-radius: 6px; margin: 6px 0; }
   .mCastle[hidden] { display: none; }
   #mMeta img.chest { width: 14px; height: 14px; vertical-align: -2px; }
@@ -936,11 +937,10 @@
       <button class="tabCard" data-tab="trophies" title="Trofeje"><img id="icoTrophy" alt="Trofeje"><em id="trophyTxt" class="badge" hidden>0</em></button>
       <button class="tabCard shop shine" data-tab="shop" title="Nákupy"><img id="icoShop" alt="Nákupy"></button>
     </div>
-    <!-- vľavo dole: prepínač vzhľadu mapy a nekonečná obrana -->
+    <!-- vľavo dole: prepínač vzhľadu mapy a pod ním mapa sveta (stĺpec je ukotvený zdola – zemeguľa ostáva na mieste aj na mape sveta) -->
     <div id="mapSide">
-      <button id="worldBtn" class="mapIc" title="Mapa sveta" aria-label="Mapa sveta" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M11.5 3a17 17 0 0 0 0 18"/><path d="M12.5 3a17 17 0 0 1 0 18"/></svg></button>
       <button id="mapStyleBtn" class="mapIc" title="Vzhľad mapy" aria-label="Vzhľad mapy"><img id="icoMapStyle" alt=""></button>
-      <button id="endlessBtn" class="mapIc" title="Nekonečná obrana" aria-label="Nekonečná obrana"><img id="icoEndless" alt=""></button>
+      <button id="worldBtn" class="mapIc" title="Mapa sveta" aria-label="Mapa sveta" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M11.5 3a17 17 0 0 0 0 18"/><path d="M12.5 3a17 17 0 0 1 0 18"/></svg></button>
     </div>
     <!-- okno misie: zjaví sa až po ťuknutí na hrad -->
     <div id="missionBox" class="screenOverlay" hidden>
