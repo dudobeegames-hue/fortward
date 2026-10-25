@@ -715,7 +715,8 @@ function makeOrcKeep(lvl) {
   const W = lvl === 1 ? ORC_WOOD_LIGHT : ORC_WOOD, Y = y => y + o;
   const stoneFrom = lvl >= 4 ? 4 : lvl === 3 ? 30 : 99; // od ktorého riadku je veža kamenná
   // bočné opevnenie: na úr. 5 kamenný múr s cimburím a železnými hrotmi, inak hrubé zvislé koly (hroty: drevo, kosť, od úr. 4 železo)
-  if (lvl >= 5) for (let x = 1; x <= 54; x++) {
+  // opevnenie len na šírku radnice (3 políčka = x 4–51), aby neprekrývalo susedné stavby
+  if (lvl >= 5) for (let x = 5; x <= 50; x++) {
     const merlon = Math.floor((x - 1) / 3) % 2 === 0, top = merlon ? 13 : 16;
     if (merlon && (x - 1) % 3 === 1) p.set(x, Y(12), RIVET);                    // železný hrot na zube
     for (let y = top; y <= 49; y++) {
@@ -728,7 +729,7 @@ function makeOrcKeep(lvl) {
       p.shade(x, Y(y), STONE_DARK, v);
     }
   }
-  else for (let x = 1; x <= 54; x++) {
+  else for (let x = 5; x <= 50; x++) {
     const lx = (x - 1) % 3, top = (lvl === 1 ? 24 : 16) + ((Math.floor((x - 1) / 3) * 5) % 2), tip = lx === 1 ? top - 2 : top;
     for (let y = tip; y <= 49; y++) {
       let v = [0.8, 0.6, 0.32][lx] - (y - top) * 0.004;
@@ -796,8 +797,8 @@ function makeOrcKeep(lvl) {
     if (y === end && (x - bx) % 2 === 1) continue;
     p.set(x, Y(y), x === bx ? BLOOD2 : (y === 25 && x > bx + 1 && x < bx + 4) ? hexRGB('#1c140e') : BLOOD);
   }
-  if (lvl >= 4) for (const bx of [2, 51]) { // žeravníky na kôloch pri krajoch
-    for (let y = 14; y <= 22; y++) p.shade(bx + 1, Y(y), W, 0.5);
+  if (lvl >= 4) for (const bx of [5, 48]) { // žeravníky na kôloch pri krajoch
+    for (let y = 14; y <= 20; y++) p.shade(bx + 1, Y(y), W, 0.5); // kôl končí nad zástavou
     for (let x = bx; x <= bx + 2; x++) { p.set(x, Y(13), IRON); p.set(x, Y(12), x === bx + 1 ? hexRGB('#fff070') : EMBER); }
     p.set(bx + 1, Y(11), EMBER);
   }
