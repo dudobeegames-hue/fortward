@@ -1,39 +1,48 @@
 'use strict';
 // Fortward – svet: domovský ostrov a ďalšie územia, všetko na jednej námorníckej (papierovej) mape sveta.
-// Misie majú jedno spoločné poradie: 1–10 domovský ostrov, 11–17 severské ostrovy, 18–43 dlhý ostrov (púšť, potom lesy),
-// 44–57 severná krajina, 58–72 popolavý ostrov, 73–76 ostrov roja – postup (st.unlocked), hviezdy aj obtiažnosť pokračujú.
+// Misie majú jedno spoločné poradie: 1–10 domovský ostrov, 11–17 severské ostrovy, 18–27 piesočný ostrov, 28–53 pralesný ostrov
+// (aj s ostrovčekom), 54–67 severná krajina, 68–82 popolavý ostrov, 83–86 ostrov roja – postup (st.unlocked), hviezdy aj obtiažnosť pokračujú.
 
-const WORLD_W = 190, WORLD_H = 400, WORLD_SEED = 7;
+const WORLD_W = 190, WORLD_H = 360, WORLD_SEED = 7; // výška mapy sveta (pod popolavým ostrovom a ostrovom roja len pás mora)
 // obrysy území z náčrtov hráča (prevedené do mapy sveta 190 × 400)
 const WSK = (() => {
-  const X = 190 / 312, Y = 0.64, f = p => p.map(([x, y]) => [x * X, 26 + y * Y]), s2 = p => p.map(([x, y]) => [x / 1.826, y / 1.826]);
+  const X = 190 / 312, Y = 0.64, f = p => p.map(([x, y]) => [x * X, 26 + y * Y]), s2 = (p, dy) => p.map(([x, y]) => [x / 1.826, y / 1.826 + (dy || 0)]);
+  const mv = (p, dx, dy) => p.map(([x, y]) => [x + dx, y + dy]);
+  const UP = -40; // domovský ostrov, tri ostrovy a popolavý ostrov bližšie k dlhému ostrovu (menšie prázdne more)
   return {
-    home:  f([[24, 274], [52, 274], [60, 300], [79, 303], [79, 336], [64, 342], [60, 380], [48, 390], [18, 390], [12, 360], [8, 320], [9, 292], [22, 286]]),
-    isA:   f([[116, 346], [134, 346], [134, 372], [118, 372], [116, 364], [107, 362], [107, 355], [116, 354]]),
-    isB:   f([[152, 337], [179, 337], [179, 355], [152, 355]]),
-    isC:   f([[143, 364], [170, 364], [170, 373], [179, 373], [179, 391], [143, 391]]),
-    grey:  f([[134, 427], [188, 427], [188, 445], [161, 445], [161, 463], [152, 463], [152, 481], [197, 481], [206, 490], [206, 517], [188, 517], [188, 525], [161, 525], [161, 517], [89, 517], [89, 507], [26, 507], [17, 495], [26, 481], [35, 472], [62, 472], [62, 463], [89, 463], [89, 445], [98, 445], [98, 436], [107, 436], [125, 436]]),
+    // domovský ostrov sa na mape sveta kreslí z jeho vlastnej mapy (maska v hre); tento obrys je len náhradný
+    home:  mv(f([[24, 274], [52, 274], [60, 300], [79, 303], [79, 336], [64, 342], [60, 380], [48, 390], [18, 390], [12, 360], [8, 320], [9, 292], [22, 286]]), 0, UP),
+    isA:   mv(f([[116, 346], [134, 346], [134, 372], [118, 372], [116, 364], [107, 362], [107, 355], [116, 354]]), 0, UP),
+    isB:   mv(f([[152, 337], [179, 337], [179, 355], [152, 355]]), 0, UP),
+    isC:   mv(f([[143, 364], [170, 364], [170, 373], [179, 373], [179, 391], [143, 391]]), 0, UP),
+    grey:  mv(f([[134, 427], [188, 427], [188, 445], [161, 445], [161, 463], [152, 463], [152, 481], [197, 481], [206, 490], [206, 517], [188, 517], [188, 525], [161, 525], [161, 517], [89, 517], [89, 507], [26, 507], [17, 495], [26, 481], [35, 472], [62, 472], [62, 463], [89, 463], [89, 445], [98, 445], [98, 436], [107, 436], [125, 436]]), 0, UP),
     red:   [[268, 413, 11], [281, 425, 11], [262, 431, 9], [284, 439, 10]].map(([x, y, r]) => [x * X, 26 + y * Y, r * Math.sqrt(X * Y)]),
+    // piesočný ostrov: pôvodný obrys domovského ostrova z náčrtu, presunutý napravo od troch ostrovov
+    dune:  mv(f([[24, 274], [52, 274], [60, 300], [79, 303], [79, 336], [64, 342], [60, 380], [48, 390], [18, 390], [12, 360], [8, 320], [9, 292], [22, 286]]), 131, -28),
     redRaw: [[268, 413, 11], [281, 425, 11], [262, 431, 9], [284, 439, 10]],
-    long:  s2([[20, 230], [70, 226], [130, 236], [180, 252], [215, 265], [250, 282], [285, 298], [305, 322], [292, 348], [240, 346], [180, 333], [125, 322], [90, 305], [55, 294], [28, 280], [18, 255]]),
-    north: s2([[172, 145], [200, 132], [240, 128], [285, 140], [292, 165], [275, 180], [245, 185], [215, 195], [185, 190], [168, 170]]),
-    northS: [[276 / 1.826, 210 / 1.826, 17 / 1.826]],
+    // pralesný ostrov podľa náčrtu hráča (súradnice mapy sveta) a malý ostrovček pod ním
+    long:  [[16.7, 86.3], [34.1, 83.9], [54, 80.3], [66.5, 83.9], [70.2, 95.8], [86.4, 100.6], [100, 106.1], [116.2, 111.3], [138.6, 120.4], [152.3, 125.7], [149.8, 138.8], [133.6, 142.4],
+            [123.7, 149.5], [116.2, 161.5], [106.3, 168.6], [96.3, 167.4], [91.3, 156.7], [90.1, 147.1], [81.4, 142.4], [64, 141.2], [55.3, 135.2], [47.8, 119.7], [34.1, 116.1], [18, 112.5], [14.7, 101.8]],
+    longS: [[72.7, 158.6, 6.8]],
+    north: s2([[172, 145], [200, 132], [240, 128], [285, 140], [292, 165], [275, 180], [245, 185], [215, 195], [185, 190], [168, 170]], -25),
+    northS: [[276 / 1.826, 210 / 1.826 - 25, 17 / 1.826]],
   };
 })();
 // mapa sveta: súš, provincie a krajina každého územia (rampy farieb rás sú v paper.js)
 function worldSpec() {
   const homeZones = (x, y, b) => (y - b.y0) / (b.y1 - b.y0) + (fbm(x * 0.05, y * 0.05, 503) - 0.5) * 0.1 > 0.5 ? 0 : 1;
-  const longZones = (x, y) => ((x - 11) * 0.937 + (y - 125) * 0.349) / 165 + (fbm(x * 0.04, y * 0.04, 505) - 0.5) * 0.16 < 0.48 ? 0 : 1;
   return { W: WORLD_W, H: WORLD_H, seed: WORLD_SEED, lands: [
     { shape: { poly: WSK.home }, amp: 4, freq: 0.1, zones: [{ n: 5, race: 'human', biome: 'grass' }, { n: 5, race: 'orc', biome: 'grass' }], zoneAt: homeZones, jitter: 3 },
     { shape: { poly: WSK.isA }, amp: 3, freq: 0.18, zones: [{ n: 2, race: 'nordic', biome: 'tundra' }], jitter: 2 },
     { shape: { poly: WSK.isB }, amp: 3, freq: 0.18, zones: [{ n: 2, race: 'nordic', biome: 'tundra' }], jitter: 2 },
     { shape: { poly: WSK.isC }, amp: 3, freq: 0.18, zones: [{ n: 3, race: 'nordic', biome: 'tundra' }], jitter: 2 },
-    { shape: { poly: WSK.long }, amp: 4, freq: 0.08, zones: [{ n: 14, race: 'elf', biome: 'forest' }, { n: 12, race: 'desert', biome: 'desert' }], zoneAt: longZones, jitter: 3 },
+    { shape: { poly: WSK.long }, amp: 4, freq: 0.08, zones: [{ n: 24, race: 'elf', biome: 'jungle' }], jitter: 3 },
     { shape: { poly: WSK.north }, amp: 3.5, freq: 0.09, zones: [{ n: 10, race: 'polar', biome: 'ice' }], jitter: 3 },
     { shape: { circles: WSK.northS }, amp: 2.5, freq: 0.16, zones: [{ n: 4, race: 'polar', biome: 'ice' }], jitter: 2 },
     { shape: { poly: WSK.grey }, amp: 5, freq: 0.09, zones: [{ n: 15, race: 'undead', biome: 'ash' }], jitter: 3 },
     { shape: { circles: WSK.red }, amp: 2.5, freq: 0.15, zones: [{ n: 4, race: 'swarm', biome: 'hive' }], jitter: 2 },
+    { shape: { poly: WSK.dune }, amp: 4, freq: 0.1, zones: [{ n: 10, race: 'desert', biome: 'desert' }], jitter: 3 },
+    { shape: { circles: WSK.longS }, amp: 2.5, freq: 0.16, zones: [{ n: 2, race: 'elf', biome: 'jungle' }], jitter: 2 },
   ] };
 }
 
@@ -44,17 +53,18 @@ const LANDS = [
   { id: 'home',  name: 'Domovský ostrov', first: 1, count: 10, home: true, wl: [0] },
   { id: 'isles', name: 'Severské ostrovy', first: 11, count: 7, wl: [1, 2, 3], view: { s: 3.3 }, groups: [[[1, 0], [2, 0], [3, 0]]],
     reward: { id: 'gold', txt: '+5 % zlata za vlny a nepriateľov' } },
-  { id: 'long',  name: 'Dlhý ostrov', first: 18, count: 26, wl: [4], view: { s: 2.25, w: 380 }, groups: [[[4, 1]], [[4, 0]]], // najprv púšť, potom lesy
+  { id: 'dune',  name: 'Piesočný ostrov', first: 18, count: 10, wl: [9], view: { s: 3.4 }, groups: [[[9, 0]]] },
+  { id: 'long',  name: 'Pralesný ostrov', first: 28, count: 26, wl: [4, 10], view: { s: 2.5, w: 380 }, groups: [[[4, 0], [10, 0]]],
     reward: { id: 'walls', txt: 'hradby o 10 % lacnejšie' } },
-  { id: 'north', name: 'Severná krajina', first: 44, count: 14, wl: [5, 6], view: { s: 3, w: 260 }, groups: [[[5, 0]], [[6, 0]]],
+  { id: 'north', name: 'Severná krajina', first: 54, count: 14, wl: [5, 6], view: { s: 3, w: 260 }, groups: [[[5, 0]], [[6, 0]]],
     reward: { id: 'point', txt: '+1 voľný bod každému hrdinovi' } },
-  { id: 'ash',   name: 'Popolavý ostrov', first: 58, count: 15, wl: [7], view: { s: 2.3, w: 300 }, groups: [[[7, 0]]] },
+  { id: 'ash',   name: 'Popolavý ostrov', first: 68, count: 15, wl: [7], view: { s: 2.3, w: 300 }, groups: [[[7, 0]]] },
   // ostrov roja má vlastnú (schválenú) mapu: väčšie kopce, než by dal výrez mapy sveta
-  { id: 'swarm', name: 'Ostrov roja', first: 73, count: 4, wl: [8], own: { seed: 41, circles: WSK.redRaw.map(([x, y, r]) => [-886 + x * 3.6, -1342 + y * 3.6, r * 3.6]), amp: 6 } },
+  { id: 'swarm', name: 'Ostrov roja', first: 83, count: 4, wl: [8], own: { seed: 41, circles: WSK.redRaw.map(([x, y, r]) => [-886 + x * 3.6, -1342 + y * 3.6, r * 3.6]), amp: 6 } },
 ];
 const MAX_MISSION = LANDS[LANDS.length - 1].first + LANDS[LANDS.length - 1].count - 1; // posledná misia sveta
 // plavebné trasy (poradie území)
-const SEA_ROUTES = [['home', 'isles'], ['isles', 'long'], ['long', 'north'], ['north', 'ash'], ['ash', 'swarm']];
+const SEA_ROUTES = [['home', 'isles'], ['isles', 'dune'], ['dune', 'long'], ['long', 'north'], ['north', 'ash'], ['ash', 'swarm']];
 
 // misie mimo domovského ostrova: theme = krajina bojiska (index do THEMES v scene.js), castle = rozloženie tábora z editora hradov
 // (zatiaľ požičané z misií domovského ostrova), giants = obri v poslednej vlne, posledná misia územia = útok na hrad
@@ -62,10 +72,14 @@ const WORLD_MISSIONS = (() => {
   const L = [
     { names: ['Tulenia pláž', 'Skalný maják', 'Brezový breh', 'Ľadový brod', 'Havranie hniezdo', 'Mlynský záliv', 'Jarlova sieň'], themes: [0, 4, 2, 3, 6, 1], last: 9,
       desc: ['Nájazdníci sa vylodili medzi tuleňmi. Zhoď ich späť do mora.', 'Maják na útese varuje lode. Neber ho nepriateľovi z rúk.', 'Na brehu fjordu sa zhromažďujú nájazdníci.', 'Cez plytčinu sa valia ťažké posily.', 'Strážne veže na skalách vidia celé súostrovie.', 'Mlyny živia jarlovo vojsko. Odrež ho od zásob.', 'Rozhodujúci útok na sieň jarla. Postav vojsko zo zlatiek v truhlici.'] },
-    { names: ['Spálené duny', 'Studňa v piesku', 'Karavánna cesta', 'Zlatý kaňon', 'Oáza paliem', 'Slaná pláň', 'Piesočná búrka', 'Hrobky kráľov', 'Skalné mesto', 'Suchý prameň', 'Brána púšte', 'Okraj púšte',
-             'Okraj lesa', 'Lesná čistina', 'Dubový háj', 'Machový brod', 'Tichý potok', 'Stará píla', 'Hlboký les', 'Hubárska lúka', 'Medvedí brloh', 'Lesný chrám', 'Korene sveta', 'Strážny strom', 'Elfí most', 'Srdce lesa'],
-      themes: [12, 12, 4, 12, 12, 7, 12, 12, 4, 12, 7, 12, 13, 2, 13, 1, 13, 6, 13, 10, 13, 2, 13, 5, 13], last: 13, split: 12, // 12 misií púšte, potom lesy
-      desc: ['Púštni bojovníci strážia studne a karavánne cesty. Bez vody neprežiješ.', 'V lesoch dlhého ostrova sa skrývajú lukostrelci. Postupuj opatrne.', 'Rozhodujúci útok na srdce lesa. Postav vojsko zo zlatiek v truhlici.'] },
+    { names: ['Horúci breh', 'Zlatý piesok', 'Studňa nomádov', 'Kamenná oáza', 'Duna vetrov', 'Šakalí kaňon', 'Soľné jazero', 'Púštna veža', 'Sultánova cesta', 'Palác v piesku'],
+      themes: [12, 12, 4, 12, 7, 12, 12, 4, 12], last: 12,
+      desc: ['Piesočný ostrov strážia púštni bojovníci. Ubráň sa v horúcich dunách.', 'Rozhodujúci útok na palác v piesku. Postav vojsko zo zlatiek v truhlici.'] },
+    { names: ['Okraj pralesa', 'Lianový most', 'Papraďová roklina', 'Opičí brod', 'Tichý potok', 'Kmeň obrov', 'Hmlistá čistina', 'Orchideové jazierko', 'Stará svätyňa', 'Hadia cesta',
+             'Machový kaňon', 'Vodopád', 'Korene sveta', 'Zelené šero', 'Elfí most', 'Strážny strom', 'Zarastený chrám', 'Bažina žiab', 'Medvedí brloh', 'Hniezdo dravcov',
+             'Malý ostrov', 'Pobrežie paliem', 'Rozľahlé koruny', 'Lesná citadela', 'Srdce pralesa', 'Kráľovský strom'],
+      themes: [13, 13, 2, 13, 1, 13, 5, 13, 7, 13, 6, 1, 13, 13, 10, 2, 7, 5, 13, 13, 0, 13, 13, 7, 13], last: 13,
+      desc: ['V pralese sa skrývajú elfskí lukostrelci a za každým kmeňom môže čakať záloha. Postupuj opatrne.', 'Rozhodujúci útok na kráľovský strom. Postav vojsko zo zlatiek v truhlici.'] },
     { names: ['Zamrznutý záliv', 'Snežné pole', 'Ľadové jaskyne', 'Biela pustatina', 'Mrazivý priesmyk', 'Polárna noc', 'Ľadovcová stena', 'Tulenia kolónia', 'Severná žiara', 'Ľadový hrad',
              'Malý ostrov', 'Mrazivý maják', 'Snehová skala', 'Pevnosť na ľade'], themes: [11, 11, 3, 11, 0, 11, 11, 7, 11, 11, 0, 11, 11], last: 11,
       desc: ['Mráz a sneh sú tu spojencami nepriateľa. Ubráň sa v ľadovej pustatine.', 'Rozhodujúci útok na pevnosť na ľade. Postav vojsko zo zlatiek v truhlici.'] },

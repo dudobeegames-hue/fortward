@@ -4514,14 +4514,14 @@
     // veterná ružica s kurzovými čiarami na voľnom mori (najďalej od UI a ostrova)
     const seaBox = (cx, cy, r) => { for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) { if (x < 0 || y < 0 || x >= MW || y >= MH) return false; const i = y * MW + x; if (!sea(i) || sd[i] < 3 || uiBand(x, y)) return false; } return true; };
     let rose = null; // veterná ružica dole napravo od ostrova (kompas z obrázka dokreslí present v plnom rozlíšení)
-    for (let y = Math.round(yb) - 34; y > MH * 0.45 && !rose; y -= 2) for (let x = MW - 22; x > MW * 0.5 && !rose; x -= 2) if (seaBox(x, y, 17)) rose = [x, y];
-    if (!rose) for (let y = 20; y < MH - 20 && !rose; y += 2) for (let x = 20; x < MW - 20 && !rose; x += 2) if (seaBox(x, y, 15)) rose = [x, y];
+    for (let y = Math.round(yb) - 34; y > MH * 0.45 && !rose; y -= 2) for (let x = MW - 22; x > MW * 0.5 && !rose; x -= 2) if (seaBox(x, y, 12)) rose = [x, y];
+    if (!rose) for (let y = 20; y < MH - 20 && !rose; y += 2) for (let x = 20; x < MW - 20 && !rose; x += 2) if (seaBox(x, y, 11)) rose = [x, y];
     island.paperRose = rose;
     if (rose) {
       const [cx, cy] = rose;
       for (let a = 0; a < 16; a++) { // kurzové čiary (portolán): z ružice cez more, bodkované
         const an = a * Math.PI / 8, dx = Math.cos(an), dy = Math.sin(an);
-        for (let r = 23; r < 400; r += 2) {
+        for (let r = 16; r < 400; r += 2) {
           const x = Math.round(cx + dx * r), y = Math.round(cy + dy * r);
           if (x < 0 || y < 0 || x >= MW || y >= MH) break;
           const i = y * MW + x; if (sea(i) && sd[i] > 3 && (r % 6 !== 0)) put(x, y, lit(x, y, a % 2 ? 0.9 : 0.84));
@@ -4637,7 +4637,19 @@
   // papier okolo mapy: mapy sa kreslia s pásom mora navyše, aby papier pokračoval aj na širšom displeji a pri posune
   const PPX = 48, PPY = 40;
   let worldGeom = null;
-  const worldG = () => worldGeom || (worldGeom = PAPER.build(Object.assign(worldSpec(), { W: WORLD_W + 2 * PPX, H: WORLD_H + 2 * PPY, view: { s: 1, cx: WORLD_W / 2, cy: WORLD_H / 2 } })));
+  // domovský ostrov na mape sveta: jeho skutočná mapa (tvar aj provincie) zmenšená na miesto pôvodného obrysu
+  function homeMask(L) {
+    const isl = landIsland('home'), P = isl.prov, h = P.length / MW, b = L.shape.poly;
+    const cx = (Math.min(...b.map(p => p[0])) + Math.max(...b.map(p => p[0]))) / 2, cy = (Math.min(...b.map(p => p[1])) + Math.max(...b.map(p => p[1]))) / 2;
+    const sc = 80 / (isl.landBot - isl.landTop);
+    return { data: P, w: MW, h, sc, ox: cx - MW / 2 * sc, oy: cy - (isl.landTop + isl.landBot) / 2 * sc };
+  }
+  function worldG() {
+    if (worldGeom) return worldGeom;
+    const spec = worldSpec(), L0 = spec.lands[0];
+    spec.lands[0] = Object.assign({}, L0, { shape: { mask: homeMask(L0) }, maskZone: v => v < HOME_PROVINCES ? 0 : 1 }); // uzly 0–4 = juh (ľudia)
+    return (worldGeom = PAPER.build(Object.assign(spec, { W: WORLD_W + 2 * PPX, H: WORLD_H + 2 * PPY, view: { s: 1, cx: WORLD_W / 2, cy: WORLD_H / 2 } })));
+  }
   // poradie misií: skupiny (súš, pásmo krajiny) za sebou, v každej od hradu najbližšieho predošlému (prvý celkovo najnižší)
   function snakeOrder(items, groups, key) {
     const out = [];
@@ -4659,7 +4671,8 @@
     const G0 = worldG(), m = new Array(G0.provs.length).fill(0), idx = G0.provs.map((p, i) => Object.assign({ i }, p));
     for (const l of LANDS) {
       const groups = l.groups || [l.wl.map(li => [li, 0]).concat(l.wl.map(li => [li, 1]))];
-      snakeOrder(idx, groups, (p, li, zi) => p.land === li && p.zone === zi).forEach((p, k) => { m[p.i] = l.home ? (isOrc() ? MISSIONS.length - k : k + 1) : l.first + k; });
+      if (l.home) { idx.filter(p => p.land === l.wl[0]).forEach(p => { m[p.i] = isOrc() ? MISSIONS.length - p.maskId : p.maskId + 1; }); continue; } // provincia = uzol mapy ostrova
+      snakeOrder(idx, groups, (p, li, zi) => p.land === li && p.zone === zi).forEach((p, k) => { m[p.i] = l.first + k; });
     }
     worldMis = { key, m };
     return m;
@@ -4677,8 +4690,10 @@
     const seen = landsSeen(), key = st.unlocked + ':' + st.race + ':' + seen.join(',');
     if (worldImg && worldImgKey === key) return worldImg;
     const G0 = worldG(), mis = worldMissions(), li = id => LANDS.findIndex(l => l.id === id);
-    const routes = SEA_ROUTES.map(([a, b]) => [landById(a).wl[landById(a).wl.length - 1], landById(b).wl[0], seen.includes(b)]);
-    worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), routes, rose: [PPX + 165, PPY + 375], roseImg: true, noEdge: true });
+    // trasa z tej súše územia, ktorá je najbližšie k ďalšiemu územiu
+    const near = (A, B) => { let best = null, bd = 1e9; for (const i of A.wl) for (const j of B.wl) { const p = G0.boxes[i], q = G0.boxes[j], d = Math.hypot((p.x0 + p.x1 - q.x0 - q.x1) / 2, (p.y0 + p.y1 - q.y0 - q.y1) / 2); if (d < bd) { bd = d; best = [i, j]; } } return best; };
+    const routes = SEA_ROUTES.map(([a, b]) => near(landById(a), landById(b)).concat([seen.includes(b)]));
+    worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), routes, rose: [PPX + 22, PPY + 66], roseImg: true, noEdge: true });
     worldImgKey = key;
     return worldImg;
   }
@@ -4875,7 +4890,7 @@
     sctx.fillStyle = '#000'; sctx.fillRect(0, 0, screen.width, screen.height);
     sctx.drawImage(buf, 0, 0, W, buf.height, sx * S, (sy - Math.round(camY)) * S, W * S, buf.height * S);
     if (mapRose && st.phase === 'map' && COMPASS.complete && COMPASS.width) { // kompas z obrázka v plnom rozlíšení
-      const w = COMPASS.width / 2.2 * S, h = COMPASS.height / 2.2 * S;
+      const w = COMPASS.width / 3.3 * S, h = COMPASS.height / 3.3 * S; // menší kompas (≈ 30 bodov mapy)
       sctx.imageSmoothingEnabled = true; sctx.drawImage(COMPASS, (mapRose.x + sx) * S - w / 2, (mapRose.y + sy - Math.round(camY)) * S - h / 2, w, h); sctx.imageSmoothingEnabled = false;
     }
     if (worldLbls && st.phase === 'map') for (const lb of worldLbls) { // názvy území na mape sveta

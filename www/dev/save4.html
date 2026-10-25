@@ -14,12 +14,12 @@
 </head>
 <body>
 <h1>Pozícia 4 – všetko odomknuté</h1>
-<p>Zapíše do 4. pozície hru za ľudí, v ktorej sú dobyté všetky misie 1–76 (každá s 3 medenými hviezdami), videné všetky územia,
+<p>Zapíše do 4. pozície hru za ľudí, v ktorej sú dobyté všetky misie 1–86 (každá s 3 medenými hviezdami), videné všetky územia,
   kráľ na úrovni 10 a 50 000 zlatiek v truhlici. Ostatných pozícií, gemov ani kúpených hrdinov sa to nedotkne.</p>
 <p id="state"></p>
 <div id="btns"></div>
 <script>
-  const P = 'fortward.s4.', MISSIONS = 76;
+  const P = 'fortward.s4.', MISSIONS = 86;
   const used = Object.keys(localStorage).filter(k => k.startsWith(P));
   const write = () => {
     for (const k of used) localStorage.removeItem(k); // stará 4. pozícia celá preč (aby sa nemiešali staré údaje)
@@ -27,7 +27,7 @@
     set('race', 'Ľudia');
     localStorage.setItem(P + 'unlocked', String(MISSIONS + 1));
     set('stars', Array.from({ length: MISSIONS }, () => [3, 0, 0]));
-    set('lands', ['home', 'isles', 'long', 'north', 'ash', 'swarm']);
+    set('lands', ['home', 'isles', 'dune', 'long', 'north', 'ash', 'swarm']);
     set('chest', 50000);
     set('introSeen', true);
     set('hero', 'king');

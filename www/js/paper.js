@@ -91,8 +91,10 @@ const PAPER = (() => {
     return v - Math.pow(Math.min(1, vx * vx * 0.7 + vy * vy * 0.9), 2) * 0.16;
   }
   const inPoly = (P, x, y) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
-  const inShape = (s, x, y) => s.poly ? inPoly(s.poly, x, y) : s.circles.some(([cx, cy, r]) => Math.hypot(x - cx, y - cy) <= r);
-  const shapeBox = s => { const pts = s.poly || s.circles.flatMap(([cx, cy, r]) => [[cx - r, cy - r], [cx + r, cy + r]]); return { x0: Math.min(...pts.map(p => p[0])), x1: Math.max(...pts.map(p => p[0])), y0: Math.min(...pts.map(p => p[1])), y1: Math.max(...pts.map(p => p[1])) }; };
+  // mask = provincie inej mapy (w × h, 255 = more) zmenšené do sveta: bod mapy (mx, my) leží na (ox + mx·sc, oy + my·sc)
+  const maskAt = (m, x, y) => { const mx = Math.round((x - m.ox) / m.sc), my = Math.round((y - m.oy) / m.sc); return mx < 0 || my < 0 || mx >= m.w || my >= m.h ? 255 : m.data[my * m.w + mx]; };
+  const inShape = (s, x, y) => s.mask ? maskAt(s.mask, x, y) !== 255 : s.poly ? inPoly(s.poly, x, y) : s.circles.some(([cx, cy, r]) => Math.hypot(x - cx, y - cy) <= r);
+  const shapeBox = s => { if (s.mask) { const m = s.mask; return { x0: m.ox, x1: m.ox + m.w * m.sc, y0: m.oy, y1: m.oy + m.h * m.sc }; } const pts = s.poly || s.circles.flatMap(([cx, cy, r]) => [[cx - r, cy - r], [cx + r, cy + r]]); return { x0: Math.min(...pts.map(p => p[0])), x1: Math.max(...pts.map(p => p[0])), y0: Math.min(...pts.map(p => p[1])), y1: Math.max(...pts.map(p => p[1])) }; };
   // prevod obrysu z náčrtu do mapy: x' = ox + x·sx, y' = oy + y·sy
   const fit = (poly, ox, oy, sx, sy) => poly.map(([x, y]) => [ox + x * sx, oy + y * sy]);
   const fitC = (cs, ox, oy, sx, sy) => cs.map(([x, y, r]) => [ox + x * sx, oy + y * sy, r * Math.sqrt(sx * sy)]);
@@ -114,11 +116,11 @@ const PAPER = (() => {
       for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
         const [wx, wy] = toW(x, y);
         if (wx < b.x0 - 3 * a || wx > b.x1 + 3 * a || wy < b.y0 - 3 * a || wy > b.y1 + 3 * a) continue;
-        // dve mierky šumu: veľké zálivy a polostrovy + drobné členenie pobrežia
-        const dx = (fbm(wx * f, wy * f, ns) - 0.5) * 3.6 * a + (fbm(wx * f * 3.2, wy * f * 3.2, ns + 2) - 0.5) * 1.6 * a;
-        const dy = (fbm(wx * f, wy * f, ns + 5) - 0.5) * 3.6 * a + (fbm(wx * f * 3.2, wy * f * 3.2, ns + 7) - 0.5) * 1.6 * a;
+        // dve mierky šumu: veľké zálivy a polostrovy + drobné členenie pobrežia (maska má pobrežie hotové)
+        const msk = L.shape.mask, dx = msk ? 0 : (fbm(wx * f, wy * f, ns) - 0.5) * 3.6 * a + (fbm(wx * f * 3.2, wy * f * 3.2, ns + 2) - 0.5) * 1.6 * a;
+        const dy = msk ? 0 : (fbm(wx * f, wy * f, ns + 5) - 0.5) * 3.6 * a + (fbm(wx * f * 3.2, wy * f * 3.2, ns + 7) - 0.5) * 1.6 * a;
         if (!inShape(L.shape, wx + dx, wy + dy)) continue;
-        const k = y * W + x; land[k] = li; zone[k] = L.zoneAt ? L.zoneAt(wx, wy, b) : 0;
+        const k = y * W + x; land[k] = li; zone[k] = msk ? L.maskZone(maskAt(msk, wx, wy)) : L.zoneAt ? L.zoneAt(wx, wy, b) : 0;
         if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
       }
       L.box = { x0, x1, y0, y1 };
@@ -126,7 +128,19 @@ const PAPER = (() => {
     // 2) provincie: rovnomerne rozložené jadrá (najvzdialenejší bod + vyhladenie), hranice so šumom ako v hre;
     // zadané jadrá (seeds, súradnice sveta) sa len prenesú – mapa územia má tak rovnaké provincie ako mapa sveta
     const provs = [];
-    spec.lands.forEach((L, li) => L.zones.forEach((Z, zi) => {
+    spec.lands.forEach((L, li) => { // súš z masky: provincie sú tie z masky (maskId), jadro v ťažisku
+      const msk = L.shape.mask; if (!msk) return;
+      const acc = new Map();
+      for (let k = 0; k < N; k++) if (land[k] === li) { const x = k % W, y = (k / W) | 0, [wx, wy] = toW(x, y), v = maskAt(msk, wx, wy); if (!acc.has(v)) acc.set(v, [0, 0, 0, []]); const a = acc.get(v); a[0] += x; a[1] += y; a[2]++; a[3].push(k); }
+      for (const v of [...acc.keys()].sort((p, q) => p - q)) {
+        const [sx, sy, n, ks] = acc.get(v), Z = L.zones[L.maskZone(v)], cx = sx / n, cy = sy / n;
+        let bk = ks[0], bd = 1e9; for (const k of ks) { const d = (k % W - cx) ** 2 + (((k / W) | 0) - cy) ** 2; if (d < bd) { bd = d; bk = k; } }
+        const x = bk % W, y = (bk / W) | 0, [wx, wy] = toW(x, y), idx = provs.length;
+        provs.push({ land: li, zone: L.maskZone(v), race: Z.race, biome: Z.biome, x, y, wx, wy, maskId: v });
+        for (const k of ks) prov[k] = idx;
+      }
+    });
+    spec.lands.forEach((L, li) => L.shape.mask ? null : L.zones.forEach((Z, zi) => {
       const px = [];
       for (let k = 0; k < N; k++) if (land[k] === li && zone[k] === zi) px.push(k);
       if (!px.length) return;
@@ -301,10 +315,10 @@ const PAPER = (() => {
     const seaBox = (cx0, cy0, r) => { for (let y = cy0 - r; y <= cy0 + r; y++) for (let x = cx0 - r; x <= cx0 + r; x++) { if (x < 3 || y < 3 || x >= W - 3 || y >= H - 3) return false; const k = y * W + x; if (!sea(k) || sd[k] < 3) return false; } return true; };
     let rose = null;
     const rp = spec.rose || [W - 20, H - 40];
-    for (let r = 0; r < 200 && !rose; r += 2) for (let a = 0; a < 16 && !rose; a++) { const x = Math.round(rp[0] + Math.cos(a / 16 * 6.283) * r), y = Math.round(rp[1] + Math.sin(a / 16 * 6.283) * r); if (seaBox(x, y, 21)) rose = [x, y]; }
+    for (let r = 0; r < 200 && !rose; r += 2) for (let a = 0; a < 16 && !rose; a++) { const x = Math.round(rp[0] + Math.cos(a / 16 * 6.283) * r), y = Math.round(rp[1] + Math.sin(a / 16 * 6.283) * r); if (seaBox(x, y, 15)) rose = [x, y]; }
     if (rose) {
       const [rx, ry] = rose;
-      for (let a = 0; a < 16; a++) { const an = a * Math.PI / 8, dx = Math.cos(an), dy = Math.sin(an); for (let r = 23; r < 600; r += 2) { const x = Math.round(rx + dx * r), y = Math.round(ry + dy * r); if (x < 0 || y < 0 || x >= W || y >= H) break; const k = y * W + x; if (sea(k) && sd[k] > 3 && r % 6 !== 0) put(x, y, lit(x, y, a % 2 ? 0.9 : 0.84)); } }
+      for (let a = 0; a < 16; a++) { const an = a * Math.PI / 8, dx = Math.cos(an), dy = Math.sin(an); for (let r = 16; r < 600; r += 2) { const x = Math.round(rx + dx * r), y = Math.round(ry + dy * r); if (x < 0 || y < 0 || x >= W || y >= H) break; const k = y * W + x; if (sea(k) && sd[k] > 3 && r % 6 !== 0) put(x, y, lit(x, y, a % 2 ? 0.9 : 0.84)); } }
       if (!spec.roseImg) compass(put, null, rx, ry, 14); // s obrázkom kompasu ho dokreslí stránka v plnom rozlíšení
     }
     let ships = 0;
