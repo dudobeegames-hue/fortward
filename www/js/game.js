@@ -4813,18 +4813,27 @@
     if (island.w > W) mapRose = { x: 22, y: Math.round(camY) + 52 }; // široká mapa sa posúva – kompas ostáva v ľavom hornom rohu obrazovky
     else if (cur.rose) mapRose = { x: ox - PPX + cur.rose[0], y: cur.rose[1] - PPY };
   }
-  // územie na rade: bodkovaný zlatý ovál, bodky obiehajú dookola (s tmavým tieňom pod každou)
-  function drawWorldRing(b, time) {
-    const cx = b.x + b.w / 2, cy = b.y + b.h / 2, rx = b.w / 2 + 5, ry = b.h / 2 + 5;
-    const n = Math.round(Math.PI * (rx + ry) / 2), sh = Math.floor(time * 6);
-    let last = null;
-    for (let k = 0; k < n; k++) {
-      if ((k + sh) % 3 === 0) continue;
-      const a = k / n * 6.2832, x = Math.round(cx + Math.cos(a) * rx), y = Math.round(cy + Math.sin(a) * ry);
-      if (last && last[0] === x && last[1] === y) continue; last = [x, y];
-      g.fillStyle = '#3a2414'; g.fillRect(x, y + 1, 1, 1);
-      g.fillStyle = (k + sh) % 3 === 1 ? '#fff070' : '#f8b830'; g.fillRect(x, y, 1, 1);
+  // územie na rade: jeho pobrežie pulzuje zlatým lemom (dva pásy mora pri brehu, vnútorný jasnejší); obrázok lemu sa pripraví raz
+  const coastGlow = {};
+  function landGlow(l) {
+    if (coastGlow[l.id]) return coastGlow[l.id];
+    const G0 = worldG(), { W, H, land } = G0, own = k => l.wl.includes(land[k]);
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const cx = c.getContext('2d'), id = cx.createImageData(W, H), d = id.data;
+    const dist = new Uint8Array(W * H); // 1 = more pri brehu územia, 2 = o pixel ďalej
+    for (let pass = 1; pass <= 2; pass++) for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+      const k = y * W + x; if (land[k] >= 0 || dist[k]) continue;
+      const hit = pass === 1 ? [k - 1, k + 1, k - W, k + W].some(own) : [k - 1, k + 1, k - W, k + W].some(j => dist[j] === 1);
+      if (hit) dist[k] = pass;
     }
+    for (let k = 0; k < W * H; k++) if (dist[k]) { const q = k * 4, a = dist[k] === 1; d[q] = 255; d[q + 1] = a ? 236 : 200; d[q + 2] = a ? 120 : 64; d[q + 3] = a ? 255 : 150; }
+    cx.putImageData(id, 0, 0);
+    return (coastGlow[l.id] = c);
+  }
+  function drawWorldRing(l, time) {
+    g.save(); g.globalAlpha = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(time * 4));
+    g.drawImage(landGlow(l), -PPX, -PPY);
+    g.restore();
   }
   let worldLbls = null; // názvy území (hladké písmo cez present)
   function renderWorld(time) {
@@ -4839,7 +4848,7 @@
       lbl.push({ s: l.name, sub: known ? (won >= l.count ? 'dobyté ✓' : won + ' / ' + l.count) : '', x: ox + b.x + b.w / 2 + (l.lblDx || 0), y: b.y - 3, on: l === next && known, dim: !known });
     }
     const ringL = st.sail ? landById(st.sail.to) : landReached(next) ? next : null; // územie na rade (počas plavby to, kam sa pláva)
-    if (ringL) drawWorldRing(landBox(ringL), time);
+    if (ringL) drawWorldRing(ringL, time);
     g.restore();
     drawPaperEdges();
     worldLbls = lbl;
