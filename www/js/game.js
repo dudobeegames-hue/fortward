@@ -4228,6 +4228,38 @@
   // aktuálna misia: okraje územia žiaria farbou hráča (ľudia modrou, orkovia oranžovou) – mäkká žiara dovnútra, svetlé jadro
   // na hranici a plynulé dýchanie celého okraja naraz; na živej aj námorníckej mape
   const BLINK_R = 14; // ako hlboko do regiónu žiara siaha (body)
+  // dobytie na farebnej mape: z hradu sa po regióne rozleje vlna farby hráča (svetlé čelo, za ním farba, ktorá na konci vybledne)
+  function waveData(i) {
+    const B = island.wave || (island.wave = []);
+    if (B[i]) return B[i];
+    const P = island.prov, IW = island.w || MW, n = island.nodes[i], cx = n.x, cy = n.y - 4;
+    let x0 = IW, y0 = MH, x1 = 0, y1 = 0;
+    for (let k = 0; k < P.length; k++) if (P[k] === i) { const x = k % IW, y = (k / IW) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, pts = [];
+    let maxD = 1;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (P[y * IW + x] === i) {
+      const d = Math.hypot(x - cx, (y - cy) * 1.1) + (fbm(x * 0.12, y * 0.12, 77) - 0.5) * 6; // mierne zvlnené čelo
+      pts.push((y - y0) * w + x - x0, d); if (d > maxD) maxD = d;
+    }
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    return (B[i] = { x0, y0, w, h, pts, maxD, c, ctx: c.getContext('2d'), id: c.getContext('2d').createImageData(w, h) });
+  }
+  function drawConquerWave() {
+    const pa = st.provAnim;
+    if (!pa || !island.nodes[pa.i]) return;
+    const D = waveData(pa.i), d = D.id.data, [r, gg, b] = PROV_COL[isOrc() ? 'red' : 'blue'];
+    const R = Math.min(1, pa.t / 0.7) * (D.maxD + 8), fade = pa.t < 0.7 ? 1 : 1 - (pa.t - 0.7) / 0.3; // vlna dobehne za 70 % času, potom farba vybledne
+    d.fill(0);
+    for (let n = 0; n < D.pts.length; n += 2) {
+      const k = D.pts[n], dd = D.pts[n + 1];
+      if (dd > R) continue;
+      const front = Math.max(0, 1 - (R - dd) / 7); // svetlé čelo vlny
+      const wht = front * 0.7, al = (0.42 + front * 0.5) * fade;
+      d[k * 4] = r + (255 - r) * wht; d[k * 4 + 1] = gg + (255 - gg) * wht; d[k * 4 + 2] = b + (255 - b) * wht; d[k * 4 + 3] = al * 255;
+    }
+    D.ctx.putImageData(D.id, 0, 0);
+    g.drawImage(D.c, D.x0, D.y0);
+  }
   function blinkData(i) {
     const B = island.blink || (island.blink = []);
     if (B[i]) return B[i];
@@ -4303,6 +4335,7 @@
       } else drawProvince(i, provState(i), time);
     }
     g.drawImage(borderLayer(), 0, 0);
+    drawConquerWave();
     drawMissionBlink(time);
   }
   // ohne, dym a šípky útoku v napadnutých provinciách
@@ -4831,6 +4864,7 @@
       g.restore();
     }
     g.save(); g.translate(ox, 0);
+    if (live) drawConquerWave();
     drawMissionBlink(time);
     island.nodes.forEach((n, i) => drawMapNode(i, n, time));
     for (const q of st.parts) { g.globalAlpha = Math.min(1, q.life / q.max * 2); g.fillStyle = q.col; g.fillRect(Math.round(q.x), Math.round(q.y), 1, 1); }
