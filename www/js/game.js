@@ -4705,6 +4705,18 @@
     if (worldImg && worldImgKey === key) return worldImg;
     const G0 = worldG(), mis = worldMissions(), li = id => LANDS.findIndex(l => l.id === id);
     worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), rose: [PPX + 22, PPY + 46], roseImg: true, noEdge: true });
+    // územia, ktoré sú ešte zamknuté, sú vyšedené (súš aj pobrežie)
+    const locked = new Set(LANDS.filter(l => !landReached(l)).flatMap(l => l.wl));
+    if (locked.size) {
+      const cv = worldImg.canvas, cx = cv.getContext('2d'), id = cx.getImageData(0, 0, cv.width, cv.height), d = id.data, { W, H, land } = G0;
+      const lk = (x, y) => x >= 0 && y >= 0 && x < W && y < H && locked.has(land[y * W + x]);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        if (!lk(x, y) && !lk(x - 1, y) && !lk(x + 1, y) && !lk(x, y - 1) && !lk(x, y + 1)) continue;
+        const q = (y * W + x) * 4, v = Math.round((d[q] * 0.3 + d[q + 1] * 0.59 + d[q + 2] * 0.11) * 0.85 + 30);
+        d[q] = d[q + 1] = d[q + 2] = v;
+      }
+      cx.putImageData(id, 0, 0);
+    }
     worldImgKey = key;
     return worldImg;
   }
@@ -4749,7 +4761,7 @@
     for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
       const a = nodes[i], b = nodes[j], dx = b.x - a.x;
       if (Math.abs(b.y - a.y) >= 34 || Math.abs(dx) >= 24) continue;
-      const half = (24 - Math.abs(dx)) / 2, sg = dx >= 0 ? 1 : -1;
+      const half = Math.ceil((24 - Math.abs(dx)) / 2), sg = dx >= 0 ? 1 : -1; // celé body, inak by sa hrad kreslil rozmazane
       if (onLand(a.x - sg * half, a.y) && onLand(b.x + sg * half, b.y)) { a.x -= sg * half; b.x += sg * half; }
       else if (onLand(b.x + sg * half * 2, b.y)) b.x += sg * half * 2;
       else if (onLand(a.x - sg * half * 2, a.y)) a.x -= sg * half * 2;
@@ -4828,7 +4840,7 @@
     if (island.w > W) mapRose = { x: 22, y: Math.round(camY) + 52 }; // široká mapa sa posúva – kompas ostáva v ľavom hornom rohu obrazovky
     else if (cur.rose) mapRose = { x: ox - PPX + cur.rose[0], y: cur.rose[1] - PPY };
   }
-  // územie na rade: jeho pobrežie pulzuje zlatým lemom (dva pásy mora pri brehu, vnútorný jasnejší); obrázok lemu sa pripraví raz
+  // zvolené územie: jeho pobrežie pulzuje zlatým lemom (dva pásy mora pri brehu, vnútorný jasnejší); obrázok lemu sa pripraví raz
   const coastGlow = {};
   function landGlow(l) {
     if (coastGlow[l.id]) return coastGlow[l.id];
@@ -4862,7 +4874,7 @@
       const won = Math.max(0, Math.min(l.count, st.unlocked - l.first));
       lbl.push({ s: l.name, sub: known ? (won >= l.count ? 'dobyté ✓' : won + ' / ' + l.count) : '', x: ox + b.x + b.w / 2 + (l.lblDx || 0), y: b.y - 3, on: l === next && known, dim: !known });
     }
-    const ringL = st.sail ? landById(st.sail.to) : landReached(next) ? next : null; // územie na rade (počas plavby to, kam sa pláva)
+    const ringL = st.sail ? landById(st.sail.to) : landById(st.land); // zvolené územie (počas plavby to, kam sa pláva)
     if (ringL) drawWorldRing(ringL, time);
     g.restore();
     drawPaperEdges(true);
@@ -6667,7 +6679,7 @@
         focusMapNode(st.mapSel);
         AUDIO.play('unlock');
         const nm = st.mapSel;
-        setTimeout(() => { if (st.phase === 'map') showUnlockDeck(nm); }, 700);
+        setTimeout(() => { if (st.phase === 'map') showUnlockDeck(nm); }, 2400); // nový región najprv chvíľu pobliká, až potom kartičky
       }
     }
   }
