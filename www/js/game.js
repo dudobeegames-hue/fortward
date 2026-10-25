@@ -564,7 +564,7 @@
       if (!a || !a.some(v => v > 0)) { meta.stars[m - 1] = [1, 0, 0]; fixed = true; }
     }
     if (fixed) saveJSON(sk('stars'), meta.stars);
-    st.mapSel = null; st.mapTierFor = null; st.mapAnim = null; st.provAnim = null; st.world = false; st.sail = null; st.sailTo = null;
+    st.mapSel = null; st.mapTierFor = null; st.mapAnim = null; st.provAnim = null; st.world = false; st.sail = null; st.sailTo = null; st.wwave = null;
     { const seen = loadJSON(sk('lands'), ['home']), target = landOfMission(Math.min(st.unlocked, MAX_MISSION));
       if (seen.includes(target.id)) setLand(target.id);
       else { setLand(LANDS[Math.max(0, LANDS.indexOf(target) - 1)].id); st.sailTo = target.id; } }
@@ -1699,6 +1699,16 @@
       }
     } else e.trap = null;
 
+    // liečiteľ sa drží v zadnej línii: stojí kúsok za čelom hordy a dopredu ide, len keď treba niekoho vyliečiť
+    if (e.d.heals) {
+      let front = -1e9, needs = false;
+      for (const o of st.enemies) {
+        if (o.dead || o === e || o.d.heals || o.d.fly) continue;
+        if (o.y > front) front = o.y;
+        if (o.hp < o.max && Math.hypot(o.x - e.x, o.y - e.y) > 28 && o.y > e.y - 10) needs = true; // zranený spojenec mimo dosahu liečenia
+      }
+      if (!needs && front > -1e9 && e.y > front - 36) { e.attacking = false; return; } // dosť vpredu – čaká
+    }
     // podkopník namiesto úderu vybuchne
     const attack = e.d.sapper ? () => explode(e) : attackFn;
 
@@ -4897,10 +4907,49 @@
     g.restore();
   }
   let worldLbls = null; // názvy území (hladké písmo cez present)
+  // provincie dobyté od posledného pohľadu na mapu sveta: najprv v pôvodnej farbe, z hradu sa po nich rozleje farba hráča
+  // (rovnaká vlna ako na farebnej mape územia)
+  function worldWaveStart(time) {
+    const seenU = loadJSON(sk('worldSeenU'), 0);
+    saveJSON(sk('worldSeenU'), st.unlocked);
+    if (!seenU || seenU >= st.unlocked) return null;
+    const G0 = worldG(), mis = worldMissions(), anim = new Set();
+    G0.provs.forEach((p, i) => { if (mis[i] >= seenU && mis[i] < st.unlocked) anim.add(i); });
+    if (!anim.size) return null;
+    const img = worldPaint(), old = PAPER.paint(G0, { raceOf: i => anim.has(i) ? G0.provs[i].race : provRaceW(G0.provs[i], mis[i]), rose: [PPX + 22, PPY + 40], roseImg: true, noEdge: true });
+    const { W: GW, H: GH, prov } = G0, nd = img.canvas.getContext('2d').getImageData(0, 0, GW, GH).data, od = old.canvas.getContext('2d').getImageData(0, 0, GW, GH).data;
+    let x0 = GW, y0 = GH, x1 = 0, y1 = 0;
+    for (let k = 0; k < GW * GH; k++) if (anim.has(prov[k])) { const x = k % GW, y = (k / GW) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, pts = [];
+    let maxD = 1;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const k = y * GW + x, i = prov[k]; if (!anim.has(i)) continue;
+      const p = G0.provs[i], d = Math.hypot(x - p.x, (y - p.y) * 1.1) + (fbm(x * 0.12, y * 0.12, 77) - 0.5) * 4;
+      pts.push((y - y0) * w + x - x0, d, k * 4); if (d > maxD) maxD = d;
+    }
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const cx = c.getContext('2d');
+    return { t0: time, x0, y0, pts, maxD, nd, od, c, cx, id: cx.createImageData(w, h) };
+  }
+  function drawWorldWave(time, ox) {
+    const A = st.wwave, t = (time - A.t0) / 2.2;
+    if (t >= 1) { st.wwave = { done: true }; return; }
+    const R = Math.min(1, t / 0.8) * (A.maxD + 6), d = A.id.data, [r, gg, b] = PROV_COL[isOrc() ? 'red' : 'blue'];
+    for (let n = 0; n < A.pts.length; n += 3) {
+      const k = A.pts[n] * 4, dd = A.pts[n + 1], q = A.pts[n + 2];
+      if (dd > R) { d[k] = A.od[q]; d[k + 1] = A.od[q + 1]; d[k + 2] = A.od[q + 2]; d[k + 3] = 255; continue; } // vlna sem ešte nedošla
+      const front = Math.max(0, 1 - (R - dd) / 5) * Math.min(1, (1 - t) * 4), mix = front * 0.55; // svetlé čelo vlny vo farbe hráča
+      d[k] = A.nd[q] + (r + (255 - r) * 0.5 - A.nd[q]) * mix; d[k + 1] = A.nd[q + 1] + (gg + (255 - gg) * 0.5 - A.nd[q + 1]) * mix; d[k + 2] = A.nd[q + 2] + (b + (255 - b) * 0.5 - A.nd[q + 2]) * mix; d[k + 3] = 255;
+    }
+    A.cx.putImageData(A.id, 0, 0);
+    g.drawImage(A.c, ox - PPX + A.x0, -PPY + A.y0);
+  }
   function renderWorld(time) {
     const ox = mapOX(), img = worldPaint();
     g.fillStyle = PAPER_BG; g.fillRect(0, 0, W, Math.max(WORLD_H, buf.height));
     g.drawImage(img.canvas, ox - PPX, -PPY);
+    if (!st.wwave) st.wwave = worldWaveStart(time) || { done: true };
+    if (!st.wwave.done) drawWorldWave(time, ox);
     g.save(); g.translate(ox, 0);
     const seen = landsSeen(), lbl = [];
     for (const l of LANDS) {
@@ -4943,12 +4992,12 @@
   }
   function openWorld() {
     if (st.mapAnim || st.provAnim) return;
-    st.world = true; mapCam = mapCamTarget = clampMap(9999); $('missionBox').hidden = true; updateMapUi(); // svet sa otvorí pri domovskom ostrove (dole)
+    st.world = true; st.wwave = null; mapCam = mapCamTarget = clampMap(9999); $('missionBox').hidden = true; updateMapUi(); // svet sa otvorí pri domovskom ostrove (dole)
   }
   // plavba k novému územiu: na chvíľu sa ukáže mapa sveta s krúžkom okolo nového územia, potom sa otvorí jeho mapa
   function startSail(to) {
     const r = SEA_ROUTES.find(q => q[1] === to);
-    st.world = true; mapCam = mapCamTarget = clampMap(9999);
+    st.world = true; st.wwave = null; mapCam = mapCamTarget = clampMap(9999);
     st.sail = { from: r ? r[0] : 'home', to, t: 0 };
     updateMapUi();
     banner('Na more!');
