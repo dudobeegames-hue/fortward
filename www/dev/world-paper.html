@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa sveta – návrhy</title>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; padding: 16px; background: #15110d; color: #eee; font-family: Rubik, sans-serif; }
+  h1 { font-family: 'Pixelify Sans'; color: #f8d048; margin: 0 0 6px; font-size: 24px; }
+  p.note { margin: 0 0 14px; max-width: 900px; line-height: 1.4; color: #cbb; }
+  .grid { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+  figure { margin: 0; }
+  figure canvas { display: block; image-rendering: pixelated; border: 2px solid #000; border-radius: 6px; }
+  figcaption { margin-top: 6px; font-size: 14px; max-width: 380px; line-height: 1.35; }
+  figcaption b { color: #f8d048; font-family: 'Pixelify Sans'; font-size: 18px; display: block; }
+</style>
+</head>
+<body>
+<h1>Mapa sveta a nové územia – návrhy (2. verzia)</h1>
+<p class="note">Všetko v štýle námorníckej mapy z hry. Mapy území sú výrezy mapy sveta – rovnaký tvar ostrovov, ich rozloženie aj provincie. Farby provincií sú len návrh (kto územie drží). Čísla na hradoch sú navrhované poradie misií.</p>
+<div class="grid" id="grid"></div>
+<script src="../js/sprites.js"></script>
+<script src="../js/scene.js"></script>
+<script src="../js/paper.js"></script>
+<script>
+  const { render, fit, fitC } = PAPER;
+  // kompas z predlohy hráča (vystrihnutý z modrého pozadia) – kreslí sa v plnom rozlíšení ako popisky, mierka ako v hre (≈ 2,2 bodu obrazovky na bod mapy)
+  const ROSE_IMG = new Image(); ROSE_IMG.src = '../img/compass.png';
+  const GAME_S = 2.2;
+  ROSE_IMG.onload = () => build();
+  function build() {
+  const _render = render, renderR = sp => _render(Object.assign({ roseImg: true }, sp));
+  // obrysy z 1. náčrtu (312 × 568 bodov)
+  const SK = {
+    home:  [[24, 274], [52, 274], [60, 300], [79, 303], [79, 336], [64, 342], [60, 380], [48, 390], [18, 390], [12, 360], [8, 320], [9, 292], [22, 286]],
+    isA:   [[116, 346], [134, 346], [134, 372], [118, 372], [116, 364], [107, 362], [107, 355], [116, 354]],
+    isB:   [[152, 337], [179, 337], [179, 355], [152, 355]],
+    isC:   [[143, 364], [170, 364], [170, 373], [179, 373], [179, 391], [143, 391]],
+    grey:  [[134, 427], [188, 427], [188, 445], [161, 445], [161, 463], [152, 463], [152, 481], [197, 481], [206, 490], [206, 517], [188, 517], [188, 525], [161, 525], [161, 517], [89, 517], [89, 507], [26, 507], [17, 495], [26, 481], [35, 472], [62, 472], [62, 463], [89, 463], [89, 445], [98, 445], [98, 436], [107, 436], [125, 436]],
+    red:   [[268, 413, 11], [281, 425, 11], [262, 431, 9], [284, 439, 10]],
+  };
+  // z 2. náčrtu (prekreslená mapa sveta 347 × 726 bodov → mapa sveta 190 × 400): dlhý ostrov s lesmi a púšťou, severná krajina
+  const S2 = p => p.map(([x, y]) => [x / 1.826, y / 1.826]);
+  const SK2 = {
+    long:  S2([[20, 230], [70, 226], [130, 236], [180, 252], [215, 265], [250, 282], [285, 298], [305, 322], [292, 348], [240, 346], [180, 333], [125, 322], [90, 305], [55, 294], [28, 280], [18, 255]]),
+    north: S2([[172, 145], [200, 132], [240, 128], [285, 140], [292, 165], [275, 180], [245, 185], [215, 195], [185, 190], [168, 170]]),
+    northS: [[274 / 1.826, 207 / 1.826, 13 / 1.826]],
+  };
+  // dlhý ostrov: lesy na západnej polovici, púšť na východnej (hranica zvlnená, naprieč ostrovom)
+  const longZones = (x, y) => ((x - 11) * 0.937 + (y - 125) * 0.349) / 165 + (fbm(x * 0.04, y * 0.04, 505) - 0.5) * 0.16 < 0.48 ? 0 : 1;
+  const LONG_Z = [{ n: 14, race: 'elf', biome: 'forest' }, { n: 12, race: 'desert', biome: 'desert' }];
+  // domovský ostrov: južná polovica ľudia, severná orkovia
+  const homeZones = (x, y, b) => (y - b.y0) / (b.y1 - b.y0) + (fbm(x * 0.05, y * 0.05, 503) - 0.5) * 0.1 > 0.5 ? 0 : 1;
+  const HOME_Z = [{ n: 5, race: 'human', biome: 'grass' }, { n: 5, race: 'orc', biome: 'grass' }];
+  // poradie misií: od najnižšieho hradu, potom vždy k najbližšiemu ešte nečíslovanému
+  const snake = provs => { const left = provs.slice(); let cur = left.reduce((a, p) => p.y > a.y ? p : a); let n = 1;
+    while (left.length) { left.splice(left.indexOf(cur), 1); cur.num = n++; if (!left.length) break; const c0 = cur; cur = left.reduce((a, p) => Math.hypot(p.x - c0.x, p.y - c0.y) < Math.hypot(a.x - c0.x, a.y - c0.y) ? p : a); } };
+
+  // ---- 1) mapa sveta (190 × 400 ako mapa ostrova) ----
+  const X = 190 / 312, Y = 0.64, f = p => fit(p, 0, 26, X, Y), WSEED = 7;
+  const WORLD = { W: 190, H: 400, seed: WSEED, ships: 2, rose: [30, 40],
+    routes: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8]],
+    lands: [
+      { shape: { poly: f(SK.home) }, amp: 4, freq: 0.1, zones: HOME_Z, zoneAt: homeZones, jitter: 3 },
+      { shape: { poly: f(SK.isA) }, amp: 3, freq: 0.18, zones: [{ n: 2, race: 'nordic', biome: 'tundra' }], jitter: 2 },
+      { shape: { poly: f(SK.isB) }, amp: 3, freq: 0.18, zones: [{ n: 2, race: 'nordic', biome: 'tundra' }], jitter: 2 },
+      { shape: { poly: f(SK.isC) }, amp: 3, freq: 0.18, zones: [{ n: 3, race: 'nordic', biome: 'tundra' }], jitter: 2 },
+      { shape: { poly: SK2.long }, amp: 4, freq: 0.08, zones: LONG_Z, zoneAt: longZones, jitter: 3 },
+      { shape: { poly: SK2.north }, amp: 3.5, freq: 0.09, zones: [{ n: 10, race: 'polar', biome: 'ice' }], jitter: 3 },
+      { shape: { circles: SK2.northS }, amp: 2.5, freq: 0.16, zones: [{ n: 4, race: 'polar', biome: 'ice' }], jitter: 2 },
+      { shape: { poly: f(SK.grey) }, amp: 5, freq: 0.09, zones: [{ n: 15, race: 'undead', biome: 'ash' }], jitter: 3 },
+      { shape: { circles: fitC(SK.red, 0, 26, X, Y) }, amp: 2.5, freq: 0.15, zones: [{ n: 4, race: 'swarm', biome: 'hive' }], jitter: 2 },
+    ] };
+  const world = renderR(WORLD);
+  const maps = [{ title: 'Mapa sveta', r: world, scale: 3,
+    cap: 'Kontinent je rozdelený: dlhý ostrov s lesmi a púšťou a severná krajina (veľký ostrov a malý pri ňom). Trasa: domovský ostrov → tri ostrovy → dlhý ostrov → severná krajina → šedý ostrov → ostrov roja.',
+    labels: [['Domovský ostrov', 0], ['Severské ostrovy', 2, -6], ['Lesy', 4, 0, 'west'], ['Púšť', 4, 0, 'east'], ['Severná krajina', 5], ['Popolavý ostrov', 7], ['Ostrov roja', 8]] }];
+
+  // ---- mapy území: výrez mapy sveta (rovnaké obrysy, šum pobrežia aj jadrá provincií), zväčšený na šírku obrazovky ----
+  function landMap(idx, o) {
+    const B = idx.map(i => world.boxes[i]), b = { x0: Math.min(...B.map(q => q.x0)), x1: Math.max(...B.map(q => q.x1)), y0: Math.min(...B.map(q => q.y0)), y1: Math.max(...B.map(q => q.y1)) };
+    const view = { s: o.s, rot: o.rot || 0, cx: (b.x0 + b.x1) / 2 + (o.dx || 0), cy: (b.y0 + b.y1) / 2 + (o.dy || 0) };
+    const lands = idx.map(li => { const L = WORLD.lands[li]; return Object.assign({}, L, { nseed: WSEED + li * 13,
+      zones: L.zones.map((Z, zi) => Object.assign({}, Z, { seeds: world.provs.filter(p => p.land === li && p.zone === zi).map(p => [p.wx, p.wy]) })) }); });
+    return renderR({ W: o.W || 190, H: o.H || 400, seed: o.seed, provSeed: WSEED, view, lands, castles: true, order: snake, ships: o.ships || 2, rose: o.rose, routes: o.routes });
+  }
+  maps.push({ title: 'Severské ostrovy (7 misií)', scale: 2, cap: 'Tie isté tri ostrovy ako na mape sveta (2 + 2 + 3 provincie), len zväčšené.',
+    r: landMap([1, 2, 3], { s: 3.3, seed: 11, rose: [40, 340], routes: [[0, 1], [1, 2]] }) });
+  maps.push({ title: 'Dlhý ostrov (26 misií)', scale: 2, cap: 'Lesy (14) a púšť (12). Leží rovnako ako na mape sveta – na šírku obrazovky.',
+    r: landMap([4], { s: 1.12, seed: 21, ships: 2, rose: [40, 330] }) });
+  maps.push({ title: 'Dlhý ostrov – široká mapa', scale: 2, cap: 'Varianta: dvakrát väčší, mapa je širšia ako obrazovka a posúva sa prstom do strán.',
+    r: landMap([4], { s: 2.25, W: 380, seed: 21, ships: 3, rose: [40, 330] }) });
+  maps.push({ title: 'Severná krajina (14 misií)', scale: 2, cap: 'Veľký ľadový ostrov (10) a malý ostrov pri ňom (4).',
+    r: landMap([5, 6], { s: 2.1, seed: 51, rose: [40, 330], routes: [[0, 1]] }) });
+  maps.push({ title: 'Popolavý ostrov (15 misií)', scale: 2, cap: 'Rovnaký tvar ako na mape sveta, bez roztiahnutia.',
+    r: landMap([7], { s: 1.45, seed: 31, rose: [40, 330] }) });
+  { const ox = -886, oy = -1342, sx = 3.6, sy = 3.6; // schválený návrh z 1. verzie (bez zmeny)
+    maps.push({ title: 'Ostrov roja (4 misie)', scale: 2, cap: 'Schválené – bez zmeny.',
+      r: renderR({ W: 190, H: 400, seed: 41, castles: true, ships: 1, rose: [40, 330],
+        lands: [{ shape: { circles: fitC(SK.red, ox, oy, sx, sy) }, amp: 6, zones: [{ n: 4, race: 'swarm', biome: 'hive' }] }], order: snake }) });
+  }
+
+  const grid = document.getElementById('grid');
+  window.OUT = {};
+  for (const m of maps) {
+    const r = m.r, S = m.scale, src = r.canvas;
+    const c = document.createElement('canvas'); c.width = src.width * S; c.height = src.height * S;
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(src, 0, 0, c.width, c.height);
+    for (const [txt, li, dy, band] of m.labels || []) { // názvy území (hladké písmo ako v hre)
+      const b = r.boxes[li]; let lx = (b.x0 + b.x1) / 2, ly = b.y0 - 3 + (dy || 0);
+      if (band === 'west') { lx = b.x0 + (b.x1 - b.x0) * 0.25; ly = b.y0 + 4; }
+      if (band === 'east') { lx = b.x0 + (b.x1 - b.x0) * 0.72; ly = b.y1 + 9; }
+      x.font = '700 ' + (5 * S) + 'px Rubik'; x.textAlign = 'center'; x.textBaseline = 'bottom'; x.lineJoin = 'round';
+      x.lineWidth = S * 1.2; x.strokeStyle = '#f3e4b8'; x.strokeText(txt, lx * S, ly * S); x.fillStyle = '#2a1c10'; x.fillText(txt, lx * S, ly * S);
+    }
+    if (r.rose) { const w = ROSE_IMG.width / GAME_S * S, h = ROSE_IMG.height / GAME_S * S; x.imageSmoothingEnabled = true; x.drawImage(ROSE_IMG, r.rose[0] * S - w / 2, r.rose[1] * S - h / 2, w, h); x.imageSmoothingEnabled = false; }
+    const fig = document.createElement('figure'); fig.appendChild(c);
+    const cap = document.createElement('figcaption'); cap.innerHTML = '<b>' + m.title + '</b>' + m.cap + ' <small>(' + r.provs.length + ' provincií)</small>';
+    fig.appendChild(cap); grid.appendChild(fig);
+    OUT[m.title] = { canvas: c, provs: r.provs.length };
+  }
+  }
+</script>
+</body>
+</html>

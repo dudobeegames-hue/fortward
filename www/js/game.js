@@ -62,7 +62,7 @@
   const UNIT_PLURAL = { knight: 'Rytieri', rider: 'Jazdci', spear: 'Kopijníci' };
   const SPIKE_COST = 25, SPIKE_TYPE_COST = 40;
   const spikeDmg = b => (4 + 3 * (b.lvl - 1)) * (1 + 0.06 * perk('traps'));
-  const stakeDmg = () => (3 + 0.5 * (st.mission - 1)) * (1 + 0.06 * perk('traps')); // koly: rastú s misiou, nie s úrovňou
+  const stakeDmg = () => (3 + 0.5 * (diffM(st.mission) - 1)) * (1 + 0.06 * perk('traps')); // koly: rastú s misiou, nie s úrovňou
   // druhy ostňov (od misie 9): ohnivé zapália, ľadové spomalia útočníka
   const SPIKE_TYPES = {
     fire: { name: 'Ohnivé ostne', tip: '#f89838', body: '#d83818', desc: 'útočník horí' },
@@ -102,7 +102,7 @@
   // zúrivosť: zasiahnutí orkovia a náčelník útočia o 50 % rýchlejšie (kratšie čakanie medzi údermi), ale dostávajú o 20 % viac
   const rageMul = u => u.rageT > 0 ? 1 / 1.5 : 1;
   const spellMax = id => id === 'volley' ? volleyCd() : spCd(id);
-  const spellPow = () => 1 + 0.15 * (st.mission - 1); // kúzla silnejú s misiou, aby stačili na tuhšiu hordu
+  const spellPow = () => 1 + 0.15 * (diffM(st.mission) - 1); // kúzla silnejú s misiou, aby stačili na tuhšiu hordu
   const mineGold = b => (20 + 12 * (b.lvl - 1)) * (1 + 0.06 * perk('mines'));
   const chapelHeal = b => 4 * (1 + 0.4 * (b.lvl - 1)) * (1 + 0.08 * perk('helpers'));
   const trapStun = b => (2.5 + 0.5 * (b.lvl - 1)) * (1 + 0.06 * perk('traps'));
@@ -429,7 +429,7 @@
   const abilDur = id => 1 + 0.05 * (abilLvl(id) - 1);
   const abilCd = id => 1 - 0.03 * (abilLvl(id) - 1);
   const spCd = id => SPELLS[id].cd * abilCd(id);
-  const ptsFree = (m) => { m = m || kingMeta; return Math.max(0, m.lvl - 1 + (landDone('jarl') ? 1 : 0) - Object.values(m.sk || {}).reduce((a, l) => a + l - 1, 0)); }; // Ostrov jarla: +1 bod
+  const ptsFree = (m) => { m = m || kingMeta; return Math.max(0, m.lvl - 1 + (landDone('north') ? 1 : 0) - Object.values(m.sk || {}).reduce((a, l) => a + l - 1, 0)); }; // Severná krajina: +1 bod
   // čo schopnosť s úrovňou zlepšuje: sila (pow) a/alebo trvanie (dur); nabíjanie sa skracuje vždy
   const ABIL_FX = { volley: 'pow', freeze: 'dur', lightning: 'pow', fireball: 'pow', warcry: 'dur', shield: 'dur', heal: 'pow', firewall: 'pow dur', teleport: 'pow',
     rage: 'dur', roar: 'pow', axe: 'pow', totem: 'dur', poison: 'pow dur', hex: 'pow', charge: 'pow', hide: 'dur', feast: 'dur' };
@@ -459,7 +459,7 @@
   const tierFree = t => tierStars(t) - tierSpent(t);
   const starsFree = () => [0, 1, 2].reduce((a, t) => a + Math.max(0, tierFree(t)), 0);
   const starsFor = ratio => ratio >= 0.8 ? 3 : ratio >= 0.4 ? 2 : 1;
-  const costOf = kind => kind === 'wall' ? Math.max(4, Math.round(BUILD.wall.cost * (1 - 0.05 * perk('masons')) * (landDone('raven') ? 0.9 : 1))) : BUILD[kind].cost; // Havraní fjord: hradby −10 %
+  const costOf = kind => kind === 'wall' ? Math.max(4, Math.round(BUILD.wall.cost * (1 - 0.05 * perk('masons')) * (landDone('long') ? 0.9 : 1))) : BUILD[kind].cost; // Dlhý ostrov: hradby −10 %
   const gateCost = () => Math.max(6, Math.round(GATE_COST * (1 - 0.05 * perk('masons'))));
   const sellShare = () => 0.5 + 0.04 * perk('dealers'); // koľko z vloženého zlata vráti predaj
 
@@ -603,7 +603,8 @@
   // mapa ostrova má pevné rozmery (rovnaký ostrov pre všetkých); na obrazovke sa vycentruje, okolo pokračuje more
   const MAP_PAD = 32, MW = 190; // ostrov 190 × 400 a nad aj pod ním pás mora
   let MH = 400 + 2 * MAP_PAD; // výška mapy práve zobrazeného územia (ostrovčeky sú nižšie)
-  const mapOX = () => Math.round((W - MW) / 2);
+  // mapa sa vycentruje; námornícka mapa širšia ako obrazovka sa posúva do strán (mapCamX)
+  const mapOX = () => !st.world && island && island.paper && island.w > W ? -Math.round(mapCamX) : Math.round((W - (!st.world && island && island.w || MW)) / 2);
   const mapViewBottom = () => mapCamMax() + H - $('mapBar').offsetHeight * DPR / S; // najnižší viditeľný riadok mapy (pri posunutí nadol)
   // hra za orkov: kampaň ide po mape opačne (orkská misia 1 = pevnosť orkov hore, uzol 10)
   const isOrc = () => st.race === 'Orkovia';
@@ -730,13 +731,13 @@
   const islandCache = {};
   function landIsland(id) {
     const l = landById(id) || LANDS[0];
-    if (!islandCache[l.id]) islandCache[l.id] = l.home ? buildIsland(MW, 400, 21, MAP_PAD) : buildIsland(MW, l.map.h, l.map.seed, MAP_PAD, l.map);
+    if (!islandCache[l.id]) islandCache[l.id] = l.home ? buildIsland(MW, 400, 21, MAP_PAD) : paperLand(l);
     return islandCache[l.id];
   }
   function setLand(id) {
     st.land = (landById(id) || LANDS[0]).id;
     island = landIsland(st.land);
-    MH = island.bg.height;
+    MH = island.paper ? island.h : island.bg.height;
     island.baseKey = island.borderKey = island.paperKey = island.paperNextKey = null;
   }
   // mriežka a krajina bojiska (výška závisí od misie)
@@ -876,7 +877,7 @@
   const CAMP_DRUM = 1.2, CAMP_TOTEM = 0.015; // bubon: horda o 20 % rýchlejšia; totem: lieči 1,5 % zdravia za sekundu
   const campLive = () => st.camp ? st.camp.parts.filter(o => o.hp > 0 && o.role !== 'trap') : []; // pasce nie sú cieľ
   const campHas = role => !!st.camp && st.camp.parts.some(o => o.role === role && o.hp > 0);
-  const campPow = () => (1 + 0.2 * (st.mission - HOME_PROVINCES - 1)) * Math.sqrt(TIERS[st.tier || 0].hp);
+  const campPow = () => (1 + 0.2 * (diffM(st.mission) - HOME_PROVINCES - 1)) * Math.sqrt(TIERS[st.tier || 0].hp);
   // jednotka vlny vyjde z liahne svojho druhu v tábore; keď tábor také liahne mal a všetky padli, ten druh už nepríde
   function spawnFromCamp(item) {
     const all = st.camp ? st.camp.parts.filter(o => o.role === 'spawn' && [].concat(o.skin.unit).includes(item.type)) : []; // liaheň môže vypúšťať aj viac druhov
@@ -892,7 +893,7 @@
     if (st.endless) return null; // nekonečná obrana je bez tábora
     const race = foeRace(), lay = castleLay(st.mission);
     if (!lay || !lay.length) return null;
-    const pieces = CAMP_PIECES[race], mm = (1 + 0.2 * (st.mission - HOME_PROVINCES - 1)) * TIERS[st.tier || 0].hp;
+    const pieces = CAMP_PIECES[race], mm = (1 + 0.2 * (diffM(st.mission) - HOME_PROVINCES - 1)) * TIERS[st.tier || 0].hp;
     return {
       rocks: [],
       parts: lay.filter(q => pieces[q.k]).map((q, i) => {
@@ -1005,7 +1006,7 @@
     tower: { hp: 420, spd: 9,  dmg: 8,  cd: 0.45, armor: 0.6, spr: 'siegeTower', range: 96 },  // dvaja lukostrelci z výšky – ďaleký dostrel, aj na letcov; sprevádza ostatné stroje
   };
   function spawnSiege(kind, x, y) {
-    const d = SIEGE[kind], a = Math.max(0, st.mission - HOME_PROVINCES - 1), sm = 1 + 0.06 * perk('siege'), hp = d.hp * (1 + 0.15 * a) * sm;
+    const d = SIEGE[kind], a = Math.max(0, diffM(st.mission) - HOME_PROVINCES - 1), sm = 1 + 0.06 * perk('siege'), hp = d.hp * (1 + 0.15 * a) * sm;
     st.soldiers.push({ siege: kind, x: x != null ? x : G.hallCx + (Math.random() - 0.5) * 10, y: y != null ? y : G.hallTop - 4, hx: x, hy: y, hp, max: hp, dmg: d.dmg * (1 + 0.15 * a) * sm, spd: d.spd, armor: d.armor, spr: d.spr, cd: 0.5, fired: 0, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
     const u = st.soldiers[st.soldiers.length - 1];
     for (let k = 0; k < 8; k++) part(u.x, u.y - 2, (Math.random() - 0.5) * 30, -Math.random() * 14, 0.4, '#c6a272', 40);
@@ -1132,7 +1133,7 @@
   function newGame() {
     undoStack = [];
     Object.assign(st, {
-      wave: 0, chestRun: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (st.mission - 1)) * (1 + 0.05 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, shake: 0, soldierN: 0,
+      wave: 0, chestRun: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (diffM(st.mission) - 1)) * (1 + 0.05 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, shake: 0, soldierN: 0,
       blds: [], paving: {}, enemies: [], soldiers: [], form: null, proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
       cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, shieldCd: 0, healCd: 0, fwCd: 0, tpCd: 0, rageCd: 0, roarCd: 0, axeCd: 0, axes: [], totemCd: 0, poisonCd: 0, hexCd: 0, totems: [], clouds: [], pools: [], chargeCd: 0, hideCd: 0, feastCd: 0, shields: [], fireWalls: [], heroDead: {},
       spellSel: null, siegeOrder: [], siegePick: null, fallFx: [], blasts: [], healFx: [], bolts: [], hallHolyT: 0, stance: 'attack', introPan: null,
@@ -1164,7 +1165,10 @@
     pBear: 0.07, pWolf: 0.1,
     pArcher: 0.12, pBat: 0.12, pRam: 0.05, pShaman: 0.04, pSapper: 0.06, // podiel nových nepriateľov
   };
-  const goldMul = () => (1 + DIFF.goldMission * (st.mission - 1)) * (landDone('seal') ? 1.05 : 1); // Tulenia skala: +5 % zlata
+  // obtiažnosť misie: do 19. rastie s číslom misie, ďalej pomalšie (inak by počty a sila hordy pri 76 misiách prerástli všetko)
+  const diffM = m => m <= 19 ? m : 19 + (m - 19) * 0.3;
+  const missionHpOf = m => DIFF.missionHp[m - 1] || DIFF.missionHp[18] + 0.15 * (diffM(m) - 19);
+  const goldMul = () => (1 + DIFF.goldMission * (diffM(st.mission) - 1)) * (landDone('isles') ? 1.05 : 1); // Severské ostrovy: +5 % zlata
   const ENDLESS_HP = 1.09, ENDLESS_BASE = 0.55; // nekonečná obrana: horda začne na 55 % sily 10. misie a každá vlna pridá 9 % zdravia
   // ---- truhlica: zlatky na útok na hrad; plní sa v obranných misiách (podiel zo zabitých + neminuté zlato pri výhre) ----
   const CHEST_KILL = 0.05; // 5 % odmeny za zabitého navyše do truhlice (neminuté zlato ide celé)
@@ -1173,13 +1177,13 @@
   const updateChest = () => { const c = document.querySelector('#chestBox span'); if (c) c.textContent = st.chest || 0; };
 
   function buildWave(w) {
-    const m = st.mission, ew = w + (m - 1) * DIFF.typeShift;
+    const m = st.mission, dm = diffM(m), ew = w + (dm - 1) * DIFF.typeShift;
     const q = [];
     const tr = TIERS[st.tier || 0];
-    const n = 6 + Math.round(w * DIFF.countWave + (m - 1) * DIFF.countMission) + tr.extra;
-    const mHp = DIFF.missionHp ? DIFF.missionHp[m - 1] : 1 + DIFF.hpMission * (m - 1);
+    const n = 6 + Math.round(w * DIFF.countWave + (dm - 1) * DIFF.countMission) + tr.extra;
+    const mHp = missionHpOf(m);
     // nekonečná obrana: začne ľahšie ako 10. misia (ENDLESS_BASE) a každá vlna pridá ENDLESS_HP – bez stropu
-    const hpMul = (st.endless ? ENDLESS_BASE * Math.pow(ENDLESS_HP, w - 1) : Math.pow(DIFF.hpWave + DIFF.hpWaveMission * (m - 1), w - 1)) * mHp * (st.tier ? tr.hp : DIFF.copperHp[m - 1]);
+    const hpMul = (st.endless ? ENDLESS_BASE * Math.pow(ENDLESS_HP, w - 1) : Math.pow(DIFF.hpWave + DIFF.hpWaveMission * (dm - 1), w - 1)) * mHp * (st.tier ? tr.hp : DIFF.copperHp[m - 1] || 1.15);
     const gap = Math.max(0.3, 1.3 - ew * 0.04);
     for (let i = 0; i < n; i++) {
       const r = Math.random();
@@ -1203,10 +1207,10 @@
     const mw = missionWaves(m), bossWave = st.endless || mw >= 10 ? w % 5 === 0 : w === mw; // kratšie misie: boss len v poslednej vlne
     if (bossWave) { // boss v 5. a 10. vlne, v posledných misiách dvaja
       const tenth = st.endless ? w % 10 === 0 : w === mw; // v nekonečnej obrane je každá 10. vlna ako posledná
-      const bossMul = (tenth ? DIFF.bossLast : 1) * (DIFF.bossBase + DIFF.bossMission * (m - 1)) * tr.hp * (st.endless ? ENDLESS_BASE * Math.pow(ENDLESS_HP, w - 5) : 1);
+      const bossMul = (tenth ? DIFF.bossLast : 1) * (DIFF.bossBase + DIFF.bossMission * (dm - 1)) * tr.hp * (st.endless ? ENDLESS_BASE * Math.pow(ENDLESS_HP, w - 5) : 1);
       const giants = st.endless ? (w < 15 ? [] : w < 30 ? [w % 10 === 5 ? 'giantRam' : 'mammoth'] : ['giantRam', 'mammoth']) : (GIANTS[m] || missionDef(m).giants || {})[w] || [];
       const eg = st.endless ? Math.pow(ENDLESS_HP, Math.max(0, w - 15)) : 1; // obri a veľkráľ rastú s vlnou nekonečnej obrany
-      for (const type of giants) q.splice(Math.floor(q.length * 0.15), 0, { type, gap: 2.5, hpMul: tr.hp * (1 + 0.15 * (m - 7)) * eg }); // obri vyrážajú skoro – sú pomalí
+      for (const type of giants) q.splice(Math.floor(q.length * 0.15), 0, { type, gap: 2.5, hpMul: tr.hp * (1 + 0.15 * (dm - 7)) * eg }); // obri vyrážajú skoro – sú pomalí
       // vojvodca je pomalý – vyrazí už po prvej pätine hordy, aby dorazil spolu s ňou (nie dlho po nej); v 5. vlne s obrom nejde
       if (!(giants.length && !tenth)) q.splice(Math.floor(q.length * 0.2), 0, { type: 'warlord', gap: 1.2, hpMul: bossMul });
       if (tenth && m >= 8) q.splice(Math.floor(q.length * 0.45), 0, { type: 'warlord', gap: 1.2, hpMul: bossMul });
@@ -1525,7 +1529,7 @@
       e.summonT = KING_SUMMON.cd;
       const mine = st.enemies.filter(o => o.summoned && !o.dead).length;
       for (let k = 0; k < Math.min(KING_SUMMON.n, KING_SUMMON.max - mine); k++) {
-        const gob = spawnEnemy({ type: 'goblin', hpMul: (DIFF.missionHp[st.mission - 1] || 3) * TIERS[st.tier || 0].hp * 1.4 });
+        const gob = spawnEnemy({ type: 'goblin', hpMul: missionHpOf(st.mission) * TIERS[st.tier || 0].hp * 1.4 });
         const a = Math.random() * 6.28;
         gob.x = e.x + Math.cos(a) * 12; gob.y = e.y + Math.sin(a) * 6; gob.summoned = true;
         for (let q = 0; q < 8; q++) part(gob.x, gob.y - 4, (Math.random() - 0.5) * 24, -Math.random() * 24, 0.6, q % 2 ? '#5aff8a' : '#305c22', 0);
@@ -4211,11 +4215,11 @@
   function blinkData(i) {
     const B = island.blink || (island.blink = []);
     if (B[i]) return B[i];
-    const P = island.prov, R = BLINK_R;
-    let x0 = MW, y0 = MH, x1 = 0, y1 = 0;
-    for (let k = 0; k < P.length; k++) if (P[k] === i) { const x = k % MW, y = (k / MW) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    const P = island.prov, R = BLINK_R, IW = island.w || MW; // námornícke územia môžu byť širšie
+    let x0 = IW, y0 = MH, x1 = 0, y1 = 0;
+    for (let k = 0; k < P.length; k++) if (P[k] === i) { const x = k % IW, y = (k / IW) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
     const w = x1 - x0 + 1, h = y1 - y0 + 1, dist = new Uint8Array(w * h).fill(255), q = [];
-    const inP = (x, y) => x >= 0 && y >= 0 && x < MW && y < MH && P[y * MW + x] === i;
+    const inP = (x, y) => x >= 0 && y >= 0 && x < IW && y < MH && P[y * IW + x] === i;
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       if (!inP(x, y)) continue;
       if (!inP(x + 1, y) || !inP(x - 1, y) || !inP(x, y + 1) || !inP(x, y - 1)) { dist[(y - y0) * w + x - x0] = 0; q.push((y - y0) * w + x - x0); }
@@ -4453,29 +4457,6 @@
     'KgK',
     '.K.',
   ];
-  // veterná ružica: hroty osvetlené zľava zhora (ľavá a horná polovica svetlá), sever červený, okolo krúžok; nad ňou N
-  const P_ROSE = [
-    '.........K.........',
-    '........KnK........',
-    '........KnK........',
-    '.......KNnnK.......',
-    '......oKNnnKo......',
-    '.....o.KNnnK.o.....',
-    '....o.KNNnnnK.o....',
-    '...KKKKNNnnnKKKK...',
-    '.KKLLLLLNnnLLLLLKK.',
-    'KDDDDDDDDWDDDDDDDDK',
-    '.KKDDDDDLDDDDDDDKK.',
-    '...KKKKLLDDDKKKK...',
-    '....o.KLLDDDK.o....',
-    '.....o.KLDDK.o.....',
-    '......oKLDDKo......',
-    '.......KLDDK.......',
-    '........KDK........',
-    '........KDK........',
-    '.........K.........',
-  ];
-  const P_N = ['K..K', 'KK.K', 'K.KK', 'K..K'];
   const P_SHIP = [
     '.....K.....',
     '.....KK....',
@@ -4614,31 +4595,25 @@
     });
     // veterná ružica s kurzovými čiarami na voľnom mori (najďalej od UI a ostrova)
     const seaBox = (cx, cy, r) => { for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) { if (x < 0 || y < 0 || x >= MW || y >= MH) return false; const i = y * MW + x; if (!sea(i) || sd[i] < 3 || uiBand(x, y)) return false; } return true; };
-    let rose = null; // veterná ružica dole napravo od ostrova
-    for (let y = Math.round(yb) - 30; y > MH * 0.45 && !rose; y -= 2) for (let x = MW - 13; x > MW * 0.5 && !rose; x -= 2) if (seaBox(x, y, 10) && seaBox(x, y - 6, 9)) rose = [x, y];
-    if (!rose) for (let y = 12; y < MH - 12 && !rose; y += 2) for (let x = 12; x < MW - 12 && !rose; x += 2) if (seaBox(x, y, 9)) rose = [x, y];
+    let rose = null; // veterná ružica dole napravo od ostrova (kompas z obrázka dokreslí present v plnom rozlíšení)
+    for (let y = Math.round(yb) - 34; y > MH * 0.45 && !rose; y -= 2) for (let x = MW - 22; x > MW * 0.5 && !rose; x -= 2) if (seaBox(x, y, 17)) rose = [x, y];
+    if (!rose) for (let y = 20; y < MH - 20 && !rose; y += 2) for (let x = 20; x < MW - 20 && !rose; x += 2) if (seaBox(x, y, 15)) rose = [x, y];
+    island.paperRose = rose;
     if (rose) {
       const [cx, cy] = rose;
       for (let a = 0; a < 16; a++) { // kurzové čiary (portolán): z ružice cez more, bodkované
         const an = a * Math.PI / 8, dx = Math.cos(an), dy = Math.sin(an);
-        for (let r = 12; r < 400; r += 2) {
+        for (let r = 23; r < 400; r += 2) {
           const x = Math.round(cx + dx * r), y = Math.round(cy + dy * r);
           if (x < 0 || y < 0 || x >= MW || y >= MH) break;
           const i = y * MW + x; if (sea(i) && sd[i] > 3 && (r % 6 !== 0)) put(x, y, lit(x, y, a % 2 ? 0.9 : 0.84));
         }
       }
-      const ox = cx - 9, oy = cy - 9;
-      P_ROSE.forEach((row, j) => { for (let q = 0; q < row.length; q++) {
-        const ch = row[q], x = ox + q, y = oy + j;
-        if (ch === '.') continue;
-        put(x, y, ch === 'K' ? INK : ch === 'D' || ch === 'o' ? INK2 : ch === 'N' ? INKR2 : ch === 'n' ? INKR : ch === 'W' ? SNOWP : lit(x, y, 1.18));
-      } });
-      P_N.forEach((row, j) => { for (let q = 0; q < 4; q++) if (row[q] === 'K') put(cx - 1 + q, oy - 6 + j, INK); });
     }
     // lode perom na mori
     let ships = 0;
     for (let y = 20; y < MH - 20 && ships < 2; y += 37) for (let x = 6; x < MW - 16 && ships < 2; x += 23) {
-      const ok = () => { for (let j = -2; j < 11; j++) for (let q = -2; q < 13; q++) { const xx = x + q, yy = y + j; if (xx < 0 || yy < 0 || xx >= MW || yy >= MH) return false; const i = yy * MW + xx; if (!sea(i) || sd[i] < 4 || uiBand(xx, yy)) return false; } return !rose || Math.hypot(x - rose[0], y - rose[1]) > 26; };
+      const ok = () => { for (let j = -2; j < 11; j++) for (let q = -2; q < 13; q++) { const xx = x + q, yy = y + j; if (xx < 0 || yy < 0 || xx >= MW || yy >= MH) return false; const i = yy * MW + xx; if (!sea(i) || sd[i] < 4 || uiBand(xx, yy)) return false; } return !rose || Math.hypot(x + 5 - rose[0], y + 4 - rose[1]) > 30; };
       if (hash2(x, y, 127) < 0.5 && ok()) { stamp(P_SHIP, x, y); for (let q = -1; q < 12; q += 2) put(x + q, y + 10, INK2); ships++; y += 60; }
     }
     x2.putImageData(id, 0, 0);
@@ -4677,6 +4652,7 @@
   }
   function renderPaperMap(time) {
     g.drawImage(paperBase(), 0, 0);
+    if (island.paperRose) mapRose = { x: mapOX() + island.paperRose[0], y: island.paperRose[1] };
     const pa = st.provAnim;
     if (pa) { g.globalAlpha = provEase(pa.t); g.drawImage(paperBase(pa.i), 0, 0); g.globalAlpha = 1; } // dobytý región sa plynule zafarbí farbou hráča
     drawMissionBlink(time);
@@ -4702,9 +4678,10 @@
     return c;
   }
   function renderMap(time) {
-    worldLbls = null;
+    worldLbls = null; mapRose = null;
     if (st.world) { if (buf.height < WORLD_H) buf.height = WORLD_H; renderWorld(time); return; }
     if (buf.height < MH) buf.height = MH; // plátno aspoň na výšku mapy – pri posunutí nadol by inak dole ostal čierny pás
+    if (island.paper) { renderPaperLand(time); return; } // územia mimo domovského ostrova: námornícka mapa
     const ox = mapOX(), hgt = Math.max(MH, buf.height);
     if (mapStyle === 'paper') g.drawImage(paperSurround(ox, hgt), 0, 0); // pergamen pokračuje aj vedľa ostrova
     else g.drawImage(mapSurround(ox, hgt), 0, 0);
@@ -4739,302 +4716,144 @@
     g.globalAlpha = 1;
   }
 
-  // ---- mapa sveta: námornícka mapa so všetkými územiami (dobyté vo farbe hráča), zahmlenými krajinami, ktoré prídu,
-  // a plavebnými trasami; po dobytí územia sa loď preplaví k ďalšiemu (st.sail). Je to režim mapy (st.world) ----
-  const WORLD_H = 400;
+  // ---- mapa sveta: námornícka mapa so všetkými územiami (paper.js) – dobyté provincie vo farbe hráča, ostatné vo farbe rasy,
+  // ktorá ich drží, plavebné trasy a kompas; po dobytí územia sa ukáže nové územie (st.sail). Je to režim mapy (st.world) ----
   const landsSeen = () => loadJSON(sk('lands'), ['home']);
   const markLandSeen = id => { const a = landsSeen(); if (!a.includes(id)) { a.push(id); saveJSON(sk('lands'), a); } };
-  const worldPct = () => Math.round(Math.min(st.unlocked - 1, MAX_MISSION) / WORLD_REGIONS * 100);
+  const worldPct = () => Math.round(Math.min(st.unlocked - 1, MAX_MISSION) / MAX_MISSION * 100);
   const landReached = l => st.unlocked >= l.first && landsSeen().includes(l.id);
-  // súš územia na mape sveta: obdĺžnik podľa súše jeho mapy, zmenšený na mierku s a vycentrovaný na (cx, cy)
+  const myRace = () => isOrc() ? 'orc' : 'human';
+  // papier okolo mapy: mapy sa kreslia s pásom mora navyše, aby papier pokračoval aj na širšom displeji a pri posune
+  const PPX = 48, PPY = 40;
+  let worldGeom = null;
+  const worldG = () => worldGeom || (worldGeom = PAPER.build(Object.assign(worldSpec(), { W: WORLD_W + 2 * PPX, H: WORLD_H + 2 * PPY, view: { s: 1, cx: WORLD_W / 2, cy: WORLD_H / 2 } })));
+  // poradie misií: skupiny (súš, pásmo krajiny) za sebou, v každej od hradu najbližšieho predošlému (prvý celkovo najnižší)
+  function snakeOrder(items, groups, key) {
+    const out = [];
+    for (const gr of groups) {
+      const left = items.filter(p => gr.some(([li, zi]) => key(p, li, zi)));
+      let cur = out.length ? out[out.length - 1] : null;
+      while (left.length) {
+        const c0 = cur, nx = c0 ? left.reduce((a, p) => Math.hypot(p.x - c0.x, p.y - c0.y) < Math.hypot(a.x - c0.x, a.y - c0.y) ? p : a) : left.reduce((a, p) => p.y > a.y ? p : a);
+        left.splice(left.indexOf(nx), 1); out.push(nx); cur = nx;
+      }
+    }
+    return out;
+  }
+  // misia každej provincie mapy sveta (domovský ostrov: zdola nahor, za orkov naopak)
+  let worldMis = null;
+  function worldMissions() {
+    const key = st.race;
+    if (worldMis && worldMis.key === key) return worldMis.m;
+    const G0 = worldG(), m = new Array(G0.provs.length).fill(0), idx = G0.provs.map((p, i) => Object.assign({ i }, p));
+    for (const l of LANDS) {
+      const groups = l.groups || [l.wl.map(li => [li, 0]).concat(l.wl.map(li => [li, 1]))];
+      snakeOrder(idx, groups, (p, li, zi) => p.land === li && p.zone === zi).forEach((p, k) => { m[p.i] = l.home ? (isOrc() ? MISSIONS.length - k : k + 1) : l.first + k; });
+    }
+    worldMis = { key, m };
+    return m;
+  }
+  // kto provinciu drží: dobytá = hráč, inak rasa územia (na domovskom ostrove ľudia na juhu, orkovia na severe)
+  const provRaceW = (p, num, skip) => num < st.unlocked && num !== skip ? myRace() : p.race;
+  // súš územia na mape sveta (súradnice mapy sveta)
   function landBox(l) {
     if (l.box) return l.box;
-    const isl = landIsland(l.id), P = isl.prov, CH = isl.bg.height;
-    let x0 = MW, x1 = 0, y0 = CH, y1 = 0;
-    for (let k = 0; k < P.length; k++) if (P[k] !== 255) { const x = k % MW, y = (k / MW) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-    const s = l.world.s, w = (x1 - x0 + 1) * s, h = (y1 - y0 + 1) * s;
-    return (l.box = { x: Math.round(l.world.cx - w / 2), y: Math.round(l.world.cy - h / 2), w: Math.round(w), h: Math.round(h), sx0: x0, sy0: y0, s });
-  }
-  const futureBox = f => ({ x: Math.round(f.cx - f.w / 2), y: Math.round(f.cy - f.h / 2), w: f.w, h: f.h });
-  const boxCenter = b => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
-  const placeBox = id => { const l = landById(id); if (l) return landBox(l); const f = FUTURE_LANDS.find(q => q.id === id); return f ? futureBox(f) : null; };
-  // trasa medzi dvoma územiami: oblúk od okraja k okraju (kontrolný bod bokom, aby loď neplávala cez súš)
-  function routePts(a, b) {
-    const A = boxCenter(placeBox(a)), B = boxCenter(placeBox(b)), ba = placeBox(a), bb = placeBox(b);
-    const dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
-    const ra = Math.min(ba.w, ba.h) * 0.45, rb = Math.min(bb.w, bb.h) * 0.45;
-    const P0 = { x: A.x + ux * ra, y: A.y + uy * ra }, P2 = { x: B.x - ux * rb, y: B.y - uy * rb };
-    const C = { x: (P0.x + P2.x) / 2 - uy * 14, y: (P0.y + P2.y) / 2 + ux * 14 };
-    const pts = [];
-    for (let k = 0; k <= 40; k++) { const t = k / 40, u = 1 - t; pts.push({ x: u * u * P0.x + 2 * u * t * C.x + t * t * P2.x, y: u * u * P0.y + 2 * u * t * C.y + t * t * P2.y }); }
-    return pts;
-  }
-  // vlastník provincie územia na mape sveta: hráč (dobyté, na domovskom ostrove aj jeho vlastné provincie) alebo nepriateľ
-  const worldOwner = (l, i) => {
-    const num = l.home ? (isOrc() ? MISSIONS.length - i : i + 1) : l.first + i;
-    return num < st.unlocked || (l.home && num <= HOME_PROVINCES) ? 'me' : 'foe';
-  };
-  // ---- podklad mapy sveta: spoločné masky (územie, provincia, vzdialenosť od pobrežia, krajina) a 5 štýlov vyfarbenia ----
-  // štýly (návrhy na výber): 1 živá, 2 maľovaná akvarelom, 3 ríše vo farbách, 4 nočná, 5 kolorovaný atlas
-  let worldStyle = 7; // pixelová mapa v štýle mapy ostrova (7); staršie pixelové návrhy 1–5
-  let worldM = null;
-  const HEX = a => a.map(hexRGB);
-  const WB = { // krajiny: tóny od tieňa k svetlu
-    grass: RAMP.grass, forest: RAMP.bush, birch: TR.birch, swamp: TR.swamp, desert: SAND, mount: SANDSTONE,
-    tundra: HEX(['#2e3a30', '#3e4e40', '#526654', '#6a806a', '#8a9e88', '#b0c0ae', '#dfe8e4']),
-    ice: HEX(['#5a7a9a', '#7a9ab8', '#9ab8d0', '#c0d8e8', '#e0eef6', '#f8fcff']),
-    hive: HEX(['#200c26', '#34143e', '#4c1e5a', '#682a78', '#8a3c98', '#ae5ab8']),
-  };
-  // farby ríš (návrh 3): kto krajinu drží teraz alebo bude (severania, elfovia, nemŕtvi, púštni, polárni, roj)
-  const REALM = { human: [70, 120, 210], orc: [214, 110, 40], nordic: [60, 150, 150], elf: [70, 160, 70], undead: [120, 80, 150], desert: [214, 176, 70], polar: [214, 228, 240], swarm: [170, 50, 60] };
-  function worldMasks() {
-    if (worldM) return worldM;
-    const N = MW * WORLD_H, land = new Int16Array(N).fill(-1), prov = new Int16Array(N).fill(-1), biome = new Array(N);
-    LANDS.forEach((l, li) => {
-      const b = landBox(l), isl = landIsland(l.id), P = isl.prov, CH = isl.bg.height, kind = { home: 'grass', seal: 'tundra', raven: 'birch', jarl: 'tundra' }[l.id] || 'grass';
-      for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) {
-        const sx = Math.round(b.sx0 + x / b.s), sy = Math.round(b.sy0 + y / b.s);
-        if (sx < 0 || sy < 0 || sx >= MW || sy >= CH) continue;
-        const pi = P[sy * MW + sx]; if (pi === 255) continue;
-        const wx = b.x + x, wy = b.y + y; if (wx < 0 || wy < 0 || wx >= MW || wy >= WORLD_H) continue;
-        const k = wy * MW + wx; land[k] = li; prov[k] = pi; biome[k] = kind;
-      }
-    });
-    FUTURE_LANDS.forEach((f, fi) => {
-      const b = futureBox(f);
-      for (let y = b.y - 4; y < b.y + b.h + 4; y++) for (let x = b.x - 4; x < b.x + b.w + 4; x++) {
-        const dd = Math.hypot((x - f.cx) / (f.w / 2), (y - f.cy) / (f.h / 2)) + (fbm(x * 0.06, y * 0.06, f.seed) - 0.5) * 0.5;
-        if (dd > 1 || x < 0 || y < 0 || x >= MW || y >= WORLD_H) continue;
-        const k = y * MW + x, t = (y - b.y) / b.h + (fbm(x * 0.05, y * 0.05, f.seed + 3) - 0.5) * 0.3; // hranice krajín nie sú rovné
-        land[k] = 100 + fi;
-        biome[k] = f.id === 'polar' ? 'ice' : f.id === 'swarm' ? 'hive' : t < 0.36 ? 'forest' : t < 0.62 ? 'swamp' : 'desert';
-        prov[k] = f.id === 'continent' ? (t < 0.36 ? 0 : t < 0.62 ? 1 : 2) : 0; // kontinent: elfovia, nemŕtvi, púštni
-      }
-    });
-    // hory vnútri väčšej súše
-    for (let k = 0; k < N; k++) if (land[k] >= 0) { const x = k % MW, y = (k / MW) | 0; if (fbm(x * 0.09, y * 0.09, 331) > 0.72 && biome[k] !== 'ice' && biome[k] !== 'desert') biome[k] = 'mount'; }
-    // hory len vnútri súše (nie na pobreží)
-    for (let k = 0; k < N; k++) if (biome[k] === 'mount') { const x = k % MW, y = (k / MW) | 0; if ([[2, 0], [-2, 0], [0, 2], [0, -2]].some(([dx, dy]) => { const nx = x + dx, ny = y + dy; return nx < 0 || ny < 0 || nx >= MW || ny >= WORLD_H || land[ny * MW + nx] < 0; })) biome[k] = land[k] >= 100 ? 'forest' : 'grass'; }
-    // vzdialenosť od pobrežia: na mori (plytčiny, príboj) aj na súši (pláž, pobrežný pás)
-    const dist = (isSrc, inside, max) => {
-      const d = new Uint8Array(N).fill(255), q = [];
-      for (let k = 0; k < N; k++) if (isSrc(k)) { d[k] = 0; q.push(k); }
-      for (let h = 0; h < q.length; h++) {
-        const k = q[h], x = k % MW, y = (k / MW) | 0, v = d[k] + 1; if (v > max) continue;
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= MW || ny >= WORLD_H) continue; const nk = ny * MW + nx; if (!inside(nk) || d[nk] <= v) continue; d[nk] = v; q.push(nk); }
-      }
-      return d;
-    };
-    const seaD = dist(k => land[k] >= 0, k => land[k] < 0, 14), landD = dist(k => land[k] < 0, k => land[k] >= 0, 6);
-    return (worldM = { land, prov, biome, seaD, landD });
-  }
-  // kto drží provinciu územia (návrh 3 a farby vlastníctva)
-  const worldRealm = (li, pi) => {
-    if (li >= 100) { const f = FUTURE_LANDS[li - 100]; return f.id === 'continent' ? ['elf', 'undead', 'desert'][pi] : f.id === 'polar' ? 'polar' : 'swarm'; }
-    const l = LANDS[li], mine = isOrc() ? 'orc' : 'human', foe = isOrc() ? 'human' : 'orc';
-    return worldOwner(l, pi) === 'me' ? mine : l.home ? foe : 'nordic';
-  };
-  const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-  const shade = (c, f) => [c[0] * f, c[1] * f, c[2] * f];
-  // veterná ružica (maľovaný a atlasový štýl)
-  function compassRose(put, cx, cy, r, ink, lt) {
-    for (let a = 0; a < 8; a++) {
-      const ang = a * Math.PI / 4 - Math.PI / 2, len = a % 2 ? r * 0.55 : r;
-      for (let t = 0; t <= len; t += 0.5) { const w = (1 - t / len) * (a % 2 ? 1.2 : 2.2); for (let s = -w; s <= w; s += 0.5) put(Math.round(cx + Math.cos(ang) * t - Math.sin(ang) * s), Math.round(cy + Math.sin(ang) * t + Math.cos(ang) * s), s < 0 ? ink : lt); }
-    }
-    for (let a = 0; a < 64; a++) { const ang = a / 64 * 6.283; put(Math.round(cx + Math.cos(ang) * r * 0.42), Math.round(cy + Math.sin(ang) * r * 0.42), ink); }
+    const B = l.wl.map(i => worldG().boxes[i]), x0 = Math.min(...B.map(b => b.x0)) - PPX, x1 = Math.max(...B.map(b => b.x1)) - PPX, y0 = Math.min(...B.map(b => b.y0)) - PPY, y1 = Math.max(...B.map(b => b.y1)) - PPY;
+    return (l.box = { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 });
   }
   let worldImg = null, worldImgKey = null;
-  function worldBase() {
-    const seen = landsSeen(), key = worldStyle + ':' + st.unlocked + ':' + st.race + ':' + seen.join(',');
-    if (worldImg && worldImgKey === key) return worldImg;
-    const M = worldMasks(), c = worldImg || document.createElement('canvas'); c.width = MW; c.height = WORLD_H;
-    const x2 = c.getContext('2d'), id = x2.createImageData(MW, WORLD_H), d = id.data;
-    const put = (x, y, rgb) => { if (x < 0 || y < 0 || x >= MW || y >= WORLD_H) return; const k = (y * MW + x) * 4; d[k] = rgb[0]; d[k + 1] = rgb[1]; d[k + 2] = rgb[2]; d[k + 3] = 255; };
-    const S = worldStyle;
-    for (let y = 0; y < WORLD_H; y++) for (let x = 0; x < MW; x++) {
-      const k = y * MW + x, li = M.land[k], n = fbm(x * 0.05, y * 0.05, 301) - 0.5, h = hash2(x, y, 303) - 0.5;
-      if (li < 0) { // ---- more ----
-        const sd = M.seaD[k], wv = sd > 3 && y % 7 === 0 && (x + Math.floor(y / 7) * 11) % 19 < 3; // krátke čiarky vĺn
-        let col;
-        if (S === 1) { let v = 0.34 + (sd < 2 ? 0.45 : sd < 5 ? 0.28 : sd < 10 ? 0.14 : 0) + n * 0.18 + h * 0.05; if (wv) v += 0.14; col = pickRamp(SEA, v, x, y); }
-        else if (S === 2) { const base = sd < 2 ? [120, 196, 222] : sd < 6 ? [150, 214, 232] : [176, 226, 238]; col = mix(base, [236, 246, 244], Math.max(0, n * 0.6 + h * 0.25)); if (wv) col = mix(col, [255, 255, 255], 0.55); }
-        else if (S === 3) { col = shade([58, 106, 168], 0.92 + n * 0.25 + h * 0.04); if (sd === 1 || sd === 2) col = mix(col, [140, 190, 230], 0.45); if (wv) col = mix(col, [190, 220, 245], 0.4); }
-        else if (S === 4) { col = shade([14, 22, 52], 0.85 + n * 0.5); if (sd <= 2) col = mix(col, [60, 140, 190], (3 - sd) / 5); if (hash2(x, y, 307) > 0.996) col = [230, 240, 255]; }
-        else { col = pickRamp(PR.sea, 0.62 + n * 0.3 + h * 0.08, x, y); if (sd === 3 || sd === 7) { if ((x + y) % 2 === 0) col = INK2; } } // atlas: soustredné čiary pri pobreží
-        put(x, y, col); continue;
-      }
-      // ---- súš ----
-      const bio = M.biome[k], ld = M.landD[k], ramp = WB[bio] || RAMP.grass;
-      let v = 0.55 + n * 0.45 + h * 0.12;
-      if (bio === 'grass' && fbm(x * 0.08, y * 0.08, 309) > 0.58) v -= 0.22; // lesíky
-      let col = pickRamp(ramp, v, x, y);
-      const beach = ld === 0 && bio !== 'ice' && bio !== 'hive' && bio !== 'swamp';
-      if (S === 1) { if (beach) col = pickRamp(SAND, 0.75 + h * 0.2, x, y); if (ld === 0 && !beach) col = shade(col, 0.8); }
-      else if (S === 2) { col = mix(col, [250, 246, 232], 0.42); if (ld <= 1) col = mix(col, [255, 255, 245], 0.35); if (ld === 0) col = [92, 70, 50]; }
-      else if (S === 3) {
-        const rc = REALM[worldRealm(li, M.prov[k])];
-        col = mix(rc, [255, 255, 255], 0.12 + n * 0.25);
-        const x1 = Math.min(MW - 1, x + 1), y1 = Math.min(WORLD_H - 1, y + 1);
-        const brd = (M.land[y * MW + x1] === li && M.prov[y * MW + x1] !== M.prov[k]) || (M.land[y1 * MW + x] === li && M.prov[y1 * MW + x] !== M.prov[k]);
-        if (brd) col = shade(rc, 0.45);
-        if (ld === 0) col = [24, 18, 12];
-      }
-      else if (S === 4) { col = shade(col, 0.42); if (ld === 0) col = li >= 100 ? [200, 170, 120] : [255, 214, 120]; else if (ld === 1) col = mix(col, [255, 200, 110], 0.35); }
-      else { col = mix(col, pickRamp(PR.paper, 0.7 + h * 0.1, x, y), 0.45); if (ld === 0) col = INK; if (bio === 'mount' && (x + y) % 3 === 0) col = INK2; }
-      put(x, y, col);
-    }
-    // plavebné trasy
-    const rc = S === 1 ? [255, 255, 255] : S === 2 ? [150, 40, 30] : S === 3 ? [255, 255, 255] : S === 4 ? [255, 214, 110] : INKR;
-    for (const [a2, b2] of SEA_ROUTES) {
-      const done = !!landById(b2) && seen.includes(b2);
-      routePts(a2, b2).forEach((pt, k) => { const px = Math.round(pt.x), py = Math.round(pt.y); if (M.land[py * MW + px] >= 0) return; if (done ? k % 3 < 2 : k % 3 === 0) put(px, py, rc); });
-    }
-    if (S === 2 || S === 5) compassRose(put, 104, 368, 13, S === 2 ? [70, 50, 40] : INK, S === 2 ? [250, 240, 220] : PR.paper[7]);
-    x2.putImageData(id, 0, 0);
-    worldImg = c; worldImgKey = key;
-    return c;
-  }
-  // ---- pixelová mapa sveta (štýl 7): rovnaké rampy, dithering a more ako mapa ostrova – plytčiny pri brehu, piesočné pláže
-  // s osvetlenou a zatienenou hranou, lesy z drobných stromčekov, hory so snehom, duny, močiare, ľad a úľ roja ----
-  // more podľa vzdialenosti od pobrežia (sd v bodoch mapy sveta); ďaleko od súše hlboké ako na mape ostrova
-  function worldSea(x, y, sd) {
-    const dd = sd > 200 ? 30 : sd;
-    let v = 0.34 + (fbm(x * 0.05, y * 0.05, 301) - 0.5) * 0.22 + (fbm(x * 0.18, y * 0.12, 305) - 0.5) * 0.08 + Math.max(0, 1 - dd / 12) * 0.26;
-    const swell = Math.sin(x * 0.11 + y * 0.045 + fbm(x * 0.03, y * 0.03, 307) * 6);
-    if (swell > 0.82) v += 0.07; else if (swell < -0.9) v -= 0.05; // dlhé vlny
-    if (dd <= 3) v += (4 - dd) * 0.07;                              // tyrkysová plytčina
-    if (dd === 1) v = 0.95;                                         // príboj pri brehu
-    return pickRamp(SEA, Math.max(0.22, v), x, y);
-  }
-  // drobné kresby na súši (znak = tón rampy): l svetlo, m stred, d tieň, k najtmavšie, h odlesk, s sneh
-  const WSTAMP = {
-    tree:  ['.l.', 'lmd', '.k.'],
-    birch: ['.h.', 'lmd', '.k.'],
-    pine:  ['.l.', '.m.', 'lmd', '.k.'],
-    mount: ['..s..', '.lsd.', 'lmmdd'],
-    peak:  ['...s...', '..lsd..', '.lmmdd.', 'lmmmddd'],
-    spire: ['.h.', '.m.', 'lmd'],
-    reed:  ['l.l', 'm.d'],
-  };
-  const WSWAMP = HEX(['#1a2618', '#24321e', '#304026', '#3e4e2c', '#4e5e34', '#62703e', '#788648']); // močiar: olivový, aby sa odlíšil od lesa
-  const SNOW = hexRGB('#eef4f8'), HIVE_GLOW = hexRGB('#e878ff');
-  let worldPx = null, worldPxKey = null, worldFx = null;
-  function worldPixel() {
+  function worldPaint() {
     const seen = landsSeen(), key = st.unlocked + ':' + st.race + ':' + seen.join(',');
-    if (worldPx && worldPxKey === key) return worldPx;
-    const M = worldMasks(), c = worldPx || document.createElement('canvas'); c.width = MW; c.height = WORLD_H;
-    const x2 = c.getContext('2d'), id = x2.createImageData(MW, WORLD_H), d = id.data;
-    const put = (x, y, rgb) => { if (x < 0 || y < 0 || x >= MW || y >= WORLD_H) return; const k = (y * MW + x) * 4; d[k] = rgb[0]; d[k + 1] = rgb[1]; d[k + 2] = rgb[2]; d[k + 3] = 255; };
-    const landAt = (x, y) => x >= 0 && y >= 0 && x < MW && y < WORLD_H && M.land[y * MW + x] >= 0;
-    const foam = [];
-    for (let y = 0; y < WORLD_H; y++) for (let x = 0; x < MW; x++) {
-      const k = y * MW + x, li = M.land[k];
-      if (li < 0) { if (M.seaD[k] === 1) foam.push({ x, y, ph: hash2(x, y, 7) * 6.28 }); put(x, y, worldSea(x, y, M.seaD[k])); continue; }
-      const bio = M.biome[k], ld = M.landD[k], n = fbm(x * 0.06, y * 0.06, 401) - 0.5, h = hash2(x, y, 403) - 0.5;
-      // pobrežie: svetlo zľava zhora – hrana k moru hore/vľavo je osvetlená, dole/vpravo v tieni
-      const lit = (!landAt(x - 1, y) || !landAt(x, y - 1) ? 0.18 : 0) - (!landAt(x + 1, y) || !landAt(x, y + 1) ? 0.22 : 0);
-      let col;
-      if (ld <= 1) { // pobrežný pás súše (vzdialenosť od mora 1)
-        if (bio === 'ice') col = pickRamp(WB.ice, 0.8 + lit + h * 0.1, x, y);
-        else if (bio === 'hive') col = pickRamp(WB.hive, 0.35 + lit + h * 0.1, x, y);
-        else if (bio === 'swamp') col = pickRamp(TR.mud, 0.6 + lit + h * 0.2, x, y);
-        else col = pickRamp(SAND, 0.66 + lit + h * 0.25, x, y);
-      } else {
-        let v = 0.55 + n * 0.5 + h * 0.16;
-        if (ld === 2) v -= 0.1; // tieň pod plážou
-        if (bio === 'grass' || bio === 'mount') col = pickRamp(RAMP.grass, v + (bio === 'mount' ? -0.08 : 0), x, y);
-        else if (bio === 'birch') col = pickRamp(TR.birch, v, x, y);
-        else if (bio === 'tundra') col = pickRamp(WB.tundra, v, x, y);
-        else if (bio === 'forest') col = pickRamp(RAMP.bush, v - 0.05, x, y);
-        else if (bio === 'swamp') col = fbm(x * 0.15, y * 0.15, 409) > 0.56 ? pickRamp(TR.swampW, 0.75 + h * 0.4, x, y) : pickRamp(WSWAMP, v, x, y); // tône medzi trsmi
-        else if (bio === 'desert') { // duny: svetlý hrebeň, záveterná strana tmavá
-          const r = Math.sin(x * 0.45 + y * 0.8 + fbm(x * 0.05, y * 0.05, 411) * 8);
-          col = pickRamp(SAND, 0.6 + n * 0.3 + h * 0.1 + (r > 0.75 ? 0.25 : r < -0.6 ? -0.2 : 0), x, y);
-        }
-        else if (bio === 'ice') { const cr = Math.abs(fbm(x * 0.09, y * 0.12, 413) - 0.5) < 0.012; col = cr ? WB.ice[1] : pickRamp(WB.ice, 0.66 + n * 0.4 + h * 0.1, x, y); } // trhliny v ľade
-        else col = hash2(x, y, 415) > 0.985 ? HIVE_GLOW : pickRamp(WB.hive, 0.42 + n * 0.5 + h * 0.12, x, y); // úľ: svietiace bodky
-      }
-      put(x, y, col);
+    if (worldImg && worldImgKey === key) return worldImg;
+    const G0 = worldG(), mis = worldMissions(), li = id => LANDS.findIndex(l => l.id === id);
+    const routes = SEA_ROUTES.map(([a, b]) => [landById(a).wl[landById(a).wl.length - 1], landById(b).wl[0], seen.includes(b)]);
+    worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), routes, rose: [PPX + 165, PPY + 375], ships: 2, roseImg: true, noEdge: true });
+    worldImgKey = key;
+    return worldImg;
+  }
+  // ---- mapy území (okrem domovského ostrova): výrez mapy sveta – rovnaký tvar súše aj provincie, zväčšený (view.s);
+  // mapa širšia ako obrazovka sa posúva aj do strán. Uzly (hrady) idú v poradí misií ----
+  function paperLand(l) {
+    const G0 = worldG(), WS = worldSpec(), mis = worldMissions();
+    let spec, w = (l.view && l.view.w) || MW, h = 400, wids = null;
+    if (l.own) { // vlastná mapa (ostrov roja)
+      const p0 = G0.provs.find(p => p.land === l.wl[0]);
+      spec = { W: w + 2 * PPX, H: h + 2 * PPY, seed: l.own.seed, view: { s: 1, cx: w / 2, cy: h / 2 },
+        lands: [{ shape: { circles: l.own.circles }, amp: l.own.amp, zones: [{ n: l.count, race: p0.race, biome: p0.biome }] }] };
+    } else {
+      const b = landBox(l), s = l.view.s;
+      h = Math.max(400, Math.round(b.h * s + 170));
+      wids = [];
+      const lands = l.wl.map(li => { const L = WS.lands[li]; return Object.assign({}, L, { nseed: WORLD_SEED + li * 13,
+        zones: L.zones.map((Z, zi) => { const ps = G0.provs.map((p, i) => [p, i]).filter(([p]) => p.land === li && p.zone === zi); ps.forEach(([, i]) => wids.push(i)); return Object.assign({}, Z, { seeds: ps.map(([p]) => [p.wx, p.wy]) }); }) }); });
+      spec = { W: w + 2 * PPX, H: h + 2 * PPY, seed: 11 + LANDS.indexOf(l) * 10, provSeed: WORLD_SEED, view: { s, cx: b.x + b.w / 2, cy: b.y + b.h / 2 + 10 / s }, lands };
     }
-    // stromčeky, hory a veže úľa: po riadkoch zhora (nižšie prekrývajú vyššie), len vnútri súše toho istého územia
-    const stamp = (S, x0, y0, R, li) => {
-      for (let j = 0; j < S.length; j++) for (let i = 0; i < S[j].length; i++) {
-        if (S[j][i] === '.') continue;
-        const x = x0 + i, y = y0 + j;
-        if (!landAt(x, y) || M.land[y * MW + x] !== li || M.landD[y * MW + x] < 2) return false;
-      }
-      const n2 = R.length - 1;
-      for (let j = 0; j < S.length; j++) for (let i = 0; i < S[j].length; i++) {
-        const ch = S[j][i]; if (ch === '.') continue;
-        put(x0 + i, y0 + j, ch === 'l' ? R[n2 - 1] : ch === 'm' ? R[Math.round(n2 * 0.55)] : ch === 'd' ? R[Math.max(1, Math.round(n2 * 0.25))] : ch === 'k' ? R[0] : ch === 'h' ? R[n2] : SNOW);
-      }
-      return true;
-    };
-    for (let y0 = 0; y0 < WORLD_H; y0 += 2) for (let x0 = 0; x0 < MW; x0 += 3) {
-      const x = x0 + Math.floor(hash2(x0, y0, 423) * 3), y = y0 + (hash2(x0, y0, 425) > 0.5 ? 1 : 0); // bez pravidelnej mriežky
-      if (x >= MW || y >= WORLD_H) continue;
-      const k = y * MW + x, li = M.land[k]; if (li < 0) continue;
-      const bio = M.biome[k], r = hash2(x, y, 421), wood = fbm(x * 0.08, y * 0.08, 309);
-      if (bio === 'mount') { if (r < 0.6) stamp(li >= 100 ? WSTAMP.peak : WSTAMP.mount, x - 2, y - 2, li === 0 ? SANDSTONE : RAMP.stone, li); }
-      else if (bio === 'grass') { if (wood > 0.56 && r < 0.75) stamp(WSTAMP.tree, x - 1, y - 1, RAMP.bush, li); }
-      else if (bio === 'forest') { if (r < 0.8) stamp(WSTAMP.tree, x - 1, y - 1, RAMP.bush, li); }
-      else if (bio === 'birch') { if (wood > 0.5 && r < 0.7) stamp(WSTAMP.birch, x - 1, y - 1, TR.birch, li); }
-      else if (bio === 'tundra') { if (wood > 0.52 && r < 0.7) stamp(WSTAMP.pine, x - 1, y - 2, RAMP.bush, li); }
-      else if (bio === 'swamp') { if (r < 0.18) stamp(WSTAMP.reed, x - 1, y - 1, WSWAMP, li); }
-      else if (bio === 'hive') { if (r < 0.22) stamp(WSTAMP.spire, x - 1, y - 2, WB.hive, li); }
+    const geom = PAPER.build(spec);
+    // poradie misií na mape územia: podľa misií provincií mapy sveta (výrez), vlastná mapa zdola nahor
+    let order;
+    if (wids) order = geom.provs.map((p, j) => j).sort((a, b) => mis[wids[a]] - mis[wids[b]]);
+    else order = snakeOrder(geom.provs.map((p, j) => Object.assign({ j }, p)), [[[0, 0]]], (p, li, zi) => p.land === li && p.zone === zi).map(p => p.j);
+    const node = new Array(geom.provs.length); order.forEach((j, k) => { node[j] = k; });
+    const prov = new Uint8Array(w * h).fill(255);
+    let landTop = h, landBot = 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const pj = geom.prov[(y + PPY) * geom.W + x + PPX];
+      if (geom.land[(y + PPY) * geom.W + x + PPX] < 0 || pj < 0) continue;
+      prov[y * w + x] = node[pj]; if (y < landTop) landTop = y; if (y > landBot) landBot = y;
     }
-    // plavebné trasy: preplávané svetlé čiarky s tieňom na vode, ďalšie len riedke bodky
-    const GLD = hexRGB('#f8e8a8'), DOT = hexRGB('#c8e0f0');
-    for (const [a2, b2] of SEA_ROUTES) {
-      const done = !!landById(b2) && seen.includes(b2);
-      routePts(a2, b2).forEach((pt, k) => {
-        const px = Math.round(pt.x), py = Math.round(pt.y); if (landAt(px, py)) return;
-        if (done ? k % 3 < 2 : k % 3 === 0) { put(px, py, done ? GLD : DOT); if (done && !landAt(px, py + 1)) put(px, py + 1, SEA[1]); }
-      });
+    const nodes = order.map(j => ({ x: geom.provs[j].x - PPX, y: geom.provs[j].y - PPY + 4 }));
+    const routes = l.wl.length > 1 ? l.wl.slice(1).map((_, k) => [k, k + 1]) : [];
+    return { paper: true, land: l, w, h, geom, order, node, prov, nodes, segs: [], routes, landTop, landBot, foam: [], waves: [], fires: nodes.map(() => []),
+      bg: { height: h }, fort: makeOrcFort(), castle: makeMiniCastle(false) };
+  }
+  // vyfarbená mapa územia; skip = uzol, ktorý sa ešte kreslí v pôvodnej farbe (počas prefarbenia po dobytí)
+  function landPaint(skip) {
+    const I = island, l = I.land, key = st.unlocked + ':' + st.race + ':' + skip;
+    if (!I.geom) return { canvas: document.createElement('canvas'), rose: null }; // poistka (mapa územia ešte nie je hotová)
+    I.pimg = I.pimg || {};
+    if (I.pimg[key]) return I.pimg[key];
+    const G0 = I.geom;
+    I.pimg[key] = PAPER.paint(G0, { raceOf: j => { const k = I.node[j], num = l.first + k; return num < st.unlocked && k !== skip ? myRace() : G0.provs[j].race; },
+      keep: I.nodes.map(n => [n.x + PPX, n.y + PPY - 4]), routes: I.routes, rose: [PPX + I.w - 32, PPY + I.h - 80], ships: 2, roseImg: true, noEdge: true }); // kompas vpravo dole (vľavo sú tlačidlá)
+    for (const k in I.pimg) if (k !== key && !k.startsWith(st.unlocked + ':' + st.race + ':')) delete I.pimg[k]; // staré stavy preč
+    return I.pimg[key];
+  }
+  // opálené okraje papiera na okrajoch obrazovky (mapy sa posúvajú, okraje ostávajú) – tmavý pergamen s ditheringom
+  let edgeImg = null, edgeKey = null;
+  function paperEdges(hv) {
+    const key = W + 'x' + hv;
+    if (edgeKey === key) return edgeImg;
+    const c = edgeImg || document.createElement('canvas'); c.width = W; c.height = hv;
+    const x2 = c.getContext('2d'), id = x2.createImageData(W, hv), d = id.data, [r, gg, b] = PR.paper[0];
+    for (let y = 0; y < hv; y++) for (let x = 0; x < W; x++) {
+      const e = Math.min(x, y, W - 1 - x, hv - 1 - y) + (fbm(x * 0.08, y * 0.08, 109) - 0.5) * 12;
+      let a = e < 22 ? Math.pow((22 - e) / 22, 2.2) * 0.75 : 0;
+      const vx = (x - W / 2) / (W / 2), vy = (y - hv / 2) / (hv / 2);
+      a += Math.pow(Math.min(1, vx * vx * 0.7 + vy * vy * 0.9), 2) * 0.16;
+      a = Math.min(1, Math.floor(Math.min(1, a * 1.3) * 6 + BAYER4[(y & 3) * 4 + (x & 3)]) / 6); // stupne s ditheringom ako na papieri
+      const k = (y * W + x) * 4; d[k] = r; d[k + 1] = gg; d[k + 2] = b; d[k + 3] = Math.round(a * 255);
     }
     x2.putImageData(id, 0, 0);
-    // hrebene vĺn na šírom mori (kreslia sa pohyblivo)
-    const waves = [];
-    for (let k = 0; k < 1500 && waves.length < 70; k++) {
-      const wx = Math.floor(hash2(k, 3, 451) * (MW - 8)), wy = Math.floor(hash2(k, 5, 453) * (WORLD_H - 2));
-      if (M.seaD[wy * MW + wx] < 5 || M.seaD[wy * MW + wx + 7] < 5) continue;
-      waves.push({ x: wx, y: wy, len: 3 + Math.floor(hash2(k, 7, 455) * 4), ph: hash2(k, 9, 457) * 6.28 });
-    }
-    worldFx = { foam, waves };
-    worldPx = c; worldPxKey = key;
+    edgeImg = c; edgeKey = key;
     return c;
   }
-  // more vedľa mapy sveta (širší displej): rovnaké hlboké more bez švu
-  let worldSur = null, worldSurKey = null;
-  function worldSurround(ox, hgt) {
-    const key = W + 'x' + hgt + ':' + ox;
-    if (worldSur && worldSurKey === key) return worldSur;
-    const c = worldSur || document.createElement('canvas'); c.width = W; c.height = hgt;
-    const x2 = c.getContext('2d'), id = x2.createImageData(W, hgt), d = id.data;
-    for (let y = 0; y < hgt; y++) for (let X = 0; X < W; X++) {
-      const x = X - ox; if (x >= 0 && x < MW && y < WORLD_H) continue;
-      const col = worldSea(x, y, 255), k = (y * W + X) * 4; d[k] = col[0]; d[k + 1] = col[1]; d[k + 2] = col[2]; d[k + 3] = 255;
-    }
-    x2.putImageData(id, 0, 0);
-    worldSur = c; worldSurKey = key;
-    return c;
-  }
-  // príboj a vlny na mori (ako na mape ostrova)
-  function drawWorldSea(time) {
-    const F = worldFx; if (!F) return;
-    g.fillStyle = 'rgba(240,250,255,0.85)';
-    for (const f of F.foam) if (Math.sin(time * 1.8 + f.ph) > 0.55) g.fillRect(f.x, f.y, 1, 1);
-    for (const w of F.waves) {
-      const a = Math.sin(time * 0.9 + w.ph);
-      if (a < 0.2) continue;
-      const x = Math.round(w.x + Math.sin(time * 0.35 + w.ph) * 2);
-      g.globalAlpha = Math.min(1, (a - 0.2) * 1.6);
-      g.fillStyle = '#8ad0e8'; g.fillRect(x, w.y, w.len, 1);
-      g.fillStyle = '#e8f8ff'; g.fillRect(x + 1, w.y, Math.max(1, w.len - 2), 1);
-      g.fillStyle = '#163a7a'; g.fillRect(x, w.y + 1, w.len, 1);
-      g.globalAlpha = 1;
-    }
+  const drawPaperEdges = () => { const hv = Math.max(60, Math.round(H - $('mapBar').offsetHeight * DPR / S)); g.drawImage(paperEdges(hv), 0, Math.round(camY)); };
+  const PAPER_BG = 'rgb(' + PR.sea[5].join(',') + ')';
+  let mapRose = null; // kompas (obrázok v plnom rozlíšení cez present)
+  function renderPaperLand(time) {
+    const ox = mapOX(), pa = st.provAnim;
+    g.fillStyle = PAPER_BG; g.fillRect(0, 0, W, buf.height);
+    const cur = landPaint(pa ? pa.i : -1);
+    g.drawImage(cur.canvas, ox - PPX, -PPY);
+    if (pa) { g.globalAlpha = provEase(pa.t); g.drawImage(landPaint(-1).canvas, ox - PPX, -PPY); g.globalAlpha = 1; } // dobytý región sa plynule zafarbí farbou hráča
+    g.save(); g.translate(ox, 0);
+    drawMissionBlink(time);
+    island.nodes.forEach((n, i) => drawMapNode(i, n, time));
+    for (const q of st.parts) { g.globalAlpha = Math.min(1, q.life / q.max * 2); g.fillStyle = q.col; g.fillRect(Math.round(q.x), Math.round(q.y), 1, 1); }
+    g.globalAlpha = 1;
+    g.restore();
+    drawPaperEdges();
+    if (cur.rose) mapRose = { x: ox - PPX + cur.rose[0], y: cur.rose[1] - PPY };
   }
   // územie na rade: bodkovaný zlatý ovál, bodky obiehajú dookola (s tmavým tieňom pod každou)
   function drawWorldRing(b, time) {
@@ -5051,36 +4870,24 @@
   }
   let worldLbls = null; // názvy území (hladké písmo cez present)
   function renderWorld(time) {
-    const ox = mapOX(), hgt = Math.max(WORLD_H, buf.height);
-    const px = worldStyle === 7;
-    if (px) { g.drawImage(worldSurround(ox, hgt), 0, 0); g.drawImage(worldPixel(), ox, 0); }
-    else {
-      const bgc = [SEA[3], [176, 226, 238], [58, 106, 168], [14, 22, 52], PR.sea[5]][worldStyle - 1];
-      g.fillStyle = 'rgb(' + bgc.join(',') + ')'; g.fillRect(0, 0, W, hgt);
-      g.drawImage(worldBase(), ox, 0);
-    }
+    const ox = mapOX(), img = worldPaint();
+    g.fillStyle = PAPER_BG; g.fillRect(0, 0, W, Math.max(WORLD_H, buf.height));
+    g.drawImage(img.canvas, ox - PPX, -PPY);
     g.save(); g.translate(ox, 0);
-    if (px) drawWorldSea(time);
-    const lbl = [];
-    const seen = landsSeen(), next = landOfMission(Math.min(st.unlocked, MAX_MISSION));
+    const seen = landsSeen(), next = landOfMission(Math.min(st.unlocked, MAX_MISSION)), lbl = [];
     for (const l of LANDS) {
       const b = landBox(l), known = seen.includes(l.id) || st.unlocked >= l.first;
       const won = Math.max(0, Math.min(l.count, st.unlocked - l.first));
-      lbl.push({ s: known ? l.name : '?', sub: known ? (won >= l.count ? 'dobyté ✓' : won + ' / ' + l.count) : '', x: ox + b.x + b.w / 2, y: b.y - 3, on: l === next && known });
+      lbl.push({ s: l.name, sub: known ? (won >= l.count ? 'dobyté ✓' : won + ' / ' + l.count) : '', x: ox + b.x + b.w / 2, y: b.y - 3, on: l === next && known, dim: !known });
     }
-    for (const f of FUTURE_LANDS) { const b = futureBox(f); lbl.push({ s: f.name, sub: 'čoskoro', x: ox + f.cx, y: b.y - 3, dim: true }); }
-    // územie na rade (počas plavby to, kam sa pláva): krúžok okolo
-    const ringL = st.sail ? landById(st.sail.to) : landReached(next) ? next : null;
-    if (ringL && px) drawWorldRing(landBox(ringL), time);
-    else if (ringL) {
-      const b = landBox(ringL), a = 0.5 + 0.5 * Math.sin(time * 3);
-      g.strokeStyle = 'rgba(138,38,20,' + (0.4 + 0.5 * a).toFixed(2) + ')'; g.lineWidth = 1;
-      g.beginPath(); g.ellipse(b.x + b.w / 2 + 0.5, b.y + b.h / 2 + 0.5, b.w / 2 + 4 + a * 2, b.h / 2 + 4 + a * 2, 0, 0, 6.29); g.stroke();
-    }
+    const ringL = st.sail ? landById(st.sail.to) : landReached(next) ? next : null; // územie na rade (počas plavby to, kam sa pláva)
+    if (ringL) drawWorldRing(landBox(ringL), time);
     g.restore();
+    drawPaperEdges();
     worldLbls = lbl;
+    if (img.rose) mapRose = { x: ox - PPX + img.rose[0], y: img.rose[1] - PPY };
   }
-  // ťuk na mapu sveta: dosiahnuté územie sa otvorí, ďalšie čaká na dobytie predošlého, zahmlené prídu neskôr
+  // ťuk na mapu sveta: dosiahnuté územie sa otvorí, ďalšie čaká na dobytie predošlého
   function tapWorld(x, y) {
     if (st.sail) return;
     x -= mapOX();
@@ -5089,10 +4896,6 @@
       if (x < b.x - 6 || x > b.x + b.w + 6 || y < b.y - 10 || y > b.y + b.h + 6) continue;
       if (!landReached(l)) { const prev = LANDS[LANDS.indexOf(l) - 1]; toast('Najprv dobyj ' + (prev ? prev.name.toLowerCase() : 'domovský ostrov')); AUDIO.play('deny'); return; }
       AUDIO.play('click'); enterLand(l.id); return;
-    }
-    for (const f of FUTURE_LANDS) {
-      const b = futureBox(f);
-      if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { toast(f.name + ' – čoskoro'); AUDIO.play('deny'); return; }
     }
   }
   // otvorí mapu územia (z mapy sveta alebo po plavbe)
@@ -5123,21 +4926,26 @@
     enterLand(sl.to);
     AUDIO.play('unlock'); banner(curLand().name);
   }
-  // ovládanie mapy podľa režimu: tlačidlo sveta (keď už je kam plávať), názov územia / sveta v hlavičke
+  // ovládanie mapy podľa režimu: tlačidlo sveta, názov územia / sveta v hlavičke; námornícke územia nemajú prepínač vzhľadu
   function updateMapUi() {
-    const open = true; // mapa sveta je prístupná od začiatku
-    $('worldBtn').hidden = !open;
+    $('worldBtn').hidden = false; // mapa sveta je prístupná od začiatku
     $('worldBtn').classList.toggle('on', !!st.world);
-    $('mapStyleBtn').hidden = $('endlessBtn').hidden = !!st.world;
-    $('mapTitle').textContent = st.world ? 'Svet · dobyté ' + worldPct() + ' %' : open ? curLand().name : '';
+    $('mapStyleBtn').hidden = !!st.world || !!(island && island.paper);
+    $('endlessBtn').hidden = !!st.world;
+    $('mapTitle').textContent = st.world ? 'Svet · dobyté ' + worldPct() + ' %' : curLand().name;
   }
 
+  const COMPASS = new Image(); COMPASS.src = 'img/compass.png'; // veterná ružica na námorníckych mapách (predloha hráča)
   function present() {
     let sx = 0, sy = 0;
     if (st.shake > 0) { sx = Math.round((Math.random() - 0.5) * 3); sy = Math.round((Math.random() - 0.5) * 3); }
     sctx.imageSmoothingEnabled = false;
     sctx.fillStyle = '#000'; sctx.fillRect(0, 0, screen.width, screen.height);
     sctx.drawImage(buf, 0, 0, W, buf.height, sx * S, (sy - Math.round(camY)) * S, W * S, buf.height * S);
+    if (mapRose && st.phase === 'map' && COMPASS.complete && COMPASS.width) { // kompas z obrázka v plnom rozlíšení
+      const w = COMPASS.width / 2.2 * S, h = COMPASS.height / 2.2 * S;
+      sctx.imageSmoothingEnabled = true; sctx.drawImage(COMPASS, (mapRose.x + sx) * S - w / 2, (mapRose.y + sy - Math.round(camY)) * S - h / 2, w, h); sctx.imageSmoothingEnabled = false;
+    }
     if (worldLbls && st.phase === 'map') for (const lb of worldLbls) { // názvy území na mape sveta
       const lx = (lb.x + sx) * S, ly = (lb.y + sy - Math.round(camY)) * S;
       sctx.textAlign = 'center'; sctx.textBaseline = 'bottom'; sctx.lineJoin = 'round';
@@ -5157,6 +4965,9 @@
   // cieľový posun kamery: v stavaní o výšku panela, v boji o spodné tlačidlá
   // ---- posúvanie mapy prstom ----
   let mapCam = 0, mapCamTarget = 0, mapDrag = null;
+  let mapCamX = 0, mapCamXTarget = 0; // vodorovný posun širokej námorníckej mapy
+  const mapCamXMax = () => !st.world && island && island.paper ? Math.max(0, island.w - W) : 0;
+  const clampMapX = v => Math.max(0, Math.min(mapCamXMax(), v));
   const MAP_HEAD = 26; // hlavička mapy (v herných px)
   function mapCamMax() {
     if (st.world) return Math.max(0, WORLD_H + 8 - (H - $('mapBar').offsetHeight * DPR / S));
@@ -5172,7 +4983,8 @@
     const panelLow = $('mapBar').offsetHeight * DPR / S;
     const mid = MAP_HEAD + (H - panelLow - MAP_HEAD) / 2;
     mapCamTarget = clampMap(n.y - 6 - mid);
-    if (instant) mapCam = mapCamTarget;
+    mapCamXTarget = clampMapX(n.x - W / 2);
+    if (instant) { mapCam = mapCamTarget; mapCamX = mapCamXTarget; }
   }
 
   const panelLow = () => $('build').offsetHeight * DPR / S;
@@ -5180,7 +4992,7 @@
   function camTick(dt) {
     if (st.phase === 'title') { camY = 0; return; }
     if (st.phase === 'map') {
-      if (!mapDrag) mapCam += (mapCamTarget - mapCam) * Math.min(1, dt * 8);
+      if (!mapDrag) { mapCam += (mapCamTarget - mapCam) * Math.min(1, dt * 8); mapCamX += (mapCamXTarget - mapCamX) * Math.min(1, dt * 8); }
       camY = mapCam;
       return;
     }
@@ -6019,7 +5831,7 @@
     }
     if (st.phase === 'battle' && p.y > 4) { tapBattle(p.x, p.y); return; }
     if (st.phase === 'map') {
-      mapDrag = { y0: ev.clientY, cam0: mapCam, moved: false, p };
+      mapDrag = { y0: ev.clientY, x0: ev.clientX, cam0: mapCam, camX0: mapCamX, moved: false, p };
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
       return;
     }
@@ -6109,9 +5921,9 @@
     }
     if (mapDrag && st.phase === 'map') {
       const r = screen.getBoundingClientRect();
-      const dy = (ev.clientY - mapDrag.y0) / r.height * H;
-      if (Math.abs(ev.clientY - mapDrag.y0) > 10) mapDrag.moved = true; // prst sa pri ťuku trochu pohne – to ešte nie je posun
-      if (mapDrag.moved) { mapCam = clampMap(mapDrag.cam0 - dy); mapCamTarget = mapCam; }
+      const dy = (ev.clientY - mapDrag.y0) / r.height * H, dx = (ev.clientX - mapDrag.x0) / r.width * W;
+      if (Math.hypot(ev.clientX - mapDrag.x0, ev.clientY - mapDrag.y0) > 10) mapDrag.moved = true; // prst sa pri ťuku trochu pohne – to ešte nie je posun
+      if (mapDrag.moved) { mapCam = clampMap(mapDrag.cam0 - dy); mapCamTarget = mapCam; mapCamX = clampMapX(mapDrag.camX0 - dx); mapCamXTarget = mapCamX; }
       return;
     }
     if (bdrag && st.phase === 'build') {
@@ -6558,6 +6370,7 @@
     focusMapNode(st.mapAnim ? st.mapAnim.seg + 2 : st.mapSel, true);
     if (st.sailTo) { const to = st.sailTo; st.sailTo = null; setTimeout(() => { if (st.phase === 'map') startSail(to); }, st.provAnim ? 2100 : 300); } // územie dobyté: plavba k ďalšiemu
     updateMapUi();
+    setTimeout(() => { if (st.phase === 'map' && !st.world && !st.sail) worldPaint(); }, 1500); // mapa sveta sa pripraví vopred, ťuk na zemeguľu je potom okamžitý
     saveStats(); checkAch();
     if (st.unlocked === 1 && !loadJSON(sk('introSeen'), false)) { // úplne nová hra
       saveJSON(sk('introSeen'), true);
@@ -6826,7 +6639,7 @@
     if (st.mapAnim) return;
     x -= mapOX(); // súradnice ostrova (je vycentrovaný)
     // ťuk na hrad alebo kamkoľvek do jeho regiónu otvorí misiu toho regiónu (hrad má prednosť pred susedným regiónom)
-    const px = Math.round(x), py = Math.round(y), reg = px >= 0 && py >= 0 && px < MW && py < MH ? island.prov[py * MW + px] : 255;
+    const IW = island.w || MW, px = Math.round(x), py = Math.round(y), reg = px >= 0 && py >= 0 && px < IW && py < MH ? island.prov[py * IW + px] : 255;
     let i = island.nodes.findIndex(n => Math.hypot(n.x - x, n.y - 5 - y) <= 14);
     if (i < 0) i = reg === 255 ? -1 : reg;
     if (i < 0) return;
@@ -7314,5 +7127,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, HEROES, switchHero, setActiveHero, ownedHeroes, heroDef, heroWalkHome,
-    setWorldStyle: n => { worldStyle = n; worldImgKey = null; }, enterBuild, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, openHeroUp, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, orderSiege, SIEGE_BUY: BUY, knightsBlocked, applyRace, placeAt, bldLimit, deployArmy, ARMY, depAt, get island() { return island; }, mapOX };
+    enterBuild, enterLand, openWorld, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, openHeroUp, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, orderSiege, SIEGE_BUY: BUY, knightsBlocked, applyRace, placeAt, bldLimit, deployArmy, ARMY, depAt, get island() { return island; }, mapOX };
 })();
