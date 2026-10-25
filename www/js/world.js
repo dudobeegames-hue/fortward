@@ -60,26 +60,26 @@ const SEA_ROUTES = [['home', 'isles'], ['isles', 'long'], ['long', 'north'], ['n
 // (zatiaľ požičané z misií domovského ostrova), giants = obri v poslednej vlne, posledná misia územia = útok na hrad
 const WORLD_MISSIONS = (() => {
   const L = [
-    { names: ['Tulenia pláž', 'Skalný maják', 'Brezový breh', 'Ľadový brod', 'Havranie hniezdo', 'Mlynský záliv', 'Jarlova sieň'], themes: [0, 4, 2, 3, 6, 1],
+    { names: ['Tulenia pláž', 'Skalný maják', 'Brezový breh', 'Ľadový brod', 'Havranie hniezdo', 'Mlynský záliv', 'Jarlova sieň'], themes: [0, 4, 2, 3, 6, 1], last: 9,
       desc: ['Nájazdníci sa vylodili medzi tuleňmi. Zhoď ich späť do mora.', 'Maják na útese varuje lode. Neber ho nepriateľovi z rúk.', 'Na brehu fjordu sa zhromažďujú nájazdníci.', 'Cez plytčinu sa valia ťažké posily.', 'Strážne veže na skalách vidia celé súostrovie.', 'Mlyny živia jarlovo vojsko. Odrež ho od zásob.', 'Rozhodujúci útok na sieň jarla. Postav vojsko zo zlatiek v truhlici.'] },
     { names: ['Spálené duny', 'Studňa v piesku', 'Karavánna cesta', 'Zlatý kaňon', 'Oáza paliem', 'Slaná pláň', 'Piesočná búrka', 'Hrobky kráľov', 'Skalné mesto', 'Suchý prameň', 'Brána púšte', 'Okraj púšte',
              'Okraj lesa', 'Lesná čistina', 'Dubový háj', 'Machový brod', 'Tichý potok', 'Stará píla', 'Hlboký les', 'Hubárska lúka', 'Medvedí brloh', 'Lesný chrám', 'Korene sveta', 'Strážny strom', 'Elfí most', 'Srdce lesa'],
-      themes: [4, 8, 4, 7, 4, 8, 4, 7, 4, 8, 4, 7, 2, 1, 2, 6, 1, 10, 2, 6, 5, 7, 2, 1, 10, 2], split: 12, // 12 misií púšte, potom lesy
+      themes: [12, 12, 4, 12, 12, 7, 12, 12, 4, 12, 7, 12, 13, 2, 13, 1, 13, 6, 13, 10, 13, 2, 13, 5, 13], last: 13, split: 12, // 12 misií púšte, potom lesy
       desc: ['Púštni bojovníci strážia studne a karavánne cesty. Bez vody neprežiješ.', 'V lesoch dlhého ostrova sa skrývajú lukostrelci. Postupuj opatrne.', 'Rozhodujúci útok na srdce lesa. Postav vojsko zo zlatiek v truhlici.'] },
     { names: ['Zamrznutý záliv', 'Snežné pole', 'Ľadové jaskyne', 'Biela pustatina', 'Mrazivý priesmyk', 'Polárna noc', 'Ľadovcová stena', 'Tulenia kolónia', 'Severná žiara', 'Ľadový hrad',
-             'Malý ostrov', 'Mrazivý maják', 'Snehová skala', 'Pevnosť na ľade'], themes: [3, 0, 4, 6, 4, 3, 7, 0, 6, 7, 0, 4, 3],
+             'Malý ostrov', 'Mrazivý maják', 'Snehová skala', 'Pevnosť na ľade'], themes: [11, 11, 3, 11, 0, 11, 11, 7, 11, 11, 0, 11, 11], last: 11,
       desc: ['Mráz a sneh sú tu spojencami nepriateľa. Ubráň sa v ľadovej pustatine.', 'Rozhodujúci útok na pevnosť na ľade. Postav vojsko zo zlatiek v truhlici.'] },
     { names: ['Popolavý breh', 'Mŕtvy les', 'Kostené pole', 'Hmlisté blato', 'Opustená dedina', 'Čierny cintorín', 'Prekliate mohyly', 'Kamenné kríže', 'Tieňová roklina', 'Zrúcaná veža', 'Popolavá pláň', 'Hrobka kniežaťa', 'Kostená brána', 'Údolie tieňov', 'Citadela nemŕtvych'],
-      themes: [8, 5, 8, 5, 7, 8, 7, 5, 8, 7, 8, 7, 9, 5],
+      themes: [14, 8, 14, 5, 14, 7, 14, 8, 14, 5, 14, 7, 14, 14], last: 14,
       desc: ['Z popola a hmly sa dvíhajú nemŕtvi. Nesmú prejsť.', 'Rozhodujúci útok na citadelu nemŕtvych. Postav vojsko zo zlatiek v truhlici.'] },
-    { names: ['Breh roja', 'Úľové pole', 'Hniezdisko', 'Srdce roja'], themes: [9, 8, 5],
+    { names: ['Breh roja', 'Úľové pole', 'Hniezdisko', 'Srdce roja'], themes: [15, 15, 15], last: 15,
       desc: ['Roj sa valí z úľov v nekonečných vlnách. Posledný boj sveta.', 'Finále: útok na srdce roja. Postav vojsko zo zlatiek v truhlici.'] },
   ];
   const out = [];
   for (const d of L) d.names.forEach((name, i) => {
     const last = i === d.names.length - 1;
     const desc = d.desc.length === d.names.length ? d.desc[i] : last ? d.desc[d.desc.length - 1] : d.split && i >= d.split ? d.desc[1] : d.desc[0];
-    out.push(last ? { name, desc, theme: 9, castle: 10, assault: true }
+    out.push(last ? { name, desc, theme: d.last, castle: 10, assault: true }
       : Object.assign({ name, desc, theme: d.themes[i % d.themes.length], castle: 6 + (i % 4), waves: 6 }, i % 3 === 2 ? { giants: { 6: [i % 2 ? 'mammoth' : 'giantRam'] } } : {}));
   });
   return out;

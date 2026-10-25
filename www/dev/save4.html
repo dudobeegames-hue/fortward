@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pozícia 4 – všetko odomknuté</title>
+<style>
+  body { margin: 0; padding: 24px 18px; background: #15110d; color: #eee; font: 16px/1.45 Rubik, system-ui, sans-serif; max-width: 520px; }
+  h1 { color: #f8d048; font-size: 22px; margin: 0 0 10px; }
+  button { font: inherit; padding: 10px 18px; margin: 12px 8px 0 0; border-radius: 8px; border: 2px solid #000; background: #3c9a3c; color: #fff; cursor: pointer; }
+  button.gray { background: #6a6a78; }
+  .warn { color: #ffb070; }
+</style>
+</head>
+<body>
+<h1>Pozícia 4 – všetko odomknuté</h1>
+<p>Zapíše do 4. pozície hru za ľudí, v ktorej sú dobyté všetky misie 1–76 (každá s 3 medenými hviezdami), videné všetky územia,
+  kráľ na úrovni 10 a 50 000 zlatiek v truhlici. Ostatných pozícií, gemov ani kúpených hrdinov sa to nedotkne.</p>
+<p id="state"></p>
+<div id="btns"></div>
+<script>
+  const P = 'fortward.s4.', MISSIONS = 76;
+  const used = Object.keys(localStorage).filter(k => k.startsWith(P));
+  const write = () => {
+    for (const k of used) localStorage.removeItem(k); // stará 4. pozícia celá preč (aby sa nemiešali staré údaje)
+    const set = (k, v) => localStorage.setItem(P + k, JSON.stringify(v));
+    set('race', 'Ľudia');
+    localStorage.setItem(P + 'unlocked', String(MISSIONS + 1));
+    set('stars', Array.from({ length: MISSIONS }, () => [3, 0, 0]));
+    set('lands', ['home', 'isles', 'long', 'north', 'ash', 'swarm']);
+    set('chest', 50000);
+    set('introSeen', true);
+    set('hero', 'king');
+    set('king', { lvl: 10 });
+    location.href = '../index.html';
+  };
+  const st = document.getElementById('state'), btns = document.getElementById('btns');
+  if (used.length) {
+    let info = '';
+    try { info = JSON.parse(localStorage.getItem(P + 'race')) + ', odomknutá misia ' + localStorage.getItem(P + 'unlocked'); } catch (e) { }
+    st.innerHTML = '<span class="warn">4. pozícia už je obsadená (' + (info || 'rozohraná hra') + '). Prepísaním sa stratí.</span>';
+    btns.innerHTML = '<button id="go">Prepísať 4. pozíciu</button><button class="gray" id="no">Nechať tak</button>';
+    document.getElementById('no').onclick = () => { location.href = '../index.html'; };
+  } else {
+    st.textContent = '4. pozícia je prázdna.';
+    btns.innerHTML = '<button id="go">Vytvoriť 4. pozíciu</button>';
+  }
+  document.getElementById('go').onclick = write;
+</script>
+</body>
+</html>

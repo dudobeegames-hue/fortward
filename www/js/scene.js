@@ -45,6 +45,12 @@ const THEMES = [
   { key: 'ash',    ground: 'ash',   road: 'ashroad', deco: 'charred', anim: 'embers' },
   { key: 'orc',    ground: 'darkLit', road: 'ashroad', deco: 'orc' },
   { key: 'frontier', ground: 'grass', road: 'cobble', deco: 'ruins', river: { y: 0.42, hw: 5, bridge: true } }, // nekonečná obrana: pohraničie s riekou a ruinami
+  // krajiny ďalších území sveta
+  { key: 'snow',   ground: 'snow',   road: 'snowroad', deco: 'snowy',  anim: 'snow' },   // 11 severná krajina: sneh, zasnežené smreky, ľadové balvany, sneží
+  { key: 'dunes',  ground: 'desert', road: 'sandroad', deco: 'desert' },                 // 12 púšť: duny, kaktusy, palmy, vybielené kosti
+  { key: 'jungle', ground: 'jungle', road: 'dirt',     deco: 'jungle' },                 // 13 lesy dlhého ostrova: husté koruny, paprade
+  { key: 'graves', ground: 'ash',    road: 'ashroad',  deco: 'graves', anim: 'fog' },    // 14 popolavý ostrov: náhrobky, kríže, mŕtve stromy, kosti, hmla
+  { key: 'hive',   ground: 'hive',   road: 'hiveroad', deco: 'hive',   anim: 'spores' }, // 15 ostrov roja: fialová zem, kukly a veže úľa, svetielkujúce spóry
 ];
 
 const TR = {
@@ -58,6 +64,13 @@ const TR = {
   darkLit:['#24160e', '#301e14', '#3e2618', '#4c301e', '#5a3a24', '#68442a', '#785032'], // pevnosť orkov: svetlejšia zem bez lávy
   lava:   ['#5a1008', '#a02810', '#e05018', '#f89838', '#fff070'],
   water:  ['#0c1e44', '#10285a', '#163a7a', '#1e5096', '#2a6ab0', '#3c88c8', '#5aa8d8', '#8ad0e8'],
+  snow:   ['#5a6a82', '#7486a0', '#90a2ba', '#aebed2', '#c8d6e4', '#dce6f0', '#ecf2f8', '#f8fbfd'],
+  snowroad: ['#4a4846', '#5e5a56', '#76706a', '#8e8880', '#a8a29a', '#c0bcb6'], // ušliapaný sneh s blatom
+  desert: ['#8a6a3c', '#a07c48', '#b48e56', '#c6a064', '#d4b274', '#e0c288', '#eacfa0', '#f2dcb4'],
+  sandroad: ['#6e5432', '#80623a', '#927246', '#a48252', '#b4925e', '#c2a06c'],
+  jungle: ['#0e2212', '#143018', '#1c3e1e', '#264e24', '#305e2a', '#3c6e32', '#4a7e3a'],
+  hive:   ['#1a0a20', '#26102e', '#341840', '#442052', '#562a66', '#6a367a', '#80448e'],
+  hiveroad: ['#140a14', '#1e101c', '#2a1626', '#361e30', '#44263a', '#523046'],
   birch:  ['#28461e', '#3a6028', '#4e7a30', '#68943c', '#86ae4c', '#a6c862'],
   sand:   ['#6e5838', '#8a7048', '#a88a5a', '#c4a670', '#dcc08a', '#ecd8a8'],
 };
@@ -111,8 +124,9 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard) {
     const dx = Math.max(hx0 - x, 0, x - hx1), dy = Math.max(G.hallTop - y, 0);
     return Math.hypot(dx, dy) - 3 + (vnoise(x * 0.25, y * 0.25, seed + 17) - 0.5) * 3;
   };
-  const groundRamp = { grass: RAMP.grass, grassDark: RAMP.grass, dry: TR.dry, swamp: TR.swamp, ash: TR.ash, dark: TR.dark, darkLit: TR.darkLit }[th.ground];
-  const groundBias = th.ground === 'grassDark' ? -0.12 : th.ground === 'swamp' ? 0.1 : 0;
+  const groundRamp = { grass: RAMP.grass, grassDark: RAMP.grass, dry: TR.dry, swamp: TR.swamp, ash: TR.ash, dark: TR.dark, darkLit: TR.darkLit,
+    snow: TR.snow, desert: TR.desert, jungle: TR.jungle, hive: TR.hive }[th.ground];
+  const groundBias = th.ground === 'grassDark' ? -0.12 : th.ground === 'swamp' ? 0.1 : th.ground === 'snow' ? 0.12 : 0;
 
   // ---- podklad: zem, cesta, nádvorie ----
   for (let y = 0; y < H; y++) {
@@ -138,7 +152,7 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard) {
           set(x, y, pickRamp(RAMP.stone, v, x, y));
           continue;
         }
-        const ramp = th.road === 'mud' ? TR.mud : th.road === 'ashroad' ? TR.ashroad : RAMP.dirt;
+        const ramp = { mud: TR.mud, ashroad: TR.ashroad, snowroad: TR.snowroad, sandroad: TR.sandroad, hiveroad: TR.hiveroad }[th.road] || RAMP.dirt;
         let v = 0.52 + (fbm(x * 0.08, y * 0.08, seed + 5) - 0.5) * 0.5 + (hash2(x, y, seed + 9) - 0.5) * 0.16;
         const rut = Math.abs(Math.abs(x - cx) - hw * 0.45);
         if (rut < 1.2) v -= 0.2;
@@ -152,6 +166,8 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard) {
         if (dd < 3) v -= 0.18 * (1 - dd / 3);
         if (yd < 3) v -= 0.15 * (1 - yd / 3);
         v += (1 - (x + y) / (W + H)) * 0.08;
+        if (th.ground === 'desert') { const r = Math.sin(x * 0.12 + y * 0.31 + fbm(x * 0.02, y * 0.02, seed + 61) * 7); v += r > 0.75 ? 0.14 : r < -0.5 ? -0.1 : 0; } // dlhé duny
+        else if (th.ground === 'snow' && fbm(x * 0.09, y * 0.09, seed + 63) > 0.66) v -= 0.16;                                   // závoje a jamky v snehu
         set(x, y, pickRamp(groundRamp, v, x, y));
       }
     }
@@ -415,8 +431,8 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard) {
     }
   };
   const grassy = th.ground === 'grass' || th.ground === 'grassDark' || th.ground === 'dry';
-  const tuftRamp = th.ground === 'dry' ? TR.dry : th.ground === 'swamp' ? TR.swamp : th.ground === 'ash' ? TR.ash : th.ground === 'dark' ? TR.dark : th.ground === 'darkLit' ? TR.darkLit : RAMP.grass;
-  for (let k = 0; k < (W * H) / (grassy ? 90 : 220); k++) {
+  const tuftRamp = { dry: TR.dry, swamp: TR.swamp, ash: TR.ash, dark: TR.dark, darkLit: TR.darkLit, snow: TR.snow, desert: TR.desert, jungle: TR.jungle, hive: TR.hive }[th.ground] || RAMP.grass;
+  for (let k = 0; k < (W * H) / (grassy || th.ground === 'jungle' ? 90 : 220); k++) {
     const x = Math.floor(rnd() * W), y = Math.floor(rnd() * H);
     if (!free(x, y, 1)) continue;
     const Gr = tuftRamp, n = Gr.length - 1;
@@ -524,6 +540,82 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard) {
         for (let dx = -1; dx < 4; dx++) darken(x + dx, y + 1, 0.6);
       }, 6);
       scatter(area / 1400, (x, y) => blob(x, y, 2 + Math.floor(rnd() * 2), TR.ash, 0.45, K), 5);
+      break;
+    }
+    case 'snowy': { // zasnežené smreky (tmavé koruny so snehom na vetvách), ľadové balvany, záveje
+      const pineD = ['#0e2218', '#16302a', '#1e3e34', '#284c40'].map(hexRGB), snowC = TR.snow;
+      const ice = ['#5a7a9a', '#7a9ab8', '#9ab8d0', '#c0d8e8', '#e0eef6'].map(hexRGB);
+      const pine = (x, y) => {
+        const h = 9 + Math.floor(rnd() * 5);
+        for (let dx = -3; dx <= 4; dx++) darken(x + dx, y + 2, 0.75);
+        for (let k = 0; k < 2; k++) set(x, y + k, WOOD[1]);
+        for (let dy = 0; dy < h; dy++) { const w = Math.round((dy + 1) * 0.42); for (let dx = -w - 1; dx <= w + 1; dx++) {
+          const yy = y - h + dy, edge = Math.abs(dx) > w;
+          set(x + dx, yy, edge ? K : (dy % 3 === 0 || (dx < 0 && dy % 3 === 1)) ? snowC[dx < 0 ? 7 : 5] : pineD[dx < 0 ? 3 : 1]);
+        } }
+        set(x, y - h - 1, K);
+      };
+      scatter(area / 520, pine, 7);
+      scatter(area / 1600, (x, y) => blob(x, y, 2 + Math.floor(rnd() * 3), ice, 0.62, K), 5);
+      scatter(area / 900, (x, y) => { for (let dx = -4; dx <= 4; dx++) { set(x + dx, y, snowC[7]); if (Math.abs(dx) < 3) set(x + dx, y - 1, snowC[7]); set(x + dx, y + 1, snowC[4]); } }, 3);
+      break;
+    }
+    case 'desert': { // kaktusy, palmy, kamene a vybielené kosti
+      const cac = ['#1e3a1a', '#2a5224', '#3c6e30', '#56923a'].map(hexRGB), bone = hexRGB('#f0e8d0');
+      scatter(area / 1100, (x, y) => { // kaktus s ramenami
+        const h = 7 + Math.floor(rnd() * 5);
+        for (let dx = -2; dx < 5; dx++) darken(x + dx, y + 1, 0.7);
+        for (let dy = 0; dy < h; dy++) { set(x - 1, y - dy, K); set(x, y - dy, cac[2]); set(x + 1, y - dy, cac[1]); set(x + 2, y - dy, K); }
+        for (let dx = -1; dx <= 2; dx++) set(x + dx, y - h, K);
+        const ay = y - Math.floor(h * 0.55);
+        for (const s2 of [-1, 1]) if (rnd() > 0.3) {
+          const ax = s2 < 0 ? x - 3 : x + 4;
+          for (let dy = 0; dy < 4; dy++) { set(ax, ay - dy, cac[s2 < 0 ? 3 : 1]); set(ax - 1, ay - dy, K); set(ax + 1, ay - dy, K); }
+          set(ax, ay - 4, K);
+          for (let q = 1; q <= 2; q++) { const xx = s2 < 0 ? ax + q : ax - q; set(xx, ay, cac[2]); set(xx, ay + 1, K); }
+        }
+      }, 6);
+      scatter(area / 2600, (x, y) => { // palma
+        for (let dx = -3; dx <= 4; dx++) darken(x + dx, y + 1, 0.7);
+        for (let k = 0; k < 9; k++) set(x + (k > 5 ? 1 : 0), y - k, WOOD[k % 2 ? 2 : 3]);
+        const tx = x + 1, ty = y - 10;
+        for (const [dx, dy] of [[-5, 1], [-4, 0], [-3, -1], [-2, -1], [-1, -2], [0, -2], [1, -2], [2, -1], [3, -1], [4, 0], [5, 1], [-3, 1], [3, 1], [-1, 0], [1, 0]]) set(tx + dx, ty + dy, RAMP.grass[dy < 0 ? 5 : 3]);
+      }, 8);
+      scatter(area / 1300, (x, y) => blob(x, y, 1 + Math.floor(rnd() * 3), TR.desert, 0.35, K), 4);
+      scatter(area / 3000, (x, y) => { set(x, y, bone); set(x + 1, y, bone); set(x + 2, y + 1, bone); set(x - 1, y + 1, bone); set(x + 3, y, bone); }, 3);
+      break;
+    }
+    case 'jungle': { // husté koruny stromov, kry a paprade
+      const fern = TR.jungle;
+      scatter(area / 420, (x, y) => tree(x, y, RAMP.bush, k => WOOD[k % 2 ? 1 : 2], 4 + Math.floor(rnd() * 3)), 8);
+      scatter(area / 700, (x, y) => blob(x, y, 2 + Math.floor(rnd() * 2), RAMP.grass, 0.45, fern[0]), 5);
+      scatter(area / 500, (x, y) => { for (let dx = -3; dx <= 3; dx++) set(x + dx, y - Math.abs(dx) % 2, fern[5]); set(x, y - 2, fern[6]); }, 2);
+      break;
+    }
+    case 'graves': { // náhrobky, kríže, mŕtve stromy a kosti
+      const st0 = RAMP.stone, dead = hexRGB('#1a1412'), bone = hexRGB('#d8d0b8');
+      scatter(area / 900, (x, y) => { // náhrobok
+        for (let dx = 0; dx < 6; dx++) darken(x + dx, y + 1, 0.6);
+        for (let dy = 0; dy < 6; dy++) for (let dx = 0; dx < 4; dx++) set(x + dx, y - dy, pickRamp(st0, dy === 5 ? 0.85 : 0.65 - dx * 0.12, x + dx, y - dy));
+        for (let dy = 0; dy <= 6; dy++) { set(x - 1, y - dy, K); set(x + 4, y - dy, K); }
+        for (let dx = 0; dx < 4; dx++) set(x + dx, y - 6, K);
+        set(x + 1, y - 3, st0[1]); set(x + 2, y - 3, st0[1]); set(x + 1, y - 4, st0[1]);
+      }, 5);
+      scatter(area / 1400, (x, y) => { for (let k = 0; k < 7; k++) { set(x, y - k, st0[4]); set(x + 1, y - k, K); } for (let dx = -2; dx <= 2; dx++) { set(x + dx, y - 5, st0[5]); set(x + dx, y - 4, K); } }, 4); // kríž
+      scatter(area / 1600, (x, y) => { for (let k = 0; k < 11; k++) set(x, y - k, dead); set(x - 1, y - 7, dead); set(x - 2, y - 8, dead); set(x + 1, y - 5, dead); set(x + 2, y - 6, dead); set(x + 3, y - 7, dead); }, 6); // mŕtvy strom
+      scatter(area / 1500, (x, y) => { set(x, y, bone); set(x + 1, y, bone); set(x + 2, y, bone); set(x - 1, y - 1, bone); set(x + 3, y + 1, bone); }, 3);
+      break;
+    }
+    case 'hive': { // veže úľa a kukly so svetielkujúcimi bodkami, slizké jamky
+      const hv = TR.hive, glow = hexRGB('#e878ff');
+      scatter(area / 1700, (x, y) => blob(x, y, 3, hv, 0.15, hv[0]), 6); // slizká jamka
+      scatter(area / 1000, (x, y) => { // veža úľa
+        const h = 10 + Math.floor(rnd() * 8);
+        for (let dx = -3; dx <= 4; dx++) darken(x + dx, y + 1, 0.6);
+        for (let dy = 0; dy < h; dy++) { const w = Math.max(0, Math.round((h - dy) / h * 2.5)); for (let dx = -w - 1; dx <= w + 1; dx++) set(x + dx, y - dy, Math.abs(dx) > w ? K : pickRamp(hv, 0.75 - dx * 0.15 - (dy % 4 === 0 ? 0.25 : 0), x + dx, y - dy)); }
+        set(x, y - h, glow); set(x - 1, y - Math.floor(h / 2), glow);
+      }, 7);
+      scatter(area / 1300, (x, y) => { blob(x, y, 2 + Math.floor(rnd() * 2), hv, 0.55, K); set(x - 1, y - 1, glow); }, 5); // kukla
       break;
     }
     case 'orc': {
