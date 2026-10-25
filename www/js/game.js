@@ -4605,7 +4605,7 @@
   }
   function renderMap(time) {
     worldLbls = null; mapRose = null;
-    if (st.world) { if (buf.height < WORLD_H) buf.height = WORLD_H; renderWorld(time); return; }
+    if (st.world) { if (buf.height < WORLD_H + 8) buf.height = WORLD_H + 8; renderWorld(time); return; } // + 8: okraj pod mapou sveta (mapCamMax), inak tam ostane čierny pás
     if (buf.height < MH) buf.height = MH; // plátno aspoň na výšku mapy – pri posunutí nadol by inak dole ostal čierny pás
     if (island.seaMap) { renderPaperLand(time); return; } // územia mimo domovského ostrova: námornícka mapa
     const ox = mapOX(), hgt = Math.max(MH, buf.height);
