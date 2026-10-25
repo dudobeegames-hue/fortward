@@ -9,7 +9,7 @@ const PAPER = (() => {
     paper:  R(['#4a3420', '#664a2c', '#84653c', '#a2804e', '#bc9a62', '#d0b276', '#dfc68c', '#ead6a2', '#f3e4b8']),
     sea:    R(['#463a28', '#5e4e36', '#7a6646', '#947e58', '#aa946a', '#bea87c', '#ccb88c', '#d8c69c', '#e2d2aa']),
     seaT:   R(['#2e3e3a', '#3e5450', '#526c66', '#68847a', '#7e988c', '#94aa9c', '#a8baa8', '#bac8b2', '#cad4bc']),
-    human:  R(['#3a4a66', '#506484', '#6880a2', '#829abc', '#9cb2d0', '#b4c6de', '#c8d6e8', '#d8e2ee', '#e4eaf0']),
+    human:  R(['#1c2850', '#26366c', '#30448a', '#3c56a6', '#4c6abc', '#6282cc', '#7e9cda', '#9ab4e4', '#b4c8ec']),
     orc:    R(['#5e3618', '#7e4a22', '#9c622e', '#b87a3c', '#cc9250', '#daa868', '#e6be86', '#eecea2', '#f4dcb8']),
     nordic: R(['#2e4a48', '#3e605c', '#527872', '#689088', '#80a89e', '#9abcb2', '#b2cec4', '#c8dcd2', '#dae8e0']),
     polar:  R(['#4a5a6a', '#627488', '#7c90a4', '#98acbe', '#b4c6d4', '#cad8e2', '#dce6ee', '#e8f0f4', '#f2f6f8']),
@@ -165,7 +165,12 @@ const PAPER = (() => {
       const base = provs.length, jit = (L.jitter == null ? 7 : L.jitter) * V.s;
       S.forEach(s => { const [wx, wy] = toW(s[0], s[1]); provs.push({ land: li, zone: zi, race: Z.race, biome: Z.biome, x: Math.round(s[0]), y: Math.round(s[1]), wx, wy }); });
       for (const k of px) {
-        const [x, y] = P(k), [wx, wy] = toW(x, y), jx = (fbm(wx * 0.05, wy * 0.05, pseed + 31) - 0.5) * 2 * jit, jy = (fbm(wx * 0.05, wy * 0.05, pseed + 37) - 0.5) * 2 * jit;
+        const [x, y] = P(k), [wx, wy] = toW(x, y);
+        // hranice provincií: posun zo šumu – v súradniciach sveta, alebo (provJit) priamo v bodoch mapy územia ako na domovskom ostrove:
+        // veľké oblúky + drobné zvlnenie, takže hranice nie sú rovné
+        const PJ = spec.provJit, pf = spec.provFreq || 0.045;
+        const jx = PJ ? (fbm(x * pf, y * pf, pseed + 31) - 0.5) * 2 * PJ + (fbm(x * pf * 3, y * pf * 3, pseed + 33) - 0.5) * PJ * 0.6 : (fbm(wx * 0.05, wy * 0.05, pseed + 31) - 0.5) * 2 * jit;
+        const jy = PJ ? (fbm(x * pf, y * pf, pseed + 37) - 0.5) * 2 * PJ + (fbm(x * pf * 3, y * pf * 3, pseed + 39) - 0.5) * PJ * 0.6 : (fbm(wx * 0.05, wy * 0.05, pseed + 37) - 0.5) * 2 * jit;
         let bi = 0, bd = 1e9; S.forEach((s, i) => { const d = Math.hypot(x + jx - s[0], (y + jy - s[1]) * 1.1); if (d < bd) { bd = d; bi = i; } });
         prov[k] = base + bi;
       }
@@ -193,13 +198,13 @@ const PAPER = (() => {
       const x = k % W, y = (k / W) | 0, bio = provs[prov[k]].biome, e = fbm(x * 0.045, y * 0.045, seed + 3), fo = fbm(x * 0.07, y * 0.07, seed + 9);
       const beach = ld[k] <= 2;
       let t = 2;
-      if (bio === 'ice') t = 8; // ľad, popol a úľ sú bez hôr
+      if (bio === 'ice') t = e > 0.54 ? 4 : 8; // ľad: stolové ľadové hory; popol a úľ sú bez hôr
       else if (beach && bio !== 'hive') t = 1;
       else if (bio === 'grass') t = e > 0.74 ? (e > 0.86 ? 5 : 4) : fo > 0.6 ? 3 : 2;
       else if (bio === 'tundra') t = e > 0.7 ? (e > 0.8 ? 5 : 4) : fo > 0.52 ? 9 : 2;
-      else if (bio === 'jungle') t = e > 0.78 ? 4 : fo < 0.3 ? 2 : 7;
+      else if (bio === 'jungle') t = fo < 0.3 ? 2 : 7; // prales bez hôr
       else if (bio === 'forest') t = e > 0.76 ? 4 : fo < 0.32 ? 2 : 3;
-      else if (bio === 'desert') t = e > 0.8 ? 4 : 6;
+      else if (bio === 'desert') t = e > 0.61 ? 4 : 6; // púšť: stolové hory z pieskovca
       else if (bio === 'ash') t = fo > 0.58 ? 11 : 2;
       else if (bio === 'hive') t = 10;
       terr[k] = t;
@@ -318,7 +323,7 @@ const PAPER = (() => {
     for (let r = 0; r < 200 && !rose; r += 2) for (let a = 0; a < 16 && !rose; a++) { const x = Math.round(rp[0] + Math.cos(a / 16 * 6.283) * r), y = Math.round(rp[1] + Math.sin(a / 16 * 6.283) * r); if (seaBox(x, y, 15)) rose = [x, y]; }
     if (rose) {
       const [rx, ry] = rose;
-      for (let a = 0; a < 16; a++) { const an = a * Math.PI / 8, dx = Math.cos(an), dy = Math.sin(an); for (let r = 16; r < 600; r += 2) { const x = Math.round(rx + dx * r), y = Math.round(ry + dy * r); if (x < 0 || y < 0 || x >= W || y >= H) break; const k = y * W + x; if (sea(k) && sd[k] > 3 && r % 6 !== 0) put(x, y, lit(x, y, a % 2 ? 0.9 : 0.84)); } }
+      if (!spec.noRhumb) for (let a = 0; a < 16; a++) { const an = a * Math.PI / 8, dx = Math.cos(an), dy = Math.sin(an); for (let r = 16; r < 600; r += 2) { const x = Math.round(rx + dx * r), y = Math.round(ry + dy * r); if (x < 0 || y < 0 || x >= W || y >= H) break; const k = y * W + x; if (sea(k) && sd[k] > 3 && r % 6 !== 0) put(x, y, lit(x, y, a % 2 ? 0.9 : 0.84)); } }
       if (!spec.roseImg) compass(put, null, rx, ry, 14); // s obrázkom kompasu ho dokreslí stránka v plnom rozlíšení
     }
     let ships = 0;
@@ -333,11 +338,12 @@ const PAPER = (() => {
   // ---- živá (kreslená) mapa územia v štýle mapy domovského ostrova: more s plytčinami a príbojom, pláže, tráva, lesy zo
   // stromčekov s obrysom, štíty hôr, krajina podľa územia (tundra, ľad, púšť, prales, popol, úľ); hranice provincií ako pás
   // vo farbe toho, kto provinciu drží. Vracia aj miesta príboja a hrebeňov vĺn (hra ich kreslí pohyblivo) ----
-  const LIVE_COL = { human: [96, 176, 255], orc: [255, 140, 42], nordic: [70, 214, 200], polar: [236, 246, 255], elf: [120, 232, 90], desert: [255, 214, 80], undead: [196, 136, 255], swarm: [255, 80, 70] };
+  const LIVE_COL = { human: [48, 104, 228], orc: [255, 140, 42], nordic: [70, 214, 200], polar: [236, 246, 255], elf: [120, 232, 90], desert: [255, 214, 80], undead: [196, 136, 255], swarm: [255, 80, 70] };
   const LR = {
     tundra: R(['#2e3a30', '#3e4e40', '#526654', '#6a806a', '#8a9e88', '#b0c0ae']),
     ice:    R(['#5a7a9a', '#7a9ab8', '#9ab8d0', '#c0d8e8', '#e0eef6', '#f8fcff']),
     hive:   R(['#200c26', '#34143e', '#4c1e5a', '#682a78', '#8a3c98', '#ae5ab8']),
+    iceRock: R(['#1e2a3a', '#2e4058', '#44607a', '#5e7e98', '#7e9cb4', '#a0bccc', '#c6dce6', '#e6f2f8', '#f8fcff']), // ľadové hory: modrastý ľad a sneh
   };
   const HIVE_GLOW = hexRGB('#e878ff');
   function paintLive(G0, opts) {
@@ -369,7 +375,18 @@ const PAPER = (() => {
       else if (t === 6) { const r = Math.sin(x * 0.35 + y * 0.62 + fbm(x * 0.04, y * 0.04, seed + 81) * 8); col = pickRamp(SAND, 0.58 + n * 0.3 + h * 0.1 + (r > 0.8 ? 0.22 : r < -0.55 ? -0.2 : 0), x, y); } // duny
       else if (t === 8 || (t === 5 && bio === 'ice')) { const cr = Math.abs(fbm(x * 0.06, y * 0.08, seed + 77) - 0.5) < 0.01; col = cr ? LR.ice[1] : pickRamp(LR.ice, 0.62 + n * 0.4 + h * 0.1 + lit, x, y); } // ľad s trhlinami
       else if (t === 10) col = hash2(x, y, 415) > 0.988 ? HIVE_GLOW : pickRamp(LR.hive, 0.42 + n * 0.5 + h * 0.12, x, y);
-      else if (t === 4 && bio === 'ice') col = pickRamp(LR.ice, 0.42 + n * 0.3 + h * 0.1 + lit, x, y); // skaly pod ľadovými štítmi
+      else if (t === 4 && (bio === 'desert' || bio === 'ice') && !keep[k]) { // stolové hory ako na domovskom ostrove: plošiny podľa výšky,
+        // svetlá horná hrana plošiny, tmavá stena útesu pod vyššou plošinou, tieň zboku (púšť z pieskovca, sever z ľadu)
+        const E0 = bio === 'desert' ? 0.61 : 0.54, band = (xx, yy) => Math.floor((fbm(xx * 0.045, yy * 0.045, seed + 3) - E0) / 0.06), bd0 = band(x, y);
+        let v2 = 0.42 + bd0 * 0.13 + (fbm(x * 0.25, y * 0.25, seed + 65) - 0.5) * 0.12;
+        if (band(x, y - 1) < bd0) v2 += 0.2;
+        const cliff = band(x, y - 1) > bd0 || band(x, y - 2) > bd0 || band(x, y - 3) > bd0;
+        if (cliff || (bio === 'ice' && band(x, y - 4) > bd0)) v2 = 0.18 + (y % 2 ? 0.05 : 0) + (hash2(x, y, seed + 66) - 0.5) * 0.08; // ľadové útesy sú vyššie
+        if (band(x - 1, y) > bd0 && !cliff) v2 -= 0.12;
+        col = pickRamp(bio === 'desert' ? SANDSTONE : LR.iceRock, v2, x, y);
+      }
+      else if (t === 4 && bio === 'ice') col = pickRamp(LR.ice, 0.62 + n * 0.4 + h * 0.1, x, y); // pri hradoch rovný ľad
+      else if (t === 4 && bio === 'desert') col = pickRamp(SAND, 0.58 + n * 0.3, x, y);
       else if (bio === 'ash') col = pickRamp(TR.ash, v + (t === 11 ? -0.1 : 0), x, y);
       else if (bio === 'tundra') col = pickRamp(LR.tundra, v + (t === 9 ? -0.12 : 0), x, y);
       else if (bio === 'desert') col = pickRamp(TR.dry, v, x, y);
@@ -396,7 +413,7 @@ const PAPER = (() => {
       else if (t === 7 && r < 0.9) items.push({ k: r < 0.2 ? 'palm' : 'jtree', x: jx, y: jy });
       else if (t === 11 && r < 0.45) items.push({ k: 'dead', x: jx, y: jy });
       else if (t === 10 && r < 0.18) items.push({ k: 'spire', x: jx, y: jy });
-      else if ((t === 4 || t === 5) && r < 0.35 && (x % 8 === 2 || x % 8 === 6) && okAt(jx - 5, jy + 3) && okAt(jx + 5, jy + 3)) items.push({ k: t === 5 || provs[prov[jy * W + jx]].biome === 'ice' ? 'snowpeak' : 'peak', x: jx, y: jy });
+      else if ((t === 4 || t === 5) && r < 0.35 && (x % 8 === 2 || x % 8 === 6) && okAt(jx - 5, jy + 3) && okAt(jx + 5, jy + 3) && !['desert', 'ice'].includes(provs[prov[jy * W + jx]].biome)) items.push({ k: t === 5 ? 'snowpeak' : 'peak', x: jx, y: jy }); // púšť a ľad majú stolové hory
       else if (t === 2 && r < 0.05) items.push({ k: 'tree', x: jx, y: jy });
       else if (t === 6 && r < 0.03) items.push({ k: 'rock', x: jx, y: jy });
     }
