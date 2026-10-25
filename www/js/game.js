@@ -604,7 +604,7 @@
   const MAP_PAD = 32, MW = 190; // ostrov 190 × 400 a nad aj pod ním pás mora
   let MH = 400 + 2 * MAP_PAD; // výška mapy práve zobrazeného územia (ostrovčeky sú nižšie)
   // mapa sa vycentruje; námornícka mapa širšia ako obrazovka sa posúva do strán (mapCamX)
-  const mapOX = () => !st.world && island && island.paper && island.w > W ? -Math.round(mapCamX) : Math.round((W - (!st.world && island && island.w || MW)) / 2);
+  const mapOX = () => !st.world && island && island.seaMap && island.w > W ? -Math.round(mapCamX) : Math.round((W - (!st.world && island && island.w || MW)) / 2);
   const mapViewBottom = () => mapCamMax() + H - $('mapBar').offsetHeight * DPR / S; // najnižší viditeľný riadok mapy (pri posunutí nadol)
   // hra za orkov: kampaň ide po mape opačne (orkská misia 1 = pevnosť orkov hore, uzol 10)
   const isOrc = () => st.race === 'Orkovia';
@@ -737,7 +737,7 @@
   function setLand(id) {
     st.land = (landById(id) || LANDS[0]).id;
     island = landIsland(st.land);
-    MH = island.paper ? island.h : island.bg.height;
+    MH = island.seaMap ? island.h : island.bg.height;
     island.baseKey = island.borderKey = island.paperKey = island.paperNextKey = null;
   }
   // mriežka a krajina bojiska (výška závisí od misie)
@@ -4681,7 +4681,7 @@
     worldLbls = null; mapRose = null;
     if (st.world) { if (buf.height < WORLD_H) buf.height = WORLD_H; renderWorld(time); return; }
     if (buf.height < MH) buf.height = MH; // plátno aspoň na výšku mapy – pri posunutí nadol by inak dole ostal čierny pás
-    if (island.paper) { renderPaperLand(time); return; } // územia mimo domovského ostrova: námornícka mapa
+    if (island.seaMap) { renderPaperLand(time); return; } // územia mimo domovského ostrova: námornícka mapa
     const ox = mapOX(), hgt = Math.max(MH, buf.height);
     if (mapStyle === 'paper') g.drawImage(paperSurround(ox, hgt), 0, 0); // pergamen pokračuje aj vedľa ostrova
     else g.drawImage(mapSurround(ox, hgt), 0, 0);
@@ -4803,7 +4803,8 @@
     }
     const nodes = order.map(j => ({ x: geom.provs[j].x - PPX, y: geom.provs[j].y - PPY + 4 }));
     const routes = l.wl.length > 1 ? l.wl.slice(1).map((_, k) => [k, k + 1]) : [];
-    return { paper: true, land: l, w, h, geom, order, node, prov, nodes, segs: [], routes, landTop, landBot, foam: [], waves: [], fires: nodes.map(() => []),
+    return { seaMap: true, // námornícke územie (island.paper je obrázok námorníckej mapy domovského ostrova)
+      land: l, w, h, geom, order, node, prov, nodes, segs: [], routes, landTop, landBot, foam: [], waves: [], fires: nodes.map(() => []),
       bg: { height: h }, fort: makeOrcFort(), castle: makeMiniCastle(false) };
   }
   // vyfarbená mapa územia; skip = uzol, ktorý sa ešte kreslí v pôvodnej farbe (počas prefarbenia po dobytí)
@@ -4930,7 +4931,7 @@
   function updateMapUi() {
     $('worldBtn').hidden = false; // mapa sveta je prístupná od začiatku
     $('worldBtn').classList.toggle('on', !!st.world);
-    $('mapStyleBtn').hidden = !!st.world || !!(island && island.paper);
+    $('mapStyleBtn').hidden = !!st.world || !!(island && island.seaMap);
     $('endlessBtn').hidden = !!st.world;
     $('mapTitle').textContent = st.world ? 'Svet · dobyté ' + worldPct() + ' %' : curLand().name;
   }
@@ -4966,7 +4967,7 @@
   // ---- posúvanie mapy prstom ----
   let mapCam = 0, mapCamTarget = 0, mapDrag = null;
   let mapCamX = 0, mapCamXTarget = 0; // vodorovný posun širokej námorníckej mapy
-  const mapCamXMax = () => !st.world && island && island.paper ? Math.max(0, island.w - W) : 0;
+  const mapCamXMax = () => !st.world && island && island.seaMap ? Math.max(0, island.w - W) : 0;
   const clampMapX = v => Math.max(0, Math.min(mapCamXMax(), v));
   const MAP_HEAD = 26; // hlavička mapy (v herných px)
   function mapCamMax() {
