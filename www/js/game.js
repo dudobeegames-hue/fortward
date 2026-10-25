@@ -1394,6 +1394,8 @@
     updateHud();
   }
 
+  // zdravie bossov okrúhle: do tisícky na 50 (300, 350…), od tisícky na 500 (1000, 1500…)
+  const bossHp = hp => { const step = hp >= 975 ? 500 : 50; return Math.max(step, Math.round(hp / step) * step); };
   function spawnEnemy(item) {
     const d = ENEMY[item.type];
     const spr = SPR[d.spr][0];
@@ -1405,6 +1407,7 @@
       jx: (Math.random() - 0.5) * 7, jy: (Math.random() - 0.5) * 5, ph: Math.random() * 6.28,
       w: spr.w, h: spr.h, dead: false, foe: null, trap: null, attacking: false, pow: Math.sqrt(item.hpMul),
     };
+    if (d.boss) e.hp = e.max = bossHp(e.max);
     if (d.king) { e.stompT = 3; e.summonT = 4; }
     if (item.fromCamp && st.camp) { const k = st.camp.parts.find(o => o.role === 'keep' && o.hp > 0); e.x = k ? k.x : scene.fortX; e.y = k ? k.y + 4 : G.gy0 + 52; st.shake = 0.5; } // vyjde z pevnosti tábora (alebo spomedzi stavieb)
     st.enemies.push(e);
@@ -1627,6 +1630,7 @@
     }
     const slow = (e.chillT > 0 ? 0.5 : 1) * (campHas('drum') ? CAMP_DRUM : 1); // vojnový bubon tábora hordu zrýchli
     const attackFn = (fn) => {
+      if (e.d.heals) { e.attacking = false; return; } // liečiteľ len lieči – neútočí na vojakov ani budovy
       e.attacking = true;
       e.atk -= dt * slow;
       if (e.atk <= 0) { e.atk = e.d.atkCd; e.lunge = 0.15; fn(); }
@@ -3041,7 +3045,11 @@
     updateFx(dt);
     if (st.hexHold > 0) st.hexHold -= dt;
     if (isAssault()) { if (st.phase === 'battle') updateAssault(DT); }
-    else if (st.phase === 'battle' && !st.spawnQ.length && !st.enemies.length && !(st.hexHold > 0)) endWave();
+    else if (st.phase === 'battle' && !st.spawnQ.length && !st.enemies.some(e => !e.d.heals) && !(st.hexHold > 0)) {
+      for (const e of st.enemies) { for (let k = 0; k < 8; k++) part(e.x, e.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.5, k % 2 ? '#5aff8a' : '#ffffff', 20); } // osamotení liečitelia zmiznú
+      st.enemies = [];
+      endWave();
+    }
   }
 
   function impact(p) {
