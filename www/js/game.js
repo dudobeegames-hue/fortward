@@ -4529,7 +4529,7 @@
     // veterná ružica s kurzovými čiarami na voľnom mori (najďalej od UI a ostrova)
     const seaBox = (cx, cy, r) => { for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) { if (x < 0 || y < 0 || x >= MW || y >= MH) return false; const i = y * MW + x; if (!sea(i) || sd[i] < 3 || uiBand(x, y)) return false; } return true; };
     let rose = null; // veterná ružica hore vľavo pod domčekom (kompas z obrázka dokreslí present v plnom rozlíšení), inak najbližšie voľné more
-    for (let r = 0; r < 160 && !rose; r += 2) for (let a = 0; a < 16 && !rose; a++) { const x = Math.round(22 + Math.cos(a / 16 * 6.283) * r), y = Math.round(52 + Math.sin(a / 16 * 6.283) * r); if (seaBox(x, y, 11)) rose = [x, y]; }
+    for (let r = 0; r < 160 && !rose; r += 2) for (let a = 0; a < 16 && !rose; a++) { const x = Math.round(22 + Math.cos(a / 16 * 6.283) * r), y = Math.round(46 + Math.sin(a / 16 * 6.283) * r); if (seaBox(x, y, 11)) rose = [x, y]; }
     island.paperRose = rose;
     if (rose) {
       const [cx, cy] = rose;
@@ -4704,7 +4704,7 @@
     const seen = landsSeen(), key = st.unlocked + ':' + st.race + ':' + seen.join(',');
     if (worldImg && worldImgKey === key) return worldImg;
     const G0 = worldG(), mis = worldMissions(), li = id => LANDS.findIndex(l => l.id === id);
-    worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), rose: [PPX + 22, PPY + 46], roseImg: true, noEdge: true });
+    worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), rose: [PPX + 22, PPY + 40], roseImg: true, noEdge: true });
     // územia, ktoré sú ešte zamknuté, sú vyšedené (súš aj pobrežie)
     const locked = new Set(LANDS.filter(l => !landReached(l)).flatMap(l => l.wl));
     if (locked.size) {
@@ -4779,13 +4779,13 @@
     const G0 = I.geom;
     const raceOf = j => { const k = I.node[j], num = l.first + k; return num < st.unlocked && k !== skip ? myRace() : G0.provs[j].race; }, keep = I.nodes.map(n => [n.x + PPX, n.y + PPY - 4]);
     I.pimg[key] = live ? PAPER.paintLive(G0, { raceOf, keep }) // kreslená mapa (ako domovský ostrov)
-      : PAPER.paint(G0, { raceOf, keep, rose: [PPX + 22, PPY + 52], roseImg: true, noEdge: true, noRhumb: I.w > W }); // kompas hore vľavo (pod domčekom); široká mapa bez kurzových čiar
+      : PAPER.paint(G0, { raceOf, keep, rose: [PPX + 22, PPY + 46], roseImg: true, noEdge: true, noRhumb: I.w > W }); // kompas hore vľavo (pod domčekom); široká mapa bez kurzových čiar
     for (const k in I.pimg) if (k !== key && !k.startsWith(st.unlocked + ':' + st.race + ':')) delete I.pimg[k]; // staré stavy preč
     return I.pimg[key];
   }
   // opálené okraje papiera na okrajoch obrazovky (mapy sa posúvajú, okraje ostávajú) – tmavý pergamen s ditheringom
   let edgeImg = null, edgeKey = null;
-  function paperEdges(hv) {
+  function paperEdges(hv, W) { // W = šírka papiera (obrazovka alebo široká mapa)
     const key = W + 'x' + hv;
     if (edgeKey === key) return edgeImg;
     const c = edgeImg || document.createElement('canvas'); c.width = W; c.height = hv;
@@ -4802,11 +4802,12 @@
     edgeImg = c; edgeKey = key;
     return c;
   }
-  // mapy území: okraje stoja na obrazovke (mapa sa pod nimi posúva); mapa sveta je celá jeden papier – okraje idú s ňou
-  const drawPaperEdges = world => {
-    const hv = Math.max(60, Math.round(H - $('mapBar').offsetHeight * DPR / S));
-    if (world) g.drawImage(paperEdges(Math.max(hv, WORLD_H + 8)), 0, 0);
-    else g.drawImage(paperEdges(hv), 0, Math.round(camY));
+  // okraje papiera patria mape (posúvajú sa s ňou): hore pri y = 0, dole tam, kde končí mapa pri najnižšom posune;
+  // mapa širšia ako obrazovka má okraje aj vľavo a vpravo na svojich krajoch, užšia na krajoch obrazovky
+  const drawPaperEdges = () => {
+    const hv = Math.max(60, Math.round(H - $('mapBar').offsetHeight * DPR / S)) + Math.round(mapCamMax());
+    const wide = !st.world && island && island.w > W;
+    g.drawImage(paperEdges(hv, wide ? island.w : W), wide ? mapOX() : 0, 0);
   };
   const PAPER_BG = 'rgb(' + PR.sea[5].join(',') + ')';
   let mapRose = null; // kompas (obrázok v plnom rozlíšení cez present)
@@ -4837,8 +4838,7 @@
     g.restore();
     if (live) return;
     drawPaperEdges();
-    if (island.w > W) mapRose = { x: 22, y: Math.round(camY) + 52 }; // široká mapa sa posúva – kompas ostáva v ľavom hornom rohu obrazovky
-    else if (cur.rose) mapRose = { x: ox - PPX + cur.rose[0], y: cur.rose[1] - PPY };
+    if (cur.rose) mapRose = { x: ox - PPX + cur.rose[0], y: cur.rose[1] - PPY };
   }
   // zvolené územie: jeho pobrežie pulzuje zlatým lemom (dva pásy mora pri brehu, vnútorný jasnejší); obrázok lemu sa pripraví raz
   const coastGlow = {};
@@ -4868,16 +4868,16 @@
     g.fillStyle = PAPER_BG; g.fillRect(0, 0, W, Math.max(WORLD_H, buf.height));
     g.drawImage(img.canvas, ox - PPX, -PPY);
     g.save(); g.translate(ox, 0);
-    const seen = landsSeen(), next = landOfMission(Math.min(st.unlocked, MAX_MISSION)), lbl = [];
+    const seen = landsSeen(), lbl = [];
     for (const l of LANDS) {
       const b = landBox(l), known = seen.includes(l.id) || st.unlocked >= l.first;
       const won = Math.max(0, Math.min(l.count, st.unlocked - l.first));
-      lbl.push({ s: l.name, sub: known ? (won >= l.count ? 'dobyté ✓' : won + ' / ' + l.count) : '', x: ox + b.x + b.w / 2 + (l.lblDx || 0), y: b.y - 3, on: l === next && known, dim: !known });
+      lbl.push({ s: l.name, sub: known ? (won >= l.count ? 'dobyté ✓' : won + ' / ' + l.count) : '', x: ox + b.x + b.w / 2 + (l.lblDx || 0), y: b.y - 3 }); // názvy jednou farbou (zamknuté územia sú vyšedené na mape)
     }
     const ringL = st.sail ? landById(st.sail.to) : landById(st.land); // zvolené územie (počas plavby to, kam sa pláva)
     if (ringL) drawWorldRing(ringL, time);
     g.restore();
-    drawPaperEdges(true);
+    drawPaperEdges();
     worldLbls = lbl;
     if (img.rose) mapRose = { x: ox - PPX + img.rose[0], y: img.rose[1] - PPY };
   }
@@ -4953,8 +4953,8 @@
       sctx.textAlign = 'center'; sctx.textBaseline = 'bottom'; sctx.lineJoin = 'round';
       sctx.font = '700 ' + (5 * S).toFixed(1) + 'px Rubik, sans-serif';
       sctx.lineWidth = Math.max(2, S * 0.9); sctx.strokeStyle = '#f3e4b8'; sctx.strokeText(lb.s, lx, ly - (lb.sub ? 4.2 * S : 0));
-      sctx.fillStyle = lb.dim ? '#7a6646' : lb.on ? '#8a2614' : '#2a1c10'; sctx.fillText(lb.s, lx, ly - (lb.sub ? 4.2 * S : 0));
-      if (lb.sub) { sctx.font = '600 ' + (3.6 * S).toFixed(1) + 'px Rubik, sans-serif'; sctx.strokeText(lb.sub, lx, ly); sctx.fillStyle = lb.dim ? '#7a6646' : '#5a4028'; sctx.fillText(lb.sub, lx, ly); }
+      sctx.fillStyle = '#2a1c10'; sctx.fillText(lb.s, lx, ly - (lb.sub ? 4.2 * S : 0));
+      if (lb.sub) { sctx.font = '600 ' + (3.6 * S).toFixed(1) + 'px Rubik, sans-serif'; sctx.strokeText(lb.sub, lx, ly); sctx.fillStyle = '#5a4028'; sctx.fillText(lb.sub, lx, ly); }
     }
     if (hallLbl) { // číslo zdravia radnice: hladké písmo s tmavým obrysom, v strede tenkého pruhu
       const lx = (hallLbl.x + sx) * S, ly = (hallLbl.y + sy - Math.round(camY)) * S;
