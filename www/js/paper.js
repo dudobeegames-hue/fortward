@@ -357,15 +357,22 @@ const PAPER = (() => {
     const put = (x, y, col) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const q = (y * W + x) * 4; d[q] = col[0]; d[q + 1] = col[1]; d[q + 2] = col[2]; d[q + 3] = 255; };
     const landAt = (x, y) => x >= 0 && y >= 0 && x < W && y < H && land[y * W + x] >= 0;
     const foam = [];
+    // vzdialenosť od brehu po celom mori (sd končí pri 24), aby more do diaľky plynulo tmavlo
+    const sdL = new Float32Array(N); // dvojprechodová (chamfer) vzdialenosť, takmer okrúhla
+    for (let k = 0; k < N; k++) sdL[k] = sea(k) ? 1e4 : 0;
+    const relax = (k, x, y, dx, dy, c) => { const nx = x + dx, ny = y + dy; if (nx >= 0 && ny >= 0 && nx < W && ny < H && sdL[ny * W + nx] + c < sdL[k]) sdL[k] = sdL[ny * W + nx] + c; };
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const k = y * W + x; relax(k, x, y, -1, 0, 1); relax(k, x, y, 0, -1, 1); relax(k, x, y, -1, -1, 1.414); relax(k, x, y, 1, -1, 1.414); }
+    for (let y = H - 1; y >= 0; y--) for (let x = W - 1; x >= 0; x--) { const k = y * W + x; relax(k, x, y, 1, 0, 1); relax(k, x, y, 0, 1, 1); relax(k, x, y, 1, 1, 1.414); relax(k, x, y, -1, 1, 1.414); }
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const k = y * W + x;
-      if (sea(k)) { // more: pri brehu tyrkysové plytčiny a svetlý príboj, ďalej hlboké s dlhými vlnami (ako pri domovskom ostrove)
-        const s = sd[k] > 200 ? 40 : sd[k];
-        let v = 0.34 + (fbm(x * 0.05, y * 0.05, seed + 5) - 0.5) * 0.22 + (fbm(x * 0.18, y * 0.12, seed + 12) - 0.5) * 0.08 + Math.max(0, 1 - s / 14) * 0.26;
+      if (sea(k)) { // more rovnaké ako pri domovskom ostrove (map.js seaRGB): hĺbka = vzdialenosť od brehu / 89 px (polomer domovského ostrova)
+        const depth = (sdL[k] - 0.5) / 89;
+        let v = 0.78 - Math.min(1, depth / 0.35) * 0.32 - Math.min(1, depth / 1.2) * 0.12;
+        v += (fbm(x * 0.05, y * 0.05, seed + 5) - 0.5) * 0.22 + (fbm(x * 0.18, y * 0.12, seed + 12) - 0.5) * 0.08;
         const sw = Math.sin(x * 0.11 + y * 0.045 + fbm(x * 0.03, y * 0.03, seed + 13) * 6);
         if (sw > 0.82) v += 0.07; else if (sw < -0.9) v -= 0.05;
-        if (s <= 3) v += (4 - s) * 0.07;
-        if (s === 1) { v = 0.95; foam.push({ x, y, ph: hash2(x, y, 7) * 6.28 }); }
+        if (depth < 0.06) v += (0.06 - depth) * 2.5;
+        if (sd[k] === 1) { v = 0.95; foam.push({ x, y, ph: hash2(x, y, 7) * 6.28 }); }
         put(x, y, pickRamp(SEA, Math.max(0.22, v), x, y)); continue;
       }
       const t = terr[k], p = provs[prov[k]], bio = p.biome, n = fbm(x * 0.06, y * 0.06, seed + 4) - 0.5, h = hash2(x, y, seed + 2) - 0.5;

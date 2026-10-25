@@ -4827,7 +4827,7 @@
     for (const l of LANDS) {
       const b = landBox(l), known = seen.includes(l.id) || st.unlocked >= l.first;
       const won = Math.max(0, Math.min(l.count, st.unlocked - l.first));
-      lbl.push({ s: l.name, sub: known ? (won >= l.count ? 'dobyté ✓' : won + ' / ' + l.count) : '', x: ox + b.x + b.w / 2, y: b.y - 3, on: l === next && known, dim: !known });
+      lbl.push({ s: l.name, sub: known ? (won >= l.count ? 'dobyté ✓' : won + ' / ' + l.count) : '', x: ox + b.x + b.w / 2 + (l.lblDx || 0), y: b.y - 3, on: l === next && known, dim: !known });
     }
     const ringL = st.sail ? landById(st.sail.to) : landReached(next) ? next : null; // územie na rade (počas plavby to, kam sa pláva)
     if (ringL) drawWorldRing(landBox(ringL), time);
@@ -4847,7 +4847,7 @@
       const v = G0.land[py * G0.W + px]; if (v >= 0) { bd = d; li = v; }
     }
     if (li >= 0) return LANDS.find(l => l.wl.includes(li));
-    return LANDS.find(l => { const b = landBox(l); return Math.abs(x - (b.x + b.w / 2)) < 34 && y > b.y - 14 && y < b.y; }) || null;
+    return LANDS.find(l => { const b = landBox(l); return Math.abs(x - (b.x + b.w / 2 + (l.lblDx || 0))) < 34 && y > b.y - 14 && y < b.y; }) || null;
   }
   function tapWorld(x, y) {
     if (st.sail) return;
