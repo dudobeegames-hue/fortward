@@ -65,7 +65,7 @@ def main():
     data = {'rot': [crop(f) for f in rot], 'run': [[crop(f) for f in d] for d in run], 'atk': [[crop(f) for f in d] for d in atk]}
     js = ["'use strict';",
           '// %s: postava z PixelLabu (postavy/%s) v palete PAL, každý znak = 1 pixel. Vygenerované: tools/pixellab2js.py – ručne neupravovať.' % (name, folder),
-          '// rot: státie v 8 smeroch (0 vpravo, 1 vpravo dole … 7 vpravo hore), run: chôdza 4 snímky, atk: úder 3 snímky (napriahnutie, švih, dokončenie)',
+          '// rot: státie v 8 smeroch (0 vpravo, 1 vpravo dole … 7 vpravo hore), run: chôdza 4 snímky, atk: vybrané snímky útoku (%s z PixelLabu)' % ', '.join(str(i + 1) for i in atk_pick),
           'const %s = %s;' % (name, json.dumps(data, separators=(',', ':')).replace('],[', '],\n[')), '']
     open(os.path.join(ROOT, out), 'w', encoding='utf8').write('\n'.join(js))
     print('%s: %dx%d, run %s, atk %s, pixelov mimo palety: %d' % (name, len(rot[0][0]), H, [len(d) for d in run], [len(d) for d in atk], off))

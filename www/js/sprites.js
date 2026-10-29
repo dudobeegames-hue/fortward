@@ -653,8 +653,8 @@ function initSprites() {
   for (const k in RACE_ART) SPR['race_' + k] = [buildOutlined(RACE_ART[k], RACE_PAL[k])];
   // lukostrelec zo strelnice (pešia jednotka) – rovnaký vojak, druhá snímka s prekročenými nohami
   SPR.footArcher = [buildSprite(DEF_ARCHER), buildSprite(DEF_ARCHER.slice(0, 14).concat(['....KddK.KddK.', '....KKK...KKK.']))];
-  lazySpr('footArcherG8', () => Object.assign(buildArcher8(PAL_GOLD_ARCHER), { bow: true })); // zlaté brnenie (strelnica 5. úrovne)
-  lazySpr('footArcher8', () => Object.assign(buildArcher8(), { bow: true })); // lukostrelec v 8 smeroch (luk pri boku, pri streľbe napnutá tetiva); bow: ako nepriateľ napína luk
+  lazySpr('footArcherG8', () => Object.assign(buildArt8(ARCHER_ART, PAL_GOLD_ARCHER, 4), { bow: true })); // zlaté brnenie (strelnica 5. úrovne)
+  lazySpr('footArcher8', () => Object.assign(buildArt8(ARCHER_ART, null, 4), { bow: true })); // lukostrelec v 8 smeroch z PixelLabu (archer-art.js), atk: napnutie, výstrel; bow: ako nepriateľ napína luk
   SPR.knight = [buildSprite(DEF_KNIGHT)];
   SPR.mage = [buildSprite(DEF_MAGE)];
   SPR.soldier = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l)));
