@@ -658,8 +658,8 @@ function initSprites() {
   SPR.knight = [buildSprite(DEF_KNIGHT)];
   SPR.mage = [buildSprite(DEF_MAGE)];
   SPR.soldier = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l)));
-  lazySpr('soldierG8', () => buildKnight8(PAL_GOLD_ARMOR)); // zlaté brnenie (kasárne 5. úrovne)
-  lazySpr('soldier8', () => buildKnight8()); // rytier v 8 smeroch (chôdza s pohupom tela, úder mečom)
+  lazySpr('soldierG8', () => buildArt8(KNIGHT_ART, PAL_GOLD_ARMOR, 4)); // zlaté brnenie (kasárne 5. úrovne)
+  lazySpr('soldier8', () => buildArt8(KNIGHT_ART, null, 4)); // rytier v 8 smeroch z PixelLabu (knight-art.js)
   SPR.king = KING_LEGS.map(l => buildSprite(KING_BODY.concat(l)));
   lazySpr('king8', buildKing8); // kráľ v 8 smeroch (chôdza, postoj, úder)
   lazySpr('paladin8', buildPaladin8); // paladin v 8 smeroch s bojovým kladivom
@@ -1530,6 +1530,14 @@ function buildUnit8(spec) {
   return all;
 }
 const buildKnight8 = pal => buildUnit8({ pal, body: KN8_BODY, shield: KN8_SHIELD, legs: KN8_LEGS, hand: KN8_HAND, blade: 6 });
+
+// jednotka v 8 smeroch nakreslená v PixelLabe (riadky znakov z tools/pixellab2js.py) – rovnaký tvar ako buildUnit8
+function buildArt8(art, pal, stride) {
+  const spr = rows => spriteFromPixels(buildSprite(rows, pal).c);
+  const all = art.rot.map((rot, d) => ({ idle: spr(rot), walk: art.run[d].map(spr), atk: art.atk[d].map(spr) }));
+  all.stride = stride || 3.2;
+  return all;
+}
 
 // lukostrelec: kožená čiapka s červeným perom, modrá tunika, kožený opasok a remeň tulca; tulec so šípmi na chrbte
 const AR8_BODY = {
