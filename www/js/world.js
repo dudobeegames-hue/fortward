@@ -48,19 +48,25 @@ function worldSpec() {
 
 // územia: first/count = misie, wl = súše na mape sveta (indexy vo worldSpec), view = zväčšenie mapy územia (výrez mapy sveta;
 // w = šírka mapy, širšia ako obrazovka sa posúva do strán), lblDx = posun názvu na mape sveta, groups = poradie misií (súše a pásma krajiny, v každom od najnižšieho
-// hradu k najbližšiemu ďalšiemu), reward = trvalá odmena za dobytie celého územia
+// hradu k najbližšiemu ďalšiemu), reward = trvalá odmena za dobytie celého územia,
+// terrain = zem, cesta, dekorácie a počasie bojísk územia (prebijú tému misie; more, rieky a mlyn témy ostanú; keep = témy, ktorým ostanú vlastné dekorácie)
 const LANDS = [
   { id: 'home',  name: 'Domovský ostrov', first: 1, count: 10, home: true, wl: [0] },
   { id: 'isles', name: 'Neutrálne zeme', first: 11, count: 5, wl: [1, 2, 3], view: { s: 3.3 }, groups: [[[1, 0], [2, 0], [3, 0]]],
+    terrain: { ground: 'darkLit', road: 'ashroad', deco: 'orc' }, // hlina ako pri pevnosti orkov
     reward: { id: 'gold', txt: '+5 % zlata za vlny a nepriateľov' } },
-  { id: 'dune',  name: 'Piesočný ostrov', first: 16, count: 8, wl: [9], view: { s: 3.4 }, groups: [[[9, 0]]] },
+  { id: 'dune',  name: 'Piesočný ostrov', first: 16, count: 8, wl: [9], view: { s: 3.4 }, groups: [[[9, 0]]],
+    terrain: { ground: 'desert', road: 'sandroad', deco: 'desert', keep: ['ruins'] } },
   { id: 'long',  name: 'Pralesný ostrov', first: 24, count: 10, wl: [4, 10], view: { s: 2.5, w: 380 }, lblDx: -40, groups: [[[4, 0], [10, 0]]],
+    terrain: { ground: 'jungle', road: 'dirt', deco: 'jungle', keep: ['swamp', 'ruins'] },
     reward: { id: 'walls', txt: 'hradby o 10 % lacnejšie' } },
   { id: 'north', name: 'Severná krajina', first: 34, count: 8, wl: [5, 6], view: { s: 4, w: 300 }, groups: [[[5, 0]], [[6, 0]]],
+    terrain: { ground: 'snow', road: 'snowroad', deco: 'snowy', anim: 'snow' },
     reward: { id: 'point', txt: '+1 voľný bod každému hrdinovi' } },
-  { id: 'ash',   name: 'Popolavý ostrov', first: 42, count: 10, wl: [7], view: { s: 3, w: 380 }, groups: [[[7, 0]]] },
+  { id: 'ash',   name: 'Popolavý ostrov', first: 42, count: 10, wl: [7], view: { s: 3, w: 380 }, groups: [[[7, 0]]],
+    terrain: { ground: 'ash', road: 'ashroad', deco: 'graves', anim: 'fog', keep: ['ash', 'swamp', 'ruins'] } },
   // ostrov roja má vlastnú (schválenú) mapu: väčšie kopce, než by dal výrez mapy sveta
-  { id: 'swarm', name: 'Ostrov roja', first: 52, count: 4, wl: [8], own: { seed: 41, circles: WSK.redRaw.map(([x, y, r]) => [-886 + x * 3.6, -1342 + y * 3.6, r * 3.6]), amp: 6 } },
+  { id: 'swarm', name: 'Ostrov roja', first: 52, count: 4, wl: [8], terrain: { ground: 'hive', road: 'hiveroad', deco: 'hive', anim: 'spores' }, own: { seed: 41, circles: WSK.redRaw.map(([x, y, r]) => [-886 + x * 3.6, -1342 + y * 3.6, r * 3.6]), amp: 6 } },
 ];
 const MAX_MISSION = LANDS[LANDS.length - 1].first + LANDS[LANDS.length - 1].count - 1; // posledná misia sveta
 // plavebné trasy (poradie území)

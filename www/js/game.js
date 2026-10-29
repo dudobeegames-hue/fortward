@@ -757,7 +757,7 @@
       return sc;
     }
     const lay = castleLay(m), ti = m > MISSIONS.length ? missionDef(m).theme : homeNode(m), sd = m > MISSIONS.length ? m : homeNode(m) + 1;
-    const sc = buildScene(W, fh, g2, 7 + sd * 13, ti, campClearRects(lay, g2), isAssaultM(m) ? 'none' : isOrc() ? 'planks' : null); // nádvorie pevnosti orkov z dosiek; pri útoku na hrad žiadne
+    const sc = buildScene(W, fh, g2, 7 + sd * 13, ti, campClearRects(lay, g2), isAssaultM(m) ? 'none' : isOrc() ? 'planks' : null, landOfMission(m).terrain); // nádvorie pevnosti orkov z dosiek; pri útoku na hrad žiadne
     sceneCache.set(key, sc);
     if (sceneCache.size > 3) sceneCache.delete(sceneCache.keys().next().value);
     return sc;

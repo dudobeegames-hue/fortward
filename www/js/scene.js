@@ -93,8 +93,10 @@ function plankRGB(X, Y) {
 
 // G: { T, gx0, gy0, cols, rows, hallCx, hallTop, hallBot, zoneTopMax }
 // clear = obdĺžniky [x0, y0, x1, y1] bez stromov a skál (stavby tábora hordy); yard = 'planks' – nádvorie z dosiek (orkovia), 'none' – bez nádvoria
-function buildScene(W, H, G, seed, themeIdx, clear, yard) {
-  const th = THEMES[((themeIdx || 0) % THEMES.length + THEMES.length) % THEMES.length];
+// terr = terén územia (LANDS v world.js): zem vždy, cestu, dekorácie a počasie, ak téma nie je v terr.keep; more s penou, rieky a mlyn ostanú
+function buildScene(W, H, G, seed, themeIdx, clear, yard, terr) {
+  let th = THEMES[((themeIdx || 0) % THEMES.length + THEMES.length) % THEMES.length];
+  if (terr) th = Object.assign({}, th, { ground: terr.ground }, (terr.keep || []).includes(th.key) ? {} : { road: terr.road, deco: terr.deco }, (terr.keep || []).includes(th.key) || th.anim === 'foam' ? {} : { anim: terr.anim });
   const bg = document.createElement('canvas'); bg.width = W; bg.height = H;
   const bx = bg.getContext('2d');
   const img = bx.createImageData(W, H), d = img.data;
@@ -148,7 +150,7 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard) {
           const row = Math.floor(y / 4), off = (row % 2) * 2, col = Math.floor((x + off) / 5);
           let v = 0.45 + (hash2(col, row, seed + 23) - 0.5) * 0.35;
           if (y % 4 === 0 || (x + off) % 5 === 0) v = 0.12;
-          if (dd > -2 || hash2(col, row, seed + 24) > 0.92) { set(x, y, pickRamp(RAMP.grass, 0.3, x, y)); continue; } // tráva medzi kameňmi
+          if (dd > -2 || hash2(col, row, seed + 24) > 0.92) { set(x, y, pickRamp(groundRamp, 0.3, x, y)); continue; } // tráva (zem územia) medzi kameňmi
           set(x, y, pickRamp(RAMP.stone, v, x, y));
           continue;
         }
