@@ -1043,7 +1043,8 @@
     u.cd = SIEGE.cat.cd; u.fired = 1.0; AUDIO.play('bolt');
   }
   // baranidlo a ohnivý voz idú na tábor, katapult ho ostreľuje z dostrelu, obliehacia veža ich sprevádza;
-  // keď tábor nie je (alebo padol), baranidlo rozráža hordu, katapult hádže spoza šíku, ohnivý voz ide so šíkom
+  // keď tábor nie je (alebo padol), baranidlo rozráža hordu, katapult hádže spoza šíku, ohnivý voz ide so šíkom;
+  // tlačidlo obrana/útok ich neovplyvňuje – tábor hordy idú búrať vždy
   function updateSiege(u, dt) {
     u.flash = Math.max(0, u.flash - dt); u.cd = Math.max(0, u.cd - dt); u.fired = Math.max(0, u.fired - dt); u.swing = 0;
     const fm = st.form || { inf: { x: G.hallCx, y: musterYOf() }, arc: { x: G.hallCx, y: musterYOf() + 16 } };
@@ -1055,7 +1056,7 @@
       return;
     }
     const giant = nearestGiant(u.x, u.y, GIANT_HUNT); // obor nablízku má prednosť pred táborom aj pred šíkom
-    const camp = armyAttacks() && !giant ? nearestCampPart(u.x, u.y) : null; // v obrane ostávajú pri šíku
+    const camp = !giant ? nearestCampPart(u.x, u.y) : null; // tábor hordy je ich prednostný cieľ – tlačidlo obrana/útok sa ich netýka
     if (u.siege === 'ram') {
       if (giant) u.tgt = giant;
       if (camp) { // tábor má prednosť – hordy si nevšíma
@@ -1067,7 +1068,6 @@
       }
       if (u.tgt && (u.tgt.dead || u.tgt.d.fly)) u.tgt = null;
       if (!u.tgt) u.tgt = nearestFoe(u.x, u.y, false);
-      if (u.tgt && !u.tgt.d.giant && !armyAttacks() && Math.hypot(u.tgt.x - fm.inf.x, u.tgt.y - fm.inf.y) > 70) u.tgt = null; // v obrane len horda pri šíku
       const t = u.tgt;
       if (!t) { go(clampX(fm.inf.x + side), fm.inf.y - 6); return; }
       if (Math.hypot(t.x - u.x, t.y - u.y) > 10) { go(t.x, t.y + 6); return; }
@@ -2375,12 +2375,15 @@
     u.cd = Math.max(0, u.cd - dt);
     u.swing = Math.max(0, (u.swing || 0) - dt);
     let near = false, nd = 1e9;
+    const prev = u.aimT;
     u.aimT = null; // na koho mieri (natočí sa k nemu a napne luk)
     for (const e of st.enemies) {
       if (e.dead || e.y <= 4) continue;
       const d = Math.hypot(e.x - u.x, e.y - u.y);
       if (d <= ARCHER_RANGE) { near = true; if (d < nd) { nd = d; u.aimT = e; } }
     }
+    // drží si cieľ, kým žije a je v dosahu – inak by sa pri viacerých nepriateľoch otáčal z jedného na druhého a blikal
+    if (near && prev && prev.d && !prev.dead && prev.y > 4 && Math.hypot(prev.x - u.x, prev.y - u.y) <= ARCHER_RANGE) u.aimT = prev;
     if (near && u.cd <= 0 && shoot(u.x, u.y, u.x, u.y - 9, ARCHER_RANGE, 'arrow', 180, u.dmg * (st.cryT > 0 ? CRY_DMG : 1), 0, ARCHER_PRIO)) {
       u.cd = ARCHER_CD / (st.cryT > 0 ? CRY_SPD : 1) * rageMul(u); u.swing = 0.1;
       u.aimT = st.proj[st.proj.length - 1].tgt || u.aimT; // vystrelil na prednostný cieľ – k nemu sa otočí
@@ -3334,14 +3337,14 @@
     const t = u.archer ? (u.aimT && !u.aimT.dead ? u.aimT : null) : u.tgt && !u.tgt.dead ? u.tgt : null;
     const near = t && (u.archer || Math.hypot(t.x - u.x, t.y - u.y) < (u.ktype === 'spear' ? SPEAR_REACH + 5 : 14)); // kopijník bodá z diaľky
     const sd = smoothDir(u, mvx, mvy);
-    if (near) turn8(u, dir8(t.x - u.x, t.y - u.y), 3);
+    if (near) turn8(u, dir8(t.x - u.x, t.y - u.y), u.archer ? 8 : 3); // lukostrelec sa otáča pomalšie (cieľ prechádza medzi smermi)
     else if (moving) turn8(u, sd, 5);
     else if (!t) turn8(u, 6, 5);
     if (u.face8 == null) u.face8 = 6;
     const v = set[u.face8];
-    if (u.archer) { // lukostrelec: po výstrele chvíľu povolená tetiva, potom znova napne; v behu luk spustí
-      if (u.swing > 0 || (near && !moving && u.cd > ARCHER_CD * 0.6)) return v.atk[1];
-      if (near && !moving) return v.atk[0];
+    if (u.archer) { // lukostrelec: po výstrele chvíľu povolená tetiva, potom znova napne; s cieľom mieri aj pri presune v rade (striedanie s chôdzou blikalo)
+      if (u.swing > 0 || (near && u.cd > ARCHER_CD * 0.6)) return v.atk[1];
+      if (near) return v.atk[0];
     }
     else if (u.swing > 0) return v.atk[u.swing > 0.075 ? 1 : 2]; // švih a dokončenie úderu
     else if (near && !moving && u.cd < 0.25) return v.atk[0];  // napriahnutie
@@ -6104,7 +6107,7 @@
   // prepínač armády útok / obrana (vidno ho v boji, keď má hráč vojsko)
   function syncStance() {
     const b = $('stanceBtn'), atk = armyAttacks();
-    b.hidden = !st.blds.some(q => UNIT_HOME[q.kind] || q.kind === 'range') && !st.soldiers.some(u => u.siege);
+    b.hidden = !st.blds.some(q => UNIT_HOME[q.kind] || q.kind === 'range'); // obliehacie stroje sa ním neriadia
     b.className = atk ? 'attack' : 'defend';
     b.querySelector('img').src = atk ? UI_ICONS.swords : UI_ICONS.shieldDefend;
     b.querySelector('span').textContent = atk ? 'ÚTOK' : 'OBRANA';
