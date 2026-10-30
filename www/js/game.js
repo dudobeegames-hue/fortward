@@ -1149,7 +1149,7 @@
   const DIFF = {
     // sila nepriateľov podľa misie (násobok zdravia v 1. vlne) – misia 1 je úvodná a ľahká, misia 10 skúška
     missionHp: [0.95, 1.5, 2.3, 2.55, 2.55, 2.7, 2.9, 3.4, 3.2, 4.0, // 6–10 silnejšie: hráč má stajne, zbrojnicu a sokoly
-      3.6, 3.8, 4.0, 4.2, 4.4, 4.6, 4.8, 5.0, 5.2], // severské ostrovčeky (11–19): kratšie misie (6 vĺn), preto silnejšia prvá vlna
+      3.6, 3.8, 4.0, 4.2, 4.4, 4.6, 4.8, 5.0, 5.2], // misie 11–19 (všetky misie majú 10 vĺn)
     copperHp:  [1, 1, 1, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15], // medená od misie 4 tuhšia (hrdina má schopnosti)
     hpWave: 1.10, hpWaveMission: 0.006, hpMission: 0.25,   // rast zdravia počas misie (neskoršie misie rastú rýchlejšie)
     countWave: 2, countMission: 1,                         // počet nepriateľov vo vlne
@@ -3326,7 +3326,8 @@
     } else if (Math.random() < 0.2) part(x + (Math.random() - 0.5) * 3, y - 1, (Math.random() - 0.5) * 4, -8 - Math.random() * 6, 0.35, green ? (Math.random() < 0.5 ? '#d8ffa0' : '#62c030') : (Math.random() < 0.5 ? '#fff070' : '#f87830'), 0);
   }
   // zasiahnutá budova či hrad sa namiesto zafarbenia jemne otrasie o pixel do strán (úlomky pridá hitBuilding / hitCamp)
-  const hitJit = f => f > 0 ? (Math.floor(performance.now() / 45) % 2 ? 1 : -1) : 0;
+  // len počas boja – zásah strely doletenej po konci vlny by inak stavbou triasol až do ďalšej vlny (záblesk sa mimo boja neodpočítava)
+  const hitJit = f => f > 0 && st.phase === 'battle' ? (Math.floor(performance.now() / 45) % 2 ? 1 : -1) : 0;
   // jednotka v 8 smeroch (rytier): natočí sa k nepriateľovi, inak smerom chôdze, v pokoji pozerá na hordu;
   // snímka chôdze sa ráta z prejdenej vzdialenosti, aby nohy nekĺzali (krok = 4 snímky na ~13 bodov)
   function unit8Frame(u, set) {

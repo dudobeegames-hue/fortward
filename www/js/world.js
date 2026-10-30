@@ -97,7 +97,7 @@ const WORLD_MISSIONS = (() => {
     const last = i === d.names.length - 1;
     const desc = d.desc.length === d.names.length ? d.desc[i] : last ? d.desc[d.desc.length - 1] : d.split && i >= d.split ? d.desc[1] : d.desc[0];
     out.push(last ? { name, desc, theme: d.last, castle: 10, assault: true }
-      : Object.assign({ name, desc, theme: d.themes[i % d.themes.length], castle: 6 + (i % 4), waves: 6 }, i % 3 === 2 ? { giants: { 6: [i % 2 ? 'mammoth' : 'giantRam'] } } : {}));
+      : Object.assign({ name, desc, theme: d.themes[i % d.themes.length], castle: 6 + (i % 4) }, i % 3 === 2 ? { giants: { 10: [i % 2 ? 'mammoth' : 'giantRam'] } } : {}));
   });
   return out;
 })();
