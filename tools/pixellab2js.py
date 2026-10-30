@@ -1,6 +1,7 @@
 """Prevod postavy z PixelLabu (postavy/<priečinok>) do JS súboru s riadkami znakov palety PAL.
 
-Použitie: python tools/pixellab2js.py <priečinok> <MENO_KONŠTANTY> <výstup.js> [snímky útoku, napr. 2,3,4]
+Použitie: python tools/pixellab2js.py <priečinok> <MENO_KONŠTANTY> <výstup.js> [snímky útoku, napr. 2,3,4] [smer=snímky ...]
+(snímky sa číslujú od 0; smer=snímky, napr. south=2,3, vyberie iné snímky pre jeden smer, keď sa v ňom generátor pomýlil)
 Priečinok má rotations/<smer>.png a animations/Running*/<smer>/frame_*.png, animations/Attack*/<smer>/frame_*.png
 (plátno 32×32, 8 smerov). Farby mimo palety PAL sa nahradia najbližšou (v priestore Lab).
 Výstup: { rot: [8 smerov], run: [8][4 snímky], atk: [8][3 snímky] }, smery v poradí hry (0 vpravo, 1 vpravo dole … 7 vpravo hore).
@@ -57,7 +58,8 @@ def main():
     rot = [load(os.path.join(base, 'rotations', d + '.png')) for d in DIRS]
     run = [[load(f) for f in anim('Running*', d)] for d in DIRS]
     atk = [[load(f) for f in anim('Attack*', d)] for d in DIRS]
-    atk = [[a[i] for i in atk_pick] for a in atk]
+    own = {d: [int(i) for i in v.split(',')] for d, v in (a.split('=') for a in sys.argv[5:])}
+    atk = [[a[i] for i in own.get(DIRS[d], atk_pick)] for d, a in enumerate(atk)]
     # chodidlá = najspodnejší riadok státia smerom dole; pod nimi PB prázdnych riadkov
     feet = max(y for y, r in enumerate(rot[2]) if r.strip('.'))
     H = feet + 1 + PB
@@ -65,7 +67,7 @@ def main():
     data = {'rot': [crop(f) for f in rot], 'run': [[crop(f) for f in d] for d in run], 'atk': [[crop(f) for f in d] for d in atk]}
     js = ["'use strict';",
           '// %s: postava z PixelLabu (postavy/%s) v palete PAL, každý znak = 1 pixel. Vygenerované: tools/pixellab2js.py – ručne neupravovať.' % (name, folder),
-          '// rot: státie v 8 smeroch (0 vpravo, 1 vpravo dole … 7 vpravo hore), run: chôdza 4 snímky, atk: vybrané snímky útoku (%s z PixelLabu)' % ', '.join(str(i + 1) for i in atk_pick),
+          '// rot: státie v 8 smeroch (0 vpravo, 1 vpravo dole … 7 vpravo hore), run: chôdza 4 snímky, atk: vybrané snímky útoku (%s z PixelLabu%s)' % (', '.join(str(i + 1) for i in atk_pick), ''.join('; %s: %s' % (d, ', '.join(str(i + 1) for i in v)) for d, v in own.items())),
           'const %s = %s;' % (name, json.dumps(data, separators=(',', ':')).replace('],[', '],\n[')), '']
     open(os.path.join(ROOT, out), 'w', encoding='utf8').write('\n'.join(js))
     print('%s: %dx%d, run %s, atk %s, pixelov mimo palety: %d' % (name, len(rot[0][0]), H, [len(d) for d in run], [len(d) for d in atk], off))
