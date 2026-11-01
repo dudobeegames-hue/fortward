@@ -23,6 +23,14 @@ const matBody = lvl => LVL_MAT[lvl].body || RAMP.stone;
 
 // Zo surového canvasu vyrobí sprite so zábleskom (biela) a siluetou.
 function spriteFromCanvas(c) { return lazyVariants({ c, w: c.width, h: c.height }); } // záblesk a silueta až pri použití (sprites.js)
+// budova z PixelLabu (tools/pixellab2obj.py): jemná kresba – plátno v plnom rozlíšení, w a h v bodoch hry (polovica)
+function artBuilding(art, i) {
+  const rows = art.lv[i], c = document.createElement('canvas'); c.width = rows[0].length; c.height = rows.length;
+  const x = c.getContext('2d'), id = x.createImageData(c.width, c.height), cols = art.pal.map(hexRGB);
+  rows.forEach((r, y) => { for (let k = 0; k < r.length; k++) { if (r[k] === '.') continue; const col = cols[art.chars.indexOf(r[k])], o = (y * c.width + k) * 4; id.data[o] = col[0]; id.data[o + 1] = col[1]; id.data[o + 2] = col[2]; id.data[o + 3] = 255; } });
+  x.putImageData(id, 0, 0);
+  return lazyVariants({ c, w: c.width / 2, h: c.height / 2, hd: true });
+}
 
 // Maliar: vrstvy farieb do bufferu, na konci obrys K okolo siluety.
 function painter(w, h) {
@@ -1435,9 +1443,10 @@ function makeMill() {
 
 const BSPR = {};
 function initBuildingSprites() {
-  BSPR.hall = [1, 2, 3, 4, 5].map(l => makeHall(l));
-  BSPR.tower = [1, 2, 3, 4, 5].map(l => makeArcherTower(l));
-  BSPR.mage = [1, 2, 3, 4, 5].map(l => makeMageTower(l));
+  BSPR.hall = [1, 2, 3, 4, 5].map(l => CASTLE_ART.lv[l - 1] ? artBuilding(CASTLE_ART, l - 1) : makeHall(l)); // hrad z PixelLabu (castle-art.js), chýbajúce úrovne zatiaľ stará kresba
+  BSPR.tower = TOWER_ART.lv.map((_, i) => artBuilding(TOWER_ART, i)); // strážna veža z PixelLabu (tower-art.js), 5 úrovní
+  BSPR.mage = FIRE_TOWER_ART.lv.map((_, i) => artBuilding(FIRE_TOWER_ART, i)); // ohnivá veža z PixelLabu (fire-tower-art.js); stará kresba: makeMageTower
+  BSPR.pitch = PITCH_TOWER_ART.lv.map((_, i) => artBuilding(PITCH_TOWER_ART, i)); // smolná veža z PixelLabu (pitch-tower-art.js), len ľudia
   BSPR.icetower = [1, 2, 3, 4, 5].map(l => makeIceTower(l));
   BSPR.ballista = [1, 2, 3, 4, 5].map(l => makeBallistaTower(l));
   BSPR.barracks = makeBarracks();

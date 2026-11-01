@@ -1,6 +1,7 @@
 """Prevod postavy z PixelLabu (postavy/<priečinok>) do JS súboru s riadkami znakov palety PAL.
 
-Použitie: python tools/pixellab2js.py <priečinok> <MENO_KONŠTANTY> <výstup.js> [snímky útoku, napr. 2,3,4] [smer=snímky ...]
+Použitie: python tools/pixellab2js.py <priečinok> <MENO_KONŠTANTY> <výstup.js> [snímky útoku, napr. 2,3,4] [smer=snímky ...] [--hd]
+(--hd = jemná kresba v dvojnásobnej mriežke, napr. plátno 48×48 alebo 64×64; hra ju kreslí v polovičnej veľkosti)
 (snímky sa číslujú od 0; smer=snímky, napr. south=2,3, vyberie iné snímky pre jeden smer, keď sa v ňom generátor pomýlil)
 Priečinok má rotations/<smer>.png a animations/Running*/<smer>/frame_*.png, animations/Attack*/<smer>/frame_*.png
 (plátno 32×32, 8 smerov). Farby mimo palety PAL sa nahradia najbližšou (v priestore Lab).
@@ -51,26 +52,54 @@ def load(path):
 
 
 def main():
-    folder, name, out = sys.argv[1:4]
-    atk_pick = [int(i) for i in (sys.argv[4] if len(sys.argv) > 4 else '2,3,4').split(',')]
+    args = [a for a in sys.argv[1:] if a != '--hd']
+    hd = '--hd' in sys.argv  # jemná kresba (dvojnásobná mriežka): hra ju kreslí v polovičnej veľkosti
+    folder, name, out = args[:3]
+    atk_pick = [int(i) for i in (args[3] if len(args) > 3 else '2,3,4').split(',')]
+    own = {d: [int(i) for i in v.split(',')] for d, v in (a.split('=') for a in args[4:])}
+    pb = PB * (2 if hd else 1)
     base = os.path.join(ROOT, 'postavy', folder)
-    anim = lambda pat, d: sorted(glob.glob(os.path.join(base, 'animations', pat, d, 'frame_*.png')))
     rot = [load(os.path.join(base, 'rotations', d + '.png')) for d in DIRS]
-    run = [[load(f) for f in anim('Running*', d)] for d in DIRS]
-    atk = [[load(f) for f in anim('Attack*', d)] for d in DIRS]
-    own = {d: [int(i) for i in v.split(',')] for d, v in (a.split('=') for a in sys.argv[5:])}
-    atk = [[a[i] for i in own.get(DIRS[d], atk_pick)] for d, a in enumerate(atk)]
-    # chodidlá = najspodnejší riadok státia smerom dole; pod nimi PB prázdnych riadkov
+    rw, rh = len(rot[0][0]), len(rot[0])
+    # animácie: Attack* = útok, prvá ďalšia = chôdza/klus (PixelLab ju pomenuje podľa zadania)
+    names = sorted(os.listdir(os.path.join(base, 'animations')))
+    atk_dir = next(n for n in names if n.startswith('Attack'))
+    run_dir = next(n for n in names if not n.startswith('Attack'))
+
+    def frames(anim, d):
+        fs = sorted(glob.glob(os.path.join(base, 'animations', anim, d, 'frame_*.png')))
+        out = []
+        for f in fs:  # animácie môžu mať väčšie plátno (68×68 pri 48×48) – stredný výrez veľkosti státia
+            fr = load(f)
+            ox, oy = (len(fr[0]) - rw) // 2, (len(fr) - rh) // 2
+            out.append([r[ox:ox + rw] for r in fr[oy:oy + rh]])
+        return out
+
+    def nearest(have, d):  # smer bez animácie dostane najbližší smer, ktorý ju má (pri zhode bočný – útok z boka mieri šikmo lepšie)
+        i = DIRS.index(d)
+        return min(have, key=lambda h: (min((DIRS.index(h) - i) % 8, (i - DIRS.index(h)) % 8), h not in ('east', 'west')))
+
+    runs = {d: frames(run_dir, d) for d in DIRS}
+    atks = {d: frames(atk_dir, d) for d in DIRS}
+    have_run, have_atk = [d for d in DIRS if runs[d]], [d for d in DIRS if atks[d]]
+    run = [runs[d if runs[d] else nearest(have_run, d)][:4] for d in DIRS]
+    atk = [[atks[d if atks[d] else nearest(have_atk, d)][i] for i in own.get(d, atk_pick)] for d in DIRS]
+    missing = [d for d in DIRS if not atks[d]] + [d for d in DIRS if not runs[d]]
+    # chodidlá = najspodnejší riadok státia smerom dole; pod nimi PB prázdnych riadkov (pri hd dvojnásobok)
     feet = max(y for y, r in enumerate(rot[2]) if r.strip('.'))
-    H = feet + 1 + PB
-    crop = lambda fr: fr[:H]
+    H = feet + 1 + pb
+    top = ['.' * rw] if hd and H % 2 else []  # hd: párna výška (polovica = celé body hry), prázdny riadok navrch
+    h0, H = H, H + len(top)
+    crop = lambda fr: top + (fr + ['.' * rw] * h0)[:h0]
     data = {'rot': [crop(f) for f in rot], 'run': [[crop(f) for f in d] for d in run], 'atk': [[crop(f) for f in d] for d in atk]}
+    if hd: data['hd'] = True
     js = ["'use strict';",
-          '// %s: postava z PixelLabu (postavy/%s) v palete PAL, každý znak = 1 pixel. Vygenerované: tools/pixellab2js.py – ručne neupravovať.' % (name, folder),
-          '// rot: státie v 8 smeroch (0 vpravo, 1 vpravo dole … 7 vpravo hore), run: chôdza 4 snímky, atk: vybrané snímky útoku (%s z PixelLabu%s)' % (', '.join(str(i + 1) for i in atk_pick), ''.join('; %s: %s' % (d, ', '.join(str(i + 1) for i in v)) for d, v in own.items())),
+          '// %s: postava z PixelLabu (postavy/%s) v palete PAL, každý znak = 1 pixel%s. Vygenerované: tools/pixellab2js.py – ručne neupravovať.' % (name, folder, ', jemná kresba (hra ju kreslí v polovičnej veľkosti)' if hd else ''),
+          '// rot: státie v 8 smeroch (0 vpravo, 1 vpravo dole … 7 vpravo hore), run: chôdza 4 snímky, atk: vybrané snímky útoku (%s z PixelLabu%s)%s' % (
+              ', '.join(str(i + 1) for i in atk_pick), ''.join('; %s: %s' % (d, ', '.join(str(i + 1) for i in v)) for d, v in own.items()),
+              '; bez vlastnej animácie (použitý najbližší smer): ' + ', '.join(missing) if missing else ''),
           'const %s = %s;' % (name, json.dumps(data, separators=(',', ':')).replace('],[', '],\n[')), '']
     open(os.path.join(ROOT, out), 'w', encoding='utf8').write('\n'.join(js))
-    print('%s: %dx%d, run %s, atk %s, pixelov mimo palety: %d' % (name, len(rot[0][0]), H, [len(d) for d in run], [len(d) for d in atk], off))
-
+    print('%s: %dx%d%s, run %s, atk %s, pixelov mimo palety: %d, chýba: %s' % (name, rw, H, ' hd' if hd else '', [len(d) for d in run], [len(d) for d in atk], off, missing))
 
 main()

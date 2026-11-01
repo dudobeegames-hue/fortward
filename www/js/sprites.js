@@ -675,8 +675,8 @@ function initSprites() {
   lazySpr('spear8', () => buildSpear8()); // kopijník v 8 smeroch (kopija opretá o zem, pri útoku sklopená a bodne)
   SPR.shield = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l), { c: '#d0d4dc', B: '#80869a', n: '#44485a' }));
   SPR.rider = RIDER_FRAMES.map(f => buildSprite(f));
-  lazySpr('riderG8', () => buildRider8(PAL_GOLD_ARMOR)); // zlaté brnenie (stajne 5. úrovne)
-  lazySpr('rider8', () => buildRider8()); // jazdec na koni v 8 smeroch (klus, kopija sklopená k útoku)
+  lazySpr('riderG8', () => buildArt8(RIDER_ART, PAL_GOLD_ARMOR, 5)); // zlaté brnenie (stajne 5. úrovne)
+  lazySpr('rider8', () => buildArt8(RIDER_ART, null, 5)); // jazdec na koni v 8 smeroch z PixelLabu, jemná kresba (rider-art.js)
   lazySpr('hknight8', buildHKnight8); // ťažký rytier (nepriateľ za orkov)
   lazySpr('captain8', buildCaptain8); // kapitán jazdy (boss za orkov)
   SPR.monk = MONK_LEGS.map(l => buildSprite(MONK_BODY.concat(l)));
@@ -1531,9 +1531,10 @@ function buildUnit8(spec) {
 }
 const buildKnight8 = pal => buildUnit8({ pal, body: KN8_BODY, shield: KN8_SHIELD, legs: KN8_LEGS, hand: KN8_HAND, blade: 6 });
 
-// jednotka v 8 smeroch nakreslená v PixelLabe (riadky znakov z tools/pixellab2js.py) – rovnaký tvar ako buildUnit8
+// jednotka v 8 smeroch nakreslená v PixelLabe (riadky znakov z tools/pixellab2js.py) – rovnaký tvar ako buildUnit8;
+// art.hd = jemná kresba (dvojnásobná mriežka): plátno ostane v plnom rozlíšení, w a h sú v bodoch hry (polovica)
 function buildArt8(art, pal, stride) {
-  const spr = rows => spriteFromPixels(buildSprite(rows, pal).c);
+  const spr = rows => { const s = spriteFromPixels(buildSprite(rows, pal).c); if (art.hd) { s.w /= 2; s.h /= 2; s.hd = true; } return s; };
   const all = art.rot.map((rot, d) => ({ idle: spr(rot), walk: art.run[d].map(spr), atk: art.atk[d].map(spr) }));
   all.stride = stride || 3.2;
   return all;

@@ -5,6 +5,11 @@
   const screen = $('screen'), sctx = screen.getContext('2d');
   const buf = document.createElement('canvas');
   const g = buf.getContext('2d'); // snímka sa už nečíta späť (zrno celej obrazovky sa nerobí – bolo drahé a rozdiel minimálny)
+  // plátno má dvojnásobné rozlíšenie: všetko sa kreslí v bodoch hry (g je zväčšené 2×), jemné sprity postáv (hd, z PixelLabu)
+  // sa kreslia v polovičnej veľkosti – ich pixel je pol bodu hry
+  const BR = 2;
+  function sizeBuf(w, h) { buf.width = w * BR; buf.height = h * BR; g.setTransform(BR, 0, 0, BR, 0, 0); g.imageSmoothingEnabled = false; }
+  const bufH = () => buf.height / BR; // výška plátna v bodoch hry
 
   const T = 16;            // veľkosť políčka mriežky
   const MAX_LVL = 5;
@@ -23,7 +28,9 @@
     stables:  { name: 'Stajne',       short: 'Stajne',  cost: 110, hp: 200, block: true, desc: 'Vysiela jazdcov – rýchlo obídu líniu a idú po strelcoch, šamanoch a podkopníkoch' },
     falconry: { name: 'Sokoliareň',   short: 'Sokoly',  cost: 120, hp: 180, block: true, desc: 'Vypúšťa sokoly – letia ponad hradby a lovia netopiere, šamanov a podkopníkov; strelci ich ľahko zostrelia' },
     armory:   { name: 'Zbrojnica',    short: 'Zbrojnica', cost: 100, hp: 240, block: true, desc: 'Vysiela kopijníkov – útočia spoza rytierov a sú silní proti jazde' },
-    mage:     { name: 'Veža mága',    short: 'Mág',    cost: 150, hp: 240, range: 70, dmg: 14, cd: 2.2, proj: 'fire', speed: 115, splash: 16, block: true, desc: 'Ohnivá guľa zasiahne celú skupinu' },
+    mage:     { name: 'Ohnivá veža',  short: 'Ohnivá', cost: 150, hp: 240, range: 70, dmg: 14, cd: 2.2, proj: 'fire', speed: 115, splash: 16, block: true, desc: 'Ohnivá guľa zasiahne celú skupinu' },
+    // smolná veža len pre ľudí: krátky dosah, leje smolu pod seba a k hradbám v okolí (PITCH_WALL) – zraní a spomalí každého na zemi
+    pitch:    { name: 'Smolná veža',  short: 'Smola',  cost: 80,  hp: 300, range: 30, dmg: 16, cd: 2.4, block: true, human: true, desc: 'Leje vriacu smolu pod seba a k blízkym hradbám – kto do nich búcha, dostane veľké poškodenie a zlepí sa' },
     icetower: { name: 'Ľadová veža',  short: 'Ľad',    cost: 90,  hp: 220, range: 72, dmg: 5,  cd: 1.3, proj: 'ice', speed: 150, chill: 2.2, block: true, desc: 'Ľadové strely spomalia zasiahnutého aj nepriateľov okolo neho' },
     ballista: { name: 'Balista',      short: 'Balista', cost: 140, hp: 260, range: 118, dmg: 34, cd: 3.2, proj: 'lance', speed: 250, block: true, desc: 'Ťažký šíp prestrelí celý rad nepriateľov na zemi' },
     wall:     { name: 'Hradby',       short: 'Hradby', cost: 12,  hp: 240, block: true, desc: 'Zatarasí cestu – horda ich musí rozbiť alebo obísť' },
@@ -43,7 +50,8 @@
   };
   const TRAPS = { pit: 1, firepit: 1, beartrap: 1 };
   const FIRE_BURN = 4; // ohnivá jama: horenie trvá 4 s (pri 8/s = 32 poškodenia – viac za zlato ako jama s ostňami, tá zas spomaľuje)
-  const SHOOTERS = { tower: 1, mage: 1, icetower: 1, ballista: 1 };
+  const SHOOTERS = { tower: 1, mage: 1, pitch: 1, icetower: 1, ballista: 1 };
+  const PITCH_WALL = 40, PITCH_SPLASH = 13; // smolná veža: hradby do 40 bodov od nej, smola zasiahne každého do 13 bodov od takej hradby
   // špecializácie veží (od úrovne 3)
   const SPECS = {
     fire:   { name: 'Ohnivé šípy',   desc: 'zásah zapáli nepriateľa', col: '#f89838', dmg: 1,    cd: 1,    range: 0 },
@@ -136,7 +144,7 @@
   const uDmg = u => WUNIT[u.type].dmg * (1 + 0.4 * (u.lvl - 1)) * (1 + 0.04 * perk('fletching'));
   const uCd = u => WUNIT[u.type].cd * Math.pow(0.92, u.lvl - 1);
   const uRange = u => WUNIT[u.type].range + 4 * (u.lvl - 1);
-  const BUILD_ORDER = ['paving', 'hedge', 'mud', 'tower', 'stake', 'wall', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'mage', 'icetower', 'ballista', 'chapel', 'firepit', 'beartrap', 'workshop'];
+  const BUILD_ORDER = ['paving', 'hedge', 'mud', 'tower', 'stake', 'wall', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'mage', 'pitch', 'icetower', 'ballista', 'chapel', 'firepit', 'beartrap', 'workshop'];
   const ORC_ORDER = BUILD_ORDER.slice(); ORC_ORDER.splice(ORC_ORDER.indexOf('icetower'), 1); ORC_ORDER.splice(ORC_ORDER.indexOf('mage'), 0, 'icetower'); // za orkov kotol pred totemom
   const ENEMY = {
     goblin:  { spr: 'goblin',  hp: 12,  speed: 24, atk: 4,  atkCd: 0.8, gold: 3,  blood: '#62a03a' },
@@ -769,7 +777,7 @@
   }
   function layoutField() {
     FH = H + (st.mission > HOME_PROVINCES && !st.endless ? Math.round(H * CAMP_EXTRA) : 0); // misie s táborom: dlhšie bojisko, posúva sa prstom
-    buf.width = W; buf.height = FH;
+    sizeBuf(W, FH);
     const oldHc = G.hc0, oldHr = G.hr0, had = !!scene;
     // pevný počet stĺpcov na každom zariadení (zmestí sa aj do najužšej plochy 180 px) – zmena okna tak mriežku neposúva
     G.cols = Math.min(GRID_COLS, Math.floor(W / T)); G.gx0 = Math.floor((W - G.cols * T) / 2);
@@ -1864,7 +1872,7 @@
   const heroReaches = (e, aggro) => { const k = st.king, h = heroPos(k); return Math.hypot(e.x - h.x, e.y - h.y) <= aggro || (!k.post && e.y >= heroBandTop()); };
   // stihne hrdina nepriateľa, kým ho zničia iní? Sčíta strely, ktoré už k nemu letia, a poškodenie,
   // ktoré mu za čas cesty hrdinu dajú veže (strieľajú na toho, kto je najbližšie k radnici) a rytier, s ktorým bojuje
-  const TOWER_KINDS = { tower: 1, mage: 1, icetower: 1, ballista: 1 };
+  const TOWER_KINDS = { tower: 1, mage: 1, pitch: 1, icetower: 1, ballista: 1 };
   function doomed(e, eta) {
     let dmg = 0;
     for (const p of st.proj) if (p.tgt === e) dmg += p.dmg || 0;
@@ -2144,7 +2152,7 @@
 
   function fireFrom(b) {
     const def = BUILD[b.kind], c = bCenter(b);
-    return shoot(c.x, c.y, c.x, tileY(b.r) + T - (b.kind === 'mage' ? 36 : 28), bRange(b), b.spec === 'fire' ? 'farrow' : def.proj, def.speed * (b.spec === 'sniper' ? 1.4 : 1), bDmg(b), def.splash || 0);
+    return shoot(c.x, c.y, c.x, tileY(b.r) + T - (b.kind === 'mage' ? 39 : 28), bRange(b), b.spec === 'fire' ? 'farrow' : def.proj, def.speed * (b.spec === 'sniper' ? 1.4 : 1), bDmg(b), def.splash || 0);
   }
   // ľadová veža: strela spomalí cieľ aj susedov (spomalenie sa predlžuje s úrovňou)
   function fireIce(b) {
@@ -2154,6 +2162,21 @@
     const p = st.proj[st.proj.length - 1];
     p.chill = def.chill + 0.3 * (b.lvl - 1);
     if (venom) { p.sx = p.x; p.sy = p.y; p.d0 = Math.hypot(p.tx - p.x, p.ty - p.y) || 1; p.lift = 0; }
+    return true;
+  }
+  // smolná veža: vyleje smolu pod seba a na hradby v okolí – zraní a zlepí (spomalí) každého na zemi pri veži alebo pri tých hradbách
+  function firePitch(b) {
+    const c = bCenter(b), rng = bRange(b);
+    const walls = st.blds.filter(w => w.kind === 'wall' && w.hp > 0 && Math.hypot(bCenter(w).x - c.x, bCenter(w).y - c.y) <= PITCH_WALL).map(bCenter);
+    const hit = st.enemies.filter(e => !e.dead && !e.d.fly && e.y >= 4 && (Math.hypot(e.x - c.x, e.y - c.y) <= rng || walls.some(w => Math.hypot(e.x - w.x, e.y - w.y) <= PITCH_SPLASH)));
+    if (!hit.length) return false;
+    const dmg = bDmg(b);
+    for (const e of hit) {
+      damage(e, dmg); e.chillT = Math.max(e.chillT || 0, 1.5 + 0.2 * (b.lvl - 1));
+      for (let k = 0; k < 5; k++) part(e.x + (Math.random() - 0.5) * 8, e.y - e.h - 4 - Math.random() * 6, (Math.random() - 0.5) * 10, 10 + Math.random() * 10, 0.5, k % 3 ? '#241c14' : '#5c4a30', 60); // padajúce kvapky smoly
+      part(e.x, e.y - e.h * 0.6, (Math.random() - 0.5) * 6, -14, 0.8, '#4a4a52', -6); // dym
+    }
+    AUDIO.play('thud');
     return true;
   }
   // balista: šíp letí rovno cez cieľ až na koniec dosahu a zraní každého na zemi, koho cestou prebodne
@@ -2891,6 +2914,7 @@
       b.flash = Math.max(0, b.flash - dt);
       if (b.kind === 'tower' || b.kind === 'mage') { b.cd -= dt; if (b.cd <= 0 && fireFrom(b)) b.cd = bCd(b); }
       else if (b.kind === 'icetower') { b.cd -= dt; if (b.cd <= 0 && fireIce(b)) b.cd = bCd(b); }
+      else if (b.kind === 'pitch') { b.cd -= dt; if (b.cd <= 0 && firePitch(b)) b.cd = bCd(b); }
       else if (b.kind === 'ballista') { b.cd -= dt; b.fired = Math.max(0, (b.fired || 0) - dt); if (b.cd <= 0 && (isTreb(b) ? fireTrebuchet(b) : fireBallista(b))) b.cd = bCd(b); }
       else if (b.unit) { b.unit.cd -= dt; if (b.unit.cd <= 0 && fireWallUnit(b)) b.unit.cd = uCd(b.unit); }
       else if (UNIT_HOME[b.kind]) updateBarracks(b, dt);
@@ -3169,7 +3193,7 @@
         g.beginPath(); g.ellipse(e.x, e.y - e.h / 2, e.w * 0.75, e.h * 0.7, 0, 0, 6.29); g.fill();
         g.globalCompositeOperation = 'source-over';
       }
-      g.drawImage(e.flash > 0 ? hitSpr(fr) : fr.c, x, y);
+      g.drawImage(e.flash > 0 ? hitSpr(fr) : fr.c, x, y, fr.w, fr.h);
       if (e.stunT > 0) drawEnemyStun(e, Math.round(e.y - e.h), time);
       return;
     }
@@ -3376,7 +3400,7 @@
       const fr = repair && u.working ? set[6].idle : unit8Frame(u, set), y = Math.round(u.y - fr.h) + U8_PB;
       shadow(u.x, u.y, 4);
       cryAura(u, false, true);
-      g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), y);
+      g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), y, fr.w, fr.h); // w, h v bodoch hry (jemný sprite má plátno 2× väčšie)
       if (repair) drawHammer(u, Math.round(u.x) + 3, Math.round(u.y) - 6);
       cryAura(u, false);
       if (u.stunT > 0) { // hviezdičky nad omráčeným
@@ -3524,11 +3548,12 @@
         if (u.lvl > 1) pxText(x, String(u.lvl), 1, y0 - 8, '#88b4ff');
       }
     } else {
-      const spr = bsprOf(o.kind, lv), w = Math.max(T, spr.w), tx = Math.floor((w - T) / 2);
-      c.width = w; c.height = spr.h + 5;
-      x.drawImage(spr.c, tx + T / 2 - Math.floor(spr.w / 2), 5);
+      const spr = bsprOf(o.kind, lv), w = Math.max(T, spr.w), tx = Math.floor((w - T) / 2), R = spr.hd ? 2 : 1; // jemná kresba: náhľad v jej rozlíšení
+      c.width = w * R; c.height = (spr.h + 5) * R; x.scale(R, R); x.imageSmoothingEnabled = false;
+      x.drawImage(spr.c, tx + T / 2 - Math.floor(spr.w / 2), 5, spr.w, spr.h);
       if (o.spec) { x.fillStyle = '#4a4e60'; x.fillRect(tx + 13, 1, 1, 6); x.fillStyle = SPECS[o.spec].col; x.fillRect(tx + 14, 1, 3, 2); }
       if (lv > 1) pxText(x, String(lv), tx + T - 3, 5 + spr.h - 7, '#f8d048');
+      return (previewCache[key] = spriteURL({ c, w: c.width / R, h: c.height / R }, 3));
     }
     return (previewCache[key] = spriteURL({ c, w: c.width, h: c.height }, 3));
   }
@@ -3552,7 +3577,7 @@
     const fade = Math.min(1, t / 0.5), gc = goldOf(spr);
     g.globalCompositeOperation = 'lighter';
     g.globalAlpha = fade * (0.32 + 0.18 * Math.sin(time * 7 + x * 0.3));
-    if (sw) g.drawImage(gc, sx, sy, sw, sh, x, y, sw, sh); else g.drawImage(gc, x, y);
+    if (sw) g.drawImage(gc, sx, sy, sw, sh, x, y, sw, sh); else g.drawImage(gc, x, y, spr.w, spr.h);
     g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
     if (Math.random() < 0.12 * fade) part(x + Math.random() * (sw || gc.width), y + Math.random() * (sh || gc.height) * 0.7, 0, -12, 0.5, Math.random() < 0.5 ? '#fff7c8' : '#f8d048', 0);
   }
@@ -3655,7 +3680,7 @@
       }
     } else {
       spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(b.kind, b.lvl); // trebuchet po výstrele s ramenom hore
-      g.drawImage(spr.c, x0 + T / 2 - Math.floor(spr.w / 2) + hitJit(b.flash), y0 + T + 1 - spr.h);
+      g.drawImage(spr.c, x0 + T / 2 - Math.floor(spr.w / 2) + hitJit(b.flash), y0 + T + 1 - spr.h, spr.w, spr.h); // w, h v bodoch hry (jemná kresba má plátno 2×)
       if (b.holyT > 0) holyGlow(spr, x0 + T / 2 - Math.floor(spr.w / 2), y0 + T + 1 - spr.h, b.holyT, time);
       if (b.spec) { // vlajočka špecializácie na veži
         const fx = x0 + 13, fy = y0 + T + 1 - spr.h - 4, wv = Math.floor(time * 6 + b.c) % 2;
@@ -3674,13 +3699,13 @@
       if (b.kind === 'mage') {
         g.globalCompositeOperation = 'lighter';
         g.fillStyle = 'rgba(255,200,80,' + (0.25 + Math.sin(time * 4 + b.c) * 0.12) + ')';
-        g.beginPath(); g.arc(x0 + 8.5, y0 + T + 1 - spr.h + 2, 4, 0, 6.29); g.fill();
+        g.beginPath(); g.arc(x0 + 8, y0 + T + 1 - spr.h + 4, 5, 0, 6.29); g.fill(); // svit ohňa v mise na vrchu veže
         g.globalCompositeOperation = 'source-over';
       }
     }
     if (b.lvl > 1 && b.kind !== 'wall' && tabOf(b.kind) !== 'towers') pxText(g, String(b.lvl), x0 + T - 3, y0 + T - 6, '#f8d048'); // úroveň (veže ju majú len na vzhľade)
   }
-  const JOINERS = { wall: 1, tower: 1, mage: 1, icetower: 1, ballista: 1 }; // hradby sa napájajú len na hradby a veže (strážna, mága) – na ostatné budovy nie
+  const JOINERS = { wall: 1, tower: 1, mage: 1, pitch: 1, icetower: 1, ballista: 1 }; // hradby sa napájajú len na hradby a veže (strážna, mága) – na ostatné budovy nie
   const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL || !!JOINERS[o.kind]); };
   const joinsV = (c, r) => occAt(c, r) !== HALL && joins(c, r); // na radnicu sa hradby napájajú len z bokov, nie zhora
   const joinsBuilding = (c, r) => { const o = occAt(c, r); return !!o && o !== HALL && o.kind !== 'wall' && !!JOINERS[o.kind]; };
@@ -3698,8 +3723,9 @@
   function drawHall(time) {
     const spr = bsprOf('hall', st.hallLvl);
     const x = Math.round(G.hallCx - spr.w / 2), y = G.hallBot + 1 - spr.h;
-    g.drawImage(spr.c, x, y); // radnica sa pri zásahu netrasie
+    g.drawImage(spr.c, x, y, spr.w, spr.h); // radnica sa pri zásahu netrasie
     if (st.hallHolyT > 0) holyGlow(spr, x, y, st.hallHolyT, time);
+    if (spr.hd) return drawHallFire(x, y); // kresba z PixelLabu má vlastnú zástavu
     // vlajky: radnica ľudí modré na stožiaroch veží, pevnosť orkov oranžové na kôloch pri krajoch hradieb
     const fl = FLAG_COL[BUILD_RACE], orc = BUILD_RACE === 'orc';
     const stake = y + spr.h - 50 + (st.hallLvl === 1 ? 24 : 16); // vrch kolov bočných hradieb pevnosti (vyššie úrovne sú vyššie)
@@ -3710,7 +3736,10 @@
       g.fillStyle = fl[1]; g.fillRect(fx + 1, fy + wv, 2, 1);
       g.fillStyle = fl[2]; g.fillRect(fx + 5, fy + 1 - wv, 1, 1);
     }
-    // oheň pri poškodení
+    drawHallFire(x, y);
+  }
+  // oheň pri poškodení radnice
+  function drawHallFire(x, y) {
     const r = st.hallHp / hallMax();
     if (r < 0.5 && st.phase === 'battle' && Math.random() < (0.6 - r)) {
       part(x + 8 + Math.random() * 36, y + 20 + Math.random() * 20, (Math.random() - 0.5) * 8, -20 - Math.random() * 15, 0.7, Math.random() < 0.5 ? '#f89838' : '#525262', -5);
@@ -3801,7 +3830,7 @@
     if (kind === 'wall') g.drawImage(spr.c, hx, hy - 6);
     else if (TRAPS[kind]) g.drawImage(spr.c, hx, hy);
     else if (isPave(kind)) g.drawImage(paveAt(hx, hy, PAVE[kind]), hx, hy);
-    else g.drawImage(spr.c, hx + T / 2 - Math.floor(spr.w / 2), hy + T + 1 - spr.h);
+    else g.drawImage(spr.c, hx + T / 2 - Math.floor(spr.w / 2), hy + T + 1 - spr.h, spr.w, spr.h);
     g.globalAlpha = 1;
     corners(hx, hy, hx + T - 1, hy + T - 1, ok ? '#9cd45a' : (blink ? '#e84838' : '#ff9a80'));
     if (BUILD[kind].range) drawRange(hx + T / 2, hy + T / 2, bRange({ kind, lvl: 1 }), time); // dosah už pri ukladaní
@@ -3888,7 +3917,7 @@
         g.globalAlpha = 0.7;
         if (mv.kind === 'wall') g.drawImage(spr.c, hx, hy - 6);
         else if (TRAPS[mv.kind]) g.drawImage(spr.c, hx, hy);
-        else g.drawImage(spr.c, hx + T / 2 - Math.floor(spr.w / 2), hy + T + 1 - spr.h);
+        else g.drawImage(spr.c, hx + T / 2 - Math.floor(spr.w / 2), hy + T + 1 - spr.h, spr.w, spr.h);
         g.globalAlpha = 1;
       } else corners(ox, oy, ox + T - 1, oy + T - 1, blink ? '#9cd45a' : '#ffffff');
     }
@@ -4652,10 +4681,10 @@
   }
   function renderMap(time) {
     worldLbls = null; mapRose = null;
-    if (st.world) { if (buf.height < WORLD_H + 8) buf.height = WORLD_H + 8; renderWorld(time); return; } // + 8: okraj pod mapou sveta (mapCamMax), inak tam ostane čierny pás
-    if (buf.height < MH) buf.height = MH; // plátno aspoň na výšku mapy – pri posunutí nadol by inak dole ostal čierny pás
+    if (st.world) { if (bufH() < WORLD_H + 8) sizeBuf(W, WORLD_H + 8); renderWorld(time); return; } // + 8: okraj pod mapou sveta (mapCamMax), inak tam ostane čierny pás
+    if (bufH() < MH) sizeBuf(W, MH); // plátno aspoň na výšku mapy – pri posunutí nadol by inak dole ostal čierny pás
     if (island.seaMap) { renderPaperLand(time); return; } // územia mimo domovského ostrova: námornícka mapa
-    const ox = mapOX(), hgt = Math.max(MH, buf.height);
+    const ox = mapOX(), hgt = Math.max(MH, bufH());
     if (mapStyle === 'paper') g.drawImage(paperSurround(ox, hgt), 0, 0); // pergamen pokračuje aj vedľa ostrova
     else g.drawImage(mapSurround(ox, hgt), 0, 0);
     g.save(); g.translate(ox, 0);
@@ -4860,7 +4889,7 @@
   let mapRose = null; // kompas (obrázok v plnom rozlíšení cez present)
   function renderPaperLand(time) {
     const ox = mapOX(), pa = st.provAnim, live = mapStyle !== 'paper';
-    g.fillStyle = live ? 'rgb(' + SEA[2].join(',') + ')' : PAPER_BG; g.fillRect(0, 0, W, buf.height);
+    g.fillStyle = live ? 'rgb(' + SEA[2].join(',') + ')' : PAPER_BG; g.fillRect(0, 0, W, bufH());
     const cur = landPaint(pa ? pa.i : -1);
     g.drawImage(cur.canvas, ox - PPX, -PPY);
     if (pa) { g.globalAlpha = provEase(pa.t); g.drawImage(landPaint(-1).canvas, ox - PPX, -PPY); g.globalAlpha = 1; } // dobytý región sa plynule zafarbí farbou hráča
@@ -4950,7 +4979,7 @@
   }
   function renderWorld(time) {
     const ox = mapOX(), img = worldPaint();
-    g.fillStyle = PAPER_BG; g.fillRect(0, 0, W, Math.max(WORLD_H, buf.height));
+    g.fillStyle = PAPER_BG; g.fillRect(0, 0, W, Math.max(WORLD_H, bufH()));
     g.drawImage(img.canvas, ox - PPX, -PPY);
     if (!st.wwave) st.wwave = worldWaveStart(time) || { done: true };
     if (!st.wwave.done) drawWorldWave(time, ox);
@@ -5030,7 +5059,7 @@
     if (st.shake > 0) { sx = Math.round((Math.random() - 0.5) * 3); sy = Math.round((Math.random() - 0.5) * 3); }
     sctx.imageSmoothingEnabled = false;
     sctx.fillStyle = '#000'; sctx.fillRect(0, 0, screen.width, screen.height);
-    sctx.drawImage(buf, 0, 0, W, buf.height, sx * S, (sy - Math.round(camY)) * S, W * S, buf.height * S);
+    sctx.drawImage(buf, 0, 0, buf.width, buf.height, sx * S, (sy - Math.round(camY)) * S, W * S, bufH() * S);
     if (mapRose && st.phase === 'map' && COMPASS.complete && COMPASS.width) { // kompas z obrázka v plnom rozlíšení
       const w = COMPASS.width / 3.3 * S, h = COMPASS.height / 3.3 * S; // menší kompas (≈ 30 bodov mapy)
       sctx.imageSmoothingEnabled = true; sctx.drawImage(COMPASS, (mapRose.x + sx) * S - w / 2, (mapRose.y + sy - Math.round(camY)) * S - h / 2, w, h); sctx.imageSmoothingEnabled = false;
@@ -5197,7 +5226,7 @@
       for (const o of st.camp.parts) if (o.hp > 0 && o.role !== 'trap') objs.push({ y: o.y, f: () => {
         const sp = o.skin.spr(o, time); shadow(o.x, o.y, 8);
         campWallSlices(g, o, o.bld, o.x - T / 2, o.y, CAMP_PIECES[foeRace()].wall); // napojenie hradby na susednú vežu
-        g.drawImage(sp.c, Math.round(o.x - sp.w / 2) + hitJit(o.flash), o.y - sp.h + (o.skin.dy || 0));
+        g.drawImage(sp.c, Math.round(o.x - sp.w / 2) + hitJit(o.flash), o.y - sp.h + (o.skin.dy || 0), sp.w, sp.h);
         if (o.lvl > 1 && !o.skin.lvlArt) pxText(g, String(o.lvl), Math.round(o.x + sp.w / 2) - 4, o.y - 7, '#f8d048'); // úroveň stavby bez vlastného vzhľadu
       } });
       for (const r of st.camp.rocks) objs.push({ y: 9999, f: () => drawRock(r) });
@@ -5323,7 +5352,7 @@
   }
   // ikony stavieb hráča v podobe jeho rasy (prekreslia sa pri zmene rasy pozície)
   function buildingIcons() {
-    for (const k of ['tower', 'barracks', 'mage', 'icetower', 'ballista', 'mine', 'chapel', 'workshop', 'range', 'stables', 'armory', 'falconry']) ICONS[k] = spriteURL(bsprOf(k, 1), 3);
+    for (const k of ['tower', 'barracks', 'mage', 'pitch', 'icetower', 'ballista', 'mine', 'chapel', 'workshop', 'range', 'stables', 'armory', 'falconry']) ICONS[k] = spriteURL(bsprOf(k, 1), 3);
     ICONS.pit = spriteURL(BSPR.pit, 3);
     for (const k of ['firepit', 'beartrap']) ICONS[k] = spriteURL(BSPR[k], 3);
     ICONS.stake = spriteURL(BSPR.stake, 3);
@@ -5500,7 +5529,7 @@
   // záložky stavebného panela (druhy stavieb); riadok záložiek a riadok označenej stavby majú rovnakú výšku, aby obrazovka neskákala
   const BUILD_TABS = [
     { id: 'hall',    name: 'Radnica', kinds: ['paving', 'hedge', 'mud'] }, // hrdina (a oživenie) a ozdoby
-    { id: 'towers',  name: 'Veže',    kinds: ['tower', 'mage', 'icetower', 'ballista'] },
+    { id: 'towers',  name: 'Veže',    kinds: ['tower', 'mage', 'pitch', 'icetower', 'ballista'] },
     { id: 'walls',   name: 'Hradby',  kinds: ['wall', 'stake', 'pit', 'firepit', 'beartrap'] },
     { id: 'army',    name: 'Vojsko',  kinds: ['barracks', 'range', 'stables', 'armory', 'falconry'] },
     { id: 'siege',   name: 'Stroje',  kinds: [] },
@@ -5654,6 +5683,7 @@
       else if (b.kind === 'workshop') stats = 'remeselník opravuje budovy ' + craftRate(b).toFixed(1) + '/s';
       else if (b.kind === 'firepit') stats = 'horenie ' + Math.round(bDmg(b)) + '/s počas ' + FIRE_BURN + ' s';
       else if (b.kind === 'beartrap') stats = 'zastaví na ' + trapStun(b).toFixed(1) + ' s';
+      else if (b.kind === 'pitch') stats = 'smola ' + Math.round(bDmg(b)) + ' každému pri veži a pri hradbách v okolí · zlepí na ' + (1.5 + 0.2 * (b.lvl - 1)).toFixed(1) + ' s';
       else if (b.kind === 'icetower') stats = 'spomalí na ' + (d.chill + 0.3 * (b.lvl - 1)).toFixed(1) + ' s · poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);
       else if (isTreb(b)) stats = 'balvan ' + Math.round(bDmg(b)) + ' celej skupine · dosah ' + Math.round(bRange(b)) + ' · výstrel každých ' + bCd(b).toFixed(1) + ' s';
       else if (b.kind === 'ballista') stats = 'poškodenie ' + Math.round(bDmg(b)) + ' každému v rade · dosah ' + bRange(b);
@@ -6496,7 +6526,7 @@
     }).sort((a, b) => a.y - b.y);
     const c = document.createElement('canvas'); c.width = W; c.height = Math.min(sc.bg.height, Math.max(...parts.map(o => o.y)) + 10);
     const x = c.getContext('2d'); x.drawImage(sc.bg, 0, 0);
-    for (const o of parts) { const sp = o.skin.spr(o, 0); campWallSlices(x, o, o.bld, o.x - T / 2, o.y, pieces.wall); x.drawImage(sp.c, Math.round(o.x - sp.w / 2), o.y - sp.h + (o.skin.dy || 0)); }
+    for (const o of parts) { const sp = o.skin.spr(o, 0); campWallSlices(x, o, o.bld, o.x - T / 2, o.y, pieces.wall); x.drawImage(sp.c, Math.round(o.x - sp.w / 2), o.y - sp.h + (o.skin.dy || 0), sp.w, sp.h); }
     return (castlePrev[key] = c.toDataURL());
   }
   function renderMapPanel() {
@@ -7211,7 +7241,7 @@
   }
   function snap(name, scale) {
     scale = scale || 4;
-    const c = document.createElement('canvas'); c.width = W * scale; c.height = buf.height * scale;
+    const c = document.createElement('canvas'); c.width = W * scale; c.height = bufH() * scale;
     const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
     x.drawImage(buf, 0, 0, c.width, c.height);
     return postPNG(c, name);
