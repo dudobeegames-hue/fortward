@@ -102,8 +102,9 @@ function campWallBld(list, q) {
 function campWallSlices(ctx, o, bld, left, bottom, wallPc) {
   if (!bld) return;
   const flat = wallPc.spr({ lvl: o.lvl, fired: 0, mask: (o.mask || 0) | 10 }), y = bottom - flat.h + (wallPc.dy || 0);
-  if (bld & 2) ctx.drawImage(flat.c, 6, 0, 4, flat.h, left + 16, y, 4, flat.h);
-  if (bld & 8) ctx.drawImage(flat.c, 6, 0, 4, flat.h, left - 4, y, 4, flat.h);
+  const fr = flat.c.width / flat.w; // 2 pri jemnej kresbe
+  if (bld & 2) ctx.drawImage(flat.c, 6 * fr, 0, 4 * fr, flat.c.height, left + 16, y, 4, flat.h);
+  if (bld & 8) ctx.drawImage(flat.c, 6 * fr, 0, 4 * fr, flat.c.height, left - 4, y, 4, flat.h);
 }
 // brána = úsek hradby so strážnicou nad ním (ako v hre), pre každé napojenie raz zložená
 const GATE_SPR = {};
@@ -113,7 +114,7 @@ function gateSprite(m, l, orc) {
   if (!GATE_SPR[key]) {
     const S = orc ? OBSPR : BSPR; // brána ľudí alebo orkov
     const c = document.createElement('canvas'); c.width = 16; c.height = 33;
-    const x = c.getContext('2d'); x.drawImage(S.wall[l][m].c, 0, 9); x.drawImage(S.gatehouse[l].c, 0, 0);
+    const ws = S.wall[l][m], x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(ws.c, 0, 33 - ws.h, ws.w, ws.h); x.drawImage(S.gatehouse[l].c, 0, 0); // hradba spodkom dole (jemná palisáda je vyššia)
     GATE_SPR[key] = spriteFromCanvas(c);
   }
   return GATE_SPR[key];

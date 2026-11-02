@@ -24,13 +24,87 @@ const matBody = lvl => LVL_MAT[lvl].body || RAMP.stone;
 // Zo surového canvasu vyrobí sprite so zábleskom (biela) a siluetou.
 function spriteFromCanvas(c) { return lazyVariants({ c, w: c.width, h: c.height }); } // záblesk a silueta až pri použití (sprites.js)
 // budova z PixelLabu (tools/pixellab2obj.py): jemná kresba – plátno v plnom rozlíšení, w a h v bodoch hry (polovica)
-function artBuilding(art, i) {
+// anim: predvolene vejúce zástavy; 'fire' = plápolajúci plameň (ohnivá veža); false = nič (hradby: špičky kolov by sa pokladali za žrde)
+function artBuilding(art, i, anim) {
   const rows = art.lv[i], c = document.createElement('canvas'); c.width = rows[0].length; c.height = rows.length;
   const x = c.getContext('2d'), id = x.createImageData(c.width, c.height), cols = art.pal.map(hexRGB);
   rows.forEach((r, y) => { for (let k = 0; k < r.length; k++) { if (r[k] === '.') continue; const col = cols[art.chars.indexOf(r[k])], o = (y * c.width + k) * 4; id.data[o] = col[0]; id.data[o + 1] = col[1]; id.data[o + 2] = col[2]; id.data[o + 3] = 255; } });
+  const frames = anim === 'fire' ? fireFrames(id) : anim === false ? null : flagFrames(id); // zástavy sa prefarbia v id, preto pred vykreslením
   x.putImageData(id, 0, 0);
-  return lazyVariants({ c, w: c.width / 2, h: c.height / 2, hd: true });
+  return lazyVariants({ c, w: c.width / 2, h: c.height / 2, hd: true, frames, fps: anim === 'fire' ? 9 : 5 });
 }
+
+// Vejúce zástavy: v hornej tretine kresby nájde žrde (zvislý pás široký 1–3 px, nad ktorým je látka širšia ako žrď)
+// a látku pri nich; látku prefarbí na modrú zástavu hradu (FLAG_BLUE, tmavý obrys ostáva) a vráti 4 snímky,
+// v ktorých sa látka vlní (pri žrdi pevná, ku koncu o 1 px hore a dole), alebo null
+const FLAG_BLUE = [0x3c, 0x64, 0xc8]; // farba zástavy na hrade z PixelLabu
+function flagFrames(id) {
+  const w = id.width, h = id.height, d = id.data, A = (x, y) => x >= 0 && y >= 0 && x < w && y < h && d[(y * w + x) * 4 + 3] > 0;
+  const run = (x, y) => { let a = x, b = x; while (A(a - 1, y)) a--; while (A(b + 1, y)) b++; return [a, b]; };
+  const narrow = (x, y) => { if (!A(x, y)) return false; const [a, b] = run(x, y); return b - a <= 2; }; // žrď široká najviac 3 px
+  const flags = [], used = new Set();
+  for (let y = 1; y < h * 0.35; y++) for (let x = 0; x < w; x++) {
+    if (used.has(x) || !narrow(x, y) || !narrow(x, y + 1) || !A(x, y - 1)) continue;
+    const wide = yy => { if (!A(x, yy)) return false; const [ra, rb] = run(x, yy); return rb - ra >= 3; };
+    if (!wide(y - 1) && !(y > 1 && A(x, y - 1) && wide(y - 2))) continue; // tesne nad žrďou (najviac o riadok vyššie) musí byť látka
+    const [pa, pb] = run(x, y), cloth = new Map(), stack = [];
+    for (let k = pa; k <= pb; k++) used.add(k);
+    for (let yy = 0; yy < y; yy++) for (const sx of [pa - 1, pb + 1]) if (A(sx, yy) && (A(pa, yy) || A(pb, yy))) stack.push([sx, yy]);
+    while (stack.length && cloth.size <= 160) {
+      const [cx, cy] = stack.pop(), key = cy * w + cx;
+      if (cloth.has(key) || !A(cx, cy) || (cx >= pa && cx <= pb) || cy >= y + 4) continue;
+      cloth.set(key, [cx, cy]);
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx || dy) stack.push([cx + dx, cy + dy]); // aj šikmo (odtrhnutý cíp látky)
+    }
+    if (cloth.size < 6 || cloth.size > 160) continue;
+    const px = [...cloth.values()], ext = i => Math.max(...px.map(p => p[i])) - Math.min(...px.map(p => p[i]));
+    if (ext(0) < 3 || ext(0) < ext(1)) continue; // zástava je širšia ako vyššia
+    const nr = px.filter(p => p[0] > pb).length, right = nr * 2 > px.length;
+    if (Math.max(nr, px.length - nr) < px.length * 0.8) continue; // zástava visí na jednu stranu (súmerná guľa na špici nie)
+    flags.push({ px, edge: right ? pb : pa });
+  }
+  if (!flags.length) return null;
+  for (const fl of flags) for (const [cx, cy] of fl.px) { // jednotná farba zástav: všetko okrem takmer čierneho obrysu
+    const k = (cy * w + cx) * 4;
+    if (Math.max(d[k], d[k + 1], d[k + 2]) >= 0x48) d.set(FLAG_BLUE, k);
+  }
+  return [0, 1, 2, 3].map(f => {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const out = new ImageData(new Uint8ClampedArray(d), w, h), o = out.data;
+    for (const fl of flags) {
+      const moved = fl.px.map(([cx, cy]) => { const k = (cy * w + cx) * 4, dist = Math.abs(cx - fl.edge); return [cx, cy + Math.round(Math.sin(f * Math.PI / 2 - dist * 0.7) * Math.min(1, dist / 3)), d.slice(k, k + 4)]; });
+      for (const [cx, cy] of fl.px) o[(cy * w + cx) * 4 + 3] = 0;
+      for (const [cx, cy, col] of moved) if (cy >= 0 && cy < h) o.set(col, (cy * w + cx) * 4);
+    }
+    c.getContext('2d').putImageData(out, 0, 0);
+    return c;
+  });
+}
+// Plápolajúci plameň: pixely v 4 farbách ohňa v hornej tretine kresby; v každej snímke niektoré stĺpce plameňa
+// vyskočia o 1 px vyššie a farby sa o stupeň zosvetlia či stmavia (podľa náhody pevnej pre snímku)
+const FIRE_RAMP = ['#fff3b0', '#ffc83c', '#ff8a1e', '#c83c10'].map(hexRGB);
+function fireFrames(id) {
+  const w = id.width, h = id.height, d = id.data, lim = Math.floor(h * 0.35);
+  const lvl = (x, y) => { const k = (y * w + x) * 4; return d[k + 3] ? FIRE_RAMP.findIndex(c => c[0] === d[k] && c[1] === d[k + 1] && c[2] === d[k + 2]) : -1; };
+  const cols = new Map(); // stĺpec -> riadky plameňa (zhora)
+  for (let y = 0; y < lim; y++) for (let x = 0; x < w; x++) if (lvl(x, y) >= 0) { if (!cols.has(x)) cols.set(x, []); cols.get(x).push(y); }
+  if (cols.size < 3) return null;
+  const rnd = (a, b, f) => { const v = Math.sin(a * 12.9898 + b * 78.233 + f * 37.719) * 43758.5453; return v - Math.floor(v); };
+  return [0, 1, 2, 3].map(f => {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const out = new ImageData(new Uint8ClampedArray(d), w, h), o = out.data;
+    const put = (x, y, li) => o.set(FIRE_RAMP[Math.max(0, Math.min(3, li))].concat(255), (y * w + x) * 4);
+    for (const [x, ys] of cols) {
+      for (const y of ys) put(x, y, lvl(x, y) + (rnd(x, y, f) < 0.3 ? -1 : rnd(x, y, f) > 0.75 ? 1 : 0)); // farba plápolá
+      const top = ys[0];
+      if (top > 0 && rnd(x, 0, f) < 0.35 && !d[((top - 1) * w + x) * 4 + 3]) put(x, top - 1, Math.min(3, lvl(x, top) + 1)); // jazyk plameňa o px vyššie
+    }
+    c.getContext('2d').putImageData(out, 0, 0);
+    return c;
+  });
+}
+// plátno budovy v čase t (vejúce zástavy, plameň; seed rozhodí fázu medzi budovami)
+const bldCanvas = (spr, t, seed) => spr.frames ? spr.frames[Math.floor(t * spr.fps + (seed || 0)) & 3] : spr.c;
 
 // Maliar: vrstvy farieb do bufferu, na konci obrys K okolo siluety.
 function painter(w, h) {
@@ -1445,20 +1519,20 @@ const BSPR = {};
 function initBuildingSprites() {
   BSPR.hall = [1, 2, 3, 4, 5].map(l => CASTLE_ART.lv[l - 1] ? artBuilding(CASTLE_ART, l - 1) : makeHall(l)); // hrad z PixelLabu (castle-art.js), chýbajúce úrovne zatiaľ stará kresba
   BSPR.tower = TOWER_ART.lv.map((_, i) => artBuilding(TOWER_ART, i)); // strážna veža z PixelLabu (tower-art.js), 5 úrovní
-  BSPR.mage = FIRE_TOWER_ART.lv.map((_, i) => artBuilding(FIRE_TOWER_ART, i)); // ohnivá veža z PixelLabu (fire-tower-art.js); stará kresba: makeMageTower
+  BSPR.mage = FIRE_TOWER_ART.lv.map((_, i) => artBuilding(FIRE_TOWER_ART, i, 'fire')); // plápolajúci plameň namiesto zástav // ohnivá veža z PixelLabu (fire-tower-art.js); stará kresba: makeMageTower
   BSPR.pitch = PITCH_TOWER_ART.lv.map((_, i) => artBuilding(PITCH_TOWER_ART, i)); // smolná veža z PixelLabu (pitch-tower-art.js), len ľudia
   BSPR.icetower = [1, 2, 3, 4, 5].map(l => makeIceTower(l));
   BSPR.ballista = [1, 2, 3, 4, 5].map(l => makeBallistaTower(l));
-  BSPR.barracks = makeBarracks();
+  BSPR.barracks = artBuilding(BARRACKS_ART, 0, false); // kasárne z PixelLabu (barracks-art.js), jedna podoba pre všetky úrovne; stará kresba: makeBarracks
   BSPR.pit = makePit();
   BSPR.mine = makeMine();
   BSPR.chapel = makeChapel();
   BSPR.firepit = makeFirepit();
   BSPR.beartrap = makeBeartrap();
   BSPR.workshop = makeWorkshop();
-  BSPR.range = makeRange();
-  BSPR.stables = makeStables();
-  BSPR.armory = makeArmory();
+  BSPR.range = artBuilding(RANGE_ART, 0, false); // strelnica z PixelLabu (range-art.js), jedna podoba pre všetky úrovne; stará kresba: makeRange
+  BSPR.stables = artBuilding(STABLES_ART, 0, false); // stajne z PixelLabu (stables-art.js), jedna podoba pre všetky úrovne; stará kresba: makeStables
+  BSPR.armory = artBuilding(ARMORY_ART, 0, false); // zbrojnica z PixelLabu (armory-art.js), jedna podoba pre všetky úrovne; stará kresba: makeArmory
   BSPR.orcKeep = makeOrcKeep(2); // pevnosť v tábore hordy (úroveň 2)
   BSPR.orcTower = [1, 2, 3, 4, 5].map(l => makeOrcTower(false, l)); // veža tábora hordy: ork spredu, pozerá na hráča
   BSPR.stakes = makeStakes();
@@ -1481,12 +1555,12 @@ function initBuildingSprites() {
   SPR.mammoth = [makeMammoth(0), makeMammoth(1)];
   SPR.wolf = [makeWolfRider(0), makeWolfRider(1)];
   SPR.falcon = [makeFalcon(true), makeFalcon(false)];
-  BSPR.falconry = makeFalconry();
+  BSPR.falconry = artBuilding(FALCONRY_ART, 0, false); // sokoliareň z PixelLabu (falconry-art.js), jedna podoba pre všetky úrovne; stará kresba: makeFalconry
   BSPR.mill = makeMill();
   // 8-násobná súmernosť: 45° otočenia rozdelených do snímok sa plynulo opakuje
   BSPR.millWheel = Array.from({ length: MILL_WHEEL.frames }, (_, i) => makeMillWheel(i / MILL_WHEEL.frames * Math.PI / 4));
   BSPR.wall = [];
-  for (let l = 1; l <= 5; l++) { BSPR.wall[l - 1] = []; for (let m = 0; m < 16; m++) BSPR.wall[l - 1][m] = makeWall(m, l); }
+  for (let l = 1; l <= 5; l++) { BSPR.wall[l - 1] = []; for (let m = 0; m < 16; m++) BSPR.wall[l - 1][m] = WALL_ART.lv[l - 1] ? artBuilding({ chars: WALL_ART.chars, pal: WALL_ART.pal, lv: WALL_ART.lv[l - 1] }, m, false) : makeWall(m, l); } // hradby z PixelLabu (wall-art.js), chýbajúce úrovne stará kresba
   BSPR.gatehouse = [1, 2, 3, 4, 5].map(l => makeGatehouse(l));
   // ikona brány: hradba + strážnica (kamenná)
   const ic = document.createElement('canvas'); ic.width = 16; ic.height = 33;
