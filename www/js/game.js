@@ -23,11 +23,11 @@
   // ---------------- Dáta ----------------
   const BUILD = {
     tower:    { name: 'Strážna veža', short: 'Veža',   cost: 60,  hp: 240, range: 80, dmg: 7,  cd: 0.9, proj: 'arrow', speed: 180, block: true, desc: 'Lukostrelec strieľa na hordu v dosahu' },
-    barracks: { name: 'Kasárne',      short: 'Kasárne', cost: 90, hp: 220, block: true, w: 2, desc: 'Posiela rytierov proti horde' },
+    barracks: { name: 'Kasárne',      short: 'Kasárne', cost: 90, hp: 220, block: true, w: 2, desc: 'Posiela rytierov proti horde, od 7. misie môžu namiesto nich vychádzať kopijníci (prepína sa v ponuke)' },
     range:    { name: 'Strelnica',    short: 'Strelnica', cost: 100, hp: 200, block: true, w: 2, desc: 'Vysiela lukostrelcov, ktorí sa držia za rytiermi a strieľajú z diaľky' },
     stables:  { name: 'Stajne',       short: 'Stajne',  cost: 110, hp: 200, block: true, w: 2, desc: 'Vysiela jazdcov – rýchlo obídu líniu a idú po strelcoch, šamanoch a podkopníkoch' },
-    falconry: { name: 'Sokoliareň',   short: 'Sokoly',  cost: 120, hp: 180, block: true, w: 2, desc: 'Vypúšťa sokoly – letia ponad hradby a lovia netopiere, šamanov a podkopníkov; strelci ich ľahko zostrelia' },
-    armory:   { name: 'Zbrojnica',    short: 'Zbrojnica', cost: 100, hp: 240, block: true, w: 2, desc: 'Vysiela kopijníkov – útočia spoza rytierov a sú silní proti jazde' },
+    falconry: { name: 'Sokoliareň mága', short: 'Mág',  cost: 120, hp: 180, block: true, w: 2, desc: 'Vyšle liečiteľa (mága), ktorý chodí za rytiermi a hrdinom a lieči ich; od 9. misie môže namiesto neho vypúšťať sokoly (prepína sa v ponuke)' }, // za orkov netopierí brloh (len netopiere)
+    armory:   { name: 'Zbrojnica',    short: 'Zbrojnica', cost: 100, hp: 240, block: true, w: 2, orc: true, desc: 'Vysiela kopijníkov – útočia spoza rytierov a sú silní proti jazde' },
     mage:     { name: 'Ohnivá veža',  short: 'Ohnivá', cost: 150, hp: 240, range: 70, dmg: 14, cd: 2.2, proj: 'fire', speed: 115, splash: 16, block: true, desc: 'Ohnivá guľa zasiahne celú skupinu' },
     // smolná veža len pre ľudí: krátky dosah, leje smolu pod seba a k hradbám v okolí (PITCH_WALL) – zraní a spomalí každého na zemi
     pitch:    { name: 'Smolná veža',  short: 'Smola',  cost: 80,  hp: 300, range: 30, dmg: 16, cd: 2.4, block: true, human: true, desc: 'Leje vriacu smolu pod seba a k blízkym hradbám – kto do nich búcha, dostane veľké poškodenie a zlepí sa' },
@@ -38,7 +38,7 @@
     stake:    { name: 'Koly',         short: 'Koly',     cost: 6, hp: 110, block: true, fixed: true, orc: true, desc: 'Lacné zahrotené koly – nevylepšujú sa a kto do nich udrie, ten sa napichne' },
     pit:      { name: 'Jama s ostňami', short: 'Jama', cost: 30,  dmg: 12, block: false, desc: 'Zraní a spomalí každého, kto ňou prejde' },
     mine:     { name: 'Zlatá baňa',   short: 'Baňa',   cost: 100, hp: 180, block: true, w: 2, desc: 'Po každej prežitej vlne prinesie zlato' },
-    chapel:   { name: 'Kaplnka',      short: 'Kaplnka', cost: 120, hp: 200, block: true, w: 2, desc: 'Vyšle mnícha, ktorý chodí za rytiermi a hrdinom a lieči ich' },
+    chapel:   { name: 'Kaplnka',      short: 'Kaplnka', cost: 120, hp: 200, block: true, w: 2, orc: true, desc: 'Vyšle mnícha, ktorý chodí za rytiermi a hrdinom a lieči ich' },
     firepit:  { name: 'Ohnivá jama',  short: 'Oheň',   cost: 50,  dmg: 8, block: false, desc: 'Kto ňou prejde, niekoľko sekúnd horí' },
     beartrap: { name: 'Medvedia pasca', short: 'Pasca', cost: 40, block: false, desc: 'Chytí nepriateľa a na chvíľu ho zastaví' },
     paving:   { name: 'Dlažba',       short: 'Dlažba', cost: 5, block: false, deco: true, desc: 'Ozdobná kamenná dlažba – dá sa položiť aj pod budovy. Ďalší ťuk ju zoberie späť' },
@@ -67,6 +67,10 @@
   };
   // každá pozemná jednotka má vlastnú budovu
   const UNIT_HOME = { barracks: 'knight', stables: 'rider', armory: 'spear' };
+  // ľudia: kasárne sa prepínajú medzi rytiermi a kopijníkmi (b.mode = 'spear'), sokoliareň mága medzi liečiteľom a sokolmi (b.mode = 'falcons');
+  // zbrojnicu a kaplnku stavajú už len orkovia (jama surovcov, šamanská chatrč)
+  const unitOf = b => b.kind === 'barracks' && b.mode === 'spear' ? 'spear' : UNIT_HOME[b.kind];
+  const mageHealer = b => b.kind === 'falconry' && BUILD_RACE !== 'orc' && b.mode !== 'falcons' && !b.army; // sokoliareň mága v režime liečiteľa
   const UNIT_PLURAL = { knight: 'Rytieri', rider: 'Jazdci', spear: 'Kopijníci' };
   const SPIKE_COST = 25, SPIKE_TYPE_COST = 40;
   const spikeDmg = b => (4 + 3 * (b.lvl - 1)) * (1 + 0.06 * perk('traps'));
@@ -121,6 +125,7 @@
     chapel:   { spr: 'monk',  hp: 30, spd: 22, rate: b => chapelHeal(b) * 2, col: '#9cd45a' },
     workshop: { spr: 'craft', hp: 36, spd: 22, rate: b => craftRate(b),      col: '#f8d048' },
   };
+  const helperKey = b => mageHealer(b) ? 'chapel' : HELPERS[b.kind] ? b.kind : null; // liečiteľ zo sokoliarne mága je ten istý ako mních z kaplnky
   const HELPER_RESPAWN = 5;
   // limity stavieb: vojenské budovy a bane podľa úrovne radnice (vojenské spolu, nezáleží na druhu), kaplnky a dielne najviac 3
   const MILITARY = { barracks: 1, range: 1, stables: 1, armory: 1, falconry: 1 };
@@ -478,7 +483,7 @@
   Object.assign(st, { mission: 1, unlocked: 1, mapSel: 1, mapAnim: null, tech: techFor(1) });
   const has = id => id === 'stake' ? isOrc() && st.tech.has('wall') : st.tech.has(id); // koly: len orkovia, spolu s hradbami
   // novinky: odomknutá stavba / vylepšenie / hrdina, na ktoré hráč ešte neťukol – jeho karta a záložka sa lesknú
-  const SHINE_TECH = { gate: 1, spikes: 1, spikeTypes: 1, wallArcher: 1, wallCrossbow: 1, spec: 1, lvl2: 1, lvl3: 1, lvl4: 1, lvl5: 1 };
+  const SHINE_TECH = { falcons: 1, gate: 1, spikes: 1, spikeTypes: 1, wallArcher: 1, wallCrossbow: 1, spec: 1, lvl2: 1, lvl3: 1, lvl4: 1, lvl5: 1 };
   let seenNew = [];
   function loadSeen() { // prvé spustenie: všetko doteraz odomknuté berie ako videné, lesknú sa až ďalšie novinky;
     // úplne nový hráč (len 1. misia) má ako novinky aj všetky stavby z prvej misie, aby sa s nimi zoznámil
@@ -1276,7 +1281,7 @@
     AUDIO.play('horn'); AUDIO.music('battle');
     st.viewUp = Math.max(0, (st.viewUp || 0) - panelLow()); // rovnaký pohľad aj bez panela
     $('build').hidden = true; $('bottom').hidden = false;
-    for (const b of st.blds) if (UNIT_HOME[b.kind] || b.kind === 'range' || b.kind === 'falconry' || HELPERS[b.kind]) { b.spawnT = HELPERS[b.kind] ? 0.6 : 0.3; b.squadUp = true; }
+    for (const b of st.blds) if (UNIT_HOME[b.kind] || b.kind === 'range' || b.kind === 'falconry' || HELPERS[b.kind]) { b.spawnT = helperKey(b) ? 0.6 : 0.3; b.squadUp = true; }
     banner(isAssault() ? 'Do útoku!' : st.endless ? 'Vlna ' + st.wave : st.wave === missionWaves(st.mission) ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + missionWaves(st.mission));
     syncStance();
     updateHud();
@@ -2150,7 +2155,7 @@
   const goldArmor = b => !isOrc() && b.lvl >= MAX_LVL;
   function spawnKnight(b, extra, dx) {
     const c = bCenter(b);
-    const ktype = UNIT_HOME[b.kind] || 'knight', kt = KTYPES[ktype], khp = knightHp(b) * kt.hp;
+    const ktype = unitOf(b) || 'knight', kt = KTYPES[ktype], khp = knightHp(b) * kt.hp;
     st.soldiers.push({ home: b, extra, gold: goldArmor(b), x: c.x + 1 + (dx || 0), y: tileY(b.r) + T + 1, hp: khp, max: khp, dmg: knightDmg(b) * kt.dmg, spd: kt.spd, spr: kt.spr, ktype, cd: 0, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
     for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
   }
@@ -2438,8 +2443,8 @@
     b.spawnT -= dt;
     if (b.spawnT > 0) return;
     b.spawnT = HELPER_RESPAWN;
-    const h = HELPERS[b.kind], c = bCenter(b), hp = h.hp * lvlMul(b, 0.3);
-    st.soldiers.push({ home: b, helper: b.kind, x: c.x + 1, y: tileY(b.r) + T + 1, hp, max: hp, spd: h.spd, spr: h.spr, rate: h.rate(b), cd: 0, tgt: null, anim: 0, flash: 0, swing: 0, dead: false });
+    const key = helperKey(b), h = HELPERS[key], c = bCenter(b), hp = h.hp * lvlMul(b, 0.3);
+    st.soldiers.push({ home: b, helper: key, x: c.x + 1, y: tileY(b.r) + T + 1, hp, max: hp, spd: h.spd, spr: h.spr, rate: h.rate(b), cd: 0, tgt: null, anim: 0, flash: 0, swing: 0, dead: false });
     for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
   }
   // mních ide za najviac zraneným rytierom/kráľom, remeselník k najviac poškodenej budove; inak sa vráti domov
@@ -2924,8 +2929,8 @@
       else if (b.unit) { b.unit.cd -= dt; if (b.unit.cd <= 0 && fireWallUnit(b)) b.unit.cd = uCd(b.unit); }
       else if (UNIT_HOME[b.kind]) updateBarracks(b, dt);
       else if (b.kind === 'range') updateRange(b, dt);
-      else if (b.kind === 'falconry') updateFalconry(b, dt);
-      else if (HELPERS[b.kind]) updateHelperHome(b, dt);
+      else if (b.kind === 'falconry' && !mageHealer(b)) updateFalconry(b, dt);
+      else if (helperKey(b)) updateHelperHome(b, dt);
       else if (b.kind === 'beartrap' && b.armT > 0) b.armT -= dt;
     }
     // rytieri
@@ -5691,7 +5696,9 @@
       else if (isTreb(b)) stats = 'balvan ' + Math.round(bDmg(b)) + ' celej skupine · dosah ' + Math.round(bRange(b)) + ' · výstrel každých ' + bCd(b).toFixed(1) + ' s';
       else if (b.kind === 'ballista') stats = 'poškodenie ' + Math.round(bDmg(b)) + ' každému v rade · dosah ' + bRange(b);
       else if (d.range) stats = 'poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);
-      else if (UNIT_HOME[b.kind]) { const kt = KTYPES[UNIT_HOME[b.kind]]; stats = UNIT_PLURAL[UNIT_HOME[b.kind]].toLowerCase() + ' ' + knightCap(b) + ' · sila ' + Math.round(knightDmg(b) * kt.dmg); }
+      else if (UNIT_HOME[b.kind]) { const kt = KTYPES[unitOf(b)]; stats = UNIT_PLURAL[unitOf(b)].toLowerCase() + ' ' + knightCap(b) + ' · sila ' + Math.round(knightDmg(b) * kt.dmg); }
+      else if (mageHealer(b)) stats = 'liečiteľ lieči rytierov a hrdinu ' + HELPERS.chapel.rate(b).toFixed(1) + '/s';
+      else if (b.kind === 'falconry') stats = (isOrc() ? 'netopiere ' : 'sokoly ') + falconCap(b) + ' · sila ' + Math.round(falconDmg(b));
       else if (b.kind === 'range') stats = 'lukostrelci ' + archerCap(b) + ' · poškodenie ' + Math.round(archerDmg(b));
       else if (b.kind === 'pit') stats = 'poškodenie ' + Math.round(bDmg(b)) + ' · spomalí';
       if (d.hp) stats += (stats ? ' · ' : '') + 'zdravie ' + Math.ceil(b.hp) + '/' + bMaxHp(b);
@@ -5713,6 +5720,16 @@
       if (fc) act(I.actRepair, 'Opraviť', coinTxt(fc), st.gold >= fc, () => { st.gold -= fc; b.hp = bMaxHp(b); rebuildOcc(); }, '', true);
       const refund = Math.floor(b.spent * sellShare()) + (b.unit ? Math.floor(b.unit.spent * sellShare()) : 0);
       act(ICONS.coin, 'Predať', '+' + refund, true, sellAll([b], refund), 'sell', true);
+      if ((b.kind === 'barracks' || b.kind === 'falconry') && !isOrc()) { // prepínanie jednotiek: zadarmo, medzi vlnami; vojaci z budovy odídu a vyjdú noví
+        const sw = b.kind === 'barracks' ? { tech: 'armory', on: 'spear', a: ['knight', 'Rytieri'], b: ['spear', 'Kopijníci'] } : { tech: 'falcons', on: 'falcons', a: ['monk', 'Liečiteľ'], b: ['falcon', 'Sokoly'] };
+        const cur = b.mode === sw.on, to = cur ? sw.a : sw.b;
+        if (!has(sw.tech)) lockAct(ICONS['u_' + sw.b[0]], sw.b[1], unlockMissionOf(sw.tech), true);
+        else if (st.phase !== 'build') act(ICONS['u_' + to[0]], to[1], 'medzi vlnami', false, 'Prepnúť sa dá medzi vlnami', 'locked', true);
+        else shineTech(act(ICONS['u_' + to[0]], to[1], 'prepnúť', true, () => {
+          b.mode = cur ? null : sw.on;
+          st.soldiers = st.soldiers.filter(s => s.home !== b); b.spawnT = 0.3; b.squadUp = true;
+        }, 'up', true), sw.tech);
+      }
       if (b.kind === 'mage' && !isOrc()) { // ohnivá veža sa prepína medzi ohňom a ľadom (zadarmo, kedykoľvek)
         const ice = iceMage(b);
         if (!has('icetower')) lockAct(after(b, { mode: 'ice' }), 'Ľad', unlockMissionOf('icetower'), true);
@@ -6208,8 +6225,9 @@
   const armyName = k => ARMY[k].siege ? BUY[k].name : KTYPES[k] ? KTYPES[k].name
     : { archer: isOrc() ? 'Goblin strelec' : 'Lukostrelec', falcon: isOrc() ? 'Netopier' : 'Sokol', monk: isOrc() ? 'Šaman' : 'Mních' }[k];
   const armyIcon = k => ARMY[k].siege ? ICONS['u_' + BUY[k].siege] : ICONS['u_' + k];
-  const armyOpen = k => ARMY[k].siege ? st.tech.has(BUY[k].siege) : has(ARMY[k].home);
-  const armyUnlock = k => unlockMissionOf(ARMY[k].siege ? BUY[k].siege : ARMY[k].home);
+  const armyTech = k => ARMY[k].siege ? BUY[k].siege : isOrc() ? ARMY[k].home : { spear: 'armory', monk: 'falconry', falcon: 'falcons' }[k] || ARMY[k].home; // ľudia: kopijníci z kasární, liečiteľ a sokoly zo sokoliarne mága
+  const armyOpen = k => ARMY[k].siege ? st.tech.has(BUY[k].siege) : has(armyTech(k));
+  const armyUnlock = k => unlockMissionOf(armyTech(k));
   const depAt = (c, r) => st.deps.find(d => d.c === c && d.r === r);
   const depSiege = k => st.deps.filter(d => d.key === k).length;
   // oddiel na políčku (c, r): jednotky stoja v zóne a vyrazia, keď hráč ťukne Do útoku
@@ -6218,7 +6236,7 @@
     if (!inZone(c, r) || (occAt(c, r) && occAt(c, r) !== HALL) || depAt(c, r)) { AUDIO.play('deny'); return false; } // radnica tu nie je – aj jej políčka sú voľné
     if (a.siege && depSiege(k) >= SIEGE_MAX) { toast('Najviac ' + SIEGE_MAX + '× ' + armyName(k).toLowerCase()); AUDIO.play('deny'); return false; }
     if (st.gold < a.cost) { toast('V truhlici nie je dosť zlatiek'); AUDIO.play('deny'); return false; }
-    const id = ++st.depN, lvl = lvlCap(), b = { kind: a.home || 'barracks', lvl, c, r, army: true }, n0 = st.soldiers.length;
+    const id = ++st.depN, lvl = lvlCap(), b = { kind: a.home || 'barracks', lvl, c, r, army: true, mode: k === 'spear' ? 'spear' : null }, n0 = st.soldiers.length;
     if (a.siege) { const p = siegeCellPos(c, r); spawnSiege(a.siege, p.x, p.y); }
     else for (let i = 0; i < a.n; i++) {
       if (k === 'archer') spawnArcher(b, true);
@@ -6820,7 +6838,7 @@
   function unlockItems(m) {
     const items = (unlocksOf()[m - 1] || []).map(u => ({
       icon: ICONS[u.icon], name: unlockName(u),
-      tag: u.id === 'icetower' && !isOrc() ? 'Nové vylepšenie' : BUILD[u.id] ? 'Nová stavba' : ABIL[u.id] ? 'Kráľova schopnosť' : /^(volley|fireball|freeze|lightning)$/.test(u.id) ? 'Kúzlo' : 'Nové vylepšenie',
+      tag: (u.id === 'icetower' || u.id === 'armory') && !isOrc() ? 'Nové vylepšenie' : BUILD[u.id] ? 'Nová stavba' : ABIL[u.id] ? 'Kráľova schopnosť' : /^(volley|fireball|freeze|lightning)$/.test(u.id) ? 'Kúzlo' : 'Nové vylepšenie',
       desc: u.desc || (BUILD[u.id] ? BUILD[u.id].desc + '.' : ''),
     }));
     for (const foe of [].concat(enemyIntro(m) || [])) items.push({ icon: ICONS['e_' + foe.id], name: foe.name, tag: ENEMY[foe.id].giant ? (isOrc() ? 'Pozor – obor ľudí' : 'Pozor – obor hordy') : 'Pozor – nový nepriateľ', desc: foe.desc.charAt(0).toUpperCase() + foe.desc.slice(1) + '.', foe: true });
