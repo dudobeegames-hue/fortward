@@ -753,7 +753,7 @@
   // terén bojiska misie (podľa rozmerov, provincie a tábora protivníka); posledné tri sa pamätajú a terén vybranej misie
   // sa vyrobí vopred, kým hráč číta jej popis na mape – ťuk na Do boja je potom okamžitý
   const sceneCache = new Map();
-  const HD_GROUND = m => m === 1 && !isOrc(); // skúška: terén v jemnej kresbe (2 pixely na bod) zatiaľ len v 1. misii
+  const HD_GROUND = m => landOfMission(m) === LANDS[0]; // terén v jemnej kresbe (2 pixely na bod): misie prvého (domovského) ostrova
   function fieldGeom(m, endless) {
     const fh = H + (m > HOME_PROVINCES && !endless ? Math.round(H * CAMP_EXTRA) : 0), g2 = Object.assign({}, G);
     g2.cols = Math.min(GRID_COLS, Math.floor(W / T)); g2.gx0 = Math.floor((W - g2.cols * T) / 2);
@@ -3837,7 +3837,7 @@
     g.globalAlpha = ok ? 0.75 : 0.45;
     if (kind === 'wall') wallImg(g, spr, hx, hy);
     else if (TRAPS[kind]) g.drawImage(spr.c, hx, hy);
-    else if (isPave(kind)) g.drawImage(paveAt(hx, hy, PAVE[kind]), hx, hy);
+    else if (isPave(kind)) drawPave(g, hx, hy, PAVE[kind]);
     else g.drawImage(spr.c, hx + pw / 2 - Math.floor(spr.w / 2), hy + T + 1 - spr.h, spr.w, spr.h);
     g.globalAlpha = 1;
     corners(hx, hy, hx + pw - 1, hy + T - 1, ok ? '#9cd45a' : (blink ? '#e84838' : '#ff9a80'));
@@ -3934,7 +3934,7 @@
       g.globalAlpha = 0.75;
       drag.path.forEach((q, i) => {
         const x = tileX(q.c), y = tileY(q.r);
-        g.drawImage(paveAt(x, y, PAVE[drag.kind]), x, y);
+        drawPave(g, x, y, PAVE[drag.kind]);
         if (i >= ok) { g.fillStyle = 'rgba(232,72,56,0.55)'; g.fillRect(x, y, T, T); }
       });
       g.globalAlpha = 1;
@@ -5192,7 +5192,7 @@
     g.drawImage(scene.bg, 0, 0, scene.bg.width / scene.R, scene.bg.height / scene.R); // jemný terén má 2 pixely na bod
     drawSceneFx(time);
     const playing = st.phase !== 'title';
-    if (playing) for (const key in st.paving) { const [pc, pr] = key.split(','), px = tileX(+pc), py = tileY(+pr); g.drawImage(paveAt(px, py, st.paving[key]), px, py); } // dlažba pod všetkým
+    if (playing) for (const key in st.paving) { const [pc, pr] = key.split(','), px = tileX(+pc), py = tileY(+pr); drawPave(g, px, py, st.paving[key]); } // dlažba pod všetkým
     if (playing) for (const b of st.blds) if (TRAPS[b.kind]) drawPit(b, time); else if (b.kind === 'mud') drawMud(b); // pasce a bahno ležia na zemi
     if (playing && st.camp) for (const o of st.camp.parts) if (o.role === 'trap') drawPit({ kind: o.kind, c: o.c, r: o.r, lvl: 1, armT: o.armT }, time); // pasce tábora tiež na zemi
     if (st.phase === 'build') drawBuildOverlay(time);
@@ -5856,23 +5856,18 @@
   // druhy dlažby: v st.paving[„c,r“] je číslo druhu (1 = dlažba / dosky); iné číslo zo starších uložených hier sa kreslí ako dlažba
   const PAVE = { paving: 1 };
   const isPave = k => !!PAVE[k];
+  const drawPave = (ctx, x, y, type) => ctx.drawImage(paveAt(x, y, type), x, y, T, T);
   const paveCache = {};
-  function paveAt(px, py, type) {
+  function paveAt(px, py, type) { // plátno dlaždice na bode (px, py); kresliť cez drawPave (jemná kresba má plátno 2×)
     type = type || 1;
     const orc = BUILD_RACE === 'orc', key = (orc ? 'o' : '') + type + ':' + px + ',' + py;
     if (paveCache[key]) return paveCache[key];
-    const c = document.createElement('canvas'); c.width = T; c.height = T;
-    const x2 = c.getContext('2d'), id = x2.createImageData(T, T);
-    const put = (x, y, rgb) => { const k = (y * T + x) * 4; id.data[k] = rgb[0]; id.data[k + 1] = rgb[1]; id.data[k + 2] = rgb[2]; id.data[k + 3] = 255; };
+    const S = orc ? T : 2 * T; // ľudská dlažba v jemnej kresbe (2 pixely na bod), orkské dosky po bodoch; hra ju kreslí na T × T bodov
+    const c = document.createElement('canvas'); c.width = S; c.height = S;
+    const x2 = c.getContext('2d'), id = x2.createImageData(S, S);
+    const put = (x, y, rgb) => { const k = (y * S + x) * 4; id.data[k] = rgb[0]; id.data[k + 1] = rgb[1]; id.data[k + 2] = rgb[2]; id.data[k + 3] = 255; };
     if (orc) for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) put(x, y, plankRGB(px + x, py + y));
-    else for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) {
-      const X = px + x, Y = py + y;
-      const row = Math.floor(Y / 5), off = (row % 2) * 3, col = Math.floor((X + off) / 6);
-      let v = 0.5 + (hash2(col, row, 21) - 0.5) * 0.3 + (hash2(X, Y, 22) - 0.5) * 0.1;
-      if (Y % 5 === 0 || (X + off) % 6 === 0) v = 0.15;
-      else if (Y % 5 === 1 || (X + off) % 6 === 1) v += 0.12;
-      put(x, y, pickRamp(RAMP.walk, v, X, Y));
-    }
+    else for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) put(x, y, paveRGB(2 * px + x, 2 * py + y));
     x2.putImageData(id, 0, 0);
     return (paveCache[key] = c);
   }
