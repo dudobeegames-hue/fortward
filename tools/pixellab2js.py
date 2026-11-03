@@ -58,12 +58,12 @@ def main():
     atk_pick = [int(i) for i in (args[3] if len(args) > 3 else '2,3,4').split(',')]
     own = {d: [int(i) for i in v.split(',')] for d, v in (a.split('=') for a in args[4:])}
     pb = PB * (2 if hd else 1)
-    base = os.path.join(ROOT, 'postavy', folder)
+    base = os.path.join(ROOT, 'postavy', folder)  # folder môže byť aj cesta, napr. ../Grafika/Ludia/postavy/lucisnik
     rot = [load(os.path.join(base, 'rotations', d + '.png')) for d in DIRS]
     rw, rh = len(rot[0][0]), len(rot[0])
     # animácie: Attack* = útok, prvá ďalšia = chôdza/klus (PixelLab ju pomenuje podľa zadania)
     names = sorted(os.listdir(os.path.join(base, 'animations')))
-    atk_dir = next(n for n in names if n.startswith('Attack'))
+    atk_dir = next((n for n in names if n.startswith('Attack')), None)  # bez útoku: snímky útoku = státie (kým PixelLab útok nedorobí)
     run_dir = next(n for n in names if not n.startswith('Attack'))
 
     def frames(anim, d):
@@ -80,7 +80,7 @@ def main():
         return min(have, key=lambda h: (min((DIRS.index(h) - i) % 8, (i - DIRS.index(h)) % 8), h not in ('east', 'west')))
 
     runs = {d: frames(run_dir, d) for d in DIRS}
-    atks = {d: frames(atk_dir, d) for d in DIRS}
+    atks = {d: frames(atk_dir, d) if atk_dir else [rot[i]] * (max(atk_pick) + 1) for i, d in enumerate(DIRS)}
     have_run, have_atk = [d for d in DIRS if runs[d]], [d for d in DIRS if atks[d]]
     run = [runs[d if runs[d] else nearest(have_run, d)][:4] for d in DIRS]
     atk = [[atks[d if atks[d] else nearest(have_atk, d)][i] for i in own.get(d, atk_pick)] for d in DIRS]
