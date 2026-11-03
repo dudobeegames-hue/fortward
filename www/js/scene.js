@@ -94,23 +94,28 @@ function plankRGB(X, Y) {
 // G: { T, gx0, gy0, cols, rows, hallCx, hallTop, hallBot, zoneTopMax }
 // clear = obdĺžniky [x0, y0, x1, y1] bez stromov a skál (stavby tábora hordy); yard = 'planks' – nádvorie z dosiek (orkovia), 'none' – bez nádvoria
 // terr = terén územia (LANDS v world.js): zem vždy, cestu, dekorácie a počasie, ak téma nie je v terr.keep; more s penou, rieky a mlyn ostanú
-function buildScene(W, H, G, seed, themeIdx, clear, yard, terr) {
+// hd = jemná kresba (2 pixely na bod ako jednotky a nové budovy): zem, cesta, nádvorie, more, mólo, loďka, trsy trávy, kvety a kríky
+// sa kreslia po pixeloch, ostatné prvky po bodoch (2×2). Zatiaľ len pre témy bez rieky, skál, lávy a mlyna; plátno má veľkosť W·R × H·R.
+function buildScene(W, H, G, seed, themeIdx, clear, yard, terr, hd) {
   let th = THEMES[((themeIdx || 0) % THEMES.length + THEMES.length) % THEMES.length];
   if (terr) th = Object.assign({}, th, { ground: terr.ground }, (terr.keep || []).includes(th.key) ? {} : { road: terr.road, deco: terr.deco }, (terr.keep || []).includes(th.key) || th.anim === 'foam' ? {} : { anim: terr.anim });
-  const bg = document.createElement('canvas'); bg.width = W; bg.height = H;
+  const R = hd && !th.river && !th.cliffs && !th.lava && !th.mill ? 2 : 1, WR = W * R, HR = H * R;
+  const bg = document.createElement('canvas'); bg.width = WR; bg.height = HR;
   const bx = bg.getContext('2d');
-  const img = bx.createImageData(W, H), d = img.data;
+  const img = bx.createImageData(WR, HR), d = img.data;
   const K = hexRGB(PAL.K);
-  const set = (x, y, c) => {
+  const setH = (x, y, c) => { // jeden pixel plátna
     x |= 0; y |= 0;
-    if (x < 0 || y < 0 || x >= W || y >= H) return;
-    const i = (y * W + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+    if (x < 0 || y < 0 || x >= WR || y >= HR) return;
+    const i = (y * WR + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
   };
-  const darken = (x, y, f) => {
+  const darkenH = (x, y, f) => {
     x |= 0; y |= 0;
-    if (x < 0 || y < 0 || x >= W || y >= H) return;
-    const i = (y * W + x) * 4; d[i] *= f; d[i + 1] *= f; d[i + 2] *= f * 1.05;
+    if (x < 0 || y < 0 || x >= WR || y >= HR) return;
+    const i = (y * WR + x) * 4; d[i] *= f; d[i + 1] *= f; d[i + 2] *= f * 1.05;
   };
+  const set = R === 1 ? setH : (x, y, c) => { x |= 0; y |= 0; for (let j = 0; j < R; j++) for (let i = 0; i < R; i++) setH(x * R + i, y * R + j, c); }; // jeden bod hry
+  const darken = R === 1 ? darkenH : (x, y, f) => { x |= 0; y |= 0; for (let j = 0; j < R; j++) for (let i = 0; i < R; i++) darkenH(x * R + i, y * R + j, f); };
   const zoneTop = G.zoneTopMax;
 
   // cesta zhora k bráne radnice
@@ -131,46 +136,51 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard, terr) {
   const groundBias = th.ground === 'grassDark' ? -0.12 : th.ground === 'swamp' ? 0.1 : th.ground === 'snow' ? 0.12 : 0;
 
   // ---- podklad: zem, cesta, nádvorie ----
-  for (let y = 0; y < H; y++) {
-    const cx = roadCx(y), hw = roadHw(y);
-    for (let x = 0; x < W; x++) {
-      const dd = roadD(x, y), yd = yardD(x, y);
+  // tvary (cesta, nádvorie, škvrny) sa počítajú v bodoch hry (x, y), zrno a raster po pixeloch plátna (px, py)
+  for (let py = 0; py < HR; py++) {
+    const y = R === 1 ? py : (py + 0.5) / R, yi = py / R | 0, cx = roadCx(y), hw = roadHw(y); // pri hrubej kresbe presne ako predtým
+    for (let px = 0; px < WR; px++) {
+      const x = R === 1 ? px : (px + 0.5) / R, dd = roadD(x, y), yd = yardD(x, y);
       if (yd < 0 && yard === 'planks') { // orkské nádvorie: hrubé dosky ako orkský chodník, okraj tmavší
-        const c = plankRGB(x, y);
-        set(x, y, yd > -2 ? [c[0] * 0.75, c[1] * 0.75, c[2] * 0.75] : c);
-      } else if (yd < 0) {
-        const row = Math.floor(y / 5), off = (row % 2) * 3, col = Math.floor((x + off) / 6);
-        let v = 0.5 + (hash2(col, row, seed + 21) - 0.5) * 0.3 + (hash2(x, y, seed + 22) - 0.5) * 0.1;
-        if (y % 5 === 0 || (x + off) % 6 === 0) v = 0.15;
-        else if (y % 5 === 1 || (x + off) % 6 === 1) v += 0.12;
+        const c = plankRGB(px / R | 0, yi);
+        setH(px, py, yd > -2 ? [c[0] * 0.75, c[1] * 0.75, c[2] * 0.75] : c);
+      } else if (yd < 0) { // dlaždice nádvoria: pri jemnej kresbe tenké škáry a svetlá hrana 1 pixel
+        const row = Math.floor(py / (5 * R)), off = (row % 2) * 3 * R, col = Math.floor((px + off) / (6 * R));
+        const ry = py % (5 * R), rx = (px + off) % (6 * R);
+        let v = 0.5 + (hash2(col, row, seed + 21) - 0.5) * 0.3 + (hash2(px, py, seed + 22) - 0.5) * 0.1;
+        if (ry === 0 || rx === 0) v = 0.15;
+        else if (ry === 1 || rx === 1) v += 0.12;
+        else if (R > 1 && (ry === 5 * R - 1 || rx === 6 * R - 1)) v -= 0.08; // zatienená spodná a pravá hrana dlaždice
         if (yd > -2) v -= 0.15;
-        set(x, y, pickRamp(RAMP.walk, v, x, y));
+        setH(px, py, pickRamp(RAMP.walk, v, px, py));
       } else if (dd < 0) {
         if (th.road === 'cobble') {
-          const row = Math.floor(y / 4), off = (row % 2) * 2, col = Math.floor((x + off) / 5);
+          const row = Math.floor(py / (4 * R)), off = (row % 2) * 2 * R, col = Math.floor((px + off) / (5 * R));
           let v = 0.45 + (hash2(col, row, seed + 23) - 0.5) * 0.35;
-          if (y % 4 === 0 || (x + off) % 5 === 0) v = 0.12;
-          if (dd > -2 || hash2(col, row, seed + 24) > 0.92) { set(x, y, pickRamp(groundRamp, 0.3, x, y)); continue; } // tráva (zem územia) medzi kameňmi
-          set(x, y, pickRamp(RAMP.stone, v, x, y));
+          if (py % (4 * R) === 0 || (px + off) % (5 * R) === 0) v = 0.12;
+          if (dd > -2 || hash2(col, row, seed + 24) > 0.92) { setH(px, py, pickRamp(groundRamp, 0.3, px, py)); continue; } // tráva (zem územia) medzi kameňmi
+          setH(px, py, pickRamp(RAMP.stone, v, px, py));
           continue;
         }
         const ramp = { mud: TR.mud, ashroad: TR.ashroad, snowroad: TR.snowroad, sandroad: TR.sandroad, hiveroad: TR.hiveroad }[th.road] || RAMP.dirt;
-        let v = 0.52 + (fbm(x * 0.08, y * 0.08, seed + 5) - 0.5) * 0.5 + (hash2(x, y, seed + 9) - 0.5) * 0.16;
+        let v = 0.52 + (fbm(x * 0.08, y * 0.08, seed + 5) - 0.5) * 0.5 + (hash2(px, py, seed + 9) - 0.5) * 0.16;
+        if (R > 1) v += (vnoise(x * 0.9, y * 0.9, seed + 12) - 0.5) * 0.18; // hrudky hliny
         const rut = Math.abs(Math.abs(x - cx) - hw * 0.45);
         if (rut < 1.2) v -= 0.2;
         else if (rut < 2.2 && x < cx) v += 0.06;
         if (dd > -2) v -= 0.14;
-        if (th.road === 'mud' && fbm(x * 0.15, y * 0.15, seed + 31) > 0.66) { set(x, y, pickRamp(TR.swampW, 0.5 + (x < cx ? 0.2 : 0), x, y)); continue; } // kaluže
-        if (hash2(x, y, seed + 11) > 0.985) v += 0.3;
-        set(x, y, pickRamp(ramp, v, x, y));
+        if (th.road === 'mud' && fbm(x * 0.15, y * 0.15, seed + 31) > 0.66) { setH(px, py, pickRamp(TR.swampW, 0.5 + (x < cx ? 0.2 : 0), px, py)); continue; } // kaluže
+        if (hash2(px, py, seed + 11) > 0.985) v += 0.3;
+        setH(px, py, pickRamp(ramp, v, px, py));
       } else {
-        let v = 0.56 + groundBias + (fbm(x * 0.05, y * 0.05, seed + 1) - 0.5) * 0.6 + (hash2(x, y, seed + 2) - 0.5) * 0.2;
+        let v = 0.56 + groundBias + (fbm(x * 0.05, y * 0.05, seed + 1) - 0.5) * 0.6 + (hash2(px, py, seed + 2) - 0.5) * 0.2;
+        if (R > 1) v += (vnoise(x * 0.7, y * 1.4, seed + 4) - 0.5) * 0.16; // jemné pásy stebiel
         if (dd < 3) v -= 0.18 * (1 - dd / 3);
         if (yd < 3) v -= 0.15 * (1 - yd / 3);
         v += (1 - (x + y) / (W + H)) * 0.08;
         if (th.ground === 'desert') { const r = Math.sin(x * 0.12 + y * 0.31 + fbm(x * 0.02, y * 0.02, seed + 61) * 7); v += r > 0.75 ? 0.14 : r < -0.5 ? -0.1 : 0; } // dlhé duny
         else if (th.ground === 'snow' && fbm(x * 0.09, y * 0.09, seed + 63) > 0.66) v -= 0.16;                                   // závoje a jamky v snehu
-        set(x, y, pickRamp(groundRamp, v, x, y));
+        setH(px, py, pickRamp(groundRamp, v, px, py));
       }
     }
   }
@@ -193,33 +203,60 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard, terr) {
     // voda nesmie siahať do zóny na stavanie: pri zóne končí pred mriežkou (piesok smie), nad ňou sa plynulo vracia
     const shore = y => G.gx0 + 5 + Math.max(0, zoneTop - 10 - y) * 0.7;
     const edge = y => Math.min(rawEdge(y), shore(y));
-    for (let y = 0; y < H; y++) {
-      const e = edge(y);
-      for (let x = 0; x < Math.ceil(e) + 1 && x < W; x++) {
-        blocked[y * W + x] = 1;
+    for (let py = 0; py < HR; py++) {
+      const y = R === 1 ? py : (py + 0.5) / R, yi = py / R | 0, e = edge(y);
+      for (let px = 0; px < (Math.ceil(e) + 1) * R && px < WR; px++) {
+        const x = R === 1 ? px : (px + 0.5) / R;
+        blocked[yi * W + (px / R | 0)] = 1;
         if (x < e - 5) {
           const depth = (e - 5 - x) / 20;
-          let v = 0.75 - depth * 1.4 + ((y + Math.round(Math.sin(x * 0.4) * 1.5)) % 6 === 0 ? 0.1 : 0);
-          if (x > e - 7) { v = 0.95; foam.push({ x, y, ph: hash2(x, y, 5) * 6.28 }); }
-          set(x, y, pickRamp(TR.water, v, x, y));
-        } else set(x, y, pickRamp(TR.sand, 0.55 + (x - e + 5) * 0.06 + (hash2(x, y, 6) - 0.5) * 0.2, x, y));
+          let v = 0.75 - depth * 1.4 + ((py + Math.round(Math.sin(px * 0.4 / R) * 1.5 * R)) % (6 * R) === 0 ? 0.1 : 0); // vlnky (pri jemnej kresbe tenké)
+          if (x > e - 7) { v = 0.95; foam.push({ x: px / R, y: py / R, s: 1 / R, ph: hash2(px, py, 5) * 6.28 }); }
+          setH(px, py, pickRamp(TR.water, v, px, py));
+        } else setH(px, py, pickRamp(TR.sand, 0.55 + (x - e + 5) * 0.06 + (hash2(px, py, 6) - 0.5) * 0.2, px, py));
       }
     }
     // mólo
     const py = Math.round(H * 0.42), pe = Math.round(edge(py)) + 4;
-    for (let y = py; y < py + 5; y++) for (let x = 0; x < pe; x++) set(x, y, pickRamp(WOOD, y === py ? 0.7 : y === py + 4 ? 0.15 : (x % 4 === 0 ? 0.3 : 0.5), x, y));
-    for (let x = 2; x < pe; x += 5) { set(x, py + 5, WOOD[1]); set(x, py + 6, WOOD[1]); }
+    if (R === 1) {
+      for (let y = py; y < py + 5; y++) for (let x = 0; x < pe; x++) set(x, y, pickRamp(WOOD, y === py ? 0.7 : y === py + 4 ? 0.15 : (x % 4 === 0 ? 0.3 : 0.5), x, y));
+      for (let x = 2; x < pe; x += 5) { set(x, py + 5, WOOD[1]); set(x, py + 6, WOOD[1]); }
+    } else { // dosky so škárami a letokruhmi, svetlá horná a tmavá spodná hrana, stĺpy s osvetlenou stranou
+      for (let j = 0; j < 5 * R; j++) for (let i = 0; i < pe * R; i++) {
+        const plank = Math.floor(i / 8);
+        let v = 0.5 + (hash2(plank, 3, seed) - 0.5) * 0.16 + (hash2(i, py * R + j, seed + 4) - 0.5) * 0.08 + (j % 3 === 1 ? 0.04 : 0);
+        if (i % 8 === 0) v = 0.24; else if (i % 8 === 1) v += 0.08;
+        if (j === 0) v = 0.78; else if (j === 5 * R - 1) v = 0.12; else if (j === 5 * R - 2) v -= 0.14;
+        setH(i, py * R + j, pickRamp(WOOD, v, i, py * R + j));
+      }
+      for (let x = 2; x < pe; x += 5) for (let j = 5 * R; j < 7 * R; j++) { setH(x * R, py * R + j, WOOD[2]); setH(x * R + 1, py * R + j, WOOD[1]); }
+    }
     // pena pod mólom by cez dosky preblikávala
     for (let i = foam.length - 1; i >= 0; i--) {
-      const f = foam[i];
-      if (f.x < pe && (f.y >= py && f.y < py + 5 || (f.y === py + 5 || f.y === py + 6) && f.x >= 2 && (f.x - 2) % 5 === 0)) foam.splice(i, 1);
+      const f = foam[i], fx = Math.floor(f.x);
+      if (f.x < pe && (f.y >= py && f.y < py + 5 || f.y >= py + 5 && f.y < py + 7 && fx >= 2 && (fx - 2) % 5 === 0)) foam.splice(i, 1);
     }
     // loďka
     const by = Math.round(H * 0.2), bx0 = 2;
-    for (let x = 0; x < 11; x++) { set(bx0 + x, by, x === 0 || x === 10 ? K : WOOD[5]); set(bx0 + x, by + 1, x === 0 || x === 10 ? K : WOOD[3]); }
-    for (let x = 1; x < 10; x++) set(bx0 + x, by + 2, K);
-    for (let y = 1; y <= 9; y++) set(bx0 + 5, by - y, WOOD[2]);
-    for (let y = 2; y <= 8; y++) for (let x = 1; x <= Math.floor((y - 1) * 0.6); x++) set(bx0 + 5 + x, by - 10 + y, hexRGB(x === 1 ? '#c4b89e' : '#eee6cc'));
+    if (R === 1) {
+      for (let x = 0; x < 11; x++) { set(bx0 + x, by, x === 0 || x === 10 ? K : WOOD[5]); set(bx0 + x, by + 1, x === 0 || x === 10 ? K : WOOD[3]); }
+      for (let x = 1; x < 10; x++) set(bx0 + x, by + 2, K);
+      for (let y = 1; y <= 9; y++) set(bx0 + 5, by - y, WOOD[2]);
+      for (let y = 2; y <= 8; y++) for (let x = 1; x <= Math.floor((y - 1) * 0.6); x++) set(bx0 + 5 + x, by - 10 + y, hexRGB(x === 1 ? '#c4b89e' : '#eee6cc'));
+    } else { // trup z dosiek s obrysom, tenký sťažeň, plachta so záhybom a tieňom pri sťažni
+      const ox = bx0 * R, oy = by * R, sailL = hexRGB('#eee6cc'), sailM = hexRGB('#d8ceb4'), sailD = hexRGB('#a8a088');
+      for (let j = 0; j < 6; j++) {
+        const x0 = Math.round(j * 0.8), x1 = 21 - Math.round(j * 0.8);
+        for (let i = x0; i <= x1; i++) setH(ox + i, oy + j, i === x0 || i === x1 || j === 5 ? K : j === 0 ? WOOD[6] : j === 2 ? WOOD[2] : WOOD[j < 2 ? 5 : 3]);
+      }
+      for (let i = 2; i < 20; i++) darkenH(ox + i, oy + 6, 0.7); // tieň trupu na vode
+      for (let j = 1; j <= 19; j++) setH(ox + 10, oy - j, WOOD[j % 4 === 0 ? 1 : 2]);
+      for (let j = 3; j <= 17; j++) {
+        const w = Math.floor((j - 2) * 0.62);
+        for (let i = 1; i <= w; i++) setH(ox + 10 + i, oy - 20 + j, i === w ? sailD : i <= 2 ? sailM : (i + j) % 7 === 0 ? sailM : sailL);
+      }
+      for (let i = 1; i <= Math.floor(15 * 0.62); i++) setH(ox + 10 + i, oy - 2, sailD); // spodný lem plachty
+    }
     spawn = [Math.round(edge(0)) + 10, spawn[1]];
   }
 
@@ -420,7 +457,7 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard, terr) {
   }
 
   // ---- dekorácie ----
-  const blob = (x0, y0, r, ramp, base, outline) => {
+  const blob = R === 1 ? (x0, y0, r, ramp, base, outline) => {
     for (let y = -r; y <= r + 2; y++) for (let x = -r; x <= r + 2; x++) {
       if ((x - 1.5) * (x - 1.5) + (y - 1.5) * (y - 1.5) * 1.6 <= r * r) darken(x0 + x, y0 + y, 0.58);
     }
@@ -431,21 +468,45 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard, terr) {
         set(x0 + x, y0 + y, pickRamp(ramp, base + (light - 0.5), x0 + x, y0 + y));
       } else if (q <= (r + 1) * (r + 1)) set(x0 + x, y0 + y, outline);
     }
+  } : (x0, y0, r, ramp, base, outline) => { // jemná kresba: rovnaký tvar, obrys 1 pixel, lístie v zhlukoch 2×2 pixely
+    const cx = x0 * R + R / 2, cy = y0 * R + R / 2, rr = r * R;
+    for (let y = -rr; y <= rr + 3 * R; y++) for (let x = -rr; x <= rr + 3 * R; x++) {
+      if ((x - 1.5 * R) * (x - 1.5 * R) + (y - 1.5 * R) * (y - 1.5 * R) * 1.6 <= rr * rr) darkenH(cx + x, cy + y, 0.58);
+    }
+    for (let y = -rr - 1; y <= rr + 1; y++) for (let x = -rr - 1; x <= rr + 1; x++) {
+      const q = x * x + y * y * 1.6, px = cx + x, py = cy + y;
+      if (q <= rr * rr) {
+        const leaf = (hash2(Math.floor(px / 2), Math.floor(py / 2), 78) - 0.5) * 0.3;
+        const light = (-x / rr - y / rr) * 0.35 + 0.5 - q / (rr * rr) * 0.15 + (hash2(px, py, 77) - 0.5) * 0.12 + leaf;
+        setH(px, py, pickRamp(ramp, base + (light - 0.5), px, py));
+      } else if (q <= (rr + 1) * (rr + 1)) setH(px, py, outline);
+    }
   };
   const grassy = th.ground === 'grass' || th.ground === 'grassDark' || th.ground === 'dry';
   const tuftRamp = { dry: TR.dry, swamp: TR.swamp, ash: TR.ash, dark: TR.dark, darkLit: TR.darkLit, snow: TR.snow, desert: TR.desert, jungle: TR.jungle, hive: TR.hive }[th.ground] || RAMP.grass;
-  for (let k = 0; k < (W * H) / (grassy || th.ground === 'jungle' ? 90 : 220); k++) {
+  for (let k = 0; k < (W * H) / (grassy || th.ground === 'jungle' ? 90 : 220) * (R > 1 ? 1.6 : 1); k++) {
     const x = Math.floor(rnd() * W), y = Math.floor(rnd() * H);
     if (!free(x, y, 1)) continue;
     const Gr = tuftRamp, n = Gr.length - 1;
-    set(x, y - 1, Gr[n]); set(x - 1, y, Gr[n - 1]); set(x + 1, y, Gr[n - 2]); set(x, y, Gr[3]); set(x, y + 1, Gr[1]);
+    if (R === 1) { set(x, y - 1, Gr[n]); set(x - 1, y, Gr[n - 1]); set(x + 1, y, Gr[n - 2]); set(x, y, Gr[3]); set(x, y + 1, Gr[1]); continue; }
+    // trs stebiel: 3–4 steblá po 1 pixeli, prostredné najvyššie, svetlé končeky, tieň pri zemi
+    const px = x * R + Math.floor(rnd() * R), py = y * R + Math.floor(rnd() * R), blades = 3 + (rnd() > 0.6 ? 1 : 0);
+    for (let b = 0; b < blades; b++) {
+      const bx2 = px + b * 1 - 1, h = b === 1 ? 4 : 2 + (b % 2), lean = b === 0 ? -1 : b === blades - 1 ? 1 : 0;
+      for (let j = 0; j < h; j++) setH(bx2 + (j === h - 1 ? lean : 0), py - j, j === h - 1 ? Gr[n] : j === 0 ? Gr[3] : Gr[n - 2]);
+    }
+    setH(px, py + 1, Gr[1]); setH(px - 1, py + 1, Gr[2]);
   }
   if (grassy) {
     const flowerCols = ['#ffffff', '#fff070', '#e84838', '#c8a0ff'].map(hexRGB);
-    for (let k = 0; k < (W * H) / 700; k++) {
+    for (let k = 0; k < (W * H) / 700 * (R > 1 ? 2 : 1); k++) {
       const x = Math.floor(rnd() * W), y = Math.floor(rnd() * H);
       if (!free(x, y, 2)) continue;
-      set(x, y, flowerCols[Math.floor(rnd() * flowerCols.length)]); set(x, y + 1, RAMP.grass[1]);
+      const c = flowerCols[Math.floor(rnd() * flowerCols.length)];
+      if (R === 1) { set(x, y, c); set(x, y + 1, RAMP.grass[1]); continue; }
+      const px = x * R, py = y * R; // kvietok: 4 lupienky okolo žltého stredu a stonka
+      if (rnd() > 0.5) { setH(px, py - 1, c); setH(px - 1, py, c); setH(px + 1, py, c); setH(px, py + 1, c); setH(px, py, hexRGB('#fff070')); setH(px, py + 2, RAMP.grass[2]); }
+      else { setH(px, py, c); setH(px, py + 1, RAMP.grass[3]); setH(px, py + 2, RAMP.grass[1]); }
     }
   }
   const scatter = (count, fn, margin) => {
@@ -631,5 +692,5 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard, terr) {
   }
 
   bx.putImageData(img, 0, 0);
-  return { bg, theme: th, foam, lava, spawn, water, mill, fortX };
+  return { bg, R, theme: th, foam, lava, spawn, water, mill, fortX };
 }

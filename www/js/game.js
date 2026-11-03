@@ -746,6 +746,7 @@
   // terén bojiska misie (podľa rozmerov, provincie a tábora protivníka); posledné tri sa pamätajú a terén vybranej misie
   // sa vyrobí vopred, kým hráč číta jej popis na mape – ťuk na Do boja je potom okamžitý
   const sceneCache = new Map();
+  const HD_GROUND = m => m === 1 && !isOrc(); // skúška: terén v jemnej kresbe (2 pixely na bod) zatiaľ len v 1. misii
   function fieldGeom(m, endless) {
     const fh = H + (m > HOME_PROVINCES && !endless ? Math.round(H * CAMP_EXTRA) : 0), g2 = Object.assign({}, G);
     g2.cols = Math.min(GRID_COLS, Math.floor(W / T)); g2.gx0 = Math.floor((W - g2.cols * T) / 2);
@@ -765,7 +766,7 @@
       return sc;
     }
     const lay = castleLay(m), ti = m > MISSIONS.length ? missionDef(m).theme : homeNode(m), sd = m > MISSIONS.length ? m : homeNode(m) + 1;
-    const sc = buildScene(W, fh, g2, 7 + sd * 13, ti, campClearRects(lay, g2), isAssaultM(m) ? 'none' : isOrc() ? 'planks' : null, landOfMission(m).terrain); // nádvorie pevnosti orkov z dosiek; pri útoku na hrad žiadne
+    const sc = buildScene(W, fh, g2, 7 + sd * 13, ti, campClearRects(lay, g2), isAssaultM(m) ? 'none' : isOrc() ? 'planks' : null, landOfMission(m).terrain, HD_GROUND(m)); // nádvorie pevnosti orkov z dosiek; pri útoku na hrad žiadne
     sceneCache.set(key, sc);
     if (sceneCache.size > 3) sceneCache.delete(sceneCache.keys().next().value);
     return sc;
@@ -5147,7 +5148,7 @@
     const a = scene.theme.anim;
     if (a === 'foam') {
       g.fillStyle = 'rgba(240,250,255,0.85)';
-      for (const f of scene.foam) if (Math.sin(time * 1.8 + f.ph) > 0.4) g.fillRect(f.x, f.y, 1, 1);
+      for (const f of scene.foam) if (Math.sin(time * 1.8 + f.ph) > 0.4) g.fillRect(f.x, f.y, f.s, f.s);
     } else if (a === 'lava') {
       for (const l of scene.lava) {
         const v = Math.sin(time * 2 + l.ph);
@@ -5180,7 +5181,7 @@
     hallLbl = null; // nastaví ho drawHallBar, keď je pruh radnice na obrazovke
     if (st.phase === 'map') { renderMap(time); present(); return; }
     if (st.phase === 'title') return; // menu má za pozadím úvodný obrázok, plátno sa nekreslí
-    g.drawImage(scene.bg, 0, 0);
+    g.drawImage(scene.bg, 0, 0, scene.bg.width / scene.R, scene.bg.height / scene.R); // jemný terén má 2 pixely na bod
     drawSceneFx(time);
     const playing = st.phase !== 'title';
     if (playing) for (const key in st.paving) { const [pc, pr] = key.split(','), px = tileX(+pc), py = tileY(+pr); g.drawImage(paveAt(px, py, st.paving[key]), px, py); } // dlažba pod všetkým
@@ -6524,8 +6525,8 @@
       const pc = pieces[q.k], [w, h] = campSize(pc);
       return { kind: q.k, skin: pc, lvl: pc.fixed ? 1 : q.l || 1, fired: 0, x: g2.gx0 + q.c * T + w * T / 2, y: g2.gy0 + (q.r + h) * T, mask: CAMP_WALLS[q.k] ? campWallMask(lay, q) : null, bld: CAMP_WALLS[q.k] ? campWallBld(lay, q) : 0 };
     }).sort((a, b) => a.y - b.y);
-    const c = document.createElement('canvas'); c.width = W; c.height = Math.min(sc.bg.height, Math.max(...parts.map(o => o.y)) + 10);
-    const x = c.getContext('2d'); x.drawImage(sc.bg, 0, 0);
+    const c = document.createElement('canvas'); c.width = W; c.height = Math.min(sc.bg.height / sc.R, Math.max(...parts.map(o => o.y)) + 10);
+    const x = c.getContext('2d'); x.drawImage(sc.bg, 0, 0, sc.bg.width / sc.R, sc.bg.height / sc.R);
     for (const o of parts) { const sp = o.skin.spr(o, 0); campWallSlices(x, o, o.bld, o.x - T / 2, o.y, pieces.wall); x.drawImage(sp.c, Math.round(o.x - sp.w / 2), o.y - sp.h + (o.skin.dy || 0), sp.w, sp.h); }
     return (castlePrev[key] = c.toDataURL());
   }
