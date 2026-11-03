@@ -252,7 +252,7 @@ function makeOrcFort() {
 const UNLOCKS = [
   [{ id: 'paving', name: 'Dlažba', icon: 'paving' }, { id: 'tower', name: 'Strážna veža', icon: 'tower' }, { id: 'wall', name: 'Hradby', icon: 'wall' }, { id: 'pit', name: 'Jama s ostňami', icon: 'pit' }, { id: 'gate', name: 'Brána', icon: 'gate', desc: 'Prerob hradbu na bránu – tvoji rytieri cez ňu prejdú, horda nie.' }],
   [{ id: 'lvl2', name: 'Radnica a stavby úrovne 2', icon: 'hall', desc: 'Vylepši radnicu na kameň – a s ňou všetky stavby a strelcov.' }, { id: 'mine', name: 'Zlatá baňa', icon: 'mine' }, { id: 'mage', name: 'Ohnivá veža', icon: 'mage' }, { id: 'wallArcher', name: 'Lukostrelec na hradbách', icon: 'u_archer', desc: 'Postav lukostrelca priamo na hradbu – strieľa rýchle šípy na hordu.' }],
-  [{ id: 'pitch', name: 'Smolná veža', icon: 'pitch', desc: 'Leje vriacu smolu pod seba a k blízkym hradbám – kto do nich búcha, dostane veľké poškodenie.' }, { id: 'icetower', name: 'Ľadová veža', icon: 'icetower' }, { id: 'workshop', name: 'Dielňa remeselníka', icon: 'workshop' }],
+  [{ id: 'pitch', name: 'Smolná veža', icon: 'pitch', desc: 'Leje vriacu smolu pod seba a k blízkym hradbám – kto do nich búcha, dostane veľké poškodenie.' }, { id: 'icetower', name: 'Ľadový plameň', icon: 'mageIce', desc: 'Ohnivú vežu prepneš na ľad – ľadové strely spomalia zasiahnutého aj nepriateľov okolo neho. Späť na oheň kedykoľvek.' }, { id: 'workshop', name: 'Dielňa remeselníka', icon: 'workshop' }],
   [{ id: 'hedge', name: 'Živý plot', icon: 'hedge' }, { id: 'lvl3', name: 'Radnica a stavby úrovne 3', icon: 'hall', desc: 'Vylepši radnicu na kameň s kovaním – a s ňou všetky stavby a strelcov.' }, { id: 'barracks', name: 'Kasárne a rytieri', icon: 'barracks' }],
   [{ id: 'range', name: 'Strelnica a lukostrelci', icon: 'range' }],
   [{ id: 'ballista', name: 'Balista', icon: 'ballista' }, { id: 'lvl4', name: 'Radnica a stavby úrovne 4', icon: 'hall', desc: 'Vylepši radnicu na tmavé opevnenie – a s ňou všetky stavby a strelcov.' }, { id: 'stables', name: 'Stajne a jazdci', icon: 'stables', desc: 'Jazdci rýchlo obídu líniu a idú po strelcoch, šamanoch a podkopníkoch.' }, { id: 'siegeRam', name: 'Baranidlo', icon: 'u_siegeRam', desc: 'Obliehací stroj zo záložky Stroje. Ide rovno na tábor hordy a rozbíja jeho stavby, orkov si nevšíma. Keď tábor nie je, rozráža hordu.' }],
@@ -295,6 +295,7 @@ ORC_UNLOCKS[3].unshift({ id: 'mud', name: 'Bahno', icon: 'mud' }); // orkovia ma
 (() => {
   const a = ORC_UNLOCKS[1], b = ORC_UNLOCKS[2], i = a.findIndex(u => u.id === 'mage'), j = b.findIndex(u => u.id === 'icetower');
   [a[i], b[j]] = [b[j], a[i]];
+  Object.assign(a[i], { icon: 'icetower', desc: undefined }); // za orkov je to jedový kotol (meno a popis z BUILD)
 })();
 const unlocksOf = () => UNLOCK_RACE === 'orc' ? ORC_UNLOCKS : UNLOCKS;
 function techFor(m) {

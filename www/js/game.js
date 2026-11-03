@@ -31,7 +31,7 @@
     mage:     { name: 'Ohnivá veža',  short: 'Ohnivá', cost: 150, hp: 240, range: 70, dmg: 14, cd: 2.2, proj: 'fire', speed: 115, splash: 16, block: true, desc: 'Ohnivá guľa zasiahne celú skupinu' },
     // smolná veža len pre ľudí: krátky dosah, leje smolu pod seba a k hradbám v okolí (PITCH_WALL) – zraní a spomalí každého na zemi
     pitch:    { name: 'Smolná veža',  short: 'Smola',  cost: 80,  hp: 300, range: 30, dmg: 16, cd: 2.4, block: true, human: true, desc: 'Leje vriacu smolu pod seba a k blízkym hradbám – kto do nich búcha, dostane veľké poškodenie a zlepí sa' },
-    icetower: { name: 'Ľadová veža',  short: 'Ľad',    cost: 90,  hp: 220, range: 72, dmg: 5,  cd: 1.3, proj: 'ice', speed: 150, chill: 2.2, block: true, desc: 'Ľadové strely spomalia zasiahnutého aj nepriateľov okolo neho' },
+    icetower: { name: 'Ľadová veža',  short: 'Ľad',    cost: 90,  hp: 220, range: 72, dmg: 5,  cd: 1.3, proj: 'ice', speed: 150, chill: 2.2, block: true, orc: true, desc: 'Ľadové strely spomalia zasiahnutého aj nepriateľov okolo neho' }, // ľudia ju nestavajú: ohnivá veža sa prepne na ľad (b.mode), strieľa potom s týmito hodnotami; orkovia = jedový kotol
     ballista: { name: 'Balista',      short: 'Balista', cost: 140, hp: 260, range: 118, dmg: 34, cd: 3.2, proj: 'lance', speed: 250, block: true, desc: 'Ťažký šíp prestrelí celý rad nepriateľov na zemi' },
     wall:     { name: 'Hradby',       short: 'Hradby', cost: 12,  hp: 240, block: true, desc: 'Zatarasí cestu – horda ich musí rozbiť alebo obísť' },
     // koly len za orkov: lacné, nevylepšujú sa (fixed), kto do nich udrie, ten sa napichne
@@ -168,13 +168,15 @@
   const GIANTS = { 7: { 10: ['giantRam'] }, 8: { 5: ['giantRam'], 10: ['mammoth'] }, 9: { 5: ['mammoth'], 10: ['giantRam', 'mammoth'] }, 10: { 5: ['giantRam', 'mammoth'] } };
 
   const lvlMul = (b, k) => 1 + k * (b.lvl - 1);
-  const bDmg = b => (isTreb(b) ? TREB.dmg : 1) * BUILD[b.kind].dmg * lvlMul(b, 0.4) * (SHOOTERS[b.kind] ? 1 + 0.04 * perk('fletching') : 1) * (TRAPS[b.kind] ? 1 + 0.06 * perk('traps') : 1) * (b.spec ? SPECS[b.spec].dmg : 1);
+  const iceMage = b => b.kind === 'mage' && b.mode === 'ice'; // ohnivá veža prepnutá na ľadový plameň
+  const bDef = b => iceMage(b) ? BUILD.icetower : BUILD[b.kind]; // hodnoty streľby (sila, rýchlosť, dosah)
+  const bDmg = b => (isTreb(b) ? TREB.dmg : 1) * bDef(b).dmg * lvlMul(b, 0.4) * (SHOOTERS[b.kind] ? 1 + 0.04 * perk('fletching') : 1) * (TRAPS[b.kind] ? 1 + 0.06 * perk('traps') : 1) * (b.spec ? SPECS[b.spec].dmg : 1);
   // trebuchet (balista za orkov): 1,5× dosah, 1,6× sila, ~2,2× pomalší, nevylepšuje sa
   const TREB = { range: 1.5, dmg: 1.6, cd: 2.2, splash: 22 };
   const isTreb = b => b.kind === 'ballista' && BUILD_RACE === 'orc';
   const fixedKind = k => !!BUILD[k].fixed || (k === 'ballista' && BUILD_RACE === 'orc'); // koly a trebuchet sa nevylepšujú
-  const bCd = b => (isTreb(b) ? TREB.cd : 1) * BUILD[b.kind].cd * Math.pow(0.92, b.lvl - 1) * (b.spec ? SPECS[b.spec].cd : 1) / (1 + 0.03 * perk('reload'));
-  const bRange = b => (isTreb(b) ? TREB.range : 1) * (BUILD[b.kind].range + 4 * (b.lvl - 1) + (b.spec ? SPECS[b.spec].range : 0)) * (1 + 0.02 * perk('lookouts'));
+  const bCd = b => (isTreb(b) ? TREB.cd : 1) * bDef(b).cd * Math.pow(0.92, b.lvl - 1) * (b.spec ? SPECS[b.spec].cd : 1) / (1 + 0.03 * perk('reload'));
+  const bRange = b => (isTreb(b) ? TREB.range : 1) * (bDef(b).range + 4 * (b.lvl - 1) + (b.spec ? SPECS[b.spec].range : 0)) * (1 + 0.02 * perk('lookouts'));
   const bMaxHp = b => Math.round((BUILD[b.kind].hp || 1) * lvlMul(b, 0.35) * (b.kind === 'wall' ? 1 + WALL_LINK * (b.nb || 0) : 1) * (1 + 0.06 * perk('carpenters')));
   const bUpCost = b => Math.round(BUILD[b.kind].cost * 0.9 * Math.pow(1.6, b.lvl - 1) * (1 - 0.04 * perk('architects')));
   const knightCap = b => b.lvl; // z vojenskej budovy vyjde naraz toľko vojakov, aká je jej úroveň
@@ -2161,7 +2163,7 @@
   function fireIce(b) {
     const def = BUILD.icetower, c = bCenter(b);
     const venom = BUILD_RACE === 'orc'; // za orkov je to jedový kotol: vrhá chuchvalce jedu po oblúku
-    if (!shoot(c.x, c.y, c.x, tileY(b.r) + T - 38, bRange(b), venom ? 'venom' : 'ice', def.speed * (venom ? 0.8 : 1), bDmg(b), 0)) return false;
+    if (!shoot(c.x, c.y, c.x, tileY(b.r) + T - (b.kind === 'mage' ? 39 : 38), bRange(b), venom ? 'venom' : 'ice', def.speed * (venom ? 0.8 : 1), bDmg(b), 0)) return false;
     const p = st.proj[st.proj.length - 1];
     p.chill = def.chill + 0.3 * (b.lvl - 1);
     if (venom) { p.sx = p.x; p.sy = p.y; p.d0 = Math.hypot(p.tx - p.x, p.ty - p.y) || 1; p.lift = 0; }
@@ -2915,8 +2917,8 @@
     // budovy
     for (const b of st.blds) {
       b.flash = Math.max(0, b.flash - dt);
-      if (b.kind === 'tower' || b.kind === 'mage') { b.cd -= dt; if (b.cd <= 0 && fireFrom(b)) b.cd = bCd(b); }
-      else if (b.kind === 'icetower') { b.cd -= dt; if (b.cd <= 0 && fireIce(b)) b.cd = bCd(b); }
+      if (b.kind === 'tower' || b.kind === 'mage' && !iceMage(b)) { b.cd -= dt; if (b.cd <= 0 && fireFrom(b)) b.cd = bCd(b); }
+      else if (b.kind === 'icetower' || iceMage(b)) { b.cd -= dt; if (b.cd <= 0 && fireIce(b)) b.cd = bCd(b); }
       else if (b.kind === 'pitch') { b.cd -= dt; if (b.cd <= 0 && firePitch(b)) b.cd = bCd(b); }
       else if (b.kind === 'ballista') { b.cd -= dt; b.fired = Math.max(0, (b.fired || 0) - dt); if (b.cd <= 0 && (isTreb(b) ? fireTrebuchet(b) : fireBallista(b))) b.cd = bCd(b); }
       else if (b.unit) { b.unit.cd -= dt; if (b.unit.cd <= 0 && fireWallUnit(b)) b.unit.cd = uCd(b.unit); }
@@ -3535,7 +3537,7 @@
   const previewCache = {};
   function bPreview(o) {
     const lv = Math.max(1, Math.min(5, o.lvl || 1)), u = o.unit;
-    const key = [o.kind, lv, o.gate ? 1 : 0, o.spikes ? o.spikeType || 1 : 0, u ? u.type + u.lvl : '', o.spec || ''].join('|');
+    const key = [o.kind, lv, o.gate ? 1 : 0, o.spikes ? o.spikeType || 1 : 0, u ? u.type + u.lvl : '', o.spec || '', o.mode || ''].join('|');
     if (previewCache[key]) return previewCache[key];
     if (o.kind === 'hall') return (previewCache[key] = spriteURL(bsprOf('hall', lv), 2));
     const c = document.createElement('canvas'), x = c.getContext('2d');
@@ -3551,7 +3553,7 @@
         if (u.lvl > 1) pxText(x, String(u.lvl), 1, y0 - 8, '#88b4ff');
       }
     } else {
-      const spr = bsprOf(o.kind, lv), w = Math.max(T, spr.w), tx = Math.floor((w - T) / 2), R = spr.hd ? 2 : 1; // jemná kresba: náhľad v jej rozlíšení
+      const spr = bsprOf(iceMage(o) ? 'mageIce' : o.kind, lv), w = Math.max(T, spr.w), tx = Math.floor((w - T) / 2), R = spr.hd ? 2 : 1; // jemná kresba: náhľad v jej rozlíšení
       c.width = w * R; c.height = (spr.h + 5) * R; x.scale(R, R); x.imageSmoothingEnabled = false;
       x.drawImage(spr.c, tx + T / 2 - Math.floor(spr.w / 2), 5, spr.w, spr.h);
       if (o.spec) { x.fillStyle = '#4a4e60'; x.fillRect(tx + 13, 1, 1, 6); x.fillStyle = SPECS[o.spec].col; x.fillRect(tx + 14, 1, 3, 2); }
@@ -3561,7 +3563,7 @@
     return (previewCache[key] = spriteURL({ c, w: c.width, h: c.height }, 3));
   }
   // náhľad stavby po zmene (jej vlastnosti s prepísanými hodnotami)
-  const after = (b, ch) => bPreview(Object.assign({ kind: b.kind, lvl: b.lvl, gate: b.gate, spikes: b.spikes, spikeType: b.spikeType, unit: b.unit, spec: b.spec }, ch));
+  const after = (b, ch) => bPreview(Object.assign({ kind: b.kind, lvl: b.lvl, gate: b.gate, spikes: b.spikes, spikeType: b.spikeType, unit: b.unit, spec: b.spec, mode: b.mode }, ch));
 
   // svätý štít: budova sa zlato leskne (pulzuje) a iskrí, kým je nezraniteľná
   const goldCache = new WeakMap();
@@ -3680,7 +3682,7 @@
         g.drawImage(us.c, 0, 0, us.w, 11, isOrc() ? Math.round(x0 + T / 2 - us.w / 2) : x0 + 1, y0 - 9, us.w, 11);
       }
     } else {
-      spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(b.kind, b.lvl); // trebuchet po výstrele s ramenom hore
+      spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl); // trebuchet po výstrele s ramenom hore; ohnivá veža na ľad má modrý plameň
       const bx = x0 + bW(b) * T / 2 - Math.floor(spr.w / 2); // stred stavby (široké budovy na 2 políčkach)
       g.drawImage(bldCanvas(spr, time, b.c * 0.7 + b.r * 0.3), bx + hitJit(b.flash), y0 + T + 1 - spr.h, spr.w, spr.h); // w, h v bodoch hry (jemná kresba má plátno 2×); zástavy vejú
       if (b.holyT > 0) holyGlow(spr, bx, y0 + T + 1 - spr.h, b.holyT, time);
@@ -3698,6 +3700,7 @@
         if (venom) { if (Math.random() < 0.08) part(x0 + 9 + (Math.random() - 0.5) * 6, y0 + T + 1 - spr.h + 3, (Math.random() - 0.5) * 3, -8 - Math.random() * 6, 0.7, Math.random() < 0.5 ? '#9cf060' : '#d8ffa0', 0); }
         else if (Math.random() < 0.03) part(x0 + 9 + (Math.random() - 0.5) * 6, y0 + T + 1 - spr.h + 4, 0, 6, 0.6, '#e8f8ff', 10); // padajú ľadové iskričky
       }
+      if (iceMage(b) && Math.random() < 0.04) part(bx + spr.w / 2 + (Math.random() - 0.5) * 6, y0 + T + 1 - spr.h + 6, 0, 6, 0.6, '#e8f8ff', 10); // z ľadového plameňa padajú iskričky
     }
     if (b.lvl > 1 && b.kind !== 'wall' && tabOf(b.kind) !== 'towers') pxText(g, String(b.lvl), x0 + bW(b) * T - 3, y0 + T - 6, '#f8d048'); // úroveň (veže ju majú len na vzhľade)
   }
@@ -5352,7 +5355,7 @@
   }
   // ikony stavieb hráča v podobe jeho rasy (prekreslia sa pri zmene rasy pozície)
   function buildingIcons() {
-    for (const k of ['tower', 'barracks', 'mage', 'pitch', 'icetower', 'ballista', 'mine', 'chapel', 'workshop', 'range', 'stables', 'armory', 'falconry']) ICONS[k] = spriteURL(bsprOf(k, 1), 3);
+    for (const k of ['tower', 'barracks', 'mage', 'mageIce', 'pitch', 'icetower', 'ballista', 'mine', 'chapel', 'workshop', 'range', 'stables', 'armory', 'falconry']) ICONS[k] = spriteURL(bsprOf(k, 1), 3);
     ICONS.pit = spriteURL(BSPR.pit, 3);
     for (const k of ['firepit', 'beartrap']) ICONS[k] = spriteURL(BSPR[k], 3);
     ICONS.stake = spriteURL(BSPR.stake, 3);
@@ -5684,7 +5687,7 @@
       else if (b.kind === 'firepit') stats = 'horenie ' + Math.round(bDmg(b)) + '/s počas ' + FIRE_BURN + ' s';
       else if (b.kind === 'beartrap') stats = 'zastaví na ' + trapStun(b).toFixed(1) + ' s';
       else if (b.kind === 'pitch') stats = 'smola ' + Math.round(bDmg(b)) + ' každému pri veži a pri hradbách v okolí · zlepí na ' + (1.5 + 0.2 * (b.lvl - 1)).toFixed(1) + ' s';
-      else if (b.kind === 'icetower') stats = 'spomalí na ' + (d.chill + 0.3 * (b.lvl - 1)).toFixed(1) + ' s · poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);
+      else if (b.kind === 'icetower' || iceMage(b)) stats = 'spomalí na ' + (BUILD.icetower.chill + 0.3 * (b.lvl - 1)).toFixed(1) + ' s · poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);
       else if (isTreb(b)) stats = 'balvan ' + Math.round(bDmg(b)) + ' celej skupine · dosah ' + Math.round(bRange(b)) + ' · výstrel každých ' + bCd(b).toFixed(1) + ' s';
       else if (b.kind === 'ballista') stats = 'poškodenie ' + Math.round(bDmg(b)) + ' každému v rade · dosah ' + bRange(b);
       else if (d.range) stats = 'poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);
@@ -5699,7 +5702,7 @@
       if (b.spec) stats += ' · ' + SPECS[b.spec].name;
       if (b.gate) stats += ' · rytieri cez ňu prejdú';
       if ((UNIT_HOME[b.kind] || b.kind === 'range') && knightsBlocked(b)) stats = '<span class="warn">⚠ vojaci sa nedostanú von</span> · ' + stats;
-      selRow(after(b, {}), (b.gate ? 'Brána' : d.name) + (fixedKind(b.kind) ? '' : ' · úr. ' + b.lvl), stats);
+      selRow(after(b, {}), (b.gate ? 'Brána' : iceMage(b) ? BUILD.icetower.name : d.name) + (fixedKind(b.kind) ? '' : ' · úr. ' + b.lvl), stats);
       if (!fixedKind(b.kind)) upAct(b.lvl, bCap(), bUpCost(b), () => {
         const ratio = d.hp ? b.hp / bMaxHp(b) : 1, c = bUpCost(b);
         st.gold -= c; b.spent += c; b.lvl++;
@@ -5710,6 +5713,11 @@
       if (fc) act(I.actRepair, 'Opraviť', coinTxt(fc), st.gold >= fc, () => { st.gold -= fc; b.hp = bMaxHp(b); rebuildOcc(); }, '', true);
       const refund = Math.floor(b.spent * sellShare()) + (b.unit ? Math.floor(b.unit.spent * sellShare()) : 0);
       act(ICONS.coin, 'Predať', '+' + refund, true, sellAll([b], refund), 'sell', true);
+      if (b.kind === 'mage' && !isOrc()) { // ohnivá veža sa prepína medzi ohňom a ľadom (zadarmo, kedykoľvek)
+        const ice = iceMage(b);
+        if (!has('icetower')) lockAct(after(b, { mode: 'ice' }), 'Ľad', unlockMissionOf('icetower'), true);
+        else shineTech(act(after(b, { mode: ice ? null : 'ice' }), ice ? 'Oheň' : 'Ľad', 'prepnúť', true, () => { b.mode = ice ? null : 'ice'; b.cd = Math.max(b.cd, 0.5); }, 'up', true), 'icetower');
+      }
       if (b.kind === 'tower' && !b.spec) {
         if (!has('spec')) lockAct(I.actSpec.fire, 'Špecializácia', unlockMissionOf('spec'), true);
         else if (b.lvl < 3) act(I.actSpec.fire, 'Špecializácia', 'od úr. 3', false, 'Špecializácia sa dá vybrať od úrovne 3', 'locked', true);
@@ -6812,7 +6820,7 @@
   function unlockItems(m) {
     const items = (unlocksOf()[m - 1] || []).map(u => ({
       icon: ICONS[u.icon], name: unlockName(u),
-      tag: BUILD[u.id] ? 'Nová stavba' : ABIL[u.id] ? 'Kráľova schopnosť' : /^(volley|fireball|freeze|lightning)$/.test(u.id) ? 'Kúzlo' : 'Nové vylepšenie',
+      tag: u.id === 'icetower' && !isOrc() ? 'Nové vylepšenie' : BUILD[u.id] ? 'Nová stavba' : ABIL[u.id] ? 'Kráľova schopnosť' : /^(volley|fireball|freeze|lightning)$/.test(u.id) ? 'Kúzlo' : 'Nové vylepšenie',
       desc: u.desc || (BUILD[u.id] ? BUILD[u.id].desc + '.' : ''),
     }));
     for (const foe of [].concat(enemyIntro(m) || [])) items.push({ icon: ICONS['e_' + foe.id], name: foe.name, tag: ENEMY[foe.id].giant ? (isOrc() ? 'Pozor – obor ľudí' : 'Pozor – obor hordy') : 'Pozor – nový nepriateľ', desc: foe.desc.charAt(0).toUpperCase() + foe.desc.slice(1) + '.', foe: true });
