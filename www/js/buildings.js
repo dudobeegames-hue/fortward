@@ -1540,11 +1540,11 @@ function initBuildingSprites() {
   BSPR.ballista = [1, 2, 3, 4, 5].map(l => makeBallistaTower(l));
   BSPR.barracks = artBuilding(BARRACKS_ART, 0, false); // kasárne z PixelLabu (barracks-art.js), jedna podoba pre všetky úrovne; stará kresba: makeBarracks
   BSPR.pit = makePit();
-  BSPR.mine = makeMine();
-  BSPR.chapel = makeChapel();
+  BSPR.mine = artBuilding(MINE_ART, 0, false); // zlatá baňa z PixelLabu (mine-art.js) na 2 políčkach; stará kresba: makeMine
+  BSPR.chapel = artBuilding(CHAPEL_ART, 0, false); // kaplnka z PixelLabu (chapel-art.js) na 2 políčkach; stará kresba: makeChapel
   BSPR.firepit = makeFirepit();
   BSPR.beartrap = makeBeartrap();
-  BSPR.workshop = makeWorkshop();
+  BSPR.workshop = artBuilding(WORKSHOP_ART, 0, false); // dielňa z PixelLabu (workshop-art.js) na 2 políčkach; stará kresba: makeWorkshop
   BSPR.range = artBuilding(RANGE_ART, 0, false); // strelnica z PixelLabu (range-art.js), jedna podoba pre všetky úrovne; stará kresba: makeRange
   BSPR.stables = artBuilding(STABLES_ART, 0, false); // stajne z PixelLabu (stables-art.js), jedna podoba pre všetky úrovne; stará kresba: makeStables
   BSPR.armory = artBuilding(ARMORY_ART, 0, false); // zbrojnica z PixelLabu (armory-art.js), jedna podoba pre všetky úrovne; stará kresba: makeArmory

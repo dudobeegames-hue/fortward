@@ -37,8 +37,8 @@
     // koly len za orkov: lacné, nevylepšujú sa (fixed), kto do nich udrie, ten sa napichne
     stake:    { name: 'Koly',         short: 'Koly',     cost: 6, hp: 110, block: true, fixed: true, orc: true, desc: 'Lacné zahrotené koly – nevylepšujú sa a kto do nich udrie, ten sa napichne' },
     pit:      { name: 'Jama s ostňami', short: 'Jama', cost: 30,  dmg: 12, block: false, desc: 'Zraní a spomalí každého, kto ňou prejde' },
-    mine:     { name: 'Zlatá baňa',   short: 'Baňa',   cost: 100, hp: 180, block: true, desc: 'Po každej prežitej vlne prinesie zlato' },
-    chapel:   { name: 'Kaplnka',      short: 'Kaplnka', cost: 120, hp: 200, block: true, desc: 'Vyšle mnícha, ktorý chodí za rytiermi a hrdinom a lieči ich' },
+    mine:     { name: 'Zlatá baňa',   short: 'Baňa',   cost: 100, hp: 180, block: true, w: 2, desc: 'Po každej prežitej vlne prinesie zlato' },
+    chapel:   { name: 'Kaplnka',      short: 'Kaplnka', cost: 120, hp: 200, block: true, w: 2, desc: 'Vyšle mnícha, ktorý chodí za rytiermi a hrdinom a lieči ich' },
     firepit:  { name: 'Ohnivá jama',  short: 'Oheň',   cost: 50,  dmg: 8, block: false, desc: 'Kto ňou prejde, niekoľko sekúnd horí' },
     beartrap: { name: 'Medvedia pasca', short: 'Pasca', cost: 40, block: false, desc: 'Chytí nepriateľa a na chvíľu ho zastaví' },
     paving:   { name: 'Dlažba',       short: 'Dlažba', cost: 5, block: false, deco: true, desc: 'Ozdobná kamenná dlažba – dá sa položiť aj pod budovy. Ďalší ťuk ju zoberie späť' },
@@ -46,7 +46,7 @@
     hedge:    { name: 'Živý plot',    short: 'Plot',   cost: 1, block: false, fixed: true, deco: true, human: true, desc: 'Strihaný živý plot – vojaci aj horda ním prejdú, len ich trochu spomalí. Nikto ho neničí' },
     // bahno: orkská obdoba živého plota – leží na zemi, kto sa ním brodí, ide pomalšie; nikto ho neničí, nevylepšuje sa
     mud:      { name: 'Bahno',        short: 'Bahno',  cost: 1, block: false, fixed: true, deco: true, orc: true, desc: 'Mazľavé bahno s mlákami – orkovia aj ľudia ním prejdú, len ich trochu spomalí. Nikto ho neničí' },
-    workshop: { name: 'Dielňa remeselníka', short: 'Dielňa', cost: 90, hp: 180, block: true, desc: 'Vyšle remeselníka, ktorý chodí opravovať poškodené budovy' },
+    workshop: { name: 'Dielňa remeselníka', short: 'Dielňa', cost: 90, hp: 180, block: true, w: 2, desc: 'Vyšle remeselníka, ktorý chodí opravovať poškodené budovy' },
   };
   const TRAPS = { pit: 1, firepit: 1, beartrap: 1 };
   const FIRE_BURN = 4; // ohnivá jama: horenie trvá 4 s (pri 8/s = 32 poškodenia – viac za zlato ako jama s ostňami, tá zas spomaľuje)
