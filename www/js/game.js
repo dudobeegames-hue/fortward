@@ -419,7 +419,7 @@
     poison:    { name: 'Jedový mrak',  desc: 'Zelený mrak na zvolenom mieste zraňuje každého v ňom a spomaľuje ho.', icon: 'sp_poison' },
     hex:       { name: 'Zakliatie',    desc: 'Až troch nepriateľov v dosahu natrvalo premení na netopiere, ktoré sa pridajú k orkom a napádajú svojich.', icon: 'sp_hex' },
     charge:    { name: 'Nápor',        desc: 'Vojvoda sa rozbehne k zvolenému miestu, zraní každého na ceste, odhodí ho nabok a omráči.', icon: 'sp_charge' },
-    hide:      { name: 'Medvedia koža', desc: 'Vojvoda a orkovia okolo neho dostávajú 6 s o polovicu menej poškodenia.', icon: 'sp_hide' },
+    hide:      { name: 'Medvedia koža', desc: 'Vojvoda a všetky jeho jednotky na bojisku dostávajú 6 s o polovicu menej poškodenia.', icon: 'sp_hide' },
     feast:     { name: 'Krvavá hostina', desc: 'Na 8 s udiera vojvoda o 30 % silnejšie a každým úderom sa lieči.', icon: 'sp_feast' },
   };
   const slotOpen = i => kingMeta.lvl >= KING_SLOT_LVL[i];
@@ -1148,7 +1148,7 @@
       wave: 0, chestRun: 0, gold: Math.round((DIFF.startGold + DIFF.startGoldMission * (diffM(st.mission) - 1)) * (1 + 0.05 * perk('treasury'))), hallLvl: 1, volleyLvl: 1, volleyT: 0, boss: null, buildTab: 'towers', tool: null, sel: null, shake: 0, soldierN: 0,
       blds: [], paving: {}, enemies: [], soldiers: [], form: null, proj: [], eproj: [], drops: [], parts: [], texts: [], marks: [], spawnQ: [],
       cryT: 0, cryCd: 0, freezeCd: 0, fireCd: 0, boltCd: 0, shieldCd: 0, healCd: 0, fwCd: 0, tpCd: 0, rageCd: 0, roarCd: 0, axeCd: 0, axes: [], totemCd: 0, poisonCd: 0, hexCd: 0, totems: [], clouds: [], pools: [], chargeCd: 0, hideCd: 0, feastCd: 0, shields: [], fireWalls: [], heroDead: {},
-      spellSel: null, siegeOrder: [], siegePick: null, fallFx: [], blasts: [], healFx: [], bolts: [], hallHolyT: 0, stance: 'attack', introPan: null,
+      spellSel: null, siegeOrder: [], siegePick: null, fallFx: [], blasts: [], healFx: [], bolts: [], hallHolyT: 0, stance: isAssaultM(st.mission) && !st.endless ? 'attack' : 'defend', introPan: null, // v misiách začína armáda v obrane, pri útoku na hrad útočí
     });
     rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
     st.camp = makeCamp(); // od misie 6 si horda hore na bojisku rozloží tábor
@@ -1335,6 +1335,13 @@
     // rytieri sa po vlne vrátia do kasární, obliehacie stroje na svoje štartové miesto pred zónou
     for (const sd of st.soldiers) if (!sd.siege) for (let k = 0; k < 5; k++) part(sd.x, sd.y - 5, (Math.random() - 0.5) * 20, -Math.random() * 20, 0.4, '#88b4ff', 30);
     st.soldiers = st.soldiers.filter(s => s.siege);
+    for (const o of st.soldiers.concat(st.blds)) o.flash = 0; // posledný zásah z boja by stroj či stavbu nechal bielu
+    if (campGone() && st.soldiers.length) { // tábor zničený: obliehacie stroje odídu, hráč dostane časť ich ceny
+      const back = st.soldiers.reduce((t, u) => t + Math.floor(BUY[u.siege].cost * sellShare()), 0);
+      for (const u of st.soldiers) for (let k = 0; k < 8; k++) part(u.x, u.y - 5, (Math.random() - 0.5) * 24, -Math.random() * 20, 0.4, '#c6a272', 30);
+      st.soldiers = []; st.gold += back;
+      toast('Tábor je zničený – obliehacie stroje odchádzajú (+' + back + ' zlata)');
+    }
     siegeGoHome();
     if (st.wave >= missionWaves(st.mission) && !st.endless) { missionWon(); return; } // nekonečná obrana sa končí až pádom radnice
     AUDIO.play('cleared');
@@ -2364,7 +2371,7 @@
       // šík ide oproti najbližšej pozemnej horde, no nie hlbšie než k zhromaždisku pred zónou
       const th = nearestFoe(F.inf.x, F.inf.y, false);
       const atk = armyAttacks(), cp = th || !atk ? null : nearestCampPart(F.inf.x, F.inf.y);
-      if (!atk) stepAnchor(F.inf, th ? th.x : cx, musterY, dt); // obrana: šík stojí pred zónou, len sa natočí k horde
+      if (!atk) stepAnchor(F.inf, th ? th.x : cx, Math.max(musterY, tileY(zoneTopRow()) + 2), dt); // obrana: šík stojí na hornom okraji zóny (bližšie k hradu), len sa natočí k horde
       else if (th) stepAnchor(F.inf, th.x, Math.max(G.gy0 + 24, Math.min(musterY, th.y + 18)), dt);
       else if (cp) stepAnchor(F.inf, cp.x, cp.y + 16, dt); // horda nikde – šík sa presunie k táboru
       else stepAnchor(F.inf, cx, musterY, dt);
@@ -2457,14 +2464,14 @@
     // drží sa svojho cieľa, kým ho úplne neopraví / nevylieči; až potom si vyberie najviac poškodený ďalší
     const healMax = o => o.isKing ? kingMax() : o.max;
     const valid = t => !!t && (u.helper === 'chapel'
-      ? !t.dead && (t.isKing || st.soldiers.includes(t)) && t.hp < healMax(t)
+      ? !t.dead && !t.siege && (t.isKing || st.soldiers.includes(t)) && t.hp < healMax(t)
       : st.blds.includes(t) && t.hp < bMaxHp(t));
     if (!valid(u.tgt)) {
       u.tgt = null;
       let best = 1;
       if (u.helper === 'chapel') {
         for (const o of st.soldiers.concat(st.king && !st.king.dead ? [st.king] : [])) {
-          if (o === u || o.dead || o.helper) continue;
+          if (o === u || o.dead || o.helper || o.siege) continue; // obliehacie stroje liečiteľ nelieči (opravujú sa inak)
           const r = o.hp / healMax(o);
           if (r < best) { best = r; u.tgt = o; }
         }
@@ -2655,10 +2662,10 @@
       st.chargeCd = spCd(id); AUDIO.play('horn'); banner('Nápor!');
       return true;
     }
-    if (id === 'hide') { // medvedia koža: vojvoda a orkovia okolo neho dostávajú polovičné poškodenie
+    if (id === 'hide') { // medvedia koža: vojvoda a všetky jeho jednotky na bojisku dostávajú polovičné poškodenie
       const dur = sp.dur * dm;
       k.hideT = dur;
-      for (const s of st.soldiers) if (!s.dead && !s.siege && !s.fly && !s.helper && Math.hypot(s.x - k.x, (s.y - k.y) / 0.7) < sp.R) s.hideT = dur;
+      for (const s of st.soldiers) if (!s.dead) s.hideT = dur;
       st.marks.push({ x: k.x, y: k.y, life: 0.6, max: 0.6, wave: sp.R * 0.8, hide: true });
       for (let q = 0; q < 30; q++) { const a = Math.random() * 6.28, r = Math.random() * sp.R * 0.6; part(k.x + Math.cos(a) * r, k.y + Math.sin(a) * r * 0.6, 0, -14 - Math.random() * 12, 0.6, q % 3 ? '#a86c38' : '#eee6cc', 0); }
       st.hideCd = spCd(id); AUDIO.play('upgrade'); banner('Medvedia koža!');
@@ -5638,13 +5645,13 @@
     };
     if (st.sel === HALL) {
       const k = st.king;
-      selRow(ICONS.hall, (isOrc() ? 'Pevnosť' : 'Radnica') + ' · úr. ' + st.hallLvl + ' (' + LVL_NAME[st.hallLvl] + ')', 'zdravie ' + Math.ceil(st.hallHp) + '/' + hallMax() + ' · ' + heroName().toLowerCase() + ' úr. ' + kingMeta.lvl + (k && k.dead ? (heroDef().fem ? ' · padla' : ' · padol') : '') + ' · vylepšenie rozšíri územie a dovolí vyššie stavby');
+      selRow(bPreview({ kind: 'hall', lvl: st.hallLvl }), (isOrc() ? 'Pevnosť' : 'Radnica') + ' · úr. ' + st.hallLvl + ' (' + LVL_NAME[st.hallLvl] + ')', 'zdravie ' + Math.ceil(st.hallHp) + '/' + hallMax() + ' · ' + heroName().toLowerCase() + ' úr. ' + kingMeta.lvl + (k && k.dead ? (heroDef().fem ? ' · padla' : ' · padol') : '') + ' · vylepšenie rozšíri územie a dovolí vyššie stavby');
       hallActs();
     } else if (selGroup()) {
       // hromadné akcie pre označenú skupinu (rad hradieb alebo všetky stavby jedného druhu)
       const grp = st.selGroup, kind = grp[0].kind, d = BUILD[kind], isWall = kind === 'wall', cap = bCap();
       const minL = Math.min(...grp.map(w => w.lvl)), maxL = Math.max(...grp.map(w => w.lvl));
-      selRow(ICONS[kind], (isWall ? 'Rad hradieb' : d.name + ' – všetky') + ' · ' + grp.length + ' ks', 'úroveň ' + (minL === maxL ? minL : minL + '–' + maxL) + ' · akcie platia pre celú skupinu, najprv pre najslabšie');
+      selRow(after(grp.find(w => w.lvl === maxL) || grp[0], { unit: null, gate: false }), (isWall ? 'Rad hradieb' : d.name + ' – všetky') + ' · ' + grp.length + ' ks', 'úroveň ' + (minL === maxL ? minL : minL + '–' + maxL) + ' · akcie platia pre celú skupinu, najprv pre najslabšie');
       // karta „pre všetky“: ak zlato nestačí, urobí toľko, koľko sa dá („3/6“)
       const bulk = (icon, name, list, costFn, apply, cls, px) => {
         if (!list.length) return;
@@ -5832,6 +5839,7 @@
       if (tab.id === 'siege') for (const key in BUY) { // obliehacie stroje: vyrazia so začiatkom vlny
         const u = BUY[key], icon = ICONS['u_' + u.siege];
         if (!st.tech.has(u.siege)) { lockAct(icon, u.name, unlockMissionOf(u.siege), true); continue; }
+        if (campGone()) { act(icon, u.name, 'tábor zničený', false, 'Tábor hordy je zničený – obliehacie stroje už netreba', 'locked', true); continue; }
         const n = siegeCount(key), full = n >= SIEGE_MAX;
         const picked = !!(st.siegePick && st.siegePick.key === key);
         act(icon, u.name + ' ' + n + '/' + SIEGE_MAX, full ? 'plné' : coinTxt(u.cost), !full && st.gold >= u.cost,
@@ -6415,7 +6423,8 @@
     if (n) toast('+' + n + ' zlatiek do truhlice');
   }
   const siegeCount = kind => st.soldiers.filter(s => s.siege === kind && !s.dead).length + st.siegeOrder.filter(o => o.key === kind).length;
-  const canSiege = key => st.tech.has(BUY[key].siege); // v každej misii, keď je stroj raz odomknutý
+  const canSiege = key => st.tech.has(BUY[key].siege) && !campGone(); // v každej misii, keď je stroj raz odomknutý, kým stojí tábor hordy
+  const campGone = () => !!st.camp && !isAssault() && campLive().length === 0; // celý tábor hordy zbúraný
   // kúpa stroja na miesto (x, y); bez miesta postaví stroj vedľa radnice (simulácia)
   function orderSiege(key, x, y) {
     const u = BUY[key];
