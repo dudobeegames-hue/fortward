@@ -767,13 +767,13 @@
     const { fh, g2 } = fieldGeom(m, endless), key = W + 'x' + fh + ':' + foeRace() + ':' + m + (endless ? ':endless' : '');
     if (sceneCache.has(key)) return sceneCache.get(key);
     if (endless) { // nekonečná obrana: vlastná krajina, nádvorie radnice ako v obranných misiách
-      const sc = buildScene(W, fh, g2, 977, ENDLESS_THEME, [], isOrc() ? 'planks' : null);
+      const sc = buildScene(W, fh, g2, 977, ENDLESS_THEME, [], 'none'); // pod radnicou tráva – dlažbu si hráč postaví sám
       sceneCache.set(key, sc);
       if (sceneCache.size > 3) sceneCache.delete(sceneCache.keys().next().value);
       return sc;
     }
     const lay = castleLay(m), ti = m > MISSIONS.length ? missionDef(m).theme : homeNode(m), sd = m > MISSIONS.length ? m : homeNode(m) + 1;
-    const sc = buildScene(W, fh, g2, 7 + sd * 13, ti, campClearRects(lay, g2), isAssaultM(m) ? 'none' : isOrc() ? 'planks' : null, landOfMission(m).terrain, HD_GROUND(m)); // nádvorie pevnosti orkov z dosiek; pri útoku na hrad žiadne
+    const sc = buildScene(W, fh, g2, 7 + sd * 13, ti, campClearRects(lay, g2), 'none', landOfMission(m).terrain, HD_GROUND(m)); // bez nádvoria: dlažbu (orkovia dosky) si hráč postaví sám
     sceneCache.set(key, sc);
     if (sceneCache.size > 3) sceneCache.delete(sceneCache.keys().next().value);
     return sc;
@@ -6074,6 +6074,13 @@
     placeAt(pd.kind, t.c, t.r);
   });
   window.addEventListener('pointercancel', () => { cardPress = null; pdrag = null; });
+  // keď už prst ťahá stavbu z karty, prehliadač nesmie pohyb do strany zobrať ako posúvanie palety (zrušil by ťah)
+  // (ani v prvých pixeloch ťahu hore, kým sa ťah ešte nezačal – inak by prehliadač mohol posúvanie rozbehnúť skôr)
+  window.addEventListener('touchmove', ev => {
+    if (!ev.cancelable || (!pdrag && !cardPress)) return;
+    const t = ev.touches[0], dx = cardPress && t ? t.clientX - cardPress.x : 0, dy = cardPress && t ? t.clientY - cardPress.y : 0;
+    if (pdrag || (dy < -3 && -dy > Math.abs(dx))) ev.preventDefault();
+  }, { passive: false });
   screen.addEventListener('pointermove', ev => {
     if (pdrag) return;
     if (vscroll && (st.phase === 'build' || st.phase === 'battle')) {

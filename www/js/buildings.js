@@ -489,15 +489,23 @@ function makeWall(mask, lvl, orc) {
       if (orc && lvl >= 2 && y === yTop && !N && !vert) { p.set(x, y, lvl >= 4 ? RIVET : BONE); continue; } // kostené, od úr. 4 železné hroty
       let v = [0.68, 0.5, 0.28][lx] + (hash2(x, y, 103) - 0.5) * 0.08;
       if (y <= topEnd) v += 0.12; // vrch brvien na svetle
-      if (orc && lvl >= 3 && !S && y >= topEnd + 2 && y <= topEnd + 5) { // železné pláty pribité nitmi na čele hradby
-        const px = x % 5, py = y - topEnd - 2;
-        if (px === 0) { p.set(x, y, PLATE[0]); continue; }                                        // škára medzi plátmi
-        if ((px === 1 || px === 4) && (py === 0 || py === 3)) { p.set(x, y, RIVET); continue; }  // nity v rohoch
-        p.set(x, y, PLATE[py === 0 ? 4 : px === 1 ? 3 : py === 3 ? 1 : 2]);
+      const pTop = topEnd + (lvl === 4 ? 1 : 2), pBot = pTop + (lvl === 4 ? 2 : 3); // na 4. úrovni užšie pláty vyššie – pod nimi kamenná päta
+      if (orc && lvl >= 3 && !S && y >= pTop && y <= pBot) { // železné pláty pribité nitmi na čele hradby
+        const px = x % 5, py = y - pTop, pl = pBot - pTop;
+        if (px === 0) { p.set(x, y, PLATE[0]); continue; }                                         // škára medzi plátmi
+        if ((px === 1 || px === 4) && (py === 0 || py === pl)) { p.set(x, y, RIVET); continue; }  // nity v rohoch
+        p.set(x, y, PLATE[py === 0 ? 4 : px === 1 ? 3 : py === pl ? 1 : 2]);
         continue;
       }
       if (orc && lvl >= 5 && !S && y >= faceEnd - 3 && y <= faceEnd - 2) { p.set(x, y, y === faceEnd - 3 ? BLOOD2 : (x % 4 === 2 ? GOLD2 : BLOOD)); continue; } // červené súkno so zlatými strapcami
-      if (orc && lvl === 4 && !S && y === faceEnd - 2) { p.set(x, y, x % 3 === 1 ? RIVET : IRON); continue; } // okovaný spodný pás
+      if (orc && lvl === 4 && !S && y > pBot) { // kamenná päta z tmavých tehál ako pri orkskej veži 4. úrovne
+        const sy = y - pBot - 1, course = Math.floor(sy / 3), off = (course % 2) * 3;
+        let sv = 0.62 - (x - x0) / Math.max(1, x1 - x0) * 0.3 + (hash2(Math.floor((x + off) / 6), course, 243) - 0.5) * 0.18;
+        if (sy % 3 === 2 || (x + off) % 6 === 5) sv -= 0.3;
+        if (sy === 0) sv += 0.1; // horná hrana päty na svetle
+        p.shade(x, y, ORC_STONE, sv);
+        continue;
+      }
       if (y === topEnd + 3 || (y <= topEnd && y === yTop + 5 && !vert)) v = 0.12; // previazanie lanom
       if (y === faceEnd) v = 0.1;
       p.shade(x, y, orc ? (lvl === 1 ? ORC_WOOD_LIGHT : ORC_WOOD) : WOOD, v);

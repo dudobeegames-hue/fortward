@@ -135,8 +135,8 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard, terr, hd) {
     const k = Math.max(0, Math.min(1, (G.hallTop - y) / 140));
     return G.hallCx + (Math.sin(y * 0.021 + seed) * (th.cliffs ? 5 : 12) + Math.sin(y * 0.053 + 1) * 4) * k;
   };
-  const roadHw = y => (th.cliffs ? 7 : 9) + Math.max(0, Math.min(1, y / G.hallTop)) * 7;
-  const roadD = (x, y) => y > G.hallTop + 4 ? 99 : Math.abs(x - roadCx(y)) - roadHw(y) + (vnoise(x * 0.3, y * 0.3, seed + 3) - 0.5) * 5;
+  const roadHw = y => 5 + Math.max(0, Math.min(1, y / G.hallTop)) * 1.5; // šírka cesty najviac jedno políčko (aj so zvlneným okrajem)
+  const roadD = (x, y) => y > G.hallTop + 4 ? 99 : Math.abs(x - roadCx(y)) - roadHw(y) + (vnoise(x * 0.3, y * 0.3, seed + 3) - 0.5) * 3;
   const hx0 = G.hallCx - 22, hx1 = G.hallCx + 22;
   const yardD = yard === 'none' ? () => 99 : (x, y) => { // 'none' = bez nádvoria (útok na hrad – hráč nemá radnicu)
     if (y >= G.hallBot) return 99; // pod radnicou nádvorie nie je (je tam pruh zdravia)
