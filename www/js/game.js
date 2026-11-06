@@ -6085,7 +6085,8 @@
   window.addEventListener('pointercancel', () => { cardPress = null; pdrag = null; });
   // keď už prst ťahá stavbu z karty, prehliadač nesmie pohyb do strany zobrať ako posúvanie palety (zrušil by ťah)
   // (ani v prvých pixeloch ťahu hore, kým sa ťah ešte nezačal – inak by prehliadač mohol posúvanie rozbehnúť skôr)
-  window.addEventListener('touchmove', ev => {
+  // len na palete: sledovanie dotyku, ktoré smie zakázať posúvanie, by na celom okne brzdilo každé posúvanie prstom v hre aj v menu
+  $('palette').addEventListener('touchmove', ev => {
     if (!ev.cancelable || (!pdrag && !cardPress)) return;
     const t = ev.touches[0], dx = cardPress && t ? t.clientX - cardPress.x : 0, dy = cardPress && t ? t.clientY - cardPress.y : 0;
     if (pdrag || (dy < -3 && -dy > Math.abs(dx))) ev.preventDefault();

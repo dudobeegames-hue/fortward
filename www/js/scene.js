@@ -149,10 +149,17 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard, terr, hd) {
 
   // ---- podklad: zem, cesta, nádvorie ----
   // tvary (cesta, nádvorie, škvrny) sa počítajú v bodoch hry (x, y), zrno a raster po pixeloch plátna (px, py)
+  // jemná kresba: pomalé plynulé šumy (veľké škvrny, zvlnenie okraja cesty) sa rátajú raz na bod hry a platia pre jeho 2×2 pixely – inak by príprava terénu na telefóne zamrzla
+  const memo = () => new Float32Array(W * H).fill(NaN);
+  const nRoad = R > 1 ? memo() : null, nGrass = R > 1 ? memo() : null, nDirt = R > 1 ? memo() : null;
+  const pt = (arr, i, f) => { let v = arr[i]; if (v !== v) { const bxp = i % W + 0.5, byp = (i / W | 0) + 0.5; v = arr[i] = f(bxp, byp); } return v; };
+  const fbmAt = (arr, i, x, y, k, sd) => R > 1 ? pt(arr, i, (bxp, byp) => fbm(bxp * k, byp * k, sd)) : fbm(x * k, y * k, sd);
   for (let py = 0; py < HR; py++) {
     const y = R === 1 ? py : (py + 0.5) / R, yi = py / R | 0, cx = roadCx(y), hw = roadHw(y); // pri hrubej kresbe presne ako predtým
     for (let px = 0; px < WR; px++) {
-      const x = R === 1 ? px : (px + 0.5) / R, dd = roadD(x, y), yd = yardD(x, y);
+      const x = R === 1 ? px : (px + 0.5) / R, pi = yi * W + (px / R | 0);
+      const dd = R === 1 ? roadD(x, y) : y > G.hallTop + 4 ? 99 : Math.abs(x - cx) - hw + pt(nRoad, pi, (bxp, byp) => (vnoise(bxp * 0.3, byp * 0.3, seed + 3) - 0.5) * 3);
+      const yd = yard === 'none' ? 99 : yardD(x, y);
       if (yd < 0 && yard === 'planks') { // orkské nádvorie: hrubé dosky ako orkský chodník, okraj tmavší
         const c = plankRGB(px / R | 0, yi);
         setH(px, py, yd > -2 ? [c[0] * 0.75, c[1] * 0.75, c[2] * 0.75] : c);
@@ -174,7 +181,7 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard, terr, hd) {
           continue;
         }
         const ramp = { mud: TR.mud, ashroad: TR.ashroad, snowroad: TR.snowroad, sandroad: TR.sandroad, hiveroad: TR.hiveroad }[th.road] || RAMP.dirt;
-        let v = 0.52 + (fbm(x * 0.08, y * 0.08, seed + 5) - 0.5) * 0.5 + (hash2(px, py, seed + 9) - 0.5) * 0.16;
+        let v = 0.52 + (fbmAt(nDirt, pi, x, y, 0.08, seed + 5) - 0.5) * 0.5 + (hash2(px, py, seed + 9) - 0.5) * 0.16;
         if (R > 1) v += (vnoise(x * 0.9, y * 0.9, seed + 12) - 0.5) * 0.18; // hrudky hliny
         const rut = Math.abs(Math.abs(x - cx) - hw * 0.45);
         if (rut < 1.2) v -= 0.2;
@@ -184,7 +191,7 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard, terr, hd) {
         if (hash2(px, py, seed + 11) > 0.985) v += 0.3;
         setH(px, py, pickRamp(ramp, v, px, py));
       } else {
-        let v = 0.56 + groundBias + (fbm(x * 0.05, y * 0.05, seed + 1) - 0.5) * 0.6 + (hash2(px, py, seed + 2) - 0.5) * 0.2;
+        let v = 0.56 + groundBias + (fbmAt(nGrass, pi, x, y, 0.05, seed + 1) - 0.5) * 0.6 + (hash2(px, py, seed + 2) - 0.5) * 0.2;
         if (R > 1) v += (vnoise(x * 0.7, y * 1.4, seed + 4) - 0.5) * 0.16; // jemné pásy stebiel
         if (dd < 3) v -= 0.18 * (1 - dd / 3);
         if (yd < 3) v -= 0.15 * (1 - yd / 3);

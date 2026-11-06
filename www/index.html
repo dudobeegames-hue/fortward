@@ -395,7 +395,7 @@
   #logoIntro.out { opacity: 0; pointer-events: none; }
   #splash > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; image-rendering: auto; }
   /* veľmi úzke displeje: celý obrázok (názov sa neoreže), okraje vyplní rozmazaná kópia */
-  #splash::before { content: ''; position: absolute; inset: -20px; background: url(img/splash.jpg) center / cover; filter: blur(14px) brightness(.55); }
+  #splash::before { content: ''; position: absolute; inset: -20px; background: url(img/splash.jpg) center / cover; filter: blur(14px) brightness(.55); transform: translateZ(0); } /* vlastná vrstva: rozmazanie sa spočíta raz, nie pri každom pulze tlačidla */
   @media (max-aspect-ratio: 9/20) { #splash > img { object-fit: contain; object-position: center; } }
 
   /* tlačidlá na úvodnom obrázku: zelené Hrať (stred na 56 % výšky) a pod ním sivé Nastavenia */
@@ -419,7 +419,7 @@
     box-shadow: inset 0 -6px 0 #1f6420, inset 0 2px 0 rgba(255,255,255,.35), var(--drop);
     text-shadow: 1px 1px 0 var(--ink);
   }
-  .greenBtn { animation: greenPulse 1.8s ease-in-out .6s infinite; }
+  .greenBtn { animation: greenPulse 1.8s ease-in-out .6s infinite; will-change: transform; } /* pulz len na grafickej karte, bez prekresľovania menu */
   .grayBtn {
     background: linear-gradient(#b4b0b8, #87838c 55%, #6c6872); box-shadow: inset 0 -6px 0 #4c4952, inset 0 2px 0 rgba(255,255,255,.35), var(--drop); }
   /* tlačidlo menu ostane zatlačené, kým sa po ťuku pripravuje ďalšia obrazovka */
