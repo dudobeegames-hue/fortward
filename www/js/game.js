@@ -2107,11 +2107,15 @@
     if (cry) dmg *= CRY_DMG;
     if (t) {
       const d = Math.hypot(t.x - u.x, t.y - u.y);
-      const spear = u.ktype === 'spear', reach = spear ? SPEAR_REACH : 8, off = spear ? 12 : 5; // kopijník bodá spoza rytiera
+      const spear = u.ktype === 'spear', rider = u.ktype === 'rider', reach = spear ? SPEAR_REACH : 8, off = spear ? 12 : rider ? 7 : 5; // kopijník bodá spoza rytiera, kôň je širší
+      // strana útoku sa zvolí raz pri novom cieli – pri odtláčaní susedov by sa inak prehadzovala a kone by poskakovali
+      if (u.atkT !== t) { u.atkT = t; u.atkSide = u.x < t.x ? -1 : 1; u.inReach = false; }
+      const inReach = d <= reach + (u.inReach ? 4 : 0); // kto už bojuje, toho drobné odtlačenie nevytrhne z boja
+      u.inReach = inReach;
       // viacerí na jedného: obstúpia ho z bokov a mierne nad/pod sebou, nestoja v jednom bode
-      if (d > reach) {
-        let ax = t.x + (u.x < t.x ? -off : off);
-        let ay = t.y + 1 + (u.isKing ? 0 : ((u.slot || 0) % 3 - 1) * 4);
+      if (!inReach) {
+        let ax = t.x + u.atkSide * off;
+        let ay = t.y + 1 + (u.isKing ? 0 : ((u.slot || 0) % 3 - 1) * (rider ? 5 : 4));
         if (go === moveKnight) { // bod vedľa nepriateľa padol do hradby (nepriateľ za ňou): druhá strana, inak priamo k nemu – cez bránu
           const okAt = x => { const q = tileAt(x, ay); return knightPass(q.c, q.r); };
           if (!okAt(ax)) { if (okAt(t.x - (ax - t.x))) ax = t.x - (ax - t.x); else { ax = t.x; ay = t.y; } }
@@ -2592,7 +2596,7 @@
       return true;
     }
     if (id === 'firewall') {
-      st.fireWalls.push({ x, y, w: sp.w, t: sp.dur * dm, dps: 7 * pow });
+      st.fireWalls.push({ x, y, w: sp.w, t: sp.dur * dm, t0: sp.dur * dm, dps: 7 * pow });
       st.fwCd = spCd(id); AUDIO.play('fire');
       return true;
     }
@@ -3374,10 +3378,11 @@
   function unit8Frame(u, set) {
     const mvx = u.x - (u._lx == null ? u.x : u._lx), mvy = u.y - (u._ly == null ? u.y : u._ly);
     u._lx = u.x; u._ly = u.y;
-    const d = Math.hypot(mvx, mvy), moving = stillFor(u, d > 0.05) < 4;
-    if (d > 0.05) u._wd = (u._wd || 0) + d;
     const t = u.archer ? (u.aimT && !u.aimT.dead ? u.aimT : null) : u.tgt && !u.tgt.dead ? u.tgt : null;
     const near = t && (u.archer || Math.hypot(t.x - u.x, t.y - u.y) < (u.ktype === 'spear' ? SPEAR_REACH + 5 : 14)); // kopijník bodá z diaľky
+    // pri nepriateľovi ho susedia v boji drobne odtláčajú – to nie je chôdza (kôň by inak prepínal snímky klusu a triasol sa)
+    const step = near && !u.archer ? 0.45 : 0.05, d = Math.hypot(mvx, mvy), moving = stillFor(u, d > step) < 4;
+    if (d > step) u._wd = (u._wd || 0) + d;
     const sd = smoothDir(u, mvx, mvy);
     if (near) turn8(u, dir8(t.x - u.x, t.y - u.y), u.archer ? 8 : 3); // lukostrelec sa otáča pomalšie (cieľ prechádza medzi smermi)
     else if (moving) turn8(u, sd, 5);
@@ -3781,7 +3786,7 @@
   // ohnivá stena: na zemi mäkká žiara a žeravé uhlíky (bez tvrdých okrajov), nad tým jazyky plameňov,
   // ktoré sú v strede najvyššie a ku krajom plynule klesajú; kreslia sa podľa hĺbky medzi nepriateľmi
   const fireEnv = (fw, x) => { const u = x / fw.w; return u <= 0 || u >= 1 ? 0 : Math.pow(Math.sin(Math.PI * u), 0.7); };
-  const fireFade = fw => Math.min(1, fw.t / 0.6, (SPELLS.firewall.dur - fw.t) / 0.25 + 0.15);
+  const fireFade = fw => Math.max(0, Math.min(1, fw.t / 0.6, ((fw.t0 || SPELLS.firewall.dur) - fw.t) / 0.25 + 0.15)); // rozhorí sa za 0,25 s od zapálenia (aj pri dlhšej, vylepšenej stene), na konci dohasína
   function drawFireGround(fw, time) {
     const a = fireFade(fw), x0 = fw.x - fw.w / 2, y0 = fw.y;
     g.globalAlpha = 0.16 * a; g.fillStyle = '#f89838';
@@ -3837,7 +3842,7 @@
     if (!pdrag || !pdrag.t) return;
     const blink = Math.floor(time * 4) % 2;
     const { c, r } = pdrag.t, hx = tileX(c), hy = tileY(r), kind = pdrag.kind;
-    const ok = (isPave(kind) ? inZone(c, r) && !inHall(c, r) : canPlace(c, r, kind)) && st.gold >= costOf(kind); // zelená = dá sa postaviť, červená = posuň prst ďalej
+    const ok = (isPave(kind) ? inZone(c, r) : canPlace(c, r, kind)) && st.gold >= costOf(kind); // zelená = dá sa postaviť, červená = posuň prst ďalej
     const pw = (BUILD[kind].w || 1) * T; // široká budova: 2 políčka
     g.fillStyle = ok ? 'rgba(156,212,90,0.35)' : 'rgba(232,72,56,0.5)'; g.fillRect(hx, hy, pw, T);
     const spr = kind === 'wall' ? wallsOf()[0][10] : TRAPS[kind] ? BSPR[kind] : isPave(kind) ? { c: paveAt(hx, hy, PAVE[kind]) } : bsprOf(kind, 1);
@@ -3885,6 +3890,16 @@
     const { c, r } = siegeCell(o.x, o.y);
     if (Math.floor(time * 4) % 2) corners(tileX(c), tileY(r), tileX(c) + T - 1, tileY(r) + T - 1, '#fff070');
   }
+  // červený výkričník nad vojenskou budovou, z ktorej sa vojaci nedostanú von (kreslí sa nad všetkými stavbami)
+  function drawBlockedMarks(time) {
+    const blink = Math.floor(time * 4) % 2;
+    for (const b of blockedBarracks()) {
+      const x = bCenter(b).x - 2, y = tileY(b.r) + T - bsprOf(b.kind, b.lvl).h - 11 + (blink ? -1 : 0);
+      g.fillStyle = PAL.K; g.fillRect(x - 1, y - 1, 5, 11);
+      g.fillStyle = '#e84838'; g.fillRect(x, y, 3, 6); g.fillRect(x, y + 7, 3, 2);
+      g.fillStyle = '#ff9a80'; g.fillRect(x, y, 1, 5);
+    }
+  }
   function drawBuildOverlay(time) {
     const zt = zoneTopRow();
     const blink = Math.floor(time * 4) % 2;
@@ -3911,12 +3926,6 @@
     }
     const col = blink ? '#f8d048' : '#fff070';
     // presúvanie: zvýrazni cieľ a ukáž polopriehľadnú stavbu
-    for (const b of blockedBarracks()) { // červený výkričník: rytieri sa nedostanú von
-      const x = bCenter(b).x - 2, y = tileY(b.r) + T - bsprOf(b.kind, b.lvl).h - 11 + (blink ? -1 : 0);
-      g.fillStyle = PAL.K; g.fillRect(x - 1, y - 1, 5, 11);
-      g.fillStyle = '#e84838'; g.fillRect(x, y, 3, 6); g.fillRect(x, y + 7, 3, 2);
-      g.fillStyle = '#ff9a80'; g.fillRect(x, y, 1, 5);
-    }
     const mv = bdrag && bdrag.moved ? bdrag.b : st.moving;
     if (mv) {
       if (st.moving) for (let r = zt; r <= G.rows - 1; r++) for (let c = 0; c < G.cols; c++) {
@@ -5249,6 +5258,7 @@
     objs.sort((a, b) => a.y - b.y || (b.x || 0) - (a.x || 0) || (a.id || 0) - (b.id || 0)); // v rovnakom rade je ľavejšia budova vpredu, jednotky v stálom poradí
     for (const o of objs) o.f();
     if (st.phase === 'build') drawPlaceGhost(time);
+    if (st.phase === 'build') drawBlockedMarks(time); // výkričníky až nad budovami a hradbami
     if (st.phase === 'build' && st.siegePick) drawSiegePick(time);
     // ukazovatele zdravia
     for (const e of st.enemies) if (e.hp < e.max && (!e.d.boss || (e.d.giant && st.boss !== e))) bar(e.x, Math.round(e.y - e.h - 3), Math.max(6, e.w - 4), e.hp / e.max, '#e84838');
@@ -5882,8 +5892,7 @@
   // ťuk dlažbou: na prázdne políčko ju položí, rovnakú zoberie (vráti zlato), iný druh zadarmo vymení
   function placePaving(c, r, kind) {
     kind = kind || 'paving';
-    if (!inZone(c, r)) { dropTool(); return false; }
-    if (inHall(c, r)) { AUDIO.play('deny'); return false; }
+    if (!inZone(c, r)) { dropTool(); return false; } // dlažba sa dá položiť aj pod radnicu
     const key = c + ',' + r, type = PAVE[kind], cur = st.paving[key], dc = costOf(kind);
     if (cur === type) { snapshot(); delete st.paving[key]; st.gold += dc; AUDIO.play('sell'); renderBuild(); return true; } // druhý ťuk dlažbu zoberie
     if (!cur && st.gold < dc) { toast('Nedostatok zlata'); AUDIO.play('deny'); return false; }
@@ -5923,8 +5932,8 @@
   function tapBuild(x, y) {
     const c = Math.floor((x - G.gx0) / T), r = Math.floor((y - G.gy0) / T);
     if (c < 0 || c >= G.cols || r < 0 || r >= G.rows) { if (st.tool) dropTool(); return; }
+    if (isPave(st.tool) && inZone(c, r)) { placeAt(st.tool, c, r); return; } // dlažba ide aj pod budovy a radnicu
     if (hallHit(x, y)) { st.sel = HALL; st.tool = null; renderBuild(); return; }
-    if (isPave(st.tool)) { placeAt(st.tool, c, r); return; } // dlažba ide aj pod budovy
     const o = occAt(c, r);
     if (o && o !== HALL) { st.sel = o; st.tool = null; renderBuild(); return; }
     if (st.tool) { placeAt(st.tool, c, r); return; }
@@ -5940,7 +5949,7 @@
   // hradby: ťuk = jedna, ťahanie = náhľad radu s cenou, pustením prsta sa postaví (kým stačí zlato)
   let drag = null;                        // {path: [{c, r}], last}
   const wallFree = (c, r) => inZone(c, r) && !inHall(c, r) && !occAt(c, r);
-  const paveFree = (c, r) => inZone(c, r) && !inHall(c, r) && !st.paving[c + ',' + r]; // dlažba ide aj pod budovy
+  const paveFree = (c, r) => inZone(c, r) && !st.paving[c + ',' + r]; // dlažba ide aj pod budovy a radnicu
   const dragFree = (c, r) => (drag && isPave(drag.kind) ? paveFree : wallFree)(c, r);
   const dragAfford = () => Math.floor(st.gold / costOf(drag ? drag.kind : 'wall'));
   const wallsAfford = () => Math.floor(st.gold / costOf('wall'));
@@ -6006,7 +6015,7 @@
     }
     if (st.siegePick || (!st.tool && siegeAt(p.x, p.y))) { tapSiege(p.x, p.y); return; } // štartové miesto obliehacieho stroja
     const t = evTile(p);
-    if (isPave(st.tool) && inZone(t.c, t.r) && !inHall(t.c, t.r)) { // dlažba: ťuk = jedna (alebo zobrať), ťah = celá plocha
+    if (isPave(st.tool) && inZone(t.c, t.r)) { // dlažba: ťuk = jedna (alebo zobrať), ťah = celá plocha (aj pod radnicou)
       drag = { kind: st.tool, path: paveFree(t.c, t.r) ? [t] : [], last: t, start: t, moved: false };
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
       return;
