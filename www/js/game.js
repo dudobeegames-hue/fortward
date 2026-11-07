@@ -5487,11 +5487,21 @@
     c.getContext('2d').drawImage(set[6].idle.c, x, y, n, n, 0, 0, n, n);
     return spriteURL({ c, w: n, h: n }, 3);
   }
+  // ikona jednotky: nová kresba z PixelLabu (jemná, státie tvárou k nám, orezané na postavu, 2× jej pixely), inak stará kresba 3×
+  function unitIcon(k) {
+    const s8 = SPR[raceSpr(k) + '8'], f = s8 && s8[2].idle;
+    if (!f || !f.hd) return SPR[raceSpr(k)] ? spriteURL(SPR[raceSpr(k)][0], 3) : ICONS['u_' + k];
+    const c = f.c, d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const t = document.createElement('canvas'); t.width = x1 - x0 + 1; t.height = y1 - y0 + 1; t.getContext('2d').drawImage(c, -x0, -y0);
+    return spriteURL({ c: t, w: t.width, h: t.height }, 2);
+  }
   function unitIcons() {
     const sp = k => SPR[raceSpr(k)][0];
-    ICONS.u_knight = spriteURL(sp('soldier'), 3); ICONS.u_footArcher = spriteURL(sp('footArcher'), 3);
+    ICONS.u_knight = unitIcon('soldier'); ICONS.u_footArcher = unitIcon('footArcher');
     ICONS.u_archer = spriteURL(sp('archer'), 3); ICONS.u_crossbow = spriteURL(sp('knight'), 3);
-    ICONS.u_spear = spriteURL(sp('spear'), 3); ICONS.u_rider = spriteURL(sp('rider'), 3); ICONS.u_monk = spriteURL(sp('monk'), 3); // oddiely pri útoku na hrad
+    ICONS.u_spear = unitIcon('spear'); ICONS.u_rider = unitIcon('rider'); ICONS.u_monk = unitIcon('monk'); ICONS.u_craft = unitIcon('craft'); // aj oddiely pri útoku na hrad
     ICONS.u_falcon = spriteURL(SPR[isOrc() ? 'bat' : 'falcon'][0], 3);
     for (const k of ['siegeRam', 'siegeCat', 'siegeFire', 'siegeTower']) ICONS['u_' + k] = spriteURL(trimmed(SPR[raceSpr(k) + '8'][1].idle), 2);
     ICONS.king = ICONS.hero_king = isOrc() ? heroPortrait(SPR.chief8, 12, 5, 18) : heroPortrait(SPR.king8, 12, 6, 18);
