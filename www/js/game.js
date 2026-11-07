@@ -3614,7 +3614,7 @@
       x.drawImage(spr.c, tx + T / 2 - Math.floor(spr.w / 2), 5, spr.w, spr.h);
       if (o.spec) { x.fillStyle = '#4a4e60'; x.fillRect(tx + 13, 1, 1, 6); x.fillStyle = SPECS[o.spec].col; x.fillRect(tx + 14, 1, 3, 2); }
       if (lv > 1) pxText(x, String(lv), tx + T - 3, 5 + spr.h - 7, '#f8d048');
-      return (previewCache[key] = spriteURL({ c, w: c.width / R, h: c.height / R }, 3));
+      return (previewCache[key] = R === 2 ? spriteURL({ c, w: c.width, h: c.height }, 1) : spriteURL({ c, w: c.width, h: c.height }, 3)); // jemná kresba v jej pixeloch
     }
     return (previewCache[key] = spriteURL({ c, w: c.width, h: c.height }, 3));
   }
@@ -5398,8 +5398,10 @@
     $('hud-king').title = heroName() + (ownedHeroes().length > 1 ? ' – ťukni pred vlnou a vymeň hrdinu' : '');
   }
   // ikony stavieb hráča v podobe jeho rasy (prekreslia sa pri zmene rasy pozície)
+  // ikona stavby: jemná kresba z PixelLabu v jej vlastných pixeloch (natiahnutá 1,5× pôsobila hrubo), stará kresba 3×
+  const sprIcon = spr => spr.hd ? spriteURL({ c: spr.c, w: spr.c.width, h: spr.c.height }, 1) : spriteURL(spr, 3);
   function buildingIcons() {
-    for (const k of ['tower', 'barracks', 'mage', 'mageIce', 'pitch', 'icetower', 'ballista', 'mine', 'chapel', 'workshop', 'range', 'stables', 'armory', 'falconry']) ICONS[k] = spriteURL(bsprOf(k, 1), 3);
+    for (const k of ['tower', 'barracks', 'mage', 'mageIce', 'pitch', 'icetower', 'ballista', 'mine', 'chapel', 'workshop', 'range', 'stables', 'armory', 'falconry']) ICONS[k] = sprIcon(bsprOf(k, 1));
     ICONS.pit = spriteURL(BSPR.pit, 3);
     for (const k of ['firepit', 'beartrap']) ICONS[k] = spriteURL(BSPR[k], 3);
     ICONS.stake = spriteURL(BSPR.stake, 3);
@@ -5621,6 +5623,7 @@
       b.className = 'pcard act' + (enabled ? '' : ' poor') + (c ? ' ' + c : '');
       b.innerHTML = '<span class="pin"><span class="face front"><span class="pic"><img' + (px ? ' class="px"' : '') + ' src="' + icon + '"></span><b>' + label + '</b><span class="cost">' + (cost == null ? '' : cost) + '</span></span></span>';
       b.addEventListener('click', () => {
+        if (c.split(' ').includes('sel')) return; // zvolená možnosť (napr. jednotka kasární) – nič sa nemení
         if (!enabled) { AUDIO.play('deny'); if (typeof onClick === 'string') toast(onClick); return; }
         if (st.phase === 'build') snapshot();
         onClick();
@@ -5768,15 +5771,18 @@
       if (fc) act(I.actRepair, 'Opraviť', coinTxt(fc), st.gold >= fc, () => { st.gold -= fc; b.hp = bMaxHp(b); rebuildOcc(); }, '', true);
       const refund = Math.floor(b.spent * sellShare()) + (b.unit ? Math.floor(b.unit.spent * sellShare()) : 0);
       act(ICONS.coin, 'Predať', '+' + refund, true, sellAll([b], refund), 'sell', true);
-      if (b.kind === 'barracks' && !isOrc()) { // prepínanie rytieri / kopijníci: zadarmo, medzi vlnami; vojaci z budovy odídu a vyjdú noví
-        const sw = { tech: 'armory', on: 'spear', a: ['knight', 'Rytieri'], b: ['spear', 'Kopijníci'] };
-        const cur = b.mode === sw.on, to = cur ? sw.a : sw.b;
-        if (!has(sw.tech)) lockAct(ICONS['u_' + sw.b[0]], sw.b[1], unlockMissionOf(sw.tech), true);
-        else if (st.phase !== 'build') act(ICONS['u_' + to[0]], to[1], 'medzi vlnami', false, 'Prepnúť sa dá medzi vlnami', 'locked', true);
-        else shineTech(act(ICONS['u_' + to[0]], to[1], 'prepnúť', true, () => {
-          b.mode = cur ? null : sw.on;
-          st.soldiers = st.soldiers.filter(s => s.home !== b); b.spawnT = 0.3; b.squadUp = true;
-        }, 'up', true), sw.tech);
+      if (b.kind === 'barracks' && !isOrc()) { // jednotky kasární: všetky možnosti naraz, zvolená je označená; prepnutie zadarmo, medzi vlnami (vojaci odídu a vyjdú noví)
+        for (const o of [{ mode: null, u: 'knight', name: 'Rytieri' }, { mode: 'spear', u: 'spear', name: 'Kopijníci', tech: 'armory' }]) {
+          const on = (b.mode || null) === o.mode;
+          if (o.tech && !has(o.tech)) { lockAct(ICONS['u_' + o.u], o.name, unlockMissionOf(o.tech), true); continue; }
+          if (on) { act(ICONS['u_' + o.u], o.name, 'zvolené', true, () => {}, 'sel', true); continue; }
+          if (st.phase !== 'build') { act(ICONS['u_' + o.u], o.name, 'medzi vlnami', false, 'Prepnúť sa dá medzi vlnami', 'locked', true); continue; }
+          const btn = act(ICONS['u_' + o.u], o.name, 'zvoliť', true, () => {
+            b.mode = o.mode;
+            st.soldiers = st.soldiers.filter(s => s.home !== b); b.spawnT = 0.3; b.squadUp = true;
+          }, 'up', true);
+          if (o.tech) shineTech(btn, o.tech);
+        }
       }
       if (b.kind === 'mage' && !isOrc()) { // ohnivá veža sa prepína medzi ohňom a ľadom (zadarmo, kedykoľvek)
         const ice = iceMage(b);
