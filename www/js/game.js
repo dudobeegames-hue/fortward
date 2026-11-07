@@ -3165,6 +3165,16 @@
   }
 
   // ---------------- Render ----------------
+  // kde snímka (jemná kresba) skutočne stojí: najspodnejší riadok kresby a šírka postavy pri zemi (v bodoch hry), raz za snímku
+  function footOf(fr) {
+    if (fr._foot) return fr._foot;
+    const c = fr.c, k = c.width / fr.w, d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let by = -1;
+    for (let y = c.height - 1; y >= 0 && by < 0; y--) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 128) { by = y; break; }
+    let x0 = c.width, x1 = -1;
+    for (let y = Math.max(0, by - 3 * k); y <= by; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 128) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); }
+    return (fr._foot = by < 0 ? { y: fr.h - U8_PB, x0: fr.w / 2 - 2, x1: fr.w / 2 + 2 } : { y: (by + 1) / k, x0: x0 / k, x1: (x1 + 1) / k });
+  }
   function shadow(x, y, r) {
     g.fillStyle = 'rgba(10,8,6,0.38)';
     for (let dx = -r; dx <= r; dx++) g.fillRect(Math.round(x) + dx, Math.round(y) - 1, 1, Math.abs(dx) >= r - 1 ? 1 : 2);
@@ -3420,7 +3430,11 @@
       const repair = u.helper === 'workshop'; // goblin-opravár (za orkov) nosí kladivo, pri oprave stojí chrbtom a klepe do budovy
       if (repair && u.working) u.face8 = 6;
       const fr = repair && u.working ? set[6].idle : unit8Frame(u, set), y = Math.round(u.y - fr.h) + U8_PB;
-      shadow(u.x, u.y, 4);
+      if (fr.hd) { // tieň pod kopytami / nohami: výška zeme zo státia v tomto smere (v kluse neposkakuje), šírka podľa snímky
+        const ft = footOf(fr), gr = footOf(set[u.face8 == null ? 6 : u.face8].idle), left = Math.round(u.x - fr.w / 2);
+        shadow(left + (ft.x0 + ft.x1) / 2, y + gr.y, Math.max(3, Math.round((ft.x1 - ft.x0) / 2)));
+      }
+      else shadow(u.x, u.y, 4);
       cryAura(u, false, true);
       g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), y, fr.w, fr.h); // w, h v bodoch hry (jemný sprite má plátno 2× väčšie)
       if (repair) drawHammer(u, Math.round(u.x) + 3, Math.round(u.y) - 6);

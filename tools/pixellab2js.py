@@ -1,6 +1,7 @@
 """Prevod postavy z PixelLabu (postavy/<priečinok>) do JS súboru s riadkami znakov palety PAL.
 
-Použitie: python tools/pixellab2js.py <priečinok> <MENO_KONŠTANTY> <výstup.js> [snímky útoku, napr. 2,3,4] [smer=snímky ...] [--hd]
+Použitie: python tools/pixellab2js.py <priečinok> <MENO_KONŠTANTY> <výstup.js> [snímky útoku, napr. 2,3,4] [smer=snímky ...] [--hd] [--wide]
+(--wide = státie sa doplní na väčšie plátno animácií namiesto orezania animácií)
 (--hd = jemná kresba v dvojnásobnej mriežke, napr. plátno 48×48 alebo 64×64; hra ju kreslí v polovičnej veľkosti)
 (snímky sa číslujú od 0; smer=snímky, napr. south=2,3, vyberie iné snímky pre jeden smer, keď sa v ňom generátor pomýlil)
 Priečinok má rotations/<smer>.png a animations/Running*/<smer>/frame_*.png, animations/Attack*/<smer>/frame_*.png
@@ -52,7 +53,8 @@ def load(path):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if a != '--hd']
+    args = [a for a in sys.argv[1:] if a not in ('--hd', '--wide')]
+    wide = '--wide' in sys.argv  # väčšie plátno animácií: státie sa doplní na ich veľkosť (meč pri švihu sa neoreže)
     hd = '--hd' in sys.argv  # jemná kresba (dvojnásobná mriežka): hra ju kreslí v polovičnej veľkosti
     folder, name, out = args[:3]
     atk_pick = [int(i) for i in (args[3] if len(args) > 3 else '2,3,4').split(',')]
@@ -61,6 +63,12 @@ def main():
     base = os.path.join(ROOT, 'postavy', folder)  # folder môže byť aj cesta, napr. ../Grafika/Ludia/postavy/lucisnik
     rot = [load(os.path.join(base, 'rotations', d + '.png')) for d in DIRS]
     rw, rh = len(rot[0][0]), len(rot[0])
+    if wide:
+        f0 = load(sorted(glob.glob(os.path.join(base, 'animations', '*', '*', 'frame_*.png')))[0])
+        aw, ah = len(f0[0]), len(f0)
+        px, py = (aw - rw) // 2, (ah - rh) // 2
+        rot = [['.' * aw] * py + ['.' * px + r + '.' * (aw - rw - px) for r in fr] + ['.' * aw] * (ah - rh - py) for fr in rot]
+        rw, rh = aw, ah
     # animácie: Attack* = útok, prvá ďalšia = chôdza/klus (PixelLab ju pomenuje podľa zadania)
     names = sorted(os.listdir(os.path.join(base, 'animations')))
     is_atk = lambda n: 'attack' in n.lower()  # PixelLab pomenuje animáciu podľa zadania („Attack…“, „spear_thrust_attack…“)
