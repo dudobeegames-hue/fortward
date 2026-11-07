@@ -3554,10 +3554,21 @@
     hallLbl = { s: hp + '/' + max, x: G.hallCx, y: y + 1 };
   }
   function bar(cx, y, w, ratio, col) {
-    const x = Math.round(cx - w / 2);
-    g.fillStyle = PAL.K; g.fillRect(x - 1, y - 1, w + 2, 3);
-    g.fillStyle = '#3a1410'; g.fillRect(x, y, w, 1);
-    g.fillStyle = col; g.fillRect(x, y, Math.max(1, Math.round(w * ratio)), 1);
+    // jemná kresba (pol bodu = 1 pixel vyrovnávacej pamäte, ako jednotky): tenký obrys, výplň 3 pixely – svetlý odlesk, farba, tieň
+    const x = Math.round(cx - w / 2), h = 0.5, fw = Math.max(h, Math.round(w * ratio * 2) / 2), sh = barShades(col);
+    g.fillStyle = PAL.K; g.fillRect(x - h, y - h, w + 2 * h, 1.5 + 2 * h);
+    g.fillStyle = '#3a1410'; g.fillRect(x, y, w, 1.5);
+    g.fillStyle = '#250c08'; g.fillRect(x, y, w, h);
+    g.fillStyle = col; g.fillRect(x, y, fw, 1.5);
+    g.fillStyle = sh[0]; g.fillRect(x, y, fw, h);
+    g.fillStyle = sh[1]; g.fillRect(x, y + 1, fw, h);
+  }
+  const barShadeCache = {};
+  function barShades(col) { // svetlejší a tmavší odtieň farby ukazovateľa
+    if (barShadeCache[col]) return barShadeCache[col];
+    const n = parseInt(col.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255];
+    const hex = f => '#' + c.map(v => Math.max(0, Math.min(255, Math.round(f(v)))).toString(16).padStart(2, '0')).join('');
+    return (barShadeCache[col] = [hex(v => v + (255 - v) * 0.45), hex(v => v * 0.62)]);
   }
 
   function drawSpikes(ctx, x0, y0, type) {
