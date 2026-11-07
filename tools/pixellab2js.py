@@ -1,6 +1,6 @@
 """Prevod postavy z PixelLabu (postavy/<priečinok>) do JS súboru s riadkami znakov palety PAL.
 
-Použitie: python tools/pixellab2js.py <priečinok> <MENO_KONŠTANTY> <výstup.js> [snímky útoku, napr. 2,3,4] [smer=snímky ...] [--hd] [--wide]
+Použitie: python tools/pixellab2js.py <priečinok> <MENO_KONŠTANTY> <výstup.js> [snímky útoku, napr. 2,3,4] [smer=snímky ...] [--hd] [--wide] [--all]
 (--wide = státie sa doplní na väčšie plátno animácií namiesto orezania animácií)
 (--hd = jemná kresba v dvojnásobnej mriežke, napr. plátno 48×48 alebo 64×64; hra ju kreslí v polovičnej veľkosti)
 (snímky sa číslujú od 0; smer=snímky, napr. south=2,3, vyberie iné snímky pre jeden smer, keď sa v ňom generátor pomýlil)
@@ -53,7 +53,8 @@ def load(path):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if a not in ('--hd', '--wide')]
+    args = [a for a in sys.argv[1:] if a not in ('--hd', '--wide', '--all')]
+    nrun = 99 if '--all' in sys.argv else 4  # --all = všetky snímky pohybu (napr. 5 snímok mávania sokola)
     wide = '--wide' in sys.argv  # väčšie plátno animácií: státie sa doplní na ich veľkosť (meč pri švihu sa neoreže)
     hd = '--hd' in sys.argv  # jemná kresba (dvojnásobná mriežka): hra ju kreslí v polovičnej veľkosti
     folder, name, out = args[:3]
@@ -91,7 +92,7 @@ def main():
     runs = {d: frames(run_dir, d) for d in DIRS}
     atks = {d: frames(atk_dir, d) if atk_dir else [rot[i]] * (max(atk_pick) + 1) for i, d in enumerate(DIRS)}
     have_run, have_atk = [d for d in DIRS if runs[d]], [d for d in DIRS if atks[d]]
-    run = [runs[d if runs[d] else nearest(have_run, d)][:4] for d in DIRS]
+    run = [runs[d if runs[d] else nearest(have_run, d)][:nrun] for d in DIRS]
     atk = [[atks[d if atks[d] else nearest(have_atk, d)][i] for i in own.get(d, atk_pick)] for d in DIRS]
     missing = [d for d in DIRS if not atks[d]] + [d for d in DIRS if not runs[d]]
     # chodidlá = najspodnejší riadok státia smerom dole; pod nimi PB prázdnych riadkov (pri hd dvojnásobok)

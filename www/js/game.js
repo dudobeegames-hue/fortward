@@ -2303,8 +2303,23 @@
     const a = performance.now() / 700 + u.slot;
     moveTo(u, c.x + Math.cos(a) * 12, c.y - 10 + Math.sin(a) * 5, u.spd * 0.6, dt);
   }
+  // sokol z PixelLabu: natočí sa do smeru letu, mávanie krídlami (5 snímok); nad cieľom pri útoku krídla zloží
+  function falconFrame(o, time) {
+    const dx = o.x - (o._fx == null ? o.x : o._fx), dy = o.y - (o._fy == null ? o.y : o._fy);
+    o._fx = o.x; o._fy = o.y;
+    if (Math.hypot(dx, dy) > 0.05) o.face8 = dir8(dx, dy);
+    const v = SPR.falcon8[o.face8 == null ? 2 : o.face8];
+    return v.walk[Math.floor(time * 10 + (o.slot || o.ph || 0) * 1.7) % v.walk.length];
+  }
   function drawFalcon(u, time) {
-    const fr = SPR[isOrc() ? 'bat' : 'falcon'][Math.floor(u.anim) % 2], bob = Math.sin(time * 5 + u.slot) * 1.5;
+    const bob = Math.sin(time * 5 + u.slot) * 1.5;
+    if (!isOrc() && !u.hexbat) { // nový sokol (jemná kresba, w×h v bodoch hry)
+      const fr = falconFrame(u, time);
+      shadow(u.x, u.y + 2, 3);
+      g.drawImage(u.flash > 0 ? hitSpr(fr) : fr.c, Math.round((u.x - fr.w / 2) * 2) / 2, Math.round((u.y - 3 - fr.h + bob + (u.swing > 0 ? 3 : 0)) * 2) / 2, fr.w, fr.h);
+      return;
+    }
+    const fr = SPR[isOrc() ? 'bat' : 'falcon'][Math.floor(u.anim) % 2];
     shadow(u.x, u.y + 2, 3);
     g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), Math.round(u.y - 14 + bob - (u.swing > 0 ? -3 : 0)));
   }
@@ -3259,6 +3274,12 @@
       return;
     }
     const frames = SPR[foeSpr(e.d.spr)];
+    if (e.d.fly && foeSpr(e.d.spr) === 'falcon') { // za orkov: ľudský sokol z PixelLabu
+      const fr = falconFrame(e, time);
+      shadow(e.x, e.y + 2, 3);
+      g.drawImage(e.flash > 0 ? hitSpr(fr) : fr.c, Math.round((e.x - fr.w / 2) * 2) / 2, Math.round((e.y - 3 - fr.h + Math.sin(time * 6 + e.ph) * 1.5) * 2) / 2, fr.w, fr.h);
+      return;
+    }
     if (e.d.fly) { // netopier mávajúci krídlami, tieň na zemi
       const fr = frames[Math.floor(time * 8 + e.ph) % 2];
       shadow(e.x, e.y + 2, 3);
@@ -5512,7 +5533,7 @@
     ICONS.u_knight = unitIcon('soldier'); ICONS.u_footArcher = unitIcon('footArcher');
     ICONS.u_archer = spriteURL(sp('archer'), 3); ICONS.u_crossbow = spriteURL(sp('knight'), 3);
     ICONS.u_spear = unitIcon('spear'); ICONS.u_rider = unitIcon('rider'); ICONS.u_monk = unitIcon('monk'); ICONS.u_craft = unitIcon('craft'); // aj oddiely pri útoku na hrad
-    ICONS.u_falcon = spriteURL(SPR[isOrc() ? 'bat' : 'falcon'][0], 3);
+    ICONS.u_falcon = isOrc() ? spriteURL(SPR.bat[0], 3) : unitIcon('falcon'); // sokol z PixelLabu
     for (const k of ['siegeRam', 'siegeCat', 'siegeFire', 'siegeTower']) ICONS['u_' + k] = spriteURL(trimmed(SPR[raceSpr(k) + '8'][1].idle), 2);
     ICONS.king = ICONS.hero_king = isOrc() ? heroPortrait(SPR.chief8, 12, 5, 18) : heroPortrait(SPR.king8, 12, 6, 18);
     ICONS.paving = spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3); // kamenná dlažba či orkské dosky
