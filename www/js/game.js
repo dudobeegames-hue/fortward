@@ -1539,6 +1539,7 @@
     const s = Math.min(d, spd * dt);
     o.x += dx / d * s; o.y += dy / d * s;
     o.anim += dt * spd / 9;
+    o._walkT = performance.now(); // ide vlastnými nohami (odtlačenie susedom nie je chôdza)
     return false;
   }
 
@@ -1828,29 +1829,37 @@
     moveTo(e, tileX(bc) + T / 2 + e.jx, tileY(br) + T / 2 + e.jy, spd, dt);
   }
 
+  // odtláčanie v tlačenici: kto práve bojuje, stojí skoro pevne a uhne ten druhý (inak by sa bojujúci počas úderu šmýkali)
+  const FIGHT_HOLD = 0.15;
+  const enemyFights = e => !!(e.foe && !e.foe.dead && Math.hypot(e.foe.x - e.x, e.foe.y - e.y) < 14) || !!e.attacking;
+  const soldierFights = u => !!(u.inReach && u.tgt && !u.tgt.dead);
+  // keď bojuje len jeden z dvojice, druhý uhne aj zaňho (spolu sa rozostúpia rovnako); keď bojujú obaja, rozostupujú sa pomaly
+  const holdK = (a, b) => Math.max(a, b) < 1 ? 1 : 2 / (a + b);
   function separate() {
     const es = st.enemies.filter(e => !e.d.fly);
+    const hold = es.map(e => enemyFights(e) ? FIGHT_HOLD : 1);
     for (let i = 0; i < es.length; i++) for (let j = i + 1; j < es.length; j++) {
       const a = es[i], b = es[j];
       const dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy;
       const min = (a.w + b.w) * 0.3;
       if (d2 > min * min || d2 < 0.01) continue;
-      const d = Math.sqrt(d2), push = (min - d) * 0.25;
-      a.x -= dx / d * push; a.y -= dy / d * push * 0.5;
-      b.x += dx / d * push; b.y += dy / d * push * 0.5;
+      const d = Math.sqrt(d2), push = (min - d) * 0.25 * holdK(hold[i], hold[j]);
+      a.x -= dx / d * push * hold[i]; a.y -= dy / d * push * hold[i] * 0.5;
+      b.x += dx / d * push * hold[j]; b.y += dy / d * push * hold[j] * 0.5;
     }
   }
 
   // vlastní pešiaci sa navzájom jemne odtláčajú, aby nestáli jeden v druhom
   function separateSoldiers() {
     const us = st.soldiers.filter(s => !s.fly && !s.dead);
+    const hold = us.map(u => soldierFights(u) ? FIGHT_HOLD : 1);
     for (let i = 0; i < us.length; i++) for (let j = i + 1; j < us.length; j++) {
       const a = us[i], b = us[j];
       const dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy, min = a.siege || b.siege ? 11 : 7;
       if (d2 > min * min || d2 < 0.01) continue;
-      const d = Math.sqrt(d2), push = (min - d) * 0.2;
-      a.x -= dx / d * push; a.y -= dy / d * push * 0.6;
-      b.x += dx / d * push; b.y += dy / d * push * 0.6;
+      const d = Math.sqrt(d2), push = (min - d) * 0.2 * holdK(hold[i], hold[j]);
+      a.x -= dx / d * push * hold[i]; a.y -= dy / d * push * hold[i] * 0.6;
+      b.x += dx / d * push * hold[j]; b.y += dy / d * push * hold[j] * 0.6;
     }
   }
 
@@ -3390,9 +3399,9 @@
     u._lx = u.x; u._ly = u.y;
     const t = u.archer ? (u.aimT && !u.aimT.dead ? u.aimT : null) : u.tgt && !u.tgt.dead ? u.tgt : null;
     const near = t && (u.archer || Math.hypot(t.x - u.x, t.y - u.y) < (u.ktype === 'spear' ? SPEAR_REACH + 5 : 14)); // kopijník bodá z diaľky
-    // pri nepriateľovi ho susedia v boji drobne odtláčajú – to nie je chôdza (kôň by inak prepínal snímky klusu a triasol sa)
-    const step = near && !u.archer ? 0.45 : 0.05, d = Math.hypot(mvx, mvy), moving = stillFor(u, d > step) < 4;
-    if (d > step) u._wd = (u._wd || 0) + d;
+    // chôdza = jednotka sama kráča (moveTo); odtlačenie susedom v tlačenici chôdza nie je (kôň by inak prepínal snímky klusu)
+    const d = Math.hypot(mvx, mvy), moving = performance.now() - (u._walkT || 0) < 100;
+    if (moving) u._wd = (u._wd || 0) + d;
     const sd = smoothDir(u, mvx, mvy);
     if (near) turn8(u, dir8(t.x - u.x, t.y - u.y), u.archer ? 8 : 3); // lukostrelec sa otáča pomalšie (cieľ prechádza medzi smermi)
     else if (moving) turn8(u, sd, 5);
