@@ -63,8 +63,9 @@ def main():
     rw, rh = len(rot[0][0]), len(rot[0])
     # animácie: Attack* = útok, prvá ďalšia = chôdza/klus (PixelLab ju pomenuje podľa zadania)
     names = sorted(os.listdir(os.path.join(base, 'animations')))
-    atk_dir = next((n for n in names if n.startswith('Attack')), None)  # bez útoku: snímky útoku = státie (kým PixelLab útok nedorobí)
-    run_dir = next(n for n in names if not n.startswith('Attack'))
+    is_atk = lambda n: 'attack' in n.lower()  # PixelLab pomenuje animáciu podľa zadania („Attack…“, „spear_thrust_attack…“)
+    atk_dir = next((n for n in names if is_atk(n)), None)  # bez útoku: snímky útoku = státie (kým PixelLab útok nedorobí)
+    run_dir = next(n for n in names if not is_atk(n))
 
     def frames(anim, d):
         fs = sorted(glob.glob(os.path.join(base, 'animations', anim, d, 'frame_*.png')))

@@ -671,8 +671,8 @@ function initSprites() {
   SPR.paladin = PALADIN_LEGS.map(l => buildSprite(PALADIN_BODY.concat(l), PAL_PALADIN));
   SPR.sorc = SORC_LEGS.map(l => buildSprite(SORC_BODY.concat(l), PAL_SORC));
   SPR.spear = SOLDIER_LEGS.map(l => buildSprite(SPEAR_BODY.concat(l))); // ľudia vždy v modrom
-  lazySpr('spearG8', () => buildSpear8(PAL_GOLD_ARMOR)); // zlaté brnenie (zbrojnica 5. úrovne)
-  lazySpr('spear8', () => buildSpear8()); // kopijník v 8 smeroch (kopija opretá o zem, pri útoku sklopená a bodne)
+  lazySpr('spearG8', () => buildArt8(SPEAR_ART, PAL_GOLD_ARMOR, 4)); // zlaté brnenie (kasárne 5. úrovne)
+  lazySpr('spear8', () => buildArt8(SPEAR_ART, null, 4)); // kopijník v 8 smeroch z PixelLabu, jemná kresba (spear-art.js); stará kresba: buildSpear8
   SPR.shield = SOLDIER_LEGS.map(l => buildSprite(SOLDIER_BODY.concat(l), { c: '#d0d4dc', B: '#80869a', n: '#44485a' }));
   SPR.rider = RIDER_FRAMES.map(f => buildSprite(f));
   lazySpr('riderG8', () => buildArt8(RIDER_ART, PAL_GOLD_ARMOR, 5)); // zlaté brnenie (stajne 5. úrovne)
