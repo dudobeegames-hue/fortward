@@ -297,13 +297,11 @@ ORC_UNLOCKS[3].unshift({ id: 'mud', name: 'Bahno', icon: 'mud' }); // orkovia ma
   [a[i], b[j]] = [b[j], a[i]];
   Object.assign(a[i], { icon: 'icetower', desc: undefined }); // za orkov je to jedový kotol (meno a popis z BUILD)
 })();
-// ľudia (až po skopírovaní pre orkov): kaplnku nahradí sokoliareň mága s liečiteľom (misia 7), zbrojnicu kopijníci v kasárňach (misia 7),
-// sokoliareň z 9. misie sa mení na sokoly – druhý režim sokoliarne mága
+// ľudia (až po skopírovaní pre orkov): kostol s liečiteľom (misia 7), zbrojnicu nahradia kopijníci v kasárňach (misia 7); sokoliareň v 9. misii
 (() => {
   const put = (m, id, u) => { const l = UNLOCKS[m - 1], i = l.findIndex(q => q.id === id); l[i] = u; };
-  put(7, 'chapel', { id: 'falconry', name: 'Sokoliareň mága', icon: 'falconry', desc: 'Liečiteľ (mág) chodí za rytiermi a hrdinom a lieči ich. Od 9. misie sa dá prepnúť na sokoly.' });
+  put(7, 'chapel', { id: 'chapel', name: 'Kostol a liečiteľ', icon: 'chapel', desc: 'Liečiteľ (mág) chodí za rytiermi a hrdinom a lieči ich.' });
   put(7, 'armory', { id: 'armory', name: 'Kopijníci v kasárňach', icon: 'u_spear', desc: 'Kasárne prepneš na kopijníkov – útočia spoza rytierov a jazdu zastavia aj s trojnásobnou silou.' });
-  put(9, 'falconry', { id: 'falcons', name: 'Sokoly', icon: 'u_falcon', desc: 'Sokoliareň mága prepneš na sokoly – letia ponad hradby a lovia netopiere, šamanov a podkopníkov. Pechota na ne nedosiahne, strelci ich však ľahko zostrelia.' });
 })();
 const unlocksOf = () => UNLOCK_RACE === 'orc' ? ORC_UNLOCKS : UNLOCKS;
 function techFor(m) {
