@@ -23,7 +23,7 @@
   // ---------------- Dáta ----------------
   const BUILD = {
     tower:    { name: 'Strážna veža', short: 'Veža',   cost: 60,  hp: 240, range: 80, dmg: 7,  cd: 0.9, proj: 'arrow', speed: 180, block: true, desc: 'Lukostrelec strieľa na hordu v dosahu' },
-    barracks: { name: 'Kasárne',      short: 'Kasárne', cost: 90, hp: 220, block: true, w: 2, desc: 'Posiela rytierov proti horde, od 7. misie môžu namiesto nich vychádzať kopijníci (prepína sa v ponuke)' },
+    barracks: { name: 'Kasárne',      short: 'Kasárne', cost: 90, hp: 220, block: true, desc: 'Posiela rytierov proti horde, od 7. misie môžu namiesto nich vychádzať kopijníci (prepína sa v ponuke)' },
     range:    { name: 'Strelnica',    short: 'Strelnica', cost: 100, hp: 200, block: true, w: 2, desc: 'Vysiela lukostrelcov, ktorí sa držia za rytiermi a strieľajú z diaľky' },
     stables:  { name: 'Stajne',       short: 'Stajne',  cost: 110, hp: 200, block: true, w: 2, desc: 'Vysiela jazdcov – rýchlo obídu líniu a idú po strelcoch, šamanoch a podkopníkoch' },
     falconry: { name: 'Sokoliareň mága', short: 'Mág',  cost: 120, hp: 180, block: true, w: 2, desc: 'Vyšle liečiteľa (mága), ktorý chodí za rytiermi a hrdinom a lieči ich; od 9. misie môže namiesto neho vypúšťať sokoly (prepína sa v ponuke)' }, // za orkov netopierí brloh (len netopiere)
@@ -3347,9 +3347,10 @@
       g.fillStyle = gr; g.beginPath(); g.ellipse(u.x, cy, r * 0.85, r, 0, 0, 6.29); g.fill();
       const rx = hero ? 9 : 6.5, ry = hero ? 3.5 : 2.6;
       for (const [k, al] of [[1, 1], [1.45, 0.45]]) { // neónový lem na zemi a slabší vonkajší kruh
-        g.strokeStyle = 'rgba(' + rgb + ',' + (al * f) + ')'; g.lineWidth = 1;
+        g.strokeStyle = 'rgba(' + rgb + ',' + (al * f) + ')'; g.lineWidth = 0.5;
         g.beginPath(); g.ellipse(u.x, u.y, rx * k, ry * k, 0, 0, 6.29); g.stroke();
       }
+      g.lineWidth = 1;
       g.globalCompositeOperation = 'source-over';
     } else if (Math.random() < (hero ? 0.35 : 0.12)) part(u.x + (Math.random() - 0.5) * 10, u.y - 4 - Math.random() * 10, 0, -14, 0.45, hero ? (Math.random() < 0.5 ? '#e0a0ff' : '#ffffff') : (Math.random() < 0.5 ? '#80e0ff' : '#ffffff'), 0);
   }
@@ -3714,8 +3715,8 @@
       const slice = (dx, w) => { for (let k = 0; k < w; k += 4) { const ww = Math.min(4, w - k); g.drawImage(flat.c, 6 * fr, 0, ww * fr, flat.c.height, dx + k, y0 + 18 - flat.h, ww, flat.h); } };
       if (joinsBuilding(b.c + 1, b.r)) slice(x0 + T, 4);
       if (joinsBuilding(b.c - 1, b.r)) slice(x0 - 4, 4);
-      if (occAt(b.c + 1, b.r) === HALL) slice(x0 + T, 8); // pod okraj hradu (hrad sa kreslí neskôr a koniec prekryje)
-      if (occAt(b.c - 1, b.r) === HALL) slice(x0 - 8, 8);
+      if (b.r === G.hr0 + 2 && occAt(b.c + 1, b.r) === HALL) slice(x0 + T, 8); // pod okraj hradu (hrad sa kreslí neskôr a koniec prekryje)
+      if (b.r === G.hr0 + 2 && occAt(b.c - 1, b.r) === HALL) slice(x0 - 8, 8);
       if (b.spikes) { // ostne na čele hradby
         drawSpikes(g, x0, y0, b.spikeType);
         if (b.spikeType === 'fire' && Math.random() < 0.04) part(x0 + 2 + Math.random() * (T - 4), y0 + 5, 0, -10, 0.4, '#f89838', -5);
@@ -3763,7 +3764,7 @@
   // hradba na políčku (x, y): spodok 2 body pod políčkom, jemná kresba je vyššia ako stará (24 bodov)
   const wallImg = (ctx, spr, x, y) => ctx.drawImage(spr.c, x, y + 18 - spr.h, spr.w, spr.h);
   const JOINERS = { wall: 1, tower: 1, mage: 1, pitch: 1, icetower: 1, ballista: 1 }; // hradby sa napájajú len na hradby a veže (strážna, mága) – na ostatné budovy nie
-  const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL || !!JOINERS[o.kind]); };
+  const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL ? r === G.hr0 + 2 : !!JOINERS[o.kind]); }; // na hrad len zo spodného radu (tam má bočné múry)
   const joinsV = (c, r) => occAt(c, r) !== HALL && joins(c, r); // na radnicu sa hradby napájajú len z bokov, nie zhora
   const joinsBuilding = (c, r) => { const o = occAt(c, r); return !!o && o !== HALL && o.kind !== 'wall' && !!JOINERS[o.kind]; };
 
@@ -3837,29 +3838,29 @@
       const e = fireEnv(fw, i); if (e < 0.2) continue;
       const fl = Math.sin(time * 7 + i * 1.9) > 0.2;
       g.fillStyle = fl ? '#f89838' : '#c03818';
-      g.fillRect(Math.round(x0 + i + hash2(i, 3, 7) * 2), Math.round(y0 - 1 + hash2(i, 5, 9) * 3), 1, 1);
+      g.fillRect(h2(x0 + i + hash2(i, 3, 7) * 2), h2(y0 - 1 + hash2(i, 5, 9) * 3), 0.5, 0.5);
     }
     g.globalAlpha = 1;
   }
   function drawFireFlames(fw, time, front) {
     const a = fireFade(fw) * (front ? 0.8 : 0.88), x0 = Math.round(fw.x - fw.w / 2), base = Math.round(fw.y) + (front ? 3 : 1);
     g.globalAlpha = a;
-    for (let i = front ? 2 : 1; i < fw.w; i += 3) { // jeden jazyk plameňa každé 3 body (s malým posunom, aby to nebolo pravidelné)
-      const e = fireEnv(fw, i); if (e < 0.12) continue;
-      const tx = x0 + i + Math.round(hash2(i, front ? 6 : 1, 4) * 2 - 1);
-      const n = 0.55 + 0.45 * Math.sin(time * (8 + hash2(i, 2, 5) * 5) + i * 2.3 + (front ? 1.7 : 0));
-      const h = Math.max(2, Math.round(e * (5 + 6 * n) * (front ? 0.45 : 1)));
-      const sway = Math.round(Math.sin(time * 5 + i) * 0.6);
-      for (let dx = -1; dx <= 1; dx++) {
-        const hh = Math.round(h * (dx ? 0.6 : 1));
-        if (hh < 1) continue;
+    for (let i = front ? 1 : 0.5; i < fw.w; i += 1.5) { // jazyk plameňa každý bod a pol, kreslený po pol bode (jemná mriežka)
+      const e = fireEnv(fw, Math.floor(i)); if (e < 0.12) continue;
+      const tx = x0 + i + h2(hash2(i * 2, front ? 6 : 1, 4) - 0.5);
+      const n = 0.55 + 0.45 * Math.sin(time * (8 + hash2(i * 2, 2, 5) * 5) + i * 2.3 + (front ? 1.7 : 0));
+      const h = Math.max(1.5, h2(e * (5 + 6 * n) * (front ? 0.45 : 1)));
+      const sway = h2(Math.sin(time * 5 + i) * 0.6);
+      for (let dx = -0.5; dx <= 0.5; dx += 0.5) {
+        const hh = h2(h * (dx ? 0.6 : 1));
+        if (hh < 0.5) continue;
         const x = tx + dx;
-        g.fillStyle = '#c83018'; g.fillRect(x, base - hh, 1, hh);
-        const ho = Math.round(hh * 0.7); g.fillStyle = '#f87830'; g.fillRect(x, base - ho, 1, ho);
-        if (!dx) { const hy = Math.round(hh * 0.4); g.fillStyle = '#f8d048'; g.fillRect(x, base - hy, 1, hy); }
+        fpx(x, base - hh, '#c83018', 0.5, hh);
+        const ho = h2(hh * 0.7); fpx(x, base - ho, '#f87830', 0.5, ho);
+        if (!dx) { const hy = h2(hh * 0.4); fpx(x, base - hy, '#f8d048', 0.5, hy); }
       }
-      g.fillStyle = '#d83818'; g.fillRect(tx + sway, base - h - 1, 1, 1); // špička sa kníše
-      if (h > 7) { g.fillStyle = '#fff7c8'; g.fillRect(tx, base - 2, 1, 1); }
+      fpx(tx + sway, base - h - 0.5, '#d83818'); // špička sa kníše
+      if (h > 7) fpx(tx, base - 1.5, '#fff7c8');
     }
     g.globalAlpha = 1;
   }
@@ -3907,16 +3908,16 @@
   function drawHealAura(u, t, time) {
     const pulse = 0.5 + 0.5 * Math.sin(time * 6 + u.x);
     const ax = Math.round(t.x), ay = Math.round(t.y), hh = healAuraH(t);
-    for (let y = 0; y < hh; y++) {                                                                // svetelný stĺp, hore sa stráca
-      const k = 1 - y / hh, w = 5 + Math.round(2 * Math.sin(time * 4 + y * 0.5));
-      g.globalAlpha = (0.16 + 0.12 * pulse) * k; g.fillStyle = '#bfe3ff'; g.fillRect(ax - w, ay - y, w * 2 + 1, 1);
+    for (let y = 0; y < hh; y += 0.5) {                                                           // svetelný stĺp, hore sa stráca (riadky po pol bode)
+      const k = 1 - y / hh, w = 5 + h2(2 * Math.sin(time * 4 + y * 0.5));
+      g.globalAlpha = (0.16 + 0.12 * pulse) * k; g.fillStyle = '#bfe3ff'; g.fillRect(ax - w, ay - y, w * 2 + 1, 0.5);
     }
-    g.globalAlpha = 0.45 + 0.35 * pulse; g.strokeStyle = '#cfe9ff'; g.lineWidth = 1;               // žiariaci kruh pri nohách
-    g.beginPath(); g.ellipse(ax + 0.5, ay + 0.5, 7 + pulse, 2.5 + pulse * 0.5, 0, 0, 6.29); g.stroke();
+    g.globalAlpha = 0.45 + 0.35 * pulse; g.strokeStyle = '#cfe9ff'; g.lineWidth = 0.5;             // žiariaci kruh pri nohách
+    g.beginPath(); g.ellipse(ax + 0.5, ay + 0.5, 7 + pulse, 2.5 + pulse * 0.5, 0, 0, 6.29); g.stroke(); g.lineWidth = 1;
     g.globalAlpha = 1;
     for (let k = 0; k < 4; k++) {                                                                 // iskričky stúpajú okolo
-      const f = (time * 0.9 + k / 4) % 1, px = ax + Math.round(Math.sin(time * 3 + k * 1.7) * 6), py = ay - Math.round(f * hh);
-      g.globalAlpha = 1 - f; g.fillStyle = k % 2 ? '#ffffff' : '#bfe3ff'; g.fillRect(px, py, 1, 1);
+      const f = (time * 0.9 + k / 4) % 1, px = ax + Math.sin(time * 3 + k * 1.7) * 6, py = ay - f * hh;
+      g.globalAlpha = 1 - f; fpx(px, py, k % 2 ? '#ffffff' : '#bfe3ff');
     }
     g.globalAlpha = 1;
   }
@@ -4025,6 +4026,9 @@
     }
   }
 
+  // bod jemnej mriežky: pol bodu hry (1 px bufferu) – efekty kúziel a strely sa kreslia jemnejšie ako terén
+  const h2 = v => Math.round(v * 2) / 2;
+  const fpx = (x, y, col, w, h) => { g.fillStyle = col; g.fillRect(h2(x), h2(y), w || 0.5, h || 0.5); };
   function drawProj(p) {
     const r = Math.round;
     if (p.k === 'lance') { // ťažký šíp: drevená žŕdka s kovovým hrotom a červenými pierkami
@@ -4070,7 +4074,7 @@
     }
     if (p.k === 'arrow' || p.k === 'farrow') {
       const cols = p.k === 'farrow' ? ['#fff070', '#f89838', '#d83818', '#6e4422', '#f89838', '#d83818'] : ['#f4f4f8', '#a86c38', '#a86c38', '#6e4422', '#ffffff', '#e84838'];
-      for (let k = 0; k < 6; k++) { g.fillStyle = cols[k]; g.fillRect(r(p.x - p.vx * k), r(p.y - p.vy * k), 1, 1); }
+      for (let k = 0; k < 12; k++) fpx(p.x - p.vx * k / 2, p.y - p.vy * k / 2, cols[k >> 1]); // jemná čiara šípu
     } else if (p.k === 'bolt') {
       const cols = ['#ffffff', '#bcc0cc', '#4a4e60', '#4a4e60', '#4a4e60'];
       for (let k = 0; k < 5; k++) { g.fillStyle = cols[k]; g.fillRect(r(p.x - p.vx * k), r(p.y - p.vy * k), 1, 1); }
@@ -4089,17 +4093,15 @@
       g.globalCompositeOperation = 'lighter';
       g.fillStyle = 'rgba(248,120,40,0.35)'; g.beginPath(); g.arc(x + 0.5, y + 0.5, 5, 0, 6.29); g.fill();
       g.globalCompositeOperation = 'source-over';
-      g.fillStyle = '#d83818'; g.fillRect(x - 1, y - 2, 3, 5); g.fillRect(x - 2, y - 1, 5, 3);
-      g.fillStyle = '#f89838'; g.fillRect(x - 1, y - 1, 3, 3);
-      g.fillStyle = '#fff070'; g.fillRect(x, y - 1, 1, 2); g.fillRect(x - 1, y, 2, 1);
+      for (const [rr, col] of [[2.6, '#8c2018'], [2.1, '#d83818'], [1.5, '#f89838'], [0.9, '#fff070'], [0.4, '#ffffff']]) { g.fillStyle = col; g.beginPath(); g.arc(p.x, p.y, rr, 0, 6.29); g.fill(); }
     }
   }
 
   function drawDrop(dr) {
     if (dr.delay > 0) return;
     const x = Math.round(dr.x), y = Math.round(dr.y);
-    const cols = ['#e84838', '#ffffff', '#a86c38', '#a86c38', '#a86c38', '#f4f4f8'];
-    for (let k = 0; k < 6; k++) { g.fillStyle = cols[k]; g.fillRect(x, y - 5 + k, 1, 1); }
+    const cols = ['#e84838', '#e84838', '#ffffff', '#ffffff', '#a86c38', '#a86c38', '#a86c38', '#a86c38', '#a86c38', '#6e4422', '#f4f4f8', '#80869a'];
+    for (let k = 0; k < 12; k++) fpx(x, y - 5 + k / 2, cols[k]); // pierka, drievko, hrot
   }
 
   // blesk: lomená čiara z neba cez zasiahnutých nepriateľov (biele jadro, žltý okraj)
@@ -4111,11 +4113,11 @@
       for (let k = 1; k <= n; k++) {
         const t = k / n, j = k < n ? (Math.random() - 0.5) * 6 : 0;
         const nx = a.x + (c.x - a.x) * t + j, ny = a.y + (c.y - a.y) * t;
-        const steps = Math.max(1, Math.round(Math.hypot(nx - px, ny - py)));
+        const steps = Math.max(1, Math.round(Math.hypot(nx - px, ny - py) * 2)); // po pol bode
         for (let s = 0; s <= steps; s++) {
-          const x = Math.round(px + (nx - px) * s / steps), y = Math.round(py + (ny - py) * s / steps);
-          g.fillStyle = '#f8e048'; g.fillRect(x - 1, y, 3, 1);
-          g.fillStyle = '#ffffff'; g.fillRect(x, y, 1, 1);
+          const x = px + (nx - px) * s / steps, y = py + (ny - py) * s / steps;
+          fpx(x - 1, y, '#f8e048', 2.5, 0.5); fpx(x - 0.5, y, '#fff7a0', 1.5, 0.5);
+          fpx(x, y, '#ffffff');
         }
         px = nx; py = ny;
       }
@@ -4125,7 +4127,7 @@
   // ohnivá guľa: na zemi sa sťahuje cieľový kruh, z neba šikmo padá žeravá guľa so žiarou
   function drawFallingFireball(f) {
     const p = Math.max(0, f.t / f.max), fx = f.x + 30 * p, fy = f.y - 90 * p, R = SPELLS.fireball.R;
-    g.strokeStyle = 'rgba(248,120,48,' + (0.85 * (1 - p)) + ')'; g.lineWidth = 1;
+    g.strokeStyle = 'rgba(248,120,48,' + (0.85 * (1 - p)) + ')'; g.lineWidth = 0.5;
     g.beginPath(); g.ellipse(f.x, f.y, R * (0.35 + 0.65 * p) + 1, (R * (0.35 + 0.65 * p) + 1) * 0.7, 0, 0, 6.29); g.stroke();
     g.fillStyle = 'rgba(20,10,4,' + (0.35 * (1 - p)) + ')'; g.beginPath(); g.ellipse(f.x, f.y, 6 * (1 - p) + 1, 3 * (1 - p) + 0.5, 0, 0, 6.29); g.fill(); // tieň gule
     g.globalCompositeOperation = 'lighter';
@@ -4152,9 +4154,9 @@
     for (let i = 0; i < (h.big ? 4 : 2); i++) { // zelené krížiky stúpajú a blednú
       const q = (p * 1.4 + i / (h.big ? 4 : 2)) % 1, cx = x + Math.round(Math.sin(i * 2.3 + p * 3) * (w + 2)), cy = Math.round(y - 6 - q * (h.big ? 26 : 18));
       g.globalAlpha = a * (1 - q);
-      g.fillStyle = PAL.K; g.fillRect(cx - 2, cy - 1, 5, 3); g.fillRect(cx - 1, cy - 2, 3, 5);
-      g.fillStyle = '#62c040'; g.fillRect(cx - 1, cy, 3, 1); g.fillRect(cx, cy - 1, 1, 3);
-      g.fillStyle = '#e8ffd0'; g.fillRect(cx, cy, 1, 1);
+      fpx(cx - 1.5, cy - 0.5, PAL.K, 3.5, 1.5); fpx(cx - 0.5, cy - 1.5, PAL.K, 1.5, 3.5);
+      fpx(cx - 1, cy, '#62c040', 2.5, 0.5); fpx(cx, cy - 1, '#62c040', 0.5, 2.5);
+      fpx(cx, cy, '#e8ffd0');
     }
     g.globalAlpha = 1;
   }
@@ -4166,7 +4168,7 @@
     gr.addColorStop(0, 'rgba(255,250,210,' + (1 - p) + ')'); gr.addColorStop(0.4, 'rgba(255,170,60,' + (0.85 * (1 - p)) + ')'); gr.addColorStop(1, 'rgba(220,60,20,0)');
     g.fillStyle = gr; g.beginPath(); g.ellipse(bl.x, bl.y - 4, fr, fr * 0.8, 0, 0, 6.29); g.fill();
     g.globalCompositeOperation = 'source-over';
-    g.strokeStyle = 'rgba(255,200,110,' + (0.9 * (1 - p)) + ')'; g.lineWidth = 2; // rázová vlna
+    g.strokeStyle = 'rgba(255,200,110,' + (0.9 * (1 - p)) + ')'; g.lineWidth = 1; // rázová vlna
     g.beginPath(); g.ellipse(bl.x, bl.y, R * 1.35 * e + 2, (R * 1.35 * e + 2) * 0.7, 0, 0, 6.29); g.stroke();
     g.lineWidth = 1;
   }
@@ -5218,28 +5220,8 @@
         if (v > 0.6) { g.fillStyle = v > 0.9 ? '#fff070' : '#f89838'; g.fillRect(l.x, l.y, 1, 1); }
       }
       if (Math.random() < 0.15 && scene.lava.length) { const l = scene.lava[Math.floor(Math.random() * scene.lava.length)]; part(l.x, l.y, (Math.random() - 0.5) * 6, -8 - Math.random() * 10, 1, '#f89838', -2); }
-    } else if (a === 'embers') {
-      if (Math.random() < 0.3) part(Math.random() * W, FH * (0.2 + Math.random() * 0.6), (Math.random() - 0.5) * 8, -6 - Math.random() * 10, 1.6, Math.random() < 0.5 ? '#f89838' : '#d83818', -3);
-    } else if (a === 'spores') { // ostrov roja: svetielkujúce spóry pomaly stúpajú
-      if (Math.random() < 0.25) part(Math.random() * W, FH * (0.15 + Math.random() * 0.7), (Math.random() - 0.5) * 6, -4 - Math.random() * 6, 2.2, Math.random() < 0.5 ? '#e878ff' : '#a858d8', -1);
-    }
+    } // hmla, sneženie, poletujúce uhlíky a spóry ponad bojisko sú zrušené
   }
-  function drawFog(time) {
-    if (scene.theme.anim === 'snow') { // sneží: vločky padajú šikmo a kývu sa, nad jednotkami
-      for (let k = 0; k < 70; k++) {
-        const sp = 10 + (k % 5) * 3, x = Math.round(((k * 53.7 + time * 5 + Math.sin(time * 0.8 + k) * 4) % (W + 10) + W + 10) % (W + 10)) - 5, y = Math.round((k * 97.3 + time * sp) % FH);
-        g.fillStyle = k % 3 ? 'rgba(255,255,255,0.75)' : 'rgba(220,234,248,0.6)'; g.fillRect(x, y, 1, 1);
-      }
-      return;
-    }
-    if (scene.theme.anim !== 'fog') return;
-    g.fillStyle = 'rgba(190,210,200,0.05)';
-    for (let k = 0; k < 5; k++) {
-      const x = ((k * 61 + time * (6 + k * 1.3)) % (W + 120)) - 60, y = (k * 97) % Math.max(1, G.zoneTopMax) + Math.sin(time * 0.3 + k) * 8;
-      g.beginPath(); g.ellipse(x, y, 46 + k * 4, 14 + (k % 3) * 4, 0, 0, 6.29); g.fill();
-    }
-  }
-
   function render(time) {
     hallLbl = null; // nastaví ho drawHallBar, keď je pruh radnice na obrazovke
     if (st.phase === 'map') { renderMap(time); present(); return; }
@@ -5302,7 +5284,10 @@
     // ukazovatele zdravia
     for (const e of st.enemies) if (e.hp < e.max && (!e.d.boss || (e.d.giant && st.boss !== e))) bar(e.x, Math.round(e.y - e.h - 3), Math.max(6, e.w - 4), e.hp / e.max, '#e84838');
     for (const b of st.blds) if (BUILD[b.kind].hp && b.hp < bMaxHp(b)) bar(bCenter(b).x, b.kind === 'wall' ? tileY(b.r) - 9 : tileY(b.r) + T - bsprOf(b.kind, b.lvl).h - 2, 12, b.hp / bMaxHp(b), '#9cd45a');
-    for (const s of st.soldiers) if (s.hp < s.max) bar(s.x, Math.round(s.y - 17), 8, s.hp / s.max, '#88b4ff');
+    for (const s of st.soldiers) if (s.hp < s.max) { // nad hlavou: vyššie postavy (jazdec na koni) majú pruh vyššie
+      const s8 = !s.siege && SPR[raceSpr(s.spr || 'soldier') + '8'], top = s8 ? s8[2].idle.h - U8_PB : 15;
+      bar(s.x, Math.round(s.y - Math.max(17, top + 2)), 8, s.hp / s.max, '#88b4ff');
+    }
     for (const o of campLive()) if (o.hp < o.max) bar(o.x, o.y - o.skin.spr(o, 0).h - 4, 14, o.hp / o.max, '#e84838');
     if (!isAssault() && (st.phase === 'build' || st.phase === 'battle' || st.phase === 'pause')) drawHallBar(); // zdravie radnice pod radnicou
     if (st.king && !st.king.dead && st.king.hp < kingMax()) bar(st.king.x, Math.round(st.king.y - 19), 10, st.king.hp / kingMax(), '#f8d048');
@@ -5313,7 +5298,6 @@
     }
     for (const dr of st.drops) drawDrop(dr);
     drawAxes();
-    drawFog(time);
     for (const b of st.bolts) drawBolt(b);
     for (const f of st.fallFx) drawFallingFireball(f);
     for (const bl of st.blasts || []) drawBlast(bl);
@@ -5323,13 +5307,13 @@
       const a = Math.min(1, sh.t / 0.4, (sh.max - sh.t) / 0.2 + 0.2);
       g.globalAlpha = 0.18 * a; g.fillStyle = '#fff070';
       g.beginPath(); g.ellipse(sh.x, sh.y, sh.R, sh.R * 0.7, 0, 0, 6.29); g.fill();
-      g.globalAlpha = 0.7 * a; g.strokeStyle = '#f8d048'; g.lineWidth = 1;
+      g.globalAlpha = 0.7 * a; g.strokeStyle = '#f8d048'; g.lineWidth = 0.5;
       g.beginPath(); g.ellipse(sh.x, sh.y, sh.R, sh.R * 0.7, 0, 0, 6.29); g.stroke();
       g.globalAlpha = 1;
     }
-    for (const q of st.parts) {
+    for (const q of st.parts) { // iskry, dym a úlomky v jemnej mriežke (pol bodu)
       g.globalAlpha = Math.min(1, q.life / q.max * 2);
-      g.fillStyle = q.col; g.fillRect(Math.round(q.x), Math.round(q.y), 1, 1);
+      fpx(q.x, q.y, q.col);
     }
     g.globalAlpha = 1;
     for (const t of st.texts) pxText(g, t.s, Math.round(t.x - t.s.length * 2), Math.round(t.y), '#f8d048');
