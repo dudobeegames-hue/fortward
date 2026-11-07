@@ -3434,11 +3434,14 @@
   }
   function drawFighter(u, sprName) {
     if (u.siege) return drawSiege8(u, SPR[sprName + '8']);
+    if (sprName === 'monkCast') sprName = 'monk'; // liečiteľ v 8 smeroch má kúzlo medzi snímkami útoku
     if (!u.isKing && SPR[sprName + '8']) {
       const set = (u.gold && SPR[sprName + 'G8']) || SPR[sprName + '8']; // zlaté brnenie z budovy najvyššej úrovne
       const repair = u.helper === 'workshop'; // goblin-opravár (za orkov) nosí kladivo, pri oprave stojí chrbtom a klepe do budovy
+      const heal = u.helper === 'chapel' && u.working && u.tgt && !u.tgt.dead; // liečiteľ: kúzlo má len smerom hore a dole – natočí sa podľa cieľa
       if (repair && u.working) u.face8 = 6;
-      const fr = repair && u.working ? set[6].idle : unit8Frame(u, set), y = Math.round(u.y - fr.h) + U8_PB;
+      if (heal) { u.face8 = u.tgt.y < u.y - 2 ? 6 : 2; u._lx = u.x; u._ly = u.y; }
+      const fr = repair && u.working ? set[6].idle : heal ? set[u.face8].atk[Math.floor(performance.now() / 120) % set[u.face8].atk.length] : unit8Frame(u, set), y = Math.round(u.y - fr.h) + U8_PB;
       if (fr.hd) { // tieň pod kopytami / nohami: výška zeme zo státia v tomto smere (v kluse neposkakuje), šírka podľa snímky
         const ft = footOf(fr), gr = footOf(set[u.face8 == null ? 6 : u.face8].idle), left = Math.round(u.x - fr.w / 2);
         shadow(left + (ft.x0 + ft.x1) / 2, y + gr.y, Math.max(3, Math.round((ft.x1 - ft.x0) / 2)));
@@ -5264,7 +5267,7 @@
       for (const b of st.blds) if (!TRAPS[b.kind] && b.kind !== 'mud') objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), x: b.c, f: () => drawBuilding(b, time) });
       for (const s of st.soldiers) {
         const cast = s.helper === 'chapel' && s.working && s.tgt && !s.dead; // mních pri liečení zdvihne palicu
-        objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: dpt(s), id: s.slot, f: () => { drawFighter(s, raceSpr(cast ? 'monkCast' : s.spr || 'soldier')); if (cast) drawStaffGlow(s, time); } });
+        objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: dpt(s), id: s.slot, f: () => { drawFighter(s, raceSpr(cast ? 'monkCast' : s.spr || 'soldier')); if (cast && !(SPR.monk8 && raceSpr('monk') === 'monk')) drawStaffGlow(s, time); } }); // liečiteľ z PixelLabu má kúzlo v animácii (bez svetla na palici)
         if (cast) { const t = s.tgt; objs.push({ y: t.y - healAuraH(t) - 1, f: () => drawHealAura(s, t, time) }); }
       }
       if (st.phase === 'build') for (const o of st.siegeOrder) { // kúpené obliehacie stroje čakajú na mieste, odkiaľ vyrazia
