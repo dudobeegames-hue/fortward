@@ -677,6 +677,7 @@ function initSprites() {
   SPR.rider = RIDER_FRAMES.map(f => buildSprite(f));
   lazySpr('riderG8', () => buildArt8(RIDER_ART, PAL_GOLD_ARMOR, 5)); // zlaté brnenie (stajne 5. úrovne)
   lazySpr('rider8', () => buildArt8(RIDER_ART, null, 5)); // jazdec na koni v 8 smeroch z PixelLabu, jemná kresba (rider-art.js)
+  lazySpr('craft8', () => buildArt8(CARPENTER_ART, null, 4)); // remeselník z dielne z PixelLabu, jemná kresba (carpenter-art.js); atk = 4 snímky úderu kladivom
   lazySpr('monk8', () => buildArt8(HEALER_ART, null, 4)); // liečiteľ (mág z kaplnky) z PixelLabu, jemná kresba (healer-art.js); atk = 4 snímky liečivého kúzla len hore a dole
   lazySpr('hknight8', buildHKnight8); // ťažký rytier (nepriateľ za orkov)
   lazySpr('captain8', buildCaptain8); // kapitán jazdy (boss za orkov)

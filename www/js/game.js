@@ -3439,9 +3439,11 @@
       const set = (u.gold && SPR[sprName + 'G8']) || SPR[sprName + '8']; // zlaté brnenie z budovy najvyššej úrovne
       const repair = u.helper === 'workshop'; // goblin-opravár (za orkov) nosí kladivo, pri oprave stojí chrbtom a klepe do budovy
       const heal = u.helper === 'chapel' && u.working && u.tgt && !u.tgt.dead; // liečiteľ: kúzlo má len smerom hore a dole – natočí sa podľa cieľa
-      if (repair && u.working) u.face8 = 6;
+      const hammer = repair && set === SPR.craft8; // remeselník z PixelLabu má údery kladivom v snímkach útoku
+      if (repair && u.working) { if (hammer && u.tgt) { const bc = bCenter(u.tgt); u.face8 = dir8(bc.x - u.x, bc.y - u.y); u._lx = u.x; u._ly = u.y; } else u.face8 = 6; } // natočí sa k opravovanej budove
       if (heal) { u.face8 = u.tgt.y < u.y - 2 ? 6 : 2; u._lx = u.x; u._ly = u.y; }
-      const fr = repair && u.working ? set[6].idle : heal ? set[u.face8].atk[Math.floor(performance.now() / 120) % set[u.face8].atk.length] : unit8Frame(u, set), y = Math.round(u.y - fr.h) + U8_PB;
+      const cast = (heal || (hammer && u.working)) && set[u.face8].atk; // kúzlo liečiteľa / búchanie kladivom: snímky útoku dokola
+      const fr = cast ? cast[Math.floor(performance.now() / 120) % cast.length] : repair && u.working ? set[6].idle : unit8Frame(u, set), y = Math.round(u.y - fr.h) + U8_PB;
       if (fr.hd) { // tieň pod kopytami / nohami: výška zeme zo státia v tomto smere (v kluse neposkakuje), šírka podľa snímky
         const ft = footOf(fr), gr = footOf(set[u.face8 == null ? 6 : u.face8].idle), left = Math.round(u.x - fr.w / 2);
         shadow(left + (ft.x0 + ft.x1) / 2, y + gr.y, Math.max(3, Math.round((ft.x1 - ft.x0) / 2)));
@@ -3449,7 +3451,7 @@
       else shadow(u.x, u.y, 4);
       cryAura(u, false, true);
       g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), y, fr.w, fr.h); // w, h v bodoch hry (jemný sprite má plátno 2× väčšie)
-      if (repair) drawHammer(u, Math.round(u.x) + 3, Math.round(u.y) - 6);
+      if (repair && !hammer) drawHammer(u, Math.round(u.x) + 3, Math.round(u.y) - 6);
       cryAura(u, false);
       if (u.stunT > 0) { // hviezdičky nad omráčeným
         const t = performance.now() / 1000;
