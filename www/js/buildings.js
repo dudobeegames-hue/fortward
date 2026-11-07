@@ -22,7 +22,7 @@ const LVL_MAT = [null,
 const matBody = lvl => LVL_MAT[lvl].body || RAMP.stone;
 
 // Zo surového canvasu vyrobí sprite so zábleskom (biela) a siluetou.
-function spriteFromCanvas(c) { return lazyVariants({ c, w: c.width, h: c.height }); } // záblesk a silueta až pri použití (sprites.js)
+function spriteFromCanvas(c, px) { return lazyVariants({ c, w: c.width, h: c.height, px }); } // záblesk a silueta až pri použití (sprites.js); px = pixely kresby (bez čítania z plátna)
 // budova z PixelLabu (tools/pixellab2obj.py): jemná kresba – plátno v plnom rozlíšení, w a h v bodoch hry (polovica)
 // anim: predvolene vejúce zástavy; 'fire' = plápolajúci plameň (ohnivá veža); 'ice' = ten istý plameň bledomodrý (ohnivá veža prepnutá na ľad);
 // false = nič (hradby: špičky kolov by sa pokladali za žrde)
@@ -33,7 +33,7 @@ function artBuilding(art, i, anim) {
   if (anim === 'ice') recolorFlame(id, ICE_RAMP, i < 4); // úrovne 1–4: aj žiara pod strechou a okná; na 5. je tá istá farba v zlatých ozdobách
   const frames = anim === 'fire' ? fireFrames(id) : anim === 'ice' ? fireFrames(id, ICE_RAMP) : anim === false ? null : flagFrames(id); // zástavy sa prefarbia v id, preto pred vykreslením
   x.putImageData(id, 0, 0);
-  return lazyVariants({ c, w: c.width / 2, h: c.height / 2, hd: true, frames, fps: anim === 'fire' || anim === 'ice' ? 9 : 5 });
+  return lazyVariants({ c, w: c.width / 2, h: c.height / 2, hd: true, frames, fps: anim === 'fire' || anim === 'ice' ? 9 : 5, px: id }); // px: pixely na záblesk a siluetu bez čítania z plátna
 }
 
 // Vejúce zástavy: v hornej tretine kresby nájde žrde (zvislý pás široký 1–3 px, nad ktorým je látka širšia ako žrď)
@@ -141,7 +141,7 @@ function painter(w, h) {
       const cx = c.getContext('2d'), id = cx.createImageData(w, h);
       out.forEach((col, i) => { if (!col) return; id.data[i * 4] = col[0]; id.data[i * 4 + 1] = col[1]; id.data[i * 4 + 2] = col[2]; id.data[i * 4 + 3] = 255; });
       cx.putImageData(id, 0, 0);
-      return spriteFromCanvas(c);
+      return spriteFromCanvas(c, id);
     },
   };
 }
@@ -1473,6 +1473,7 @@ function makeMillWheel(rot) {
   }
   // obrys len obruči a lopatkám; lúče a náboj sa dokreslia bez obrysu, aby medzi nimi bolo vidieť pozadie
   const spr = p.finish(), cx = spr.c.getContext('2d');
+  spr.px = null; // na plátno sa ešte dokresľuje – uložené pixely by neboli úplné
   const px = (x, y, col) => { cx.fillStyle = rgbStr(col); cx.fillRect(x, y, 1, 1); };
   for (let k = 0; k < 8; k++) { // lúče ako tenké čiary – rovnaká hrúbka pri každom natočení
     const ang = rot + k * Math.PI / 4, ca = Math.cos(ang), sa = Math.sin(ang);

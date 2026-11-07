@@ -220,7 +220,7 @@ function voxRender(md, dir, W, H, ox, oy) {
   const cx = c.getContext('2d'), id = cx.createImageData(W, H);
   out.forEach((col, i) => { if (!col) return; id.data[i * 4] = col[0]; id.data[i * 4 + 1] = col[1]; id.data[i * 4 + 2] = col[2]; id.data[i * 4 + 3] = 255; });
   cx.putImageData(id, 0, 0);
-  const spr = spriteFromCanvas(c);
+  const spr = spriteFromCanvas(c, id); // s pixelmi kresby: záblesk a nádych zásahu bez čítania z plátna
   spr.ax = ox; spr.ay = oy; // kotva: stred stroja na zemi
   return spr;
 }

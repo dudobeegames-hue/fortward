@@ -3198,7 +3198,7 @@
   // kde snímka (jemná kresba) skutočne stojí: najspodnejší riadok kresby a šírka postavy pri zemi (v bodoch hry), raz za snímku
   function footOf(fr) {
     if (fr._foot) return fr._foot;
-    const c = fr.c, k = c.width / fr.w, d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    const c = fr.c, k = c.width / fr.w, d = (fr.px || c.getContext('2d').getImageData(0, 0, c.width, c.height)).data; // pixely kresby, ak ich snímka má (bez čítania z grafickej karty)
     let by = -1;
     for (let y = c.height - 1; y >= 0 && by < 0; y--) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 128) { by = y; break; }
     let x0 = c.width, x1 = -1;
@@ -7285,7 +7285,6 @@
   let reloading = false;
   const reloadIfLost = () => { if (!reloading && !document.hidden && canvasesLost()) { reloading = true; location.reload(); } };
   document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(reloadIfLost, 300); });
-  setInterval(reloadIfLost, 4000);
   screen.addEventListener('contextrestored', () => { if (!reloading) { reloading = true; location.reload(); } }); // hlavné plátno prišlo o obsah
 
   // ---------------- Slučka ----------------

@@ -509,7 +509,7 @@ function buildSprite(rows, palOverride) {
     }
   }
   cx.putImageData(id, 0, 0); fx.putImageData(fd, 0, 0); sx.putImageData(sd, 0, 0);
-  return { c, f, sil, w, h };
+  return { c, f, sil, w, h, px: id }; // px = pixely kresby: zásah a päta sa z nich počítajú bez čítania z grafickej karty
 }
 
 // ---- Postavičky rás (výber rasy, Nákupy): spredu, obrys sa dopočíta automaticky ----
@@ -702,8 +702,8 @@ function initSprites() {
 function hitSpr(spr) {
   if (spr.hit) return spr.hit;
   const c = document.createElement('canvas'); c.width = spr.c.width; c.height = spr.c.height;
-  const x = c.getContext('2d'); x.drawImage(spr.c, 0, 0);
-  const id = x.getImageData(0, 0, c.width, c.height), d = id.data, K = hexRGB(PAL.K);
+  const x = c.getContext('2d');
+  const id = spr.px ? new ImageData(new Uint8ClampedArray(spr.px.data), c.width, c.height) : (x.drawImage(spr.c, 0, 0), x.getImageData(0, 0, c.width, c.height)), d = id.data, K = hexRGB(PAL.K); // pixely kresby bez čítania z grafickej karty, ak ich sprite má
   for (let i = 0; i < d.length; i += 4) {
     if (!d[i + 3] || (d[i] === K[0] && d[i + 1] === K[1] && d[i + 2] === K[2])) continue;
     d[i] = d[i] * 0.72 + 255 * 0.28; d[i + 1] = d[i + 1] * 0.8 + 50 * 0.2; d[i + 2] = d[i + 2] * 0.8 + 40 * 0.2; // jemný nádych
@@ -1188,7 +1188,7 @@ function buildHero8(spec) {
       const i = (y * K8_W + x) * 4; id.data[i] = v[0]; id.data[i + 1] = v[1]; id.data[i + 2] = v[2]; id.data[i + 3] = 255;
     }
     cx.putImageData(id, 0, 0);
-    return spriteFromPixels(c);
+    return spriteFromPixels(c, id);
   }
   function views(view) {
     const h = hand(view), L = K8_LEGS[h.legs];
@@ -1256,9 +1256,9 @@ function buildHero8(spec) {
 // sprite (s bielym zábleskom a siluetou) z hotového plátna
 // sprite z hotového plátna; biely záblesk pri zásahu (obrys ostáva) a sivá silueta (zamknuté veci) sa vyrobia
 // až pri prvom použití – väčšina snímok ich nikdy nepotrebuje a ich výroba vopred spomaľovala štart hry
-function spriteFromPixels(c) { return lazyVariants({ c, w: c.width, h: c.height }); }
-function variantCanvas(src, col) {
-  const w = src.width, h = src.height, d = src.getContext('2d').getImageData(0, 0, w, h).data, K = hexRGB(PAL.K);
+function spriteFromPixels(c, px) { return lazyVariants({ c, w: c.width, h: c.height, px }); } // px = pixely kresby (ImageData), ak sú poruke
+function variantCanvas(src, col, px) { // px = uložené pixely kresby (ImageData); bez nich sa prečítajú z plátna (pomalé – zastaví grafickú kartu)
+  const w = src.width, h = src.height, d = (px || src.getContext('2d').getImageData(0, 0, w, h)).data, K = hexRGB(PAL.K);
   const x = document.createElement('canvas'); x.width = w; x.height = h;
   const xc = x.getContext('2d'), od = xc.createImageData(w, h), o = od.data;
   for (let i = 0; i < d.length; i += 4) {
@@ -1271,8 +1271,8 @@ function variantCanvas(src, col) {
 }
 function lazyVariants(spr) {
   let f = null, sil = null;
-  Object.defineProperty(spr, 'f', { get: () => f || (f = variantCanvas(spr.c, [255, 255, 255])), enumerable: true });
-  Object.defineProperty(spr, 'sil', { get: () => sil || (sil = variantCanvas(spr.c, [51, 51, 68])), enumerable: true });
+  Object.defineProperty(spr, 'f', { get: () => f || (f = variantCanvas(spr.c, [255, 255, 255], spr.px)), enumerable: true });
+  Object.defineProperty(spr, 'sil', { get: () => sil || (sil = variantCanvas(spr.c, [51, 51, 68], spr.px)), enumerable: true });
   return spr;
 }
 // veľké sady snímok (8 smerov) sa vyrobia až pri prvom použití alebo počas načítavania po kúskoch (SPR_TASKS),
@@ -1511,7 +1511,7 @@ function buildUnit8(spec) {
       const i = (y * W + x) * 4; id.data[i] = v[0]; id.data[i + 1] = v[1]; id.data[i + 2] = v[2]; id.data[i + 3] = 255;
     }
     cx.putImageData(id, 0, 0);
-    return spriteFromPixels(c);
+    return spriteFromPixels(c, id);
   }
   const SWAY = [0.2, 0, -0.2, 0], SHIELD = [1, 0, -1, 0]; // meč a štít sa kývu proti sebe
   function views(view) {
@@ -1536,7 +1536,7 @@ const buildKnight8 = pal => buildUnit8({ pal, body: KN8_BODY, shield: KN8_SHIELD
 // jednotka v 8 smeroch nakreslená v PixelLabe (riadky znakov z tools/pixellab2js.py) – rovnaký tvar ako buildUnit8;
 // art.hd = jemná kresba (dvojnásobná mriežka): plátno ostane v plnom rozlíšení, w a h sú v bodoch hry (polovica)
 function buildArt8(art, pal, stride) {
-  const spr = rows => { const s = spriteFromPixels(buildSprite(rows, pal).c); if (art.hd) { s.w /= 2; s.h /= 2; s.hd = true; } return s; };
+  const spr = rows => { const s = buildSprite(rows, pal); if (art.hd) { s.w /= 2; s.h /= 2; s.hd = true; } return s; }; // záblesk aj silueta sú hotové, pixely v s.px
   const all = art.rot.map((rot, d) => ({ idle: spr(rot), walk: art.run[d].map(spr), atk: art.atk[d].map(spr) }));
   all.stride = stride || 3.2;
   return all;
