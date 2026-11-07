@@ -1093,7 +1093,24 @@ const SORC8_HAND = {
 const buildSorc8 = () => buildHero8({ body: SORC8_BODY, kneel: SORC8_KNEEL, weapon: 'staff', hand: SORC8_HAND,
   pal: Object.assign({}, PAL_SORC, { M: '#6e4422', D: '#3e2614' }) }); // M, D = čižmy pod šatami
 const buildKing8 = () => buildHero8({ body: K8_BODY, kneel: K8_KNEEL, weapon: 'sword' });
-const buildPaladin8 = () => buildHero8({ body: PAL8_BODY, kneel: PAL8_KNEEL, weapon: 'hammer', pal: PAL_PALADIN });
+const buildPaladin8 = () => typeof PALADIN_ART !== 'undefined' ? buildPaladinArt8() : buildHero8({ body: PAL8_BODY, kneel: PAL8_KNEEL, weapon: 'hammer', pal: PAL_PALADIN });
+// paladin z PixelLabu (paladin-art.js), jemná kresba: atk = napriahnutie (kladivo hore), úder, dokončenie; slash = snímka úderu;
+// tip = hlava kladiva v momente dopadu voči chodidlám (body hry) – tam vznikne zlatá tlaková vlna; bez kľačiaceho pohľadu (padne ako ostatní)
+function buildPaladinArt8() {
+  const set = buildArt8(PALADIN_ART, null, 4);
+  set.forEach((v, d) => {
+    v.slash = v.atk[1];
+    const fr = v.slash, W = fr.c.width, H = fr.c.height, k = W / fr.w, px = fr.px.data, a = d * Math.PI / 4, ca = Math.cos(a), sa = Math.sin(a);
+    const fx = W / 2, fy = H - U8_PB * k; // chodidlá v pixeloch plátna
+    let best = -1e9, bx = fx, by = fy;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (px[(y * W + x) * 4 + 3]) {
+      const p = (x - fx) * ca + (y - fy) * sa;
+      if (p > best) { best = p; bx = x; by = y; }
+    }
+    v.tip = { x: (bx - fx) / k, y: sa > 0.5 ? 3 : sa < -0.5 ? -5 : 1 }; // kladivo dopadne na zem pred ním
+  });
+  return set;
+}
 
 // hrdina v 8 smeroch: 5 kreslených pohľadov + 3 zrkadlové, zbraň (meč / kladivo) sa dokresľuje pod uhlom
 function buildHero8(spec) {

@@ -201,7 +201,7 @@ const PAPER = (() => {
       if (bio === 'ice') t = e > 0.54 ? 4 : 8; // ľad: stolové ľadové hory; popol a úľ sú bez hôr
       else if (beach && bio !== 'hive') t = 1;
       else if (bio === 'grass') t = e > 0.74 ? (e > 0.86 ? 5 : 4) : fo > 0.6 ? 3 : 2;
-      else if (bio === 'tundra') t = fo > 0.52 ? 9 : 2; // neutrálne zeme: bez hôr, len ihličnaté lesy
+      else if (bio === 'dirt') t = fo > 0.52 ? 9 : 2; // neutrálne zeme: hlina ako na ich bojiskách, bez hôr, ihličnaté lesy
       else if (bio === 'jungle') t = fo < 0.3 ? 2 : 7; // prales bez hôr
       else if (bio === 'forest') t = e > 0.76 ? 4 : fo < 0.32 ? 2 : 3;
       else if (bio === 'desert') t = e > 0.61 ? 4 : 6; // púšť: stolové hory z pieskovca
@@ -336,11 +336,10 @@ const PAPER = (() => {
     return { canvas: c, rose };
   }
   // ---- živá (kreslená) mapa územia v štýle mapy domovského ostrova: more s plytčinami a príbojom, pláže, tráva, lesy zo
-  // stromčekov s obrysom, štíty hôr, krajina podľa územia (tundra, ľad, púšť, prales, popol, úľ); hranice provincií ako pás
+  // stromčekov s obrysom, štíty hôr, krajina podľa územia (hlina, ľad, púšť, prales, popol, úľ); hranice provincií ako pás
   // vo farbe toho, kto provinciu drží. Vracia aj miesta príboja a hrebeňov vĺn (hra ich kreslí pohyblivo) ----
   const LIVE_COL = { human: [48, 104, 228], orc: [255, 140, 42], nordic: [70, 214, 200], polar: [236, 246, 255], elf: [120, 232, 90], desert: [255, 214, 80], undead: [196, 136, 255], swarm: [255, 80, 70] };
   const LR = {
-    tundra: R(['#2e3a30', '#3e4e40', '#526654', '#6a806a', '#8a9e88', '#b0c0ae']),
     ice:    R(['#5a7a9a', '#7a9ab8', '#9ab8d0', '#c0d8e8', '#e0eef6', '#f8fcff']),
     hive:   R(['#200c26', '#34143e', '#4c1e5a', '#682a78', '#8a3c98', '#ae5ab8']),
     iceRock: R(['#1e2a3a', '#2e4058', '#44607a', '#5e7e98', '#7e9cb4', '#a0bccc', '#c6dce6', '#e6f2f8', '#f8fcff']), // ľadové hory: modrastý ľad a sneh
@@ -395,7 +394,7 @@ const PAPER = (() => {
       else if (t === 4 && bio === 'ice') col = pickRamp(LR.ice, 0.62 + n * 0.4 + h * 0.1, x, y); // pri hradoch rovný ľad
       else if (t === 4 && bio === 'desert') col = pickRamp(SAND, 0.58 + n * 0.3, x, y);
       else if (bio === 'ash') col = pickRamp(TR.ash, v + (t === 11 ? -0.1 : 0), x, y);
-      else if (bio === 'tundra') col = pickRamp(LR.tundra, v + (t === 9 ? -0.12 : 0), x, y);
+      else if (bio === 'dirt') col = pickRamp(TR.darkLit, v + 0.1 + (t === 9 ? -0.12 : 0), x, y); // hlina (rovnaká ako zem bojísk neutrálnych zemí)
       else if (bio === 'desert') col = pickRamp(TR.dry, v, x, y);
       else if (bio === 'hive') col = pickRamp(LR.hive, 0.42 + n * 0.5, x, y);
       else if (t === 7) col = pickRamp(RAMP.bush, v - 0.05, x, y);                                           // prales
@@ -421,7 +420,7 @@ const PAPER = (() => {
       else if (t === 11 && r < 0.45) items.push({ k: 'dead', x: jx, y: jy });
       else if (t === 10 && r < 0.18) items.push({ k: 'spire', x: jx, y: jy });
       else if ((t === 4 || t === 5) && r < 0.35 && (x % 8 === 2 || x % 8 === 6) && okAt(jx - 5, jy + 3) && okAt(jx + 5, jy + 3) && !['desert', 'ice'].includes(provs[prov[jy * W + jx]].biome)) items.push({ k: t === 5 ? 'snowpeak' : 'peak', x: jx, y: jy }); // púšť a ľad majú stolové hory
-      else if (t === 2 && r < 0.05) items.push({ k: 'tree', x: jx, y: jy });
+      else if (t === 2 && r < 0.05) items.push({ k: provs[prov[jy * W + jx]].biome === 'dirt' ? 'dead' : 'tree', x: jx, y: jy }); // na hline suché stromy
       else if (t === 6 && r < 0.03) items.push({ k: 'rock', x: jx, y: jy });
     }
     items.sort((a, b) => a.y - b.y);

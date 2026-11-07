@@ -9,10 +9,10 @@ const MISSIONS = [
   { name: 'Brezový háj',     desc: 'V lese sa skrývajú rýchli goblini. Postav hradby včas.' },
   { name: 'Kamenný brod',    desc: 'Cez brod sa valia prví surovci. Budeš potrebovať silnú obranu.' },
   { name: 'Strážny vrch',    desc: 'Udrž vrch, z ktorého vidno celý ostrov.' },
-  { name: 'Hmlisté močiare', desc: 'Z hmly sa hordy vynárajú vo veľkých skupinách.' },
+  { name: 'Riečne lúky',     desc: 'Cez lúky pri rieke sa hordy valia vo veľkých skupinách.' },
   { name: 'Vlčí priesmyk',   desc: 'Úzky priesmyk je ideálne miesto na hradby a pasce.' },
   { name: 'Staré ruiny',     desc: 'V ruinách sa zhromažďujú vojvodcovia orkov.' },
-  { name: 'Popolavé svahy',  desc: 'Posledná obrana pred pevnosťou orkov.' },
+  { name: 'Skalnaté svahy',  desc: 'Posledná obrana pred pevnosťou orkov.' },
   { name: 'Pevnosť orkov',   desc: 'Rozhodujúca bitka o ostrov. Porazíš vojvodcov?' },
 ];
 
@@ -20,10 +20,10 @@ const MISSIONS = [
 // misie 1–5 bránia vlastné provincie, 6–10 útočia na tábory ľudí
 const ORC_MISSIONS = [
   { name: 'Pevnosť orkov',   desc: 'Ľudia sa vylodili pod hradbami pevnosti. Ukáž im silu hordy.' },
-  { name: 'Popolavé svahy',  desc: 'Rytieri šplhajú po popole. Zhoď ich zo svahov.' },
+  { name: 'Skalnaté svahy',  desc: 'Rytieri šplhajú po skalách. Zhoď ich zo svahov.' },
   { name: 'Staré ruiny',     desc: 'V ruinách sa skrývajú lukostrelci ľudí. Vyžeň ich.' },
   { name: 'Vlčí priesmyk',   desc: 'Jazda ľudí chce prejsť priesmykom. Zavri ho.' },
-  { name: 'Hmlisté močiare', desc: 'Posledná obrana orkského územia. Za močiarmi začína juh.' },
+  { name: 'Riečne lúky',     desc: 'Posledná obrana orkského územia. Za riekou začína juh.' },
   { name: 'Strážny vrch',    desc: 'Ľudia si na vrchu postavili tábor. Zrovnaj ho so zemou.' },
   { name: 'Kamenný brod',    desc: 'Pri brode stojí ľudská strážnica. Prebrodí sa horda?' },
   { name: 'Brezový háj',     desc: 'V háji sa opevnili kopijníci. Vypáľ ich tábor.' },

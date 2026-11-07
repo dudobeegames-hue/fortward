@@ -65,8 +65,8 @@ def main():
     rot = [load(os.path.join(base, 'rotations', d + '.png')) for d in DIRS]
     rw, rh = len(rot[0][0]), len(rot[0])
     if wide:
-        f0 = load(sorted(glob.glob(os.path.join(base, 'animations', '*', '*', 'frame_*.png')))[0])
-        aw, ah = len(f0[0]), len(f0)
+        sizes = [Image.open(f).size for f in glob.glob(os.path.join(base, 'animations', '*', '*', 'frame_000.png'))]
+        aw, ah = max(w for w, h in sizes), max(h for w, h in sizes)  # smery môžu mať rôzne plátna (48 aj 64) – najväčšie
         px, py = (aw - rw) // 2, (ah - rh) // 2
         rot = [['.' * aw] * py + ['.' * px + r + '.' * (aw - rw - px) for r in fr] + ['.' * aw] * (ah - rh - py) for fr in rot]
         rw, rh = aw, ah
@@ -81,6 +81,9 @@ def main():
         out = []
         for f in fs:  # animácie môžu mať väčšie plátno (68×68 pri 48×48) – stredný výrez veľkosti státia
             fr = load(f)
+            if len(fr[0]) < rw:  # menšie plátno smeru ako ostatné: doplní sa okolo stredu
+                px, py = (rw - len(fr[0])) // 2, (rh - len(fr)) // 2
+                fr = ['.' * rw] * py + ['.' * px + r + '.' * (rw - len(r) - px) for r in fr] + ['.' * rw] * (rh - len(fr) - py)
             ox, oy = (len(fr[0]) - rw) // 2, (len(fr) - rh) // 2
             out.append([r[ox:ox + rw] for r in fr[oy:oy + rh]])
         return out

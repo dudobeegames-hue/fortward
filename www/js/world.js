@@ -33,9 +33,9 @@ function worldSpec() {
   const homeZones = (x, y, b) => (y - b.y0) / (b.y1 - b.y0) + (fbm(x * 0.05, y * 0.05, 503) - 0.5) * 0.1 > 0.5 ? 0 : 1;
   return { W: WORLD_W, H: WORLD_H, seed: WORLD_SEED, lands: [
     { shape: { poly: WSK.home }, amp: 4, freq: 0.1, zones: [{ n: 5, race: 'human', biome: 'grass' }, { n: 5, race: 'orc', biome: 'grass' }], zoneAt: homeZones, jitter: 3 },
-    { shape: { poly: WSK.isA }, amp: 3, freq: 0.18, zones: [{ n: 1, race: 'nordic', biome: 'tundra' }], jitter: 2 }, // celý ostrov = jedna provincia
-    { shape: { poly: WSK.isB }, amp: 3, freq: 0.18, zones: [{ n: 1, race: 'nordic', biome: 'tundra' }], jitter: 2 }, // celý ostrov = jedna provincia
-    { shape: { poly: WSK.isC }, amp: 3, freq: 0.18, zones: [{ n: 3, race: 'nordic', biome: 'tundra' }], jitter: 2 },
+    { shape: { poly: WSK.isA }, amp: 3, freq: 0.18, zones: [{ n: 1, race: 'nordic', biome: 'dirt' }], jitter: 2 }, // celý ostrov = jedna provincia
+    { shape: { poly: WSK.isB }, amp: 3, freq: 0.18, zones: [{ n: 1, race: 'nordic', biome: 'dirt' }], jitter: 2 }, // celý ostrov = jedna provincia
+    { shape: { poly: WSK.isC }, amp: 3, freq: 0.18, zones: [{ n: 3, race: 'nordic', biome: 'dirt' }], jitter: 2 },
     { shape: { poly: WSK.long }, amp: 4, freq: 0.08, zones: [{ n: 9, race: 'elf', biome: 'jungle' }], jitter: 3 },
     { shape: { poly: WSK.north }, amp: 3.5, freq: 0.09, zones: [{ n: 6, race: 'polar', biome: 'ice' }], jitter: 3 },
     { shape: { circles: WSK.northS }, amp: 2.5, freq: 0.16, zones: [{ n: 2, race: 'polar', biome: 'ice' }], jitter: 2 },
