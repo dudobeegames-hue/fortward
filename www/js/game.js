@@ -2468,7 +2468,20 @@
   }
   // mních ide za najviac zraneným rytierom/kráľom, remeselník k najviac poškodenej budove; inak sa vráti domov
   const HEAL_RANGE = 40; // mních lieči kúzlom z tejto vzdialenosti
-  const REPAIR_SPOTS = [[0, 0], [-T / 2 - 3, -T / 2], [T / 2 + 3, -T / 2], [-6, 2], [6, 2], [0, -T - 5]]; // miesta remeselníkov okolo opravovanej budovy
+  // miesta remeselníkov okolo opravovanej budovy (od stredu jej políčka): pod ňou, po bokoch, nad ňou
+  const REPAIR_SPOTS = [[0, T / 2 + 3], [-T / 2 - 3, 2], [T / 2 + 3, 2], [-6, T / 2 + 5], [6, T / 2 + 5], [0, -T / 2 - 5]];
+  // miesto na opravu, na ktoré sa remeselník naozaj dostane: nie v hradbe ani v hrade a s cestou od neho (inak by sa zasekol);
+  // viacerí remeselníci pri jednej budove si rozdelia dosiahnuteľné miesta; null = k budove sa nedá dostať
+  function repairSpot(u, tgt, slot) {
+    const c = bCenter(tgt), at = tileAt(u.x, u.y), ok = [];
+    for (const [ox, oy] of REPAIR_SPOTS) {
+      const x = c.x + ox, y = c.y + oy, q = tileAt(x, y);
+      if (!knightPass(q.c, q.r) || occAt(q.c, q.r) === tgt) continue;
+      if ((q.c !== at.c || q.r !== at.r) && !knightStep(at, q)) continue;
+      ok.push({ x, y });
+    }
+    return ok.length ? ok[slot % ok.length] : null;
+  }
   function updateHelper(u, dt) {
     u.flash = Math.max(0, u.flash - dt);
     u.swing = Math.max(0, (u.swing || 0) - dt);
@@ -2478,6 +2491,8 @@
     const valid = t => !!t && (u.helper === 'chapel'
       ? !t.dead && !t.siege && (t.isKing || st.soldiers.includes(t)) && t.hp < healMax(t)
       : st.blds.includes(t) && t.hp < bMaxHp(t));
+    if (u.skip) for (const [k, v] of u.skip) { if (v <= dt) u.skip.delete(k); else u.skip.set(k, v - dt); } // odpočet vynechaných budov (6 s)
+    if (u.stuckT > 2) { (u.skip = u.skip || new Map()).set(u.tgt, 6); u.tgt = null; u.stuckT = 0; } // nedostal sa k nej – chvíľu ju vynechá
     if (!valid(u.tgt)) {
       u.tgt = null;
       let best = 1;
@@ -2489,7 +2504,7 @@
         }
       } else {
         for (const b of st.blds) {
-          if (!BUILD[b.kind].hp) continue;
+          if (!BUILD[b.kind].hp || (u.skip && u.skip.get(b) > 0)) continue; // budovu, ku ktorej sa nedostal, chvíľu vynechá
           const r = b.hp / bMaxHp(b);
           if (r < best) { best = r; u.tgt = b; }
         }
@@ -2502,19 +2517,26 @@
       const d = Math.hypot(tgt.x - u.x, tgt.y - u.y);
       if (d <= HEAL_RANGE) { tx = u.x; ty = u.y; } else { const k = (HEAL_RANGE - 6) / d; tx = tgt.x + (u.x - tgt.x) * k; ty = tgt.y + (u.y - tgt.y) * k; }
     }
-    else if (tgt) { // viacerí remeselníci pri jednej budove: každý má svoje miesto (pod ňou, po bokoch, nad ňou) a opravy sa sčítajú
-      const crew = st.soldiers.filter(o => o.helper === u.helper && !o.dead && o.tgt === tgt), slot = Math.max(0, crew.indexOf(u)) % REPAIR_SPOTS.length;
-      const [ox, oy] = REPAIR_SPOTS[slot];
-      tx = tileX(tgt.c) + T / 2 + ox; ty = tileY(tgt.r) + T + 3 + oy;
+    else if (tgt) { // viacerí remeselníci pri jednej budove: každý má svoje dosiahnuteľné miesto okolo nej a opravy sa sčítajú
+      const crew = st.soldiers.filter(o => o.helper === u.helper && !o.dead && o.tgt === tgt);
+      const spot = repairSpot(u, tgt, Math.max(0, crew.indexOf(u)));
+      if (!spot) { (u.skip = u.skip || new Map()).set(tgt, 6); u.tgt = null; return; } // k budove sa nedá dostať (napr. za hradbami) – nabudúce inú
+      tx = spot.x; ty = spot.y;
     }
     const casting = u.working; // kto už lieči, prestane až o kus ďalej (na hranici dosahu neprepína tam a späť)
     u.working = false;
     const spd = u.spd * waterMul(u);
-    if (!tgt) { // nikto nepotrebuje pomoc – späť k budove
-      if (u.home) moveKnight(u, tileX(u.home.c) + T / 2 + 1, tileY(u.home.r) + T + 2, spd * 0.85, dt);
+    if (!tgt) { // nikto nepotrebuje pomoc – remeselník sa vráti k budove, liečiteľ v boji počká, kde je (inak behal tam a späť)
+      if (u.home && !(monk && st.phase === 'battle')) moveKnight(u, tileX(u.home.c) + T / 2 + 1, tileY(u.home.r) + T + 2, spd * 0.85, dt);
       return;
     }
-    if (monk ? Math.hypot(tgt.x - u.x, tgt.y - u.y) > HEAL_RANGE + (casting ? 6 : 0) : Math.hypot(tx - u.x, ty - u.y) > 7 && !(casting && Math.hypot(tileX(tgt.c) + T / 2 - u.x, tileY(tgt.r) + T / 2 - u.y) < T + 6)) { moveKnight(u, tx, ty, spd, dt); return; } // kto už opravuje pri budove, toho tlačenica neodženie
+    if (monk ? Math.hypot(tgt.x - u.x, tgt.y - u.y) > HEAL_RANGE + (casting ? 6 : 0) : Math.hypot(tx - u.x, ty - u.y) > 7 && !(casting && Math.hypot(bCenter(tgt).x - u.x, bCenter(tgt).y - u.y) < T + 6)) {
+      const x0 = u.x, y0 = u.y;
+      moveKnight(u, tx, ty, spd, dt);
+      if (!monk) u.stuckT = Math.hypot(u.x - x0, u.y - y0) < spd * dt * 0.2 ? (u.stuckT || 0) + dt : 0; // remeselník stojí na mieste, hoci má ísť – zasekol sa
+      return;
+    }
+    u.stuckT = 0; // kto už opravuje pri budove, toho tlačenica neodženie
     // pri cieli: lieči / opravuje
     u.working = true;
     if (monk) {
@@ -3645,27 +3667,28 @@
   // živý plot: strihaný ker na políčku, so susednými plotmi sa spojí do súvislého pásu (maska: 1 hore, 2 vpravo, 4 dole, 8 vľavo)
   const hedgeAt = (c, r) => { const o = occAt(c, r); return !!o && o !== HALL && o.kind === 'hedge'; };
   const hedgeCache = {};
-  function hedgeSpr(m) {
+  function hedgeSpr(m) { // jemná kresba: plátno v dvojnásobnej mriežke (pol bodu = 1 px), hra ho kreslí v bodoch w × h
     if (hedgeCache[m]) return hedgeCache[m];
-    const w = T, h = T + 4, c = document.createElement('canvas'); c.width = w; c.height = h;
+    const w = T * 2, h = (T + 4) * 2, c = document.createElement('canvas'); c.width = w; c.height = h;
     const x2 = c.getContext('2d'), id = x2.createImageData(w, h);
     const up = m & 1, rt = m & 2, dn = m & 4, lf = m & 8;
-    const top = up ? 0 : 6, x0 = lf ? 0 : 1, x1 = rt ? w - 1 : w - 2, face = dn ? h : h - 8; // od „face“ nadol je tienisté čelo plota
+    const top = up ? 0 : 12, x0 = lf ? 0 : 2, x1 = rt ? w - 1 : w - 3, face = dn ? h : h - 16; // od „face“ nadol je tienisté čelo plota
     for (let y = top; y < h; y++) for (let x = x0; x <= x1; x++) {
       // zaoblené rohy tam, kde plot nepokračuje
-      if (!up && y === top && ((!lf && x === x0) || (!rt && x === x1))) continue;
-      if (!dn && y === h - 1 && ((!lf && x === x0) || (!rt && x === x1))) continue;
-      const n = hash2(x + m * 17, y, 41), clump = hash2(x >> 1, y >> 1, 42); // lístie v trsoch 2×2
-      const edge = (!up && y === top) || (!lf && x === x0) || (!rt && x === x1) || (!dn && y === h - 1);
+      const cx = !lf && x - x0 < 2 ? 2 - (x - x0) : !rt && x1 - x < 2 ? 2 - (x1 - x) : 0;
+      const cy = !up && y - top < 2 ? 2 - (y - top) : !dn && h - 1 - y < 2 ? 2 - (h - 1 - y) : 0;
+      if (cx + cy > 2) continue;
+      const n = hash2(x + m * 17, y, 41), clump = hash2(x >> 1, y >> 1, 42), leaf = hash2(x >> 2, (y + (x >> 2) % 2 * 2) >> 2, 43); // drobné lístky v trsoch
+      const edge = (!up && y === top) || (!lf && x === x0) || (!rt && x === x1) || (!dn && y === h - 1) || cx + cy === 2;
       let ramp = RAMP.grass, v;
-      if (y < face) v = 0.62 + (clump - 0.5) * 0.35 + (n - 0.5) * 0.15 - (y - top) * 0.01 + (!up && y <= top + 1 ? 0.18 : 0); // vrch na slnku
-      else { ramp = RAMP.bush; v = 0.68 + (clump - 0.5) * 0.3 + (n - 0.5) * 0.12 - (y - face) * 0.05 - (y === face ? 0.25 : 0); } // čelo v tieni
+      if (y < face) v = 0.6 + (leaf - 0.5) * 0.3 + (clump - 0.5) * 0.18 + (n - 0.5) * 0.12 - (y - top) * 0.005 + (!up && y <= top + 2 ? 0.18 : 0); // vrch na slnku
+      else { ramp = RAMP.bush; v = 0.68 + (leaf - 0.5) * 0.26 + (clump - 0.5) * 0.14 + (n - 0.5) * 0.1 - (y - face) * 0.025 - (y <= face + 1 ? 0.25 : 0); } // čelo v tieni
       if (edge) { ramp = RAMP.bush; v = 0.02; }
-      const rgb = n > 0.985 && !edge ? hexRGB('#f4d0e0') : pickRamp(ramp, v, x, y), k = (y * w + x) * 4; // tu a tam kvietok
+      const rgb = n > 0.992 && !edge ? hexRGB('#f4d0e0') : pickRamp(ramp, v, x, y), k = (y * w + x) * 4; // tu a tam kvietok
       id.data[k] = rgb[0]; id.data[k + 1] = rgb[1]; id.data[k + 2] = rgb[2]; id.data[k + 3] = 255;
     }
     x2.putImageData(id, 0, 0);
-    return (hedgeCache[m] = { c, w, h });
+    return (hedgeCache[m] = { c, w: T, h: T + 4, hd: true });
   }
   BSPR.hedge = hedgeSpr(0); // samostatný plot: náhľad, ikonka, karta
   // bahno: plochá kaluž na zemi, so susedným bahnom sa zleje do jedného (maska ako pri plote); tmavé blato, mláky s odleskom
@@ -3700,13 +3723,13 @@
     let spr;
     if (b.kind === 'hedge') {
       spr = hedgeSpr((hedgeAt(b.c, b.r - 1) ? 1 : 0) | (hedgeAt(b.c + 1, b.r) ? 2 : 0) | (hedgeAt(b.c, b.r + 1) ? 4 : 0) | (hedgeAt(b.c - 1, b.r) ? 8 : 0));
-      g.drawImage(spr.c, x0, y0 + T + 1 - spr.h);
+      g.drawImage(spr.c, x0, y0 + T + 1 - spr.h, spr.w, spr.h);
       return;
     }
     if (b.kind === 'wall') {
       const m = (joinsV(b.c, b.r - 1) ? 1 : 0) | (joins(b.c + 1, b.r) ? 2 : 0) | (joinsV(b.c, b.r + 1) ? 4 : 0) | (joins(b.c - 1, b.r) ? 8 : 0);
       const wl = Math.max(1, Math.min(5, b.lvl)) - 1;
-      spr = wallsOf()[wl][m];
+      spr = wallsOf()[wl][m + 16 * wallSide(b.c)] || wallsOf()[wl][m];
       wallImg(g, spr, x0, y0);
       if (b.holyT > 0) holyGlow(spr, x0, y0 + 18 - spr.h, b.holyT, time);
       // napojenie na susedné budovy (veže, radnica); k okrajom obrazovky sa hradby nenaťahujú
@@ -3761,6 +3784,8 @@
     if (b.lvl > 1 && b.kind !== 'wall' && tabOf(b.kind) !== 'towers') pxText(g, String(b.lvl), x0 + bW(b) * T - 3, y0 + T - 6, '#f8d048'); // úroveň (veže ju majú len na vzhľade)
   }
   // hradba na políčku (x, y): spodok 2 body pod políčkom, jemná kresba je vyššia ako stará (24 bodov)
+  // strana od hradu pre zvislý úsek hradby: 1 = vľavo (úsek pri ľavom okraji políčka), 2 = vpravo (pri pravom), 0 = nad/pod hradom (v strede)
+  const wallSide = c => c < G.hc0 ? 1 : c > G.hc0 + 2 ? 2 : 0;
   const wallImg = (ctx, spr, x, y) => ctx.drawImage(spr.c, x, y + 18 - spr.h, spr.w, spr.h);
   const JOINERS = { wall: 1, tower: 1, mage: 1, pitch: 1, icetower: 1, ballista: 1 }; // hradby sa napájajú len na hradby a veže (strážna, mága) – na ostatné budovy nie
   const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL ? r === G.hr0 + 2 : !!JOINERS[o.kind]); }; // na hrad len zo spodného radu (tam má bočné múry)
@@ -4006,8 +4031,8 @@
         const x = tileX(q.c), y = tileY(q.r);
         const m = (jv(q.c, q.r - 1) ? 1 : 0) | (j(q.c + 1, q.r) ? 2 : 0) | (jv(q.c, q.r + 1) ? 4 : 0) | (j(q.c - 1, q.r) ? 8 : 0);
         if (drag.kind === 'mud') { const ms = mudSpr(mudMask(q.c, q.r, (c, r) => inPath.has(key(c, r)) || mudAt(c, r))); g.drawImage(ms.c, x, y); }
-        else if (drag.kind === 'hedge') { const hs = hedgeSpr((inPath.has(key(q.c, q.r - 1)) || hedgeAt(q.c, q.r - 1) ? 1 : 0) | (inPath.has(key(q.c + 1, q.r)) || hedgeAt(q.c + 1, q.r) ? 2 : 0) | (inPath.has(key(q.c, q.r + 1)) || hedgeAt(q.c, q.r + 1) ? 4 : 0) | (inPath.has(key(q.c - 1, q.r)) || hedgeAt(q.c - 1, q.r) ? 8 : 0)); g.drawImage(hs.c, x, y + T + 1 - hs.h); }
-        else if (stake) g.drawImage(BSPR.stake.c, x, y + T + 1 - BSPR.stake.h); else wallImg(g, wallsOf()[0][m], x, y);
+        else if (drag.kind === 'hedge') { const hs = hedgeSpr((inPath.has(key(q.c, q.r - 1)) || hedgeAt(q.c, q.r - 1) ? 1 : 0) | (inPath.has(key(q.c + 1, q.r)) || hedgeAt(q.c + 1, q.r) ? 2 : 0) | (inPath.has(key(q.c, q.r + 1)) || hedgeAt(q.c, q.r + 1) ? 4 : 0) | (inPath.has(key(q.c - 1, q.r)) || hedgeAt(q.c - 1, q.r) ? 8 : 0)); g.drawImage(hs.c, x, y + T + 1 - hs.h, hs.w, hs.h); }
+        else if (stake) g.drawImage(BSPR.stake.c, x, y + T + 1 - BSPR.stake.h); else wallImg(g, wallsOf()[0][m + 16 * wallSide(q.c)] || wallsOf()[0][m], x, y);
         if (i >= ok) { g.fillStyle = 'rgba(232,72,56,0.55)'; g.fillRect(x, y - 6, T, T + 6); }
       });
       g.globalAlpha = 1;
@@ -5246,7 +5271,7 @@
       objs.push({ y: fw.y + 3, f: () => drawFireFlames(fw, time, true) });
     }
     if (playing) {
-      if (!isAssault()) objs.push({ y: G.hallBot, f: () => drawHall(time) });
+      if (!isAssault()) objs.push({ y: G.hallBot, x: 1e9, f: () => drawHall(time) }); // hrad je v svojom rade vždy vpredu
       for (const b of st.blds) if (!TRAPS[b.kind] && b.kind !== 'mud') objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), x: b.c, f: () => drawBuilding(b, time) });
       for (const s of st.soldiers) {
         const cast = s.helper === 'chapel' && s.working && s.tgt && !s.dead; // mních pri liečení zdvihne palicu
@@ -5275,7 +5300,7 @@
       } });
       for (const r of st.camp.rocks) objs.push({ y: 9999, f: () => drawRock(r) });
     }
-    objs.sort((a, b) => a.y - b.y || (b.x || 0) - (a.x || 0) || (a.id || 0) - (b.id || 0)); // v rovnakom rade je ľavejšia budova vpredu, jednotky v stálom poradí
+    objs.sort((a, b) => a.y - b.y || (a.x || 0) - (b.x || 0) || (a.id || 0) - (b.id || 0)); // v rovnakom rade je pravejšia budova vpredu (hrad vždy), jednotky v stálom poradí
     for (const o of objs) o.f();
     if (st.phase === 'build') drawPlaceGhost(time);
     if (st.phase === 'build') drawBlockedMarks(time); // výkričníky až nad budovami a hradbami
@@ -5491,7 +5516,7 @@
     for (const k of ['siegeRam', 'siegeCat', 'siegeFire', 'siegeTower']) ICONS['u_' + k] = spriteURL(trimmed(SPR[raceSpr(k) + '8'][1].idle), 2);
     ICONS.king = ICONS.hero_king = isOrc() ? heroPortrait(SPR.chief8, 12, 5, 18) : heroPortrait(SPR.king8, 12, 6, 18);
     ICONS.paving = spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3); // kamenná dlažba či orkské dosky
-    ICONS.hedge = spriteURL(BSPR.hedge, 3); ICONS.mud = spriteURL(BSPR.mud, 3);
+    ICONS.hedge = sprIcon(BSPR.hedge); ICONS.mud = spriteURL(BSPR.mud, 3);
     // ikony nepriateľov (novinky na mape, úspechy): za orkov ľudské jednotky
     for (const k of ['orc', 'garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf', 'giantRam', 'mammoth']) {
       const f = foeSpr(k), big = k === 'orcKing' || ENEMY[k].giant;
@@ -5521,7 +5546,7 @@
     syncHeroIcons(); updateGems();
     ICONS.coin = spriteURL(SPR.coin[0], 4);
     ICONS.paving = spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3);
-    ICONS.hedge = spriteURL(BSPR.hedge, 3); ICONS.mud = spriteURL(BSPR.mud, 3);
+    ICONS.hedge = sprIcon(BSPR.hedge); ICONS.mud = spriteURL(BSPR.mud, 3);
     Object.assign(ICONS, { sp_volley: UI_ICONS.spellVolley, sp_fire: UI_ICONS.spellFire, sp_frost: UI_ICONS.spellFrost, sp_bolt: UI_ICONS.spellBolt,
       sp_warcry: UI_ICONS.spellHorn, sp_shield: UI_ICONS.spellShield, sp_heal: UI_ICONS.spellHeal, sp_firewall: UI_ICONS.spellFirewall, sp_teleport: UI_ICONS.spellTeleport,
       sp_rage: UI_ICONS.spellRage, sp_roar: UI_ICONS.spellRoar, sp_axe: UI_ICONS.spellAxe,

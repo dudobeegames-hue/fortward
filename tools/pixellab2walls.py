@@ -2,6 +2,7 @@
 
 Použitie: python tools/pixellab2walls.py <výstup.js> <MENO_KONŠTANTY> <rovná hradba úrovne 1> [<úrovne 2> …]
 Bitmaska susedov ako v hre: N=1 E=2 S=4 W=8. Sprite má 32×64 px (v hre 16×32 bodov, jemná kresba), spodok je 2 body pod políčkom.
+Každý variant je trikrát: zvislý úsek a pilier v strede políčka, pri jeho ľavom a pri pravom okraji.
 Zvislý úsek = úzky rad brvien zo vzorky radený za sebou (každé o 4 px vyššie), roh a koniec = pilier zo vzorky o kus vyšší (drevo previazané lanom).
 """
 import glob
@@ -65,9 +66,12 @@ def pillar(s):
     return p.crop(p.split()[3].getbbox())
 
 
-def variants(s):
+SIDES = (16, 6, 26)  # stred zvislého úseku a piliera: v strede políčka, pri ľavom okraji (vľavo od hradu), pri pravom (vpravo od hradu)
+
+
+def variants(s, cx=16):
     lg, pl = log_strip(s), pillar(s)
-    vx = (W - lg.width) // 2
+    vx = cx - lg.width // 2
     out = []
     for m in range(16):
         N, E, S, Wn = m & 1, m & 2, m & 4, m & 8
@@ -78,11 +82,11 @@ def variants(s):
         if N and S: feet.append(FOOT)
         for f in sorted(feet):                                # zozadu dopredu
             im.alpha_composite(lg, (vx, f - lg.height))
-        if Wn: im.alpha_composite(s.crop((0, 0, 16, s.height)), (0, FOOT - s.height))
-        if E: im.alpha_composite(s.crop((16, 0, 32, s.height)), (16, FOOT - s.height))
+        if Wn: im.alpha_composite(s.crop((0, 0, cx, s.height)), (0, FOOT - s.height))        # rameno k ľavému susedovi
+        if E: im.alpha_composite(s.crop((cx, 0, 32, s.height)), (cx, FOOT - s.height))       # a k pravému (vzorka sa opakuje po 32 px)
         straight = m in (5, 10)
         if not straight:
-            im.alpha_composite(pl, ((W - pl.width) // 2, FOOT + 2 - pl.height))
+            im.alpha_composite(pl, (max(0, min(W - pl.width, cx - pl.width // 2)), FOOT + 2 - pl.height))
         if S and not straight:                                # brvná pred pilierom (bližšie k nám)
             for f in range(FOOT + 4, H + 1, 4):
                 im.alpha_composite(lg, (vx, f - lg.height))
@@ -95,7 +99,7 @@ def main():
     pal, levels = [], []
     for p in paths:
         rows_lv = []
-        for im in variants(sample(p)):
+        for im in [v for cx in SIDES for v in variants(sample(p), cx)]:
             rows = []
             for y in range(H):
                 r = ''
@@ -108,10 +112,11 @@ def main():
                 rows.append(r)
             rows_lv.append(rows)
         levels.append(rows_lv)
-        print('%s: 16 variantov %dx%d px' % (p, W, H))
+        print('%s: 3 × 16 variantov %dx%d px' % (p, W, H))
     js = ["'use strict';",
           '// %s: hradby z PixelLabu, jemná kresba. Vygenerované: tools/pixellab2walls.py – ručne neupravovať.' % name,
-          '// lv[úroveň][maska susedov N=1 E=2 S=4 W=8] = riadky znakov (znak = index v pal, \'.\' = priehľadné)',
+          '// lv[úroveň][maska susedov N=1 E=2 S=4 W=8 + 16 × strana] = riadky znakov (znak = index v pal, \'.\' = priehľadné);',
+          '// strana 0 = zvislý úsek v strede políčka, 1 = pri ľavom okraji (vľavo od hradu), 2 = pri pravom okraji (vpravo od hradu)',
           'const %s = %s;' % (name, json.dumps({'chars': ''.join(CHARS[:len(pal)]), 'pal': pal, 'lv': levels}, separators=(',', ':')).replace('],[', '],\n[')), '']
     open(os.path.join(ROOT, out), 'w', encoding='utf8').write('\n'.join(js))
     print('%s: %d úrovní, %d farieb' % (name, len(levels), len(pal)))
