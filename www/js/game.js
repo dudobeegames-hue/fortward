@@ -3342,13 +3342,14 @@
   function smoothDir(u, mvx, mvy) { u._svx = (u._svx || 0) * 0.75 + mvx * 0.25; u._svy = (u._svy || 0) * 0.75 + mvy * 0.25; return dir8(u._svx, u._svy); }
   // chôdza s dobehom: krátke zastavenie na snímku-dve nezmení chôdzu na státie
   const stillFor = (u, moving) => (u._still = moving ? 0 : (u._still || 0) + 1);
-  const CAST_T = 0.36; // dĺžka kúzla čarodejky z PixelLabu (3 snímky po 0,12 s)
+  const CAST_T = 0.26; // dĺžka kúzla čarodejky z PixelLabu (2 snímky po 0,13 s)
   const hero8 = spr => SPR[spr + '8']; // hrdinovia prerobení do 8 smerov (kráľ, paladin, čarodejka)
   function king8Frame(u, set) {
     const mvx = u.x - (u._lx == null ? u.x : u._lx), mvy = u.y - (u._ly == null ? u.y : u._ly);
     u._lx = u.x; u._ly = u.y;
     const aim = u.aim && !u.aim.dead ? u.aim : null; // čarodejka mieri na diaľku
     const moving = stillFor(u, Math.hypot(mvx, mvy) > 0.02) < 4, t = aim || (u.tgt && !u.tgt.dead ? u.tgt : null);
+    if (Math.hypot(mvx, mvy) > 0.02 && Math.hypot(mvx, mvy) < 8) u._wd = (u._wd || 0) + Math.hypot(mvx, mvy); // krok podľa prejdenej cesty (aj pri návrate domov), nohy nekĺžu
     const near = t && (aim || Math.hypot(t.x - u.x, t.y - u.y) < 26);
     const sd = smoothDir(u, mvx, mvy);
     if (near) turn8(u, dir8(t.x - u.x, t.y - u.y), 3);
@@ -3356,10 +3357,10 @@
     else if (Math.hypot(heroPos(u).x - u.x, heroPos(u).y - u.y) < 3) turn8(u, 6, 5);
     if (u.face8 == null) u.face8 = 6;
     const v = set[u.face8];
-    if (u.swing > 0 && set.cast) return v.atk[1 + Math.min(2, Math.floor((1 - u.swing / CAST_T) * 3))]; // kúzlo čarodejky: švih ohňa, výstrel, dokončenie
+    if (u.swing > 0 && set.cast) return v.atk[2 + Math.min(1, Math.floor((1 - u.swing / CAST_T) * 2))]; // kúzlo čarodejky: výstrel, dokončenie (snímka so švihom ohňa sa vynechá)
     if (u.swing > 0) return v.slash; // meč nahradí svetelný oblúk švihu (kladivo ostane dopadnuté)
     if (near && u.cd < 0.25) return v.atk[0]; // napriahnutie pred úderom
-    if (moving) return v.walk[Math.floor(u.anim * 1.4) % 4];
+    if (moving) return v.walk[Math.floor((u._wd || 0) / (set.stride || 3.2)) % 4];
     return v.idle;
   }
   // svetelný oblúk švihu meča: rýchlo sa vykreslí v smere úderu a zhasne (biely okraj, modrastý chvost)
@@ -3511,7 +3512,7 @@
       cryAura(u, true, true);
       g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), Math.round(u.y - fr.h) + K8_PB, fr.w, fr.h); // pod chodidlami je miesto na zbraň (jemná kresba paladina: w×h v bodoch hry)
       if (sprName === 'paladin') drawSmash(u);
-      else if (heroDef().range && !hero8(sprName).cast) drawCastFlare(u, hero8(sprName)[u.face8], heroDef().proj === 'spirit');
+      else if (heroDef().range) { if (!hero8(sprName).cast) drawCastFlare(u, hero8(sprName)[u.face8], heroDef().proj === 'spirit'); } // čarodejka: oheň je v kresbe, bez oblúka meča
       else if (u.swing > 0) drawSlash(u.x, u.y - (sprName === 'bearlord' ? 13 : 9), u.face8 * Math.PI / 4, 1 - u.swing / 0.3); // jazdec na medveďovi udiera zhora
       cryAura(u, true);
       return;

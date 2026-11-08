@@ -1,6 +1,6 @@
 """Prevod postavy z PixelLabu (postavy/<priečinok>) do JS súboru s riadkami znakov palety PAL.
 
-Použitie: python tools/pixellab2js.py <priečinok> <MENO_KONŠTANTY> <výstup.js> [snímky útoku, napr. 2,3,4] [smer=snímky ...] [--hd] [--wide] [--all]
+Použitie: python tools/pixellab2js.py <priečinok> <MENO_KONŠTANTY> <výstup.js> [snímky útoku, napr. 2,3,4] [smer=snímky ...] [--hd] [--wide] [--all] [--exact]
 (--wide = státie sa doplní na väčšie plátno animácií namiesto orezania animácií)
 (--hd = jemná kresba v dvojnásobnej mriežke, napr. plátno 48×48 alebo 64×64; hra ju kreslí v polovičnej veľkosti)
 (snímky sa číslujú od 0; smer=snímky, napr. south=2,3, vyberie iné snímky pre jeden smer, keď sa v ňom generátor pomýlil)
@@ -37,6 +37,10 @@ def lab(c):
 
 PL = {k: lab(c) for c, k in EXACT.items()}
 off = 0
+# --exact: farby mimo palety dostanú vlastné znaky (art.pal), aby sa napr. hrdzavé vlasy nezmenili na jasne červenú;
+# farby veľmi blízke palete (rozdiel v Lab < 5) sa zlúčia s ňou
+EXTRA = {}
+POOL = [ch for ch in '0123456789ACFHIJNQTUVXYZabfhijktuxz!#$%&()*+,-/:;<=>?@[]^_`{|}~' if ch not in pal]
 
 
 def char(c):
@@ -44,7 +48,13 @@ def char(c):
     if c in EXACT: return EXACT[c]
     off += 1
     L = lab(c)
-    return min(PL, key=lambda k: sum((a - b) ** 2 for a, b in zip(L, PL[k])))
+    near = min(PL, key=lambda k: sum((a - b) ** 2 for a, b in zip(L, PL[k])))
+    if '--exact' not in sys.argv or sum((a - b) ** 2 for a, b in zip(L, PL[near])) < 25: return near
+    if c not in EXTRA:
+        if len(EXTRA) >= len(POOL):  # znaky došli: najbližšia z doterajších vlastných farieb
+            return min(EXTRA.values(), key=lambda k: sum((a - b) ** 2 for a, b in zip(L, lab(next(cc for cc, kk in EXTRA.items() if kk == k)))))
+        EXTRA[c] = POOL[len(EXTRA)]
+    return EXTRA[c]
 
 
 def load(path):
@@ -53,7 +63,7 @@ def load(path):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if a not in ('--hd', '--wide', '--all')]
+    args = [a for a in sys.argv[1:] if a not in ('--hd', '--wide', '--all', '--exact')]
     nrun = 99 if '--all' in sys.argv else 4  # --all = všetky snímky pohybu (napr. 5 snímok mávania sokola)
     wide = '--wide' in sys.argv  # väčšie plátno animácií: státie sa doplní na ich veľkosť (meč pri švihu sa neoreže)
     hd = '--hd' in sys.argv  # jemná kresba (dvojnásobná mriežka): hra ju kreslí v polovičnej veľkosti
@@ -106,6 +116,7 @@ def main():
     crop = lambda fr: top + (fr + ['.' * rw] * h0)[:h0]
     data = {'rot': [crop(f) for f in rot], 'run': [[crop(f) for f in d] for d in run], 'atk': [[crop(f) for f in d] for d in atk]}
     if hd: data['hd'] = True
+    if EXTRA: data['pal'] = {k: '#%02x%02x%02x' % c for c, k in EXTRA.items()}
     js = ["'use strict';",
           '// %s: postava z PixelLabu (postavy/%s) v palete PAL, každý znak = 1 pixel%s. Vygenerované: tools/pixellab2js.py – ručne neupravovať.' % (name, folder, ', jemná kresba (hra ju kreslí v polovičnej veľkosti)' if hd else ''),
           '// rot: státie v 8 smeroch (0 vpravo, 1 vpravo dole … 7 vpravo hore), run: chôdza 4 snímky, atk: vybrané snímky útoku (%s z PixelLabu%s)%s' % (
@@ -113,6 +124,6 @@ def main():
               '; bez vlastnej animácie (použitý najbližší smer): ' + ', '.join(missing) if missing else ''),
           'const %s = %s;' % (name, json.dumps(data, separators=(',', ':')).replace('],[', '],\n[')), '']
     open(os.path.join(ROOT, out), 'w', encoding='utf8').write('\n'.join(js))
-    print('%s: %dx%d%s, run %s, atk %s, pixelov mimo palety: %d, chýba: %s' % (name, rw, H, ' hd' if hd else '', [len(d) for d in run], [len(d) for d in atk], off, missing))
+    print('%s: %dx%d%s, run %s, atk %s, pixelov mimo palety: %d, vlastných farieb: %d, chýba: %s' % (name, rw, H, ' hd' if hd else '', [len(d) for d in run], [len(d) for d in atk], off, len(EXTRA), missing))
 
 main()

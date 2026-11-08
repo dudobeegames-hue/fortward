@@ -1099,8 +1099,8 @@ const buildPaladin8 = () => typeof PALADIN_ART !== 'undefined' ? buildPaladinArt
 // čarodejka z PixelLabu (sorc-art.js), jemná kresba: atk = zdvihnutie palice, švih ohňa, výstrel, dokončenie; slash = snímka výstrelu;
 // tip = stred ohnivej gule na palici (svetlé teplé pixely) voči chodidlám – odtiaľ vyletí ohnivá strela
 function buildSorcArt8() {
-  const set = buildArt8(SORC_ART, null, 4);
-  set.cast = true; // atk = zdvihnutie palice, švih ohňa, výstrel, dokončenie – hra ich prehrá za sebou
+  const set = buildArt8(SORC_ART, null, 3); // krok 3 body na snímku
+  set.cast = true; // atk = zdvihnutie palice, (švih ohňa – nepoužíva sa), výstrel, dokončenie
   set.forEach((v, d) => {
     v.slash = v.atk[2];
     const fr = v.slash, W = fr.c.width, H = fr.c.height, k = W / fr.w, px = fr.px.data, fx = W / 2, fy = H - U8_PB * k;
@@ -1112,7 +1112,7 @@ function buildSorcArt8() {
   return set;
 }
 function buildPaladinArt8() {
-  const set = buildArt8(PALADIN_ART, null, 4);
+  const set = buildArt8(PALADIN_ART, null, 2.6); // krátke kroky v kresbe – snímka každých 2,6 bodu, inak sa nohy kĺžu
   set.forEach((v, d) => {
     v.slash = v.atk[1];
     const fr = v.slash, W = fr.c.width, H = fr.c.height, k = W / fr.w, px = fr.px.data, a = d * Math.PI / 4, ca = Math.cos(a), sa = Math.sin(a);
@@ -1569,7 +1569,8 @@ const buildKnight8 = pal => buildUnit8({ pal, body: KN8_BODY, shield: KN8_SHIELD
 // jednotka v 8 smeroch nakreslená v PixelLabe (riadky znakov z tools/pixellab2js.py) – rovnaký tvar ako buildUnit8;
 // art.hd = jemná kresba (dvojnásobná mriežka): plátno ostane v plnom rozlíšení, w a h sú v bodoch hry (polovica)
 function buildArt8(art, pal, stride) {
-  const spr = rows => { const s = buildSprite(rows, pal); if (art.hd) { s.w /= 2; s.h /= 2; s.hd = true; } return s; }; // záblesk aj silueta sú hotové, pixely v s.px
+  const own = art.pal ? Object.assign({}, art.pal, pal) : pal; // vlastné farby kresby (pixellab2js --exact)
+  const spr = rows => { const s = buildSprite(rows, own); if (art.hd) { s.w /= 2; s.h /= 2; s.hd = true; } return s; }; // záblesk aj silueta sú hotové, pixely v s.px
   const all = art.rot.map((rot, d) => ({ idle: spr(rot), walk: art.run[d].map(spr), atk: art.atk[d].map(spr) }));
   all.stride = stride || 3.2;
   return all;
