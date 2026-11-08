@@ -1092,7 +1092,15 @@ const SORC8_HAND = {
 };
 const buildSorc8 = () => typeof SORC_ART !== 'undefined' ? buildSorcArt8() : buildHero8({ body: SORC8_BODY, kneel: SORC8_KNEEL, weapon: 'staff', hand: SORC8_HAND,
   pal: Object.assign({}, PAL_SORC, { M: '#6e4422', D: '#3e2614' }) }); // M, D = čižmy pod šatami
-const buildKing8 = () => buildHero8({ body: K8_BODY, kneel: K8_KNEEL, weapon: 'sword' });
+const buildKing8 = () => typeof KING_ART !== 'undefined' ? buildKingArt8() : buildHero8({ body: K8_BODY, kneel: K8_KNEEL, weapon: 'sword' });
+// kráľ z PixelLabu (king-art.js), jemná kresba: atk = napriahnutie, švih meča, dokončenie švihu, návrat; počas úderu (swing 0,3 s)
+// sa za sebou prehrajú snímky 1–3 (seq), bez kľačiaceho pohľadu (padne ako ostatní)
+function buildKingArt8() {
+  const set = buildArt8(KING_ART, null, 3);
+  set.seq = [1, 2, 3]; set.seqT = 0.3;
+  set.forEach(v => { v.slash = v.atk[2]; v.tip = { x: 0, y: -8 }; });
+  return set;
+}
 const buildPaladin8 = () => typeof PALADIN_ART !== 'undefined' ? buildPaladinArt8() : buildHero8({ body: PAL8_BODY, kneel: PAL8_KNEEL, weapon: 'hammer', pal: PAL_PALADIN });
 // paladin z PixelLabu (paladin-art.js), jemná kresba: atk = napriahnutie (kladivo hore), úder, dokončenie; slash = snímka úderu;
 // tip = hlava kladiva v momente dopadu voči chodidlám (body hry) – tam vznikne zlatá tlaková vlna; bez kľačiaceho pohľadu (padne ako ostatní)
@@ -1101,6 +1109,7 @@ const buildPaladin8 = () => typeof PALADIN_ART !== 'undefined' ? buildPaladinArt
 function buildSorcArt8() {
   const set = buildArt8(SORC_ART, null, 3); // krok 3 body na snímku
   set.cast = true; // atk = zdvihnutie palice, (švih ohňa – nepoužíva sa), výstrel, dokončenie
+  set.seq = [2, 3]; set.seqT = 0.26; // počas kúzla: výstrel, dokončenie
   set.forEach((v, d) => {
     v.slash = v.atk[2];
     const fr = v.slash, W = fr.c.width, H = fr.c.height, k = W / fr.w, px = fr.px.data, fx = W / 2, fy = H - U8_PB * k;

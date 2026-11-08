@@ -3362,7 +3362,7 @@
     else if (Math.hypot(heroPos(u).x - u.x, heroPos(u).y - u.y) < 3) turn8(u, 6, 5);
     if (u.face8 == null) u.face8 = 6;
     const v = set[u.face8];
-    if (u.swing > 0 && set.cast) return v.atk[2 + Math.min(1, Math.floor((1 - u.swing / CAST_T) * 2))]; // kúzlo čarodejky: výstrel, dokončenie (snímka so švihom ohňa sa vynechá)
+    if (u.swing > 0 && set.seq) return v.atk[set.seq[Math.max(0, Math.min(set.seq.length - 1, Math.floor((1 - u.swing / set.seqT) * set.seq.length)))]]; // kresba z PixelLabu: úder či kúzlo prehrá snímky za sebou
     if (u.swing > 0) return v.slash; // meč nahradí svetelný oblúk švihu (kladivo ostane dopadnuté)
     if (near && u.cd < 0.25) return v.atk[0]; // napriahnutie pred úderom
     if (moving) return v.walk[Math.floor((u._wd || 0) / (set.stride || 3.2)) % 4];
