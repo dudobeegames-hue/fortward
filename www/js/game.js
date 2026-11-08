@@ -49,6 +49,7 @@
     workshop: { name: 'Dielňa remeselníka', short: 'Dielňa', cost: 90, hp: 180, block: true, desc: 'Vyšle remeselníka, ktorý chodí opravovať poškodené budovy' },
   };
   const TRAPS = { pit: 1, firepit: 1, beartrap: 1 };
+  const PIT_REPEAT = 1.5; // jama s ostňami: kto v nej stojí, zraní sa znova každých 1,5 s
   const FIRE_BURN = 4; // ohnivá jama: horenie trvá 4 s (pri 8/s = 32 poškodenia – viac za zlato ako jama s ostňami, tá zas spomaľuje)
   const SHOOTERS = { tower: 1, mage: 1, pitch: 1, icetower: 1, ballista: 1 };
   const PITCH_WALL = 40, PITCH_SPLASH = 13; // smolná veža: hradby do 40 bodov od nej, smola zasiahne každého do 13 bodov od takej hradby
@@ -1713,12 +1714,16 @@
     if (here && here !== HALL && TRAPS[here.kind] && !e.d.fly) {
       const fresh = e.trap !== here;
       e.trap = here;
+      e.trapT = fresh ? 0 : (e.trapT || 0) + dt; // ako dlho na pasci stojí (lučištník na nej zastane a strieľa)
       if (here.kind === 'pit') {
         spd *= 0.5;
-        if (fresh) { damage(e, bDmg(here)); for (let k = 0; k < 4; k++) part(e.x, e.y - 2, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.3, '#bcc0cc', 80); if (e.dead) return; }
-      } else if (here.kind === 'firepit' && fresh) {
-        e.burnT = Math.max(e.burnT || 0, FIRE_BURN); e.burnDps = Math.max(e.burnDps || 0, bDmg(here)); AUDIO.play('fire');
-      } else if (here.kind === 'beartrap' && fresh && !(here.armT > 0)) {
+        const again = !fresh && e.trapT >= PIT_REPEAT; // kto v jame stojí, ostne ho zrania znova každých PIT_REPEAT s
+        if (again) e.trapT = 0;
+        if (fresh || again) { damage(e, bDmg(here)); for (let k = 0; k < 4; k++) part(e.x, e.y - 2, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.3, '#bcc0cc', 80); if (e.dead) return; }
+      } else if (here.kind === 'firepit') { // kým v ohni stojí, horí ďalej (horenie sa obnovuje)
+        if (fresh) AUDIO.play('fire');
+        e.burnT = Math.max(e.burnT || 0, FIRE_BURN); e.burnDps = Math.max(e.burnDps || 0, bDmg(here));
+      } else if (here.kind === 'beartrap' && !(here.armT > 0)) { // nabitá pasca chytí aj toho, kto na nej už stojí
         e.stunT = trapStun(here) * (e.d.boss ? 0.4 : 1); here.armT = 6; here.flash = 0.1;
         AUDIO.play('clang'); for (let k = 0; k < 5; k++) part(e.x, e.y - 2, (Math.random() - 0.5) * 30, -Math.random() * 20, 0.3, '#f4f4f8', 80);
         return;
