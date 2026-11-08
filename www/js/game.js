@@ -3518,7 +3518,7 @@
       g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), Math.round(u.y - fr.h) + K8_PB, fr.w, fr.h); // pod chodidlami je miesto na zbraň (jemná kresba paladina: w×h v bodoch hry)
       if (sprName === 'paladin') drawSmash(u);
       else if (heroDef().range) { if (!hero8(sprName).cast) drawCastFlare(u, hero8(sprName)[u.face8], heroDef().proj === 'spirit'); } // čarodejka: oheň je v kresbe, bez oblúka meča
-      else if (u.swing > 0) drawSlash(u.x, u.y - (sprName === 'bearlord' ? 13 : 9), u.face8 * Math.PI / 4, 1 - u.swing / 0.3); // jazdec na medveďovi udiera zhora
+      else if (u.swing > 0 && !hero8(sprName).seq) drawSlash(u.x, u.y - (sprName === 'bearlord' ? 13 : 9), u.face8 * Math.PI / 4, 1 - u.swing / 0.3); // jazdec na medveďovi udiera zhora
       cryAura(u, true);
       return;
     }
