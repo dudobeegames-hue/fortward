@@ -7369,22 +7369,9 @@
     updateHud();
     requestAnimationFrame(frame);
     SPLASH.done();
-    prewarmHits(keys);
   })();
   // predpríprava zásahov na pozadí: biely záblesk (vlastné jednotky) a červený nádych (nepriatelia) sa inak vyrábali
   // až pri prvom zásahu každej snímky a v boji to spôsobovalo drobné zaseknutia; robí sa po malých dávkach (najviac ~5 ms)
-  function prewarmHits(keys) {
-    const frames = [];
-    const collect = o => { if (!o) return; if (o.c) frames.push(o); else if (typeof o === 'object') for (const k in o) if (k !== 'tip') collect(o[k]); };
-    for (const k of keys) { const set = SPR[k]; if (Array.isArray(set)) set.forEach(collect); }
-    let i = 0;
-    const step = () => {
-      const t0 = performance.now();
-      while (i < frames.length && performance.now() - t0 < 5) { const fr = frames[i++]; void fr.f; hitSpr(fr); }
-      if (i < frames.length) setTimeout(step, 30);
-    };
-    setTimeout(step, 500);
-  }
   SPLASH.onPlay = () => showSlots(); // zelené tlačidlo Hrať na úvodnom obrázku otvorí pozície
 
   // ---------------- Ladenie ----------------

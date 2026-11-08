@@ -487,29 +487,22 @@ function buildSprite(rows, palOverride) {
   const h = rows.length, w = rows[0].length;
   rows.forEach((r, i) => { if (r.length !== w) console.warn('Sprite: zlá šírka riadku', i, r); });
   const pal = Object.assign({}, PAL, palOverride || {});
-  const mk = () => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
-  const c = mk(), f = mk(), sil = mk();
-  const cx = c.getContext('2d'), fx = f.getContext('2d'), sx = sil.getContext('2d');
-  const id = cx.createImageData(w, h), fd = fx.createImageData(w, h), sd = sx.createImageData(w, h);
-  const outline = hexRGB(PAL.K);
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const cx = c.getContext('2d'), id = cx.createImageData(w, h), cache = {};
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const ch = rows[y][x];
       if (ch === '.') continue;
       if (!pal[ch]) { console.warn('Sprite: neznáma farba', ch); continue; }
-      const col = hexRGB(pal[ch]);
+      const col = cache[ch] || (cache[ch] = hexRGB(pal[ch]));
       const i = (y * w + x) * 4;
       id.data[i] = col[0]; id.data[i + 1] = col[1]; id.data[i + 2] = col[2]; id.data[i + 3] = 255;
-      // záblesk pri zásahu: obrys ostáva, vnútro biele
-      const fc = ch === 'K' ? outline : [255, 255, 255];
-      fd.data[i] = fc[0]; fd.data[i + 1] = fc[1]; fd.data[i + 2] = fc[2]; fd.data[i + 3] = 255;
-      // silueta pre zamknuté veci
-      const sc = ch === 'K' ? outline : [51, 51, 68];
-      sd.data[i] = sc[0]; sd.data[i + 1] = sc[1]; sd.data[i + 2] = sc[2]; sd.data[i + 3] = 255;
     }
   }
-  cx.putImageData(id, 0, 0); fx.putImageData(fd, 0, 0); sx.putImageData(sd, 0, 0);
-  return { c, f, sil, w, h, px: id }; // px = pixely kresby: zásah a päta sa z nich počítajú bez čítania z grafickej karty
+  cx.putImageData(id, 0, 0);
+  // záblesk pri zásahu (f: obrys ostáva, vnútro biele) a silueta zamknutých vecí (sil) sa vyrobia až pri prvom použití –
+  // väčšina snímok ich nikdy nepotrebuje a tisíce plátien navyše zahltili pamäť slabších tabletov
+  return lazyVariants({ c, w, h, px: id }); // px = pixely kresby: zásah a päta sa z nich počítajú bez čítania z grafickej karty
 }
 
 // ---- Postavičky rás (výber rasy, Nákupy): spredu, obrys sa dopočíta automaticky ----
