@@ -1090,12 +1090,27 @@ const SORC8_HAND = {
   SE: { idle: -1.75, atk: [-1.45, -2.15, -2.3] },
   S:  { idle: -1.7,  atk: [-1.45, -1.9, -2.0] },
 };
-const buildSorc8 = () => buildHero8({ body: SORC8_BODY, kneel: SORC8_KNEEL, weapon: 'staff', hand: SORC8_HAND,
+const buildSorc8 = () => typeof SORC_ART !== 'undefined' ? buildSorcArt8() : buildHero8({ body: SORC8_BODY, kneel: SORC8_KNEEL, weapon: 'staff', hand: SORC8_HAND,
   pal: Object.assign({}, PAL_SORC, { M: '#6e4422', D: '#3e2614' }) }); // M, D = čižmy pod šatami
 const buildKing8 = () => buildHero8({ body: K8_BODY, kneel: K8_KNEEL, weapon: 'sword' });
 const buildPaladin8 = () => typeof PALADIN_ART !== 'undefined' ? buildPaladinArt8() : buildHero8({ body: PAL8_BODY, kneel: PAL8_KNEEL, weapon: 'hammer', pal: PAL_PALADIN });
 // paladin z PixelLabu (paladin-art.js), jemná kresba: atk = napriahnutie (kladivo hore), úder, dokončenie; slash = snímka úderu;
 // tip = hlava kladiva v momente dopadu voči chodidlám (body hry) – tam vznikne zlatá tlaková vlna; bez kľačiaceho pohľadu (padne ako ostatní)
+// čarodejka z PixelLabu (sorc-art.js), jemná kresba: atk = zdvihnutie palice, švih ohňa, výstrel, dokončenie; slash = snímka výstrelu;
+// tip = stred ohnivej gule na palici (svetlé teplé pixely) voči chodidlám – odtiaľ vyletí ohnivá strela
+function buildSorcArt8() {
+  const set = buildArt8(SORC_ART, null, 4);
+  set.cast = true; // atk = zdvihnutie palice, švih ohňa, výstrel, dokončenie – hra ich prehrá za sebou
+  set.forEach((v, d) => {
+    v.slash = v.atk[2];
+    const fr = v.slash, W = fr.c.width, H = fr.c.height, k = W / fr.w, px = fr.px.data, fx = W / 2, fy = H - U8_PB * k;
+    let sx = 0, sy = 0, n = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; if (px[i + 3] && px[i] > 220 && px[i + 1] > 150 && px[i + 2] < 140) { sx += x; sy += y; n++; } }
+    if (!n) { const a = d * Math.PI / 4; sx = fx + Math.cos(a) * 12 * k; sy = fy - 14 * k; n = 1; } // poistka: pred ňou vo výške ramien
+    v.tip = { x: (sx / n - fx) / k, y: (sy / n - fy) / k };
+  });
+  return set;
+}
 function buildPaladinArt8() {
   const set = buildArt8(PALADIN_ART, null, 4);
   set.forEach((v, d) => {

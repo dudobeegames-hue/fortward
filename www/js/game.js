@@ -2046,7 +2046,7 @@
     if (t && !inRng) { moveKnight(k, t.x, t.y, k.spd * waterMul(k), dt); k.anim += dt * 6; }
     else if (t) {
       if (k.cd <= 0) {
-        k.cd = heroDef().cd * (1 - 0.12 * tal('swift')) * (st.cryT > 0 ? 0.6 : 1); k.swing = 0.15;
+        k.cd = heroDef().cd * (1 - 0.12 * tal('swift')) * (st.cryT > 0 ? 0.6 : 1); k.swing = hero8(heroDef().spr) && hero8(heroDef().spr).cast ? CAST_T : 0.15;
         const set = hero8(heroDef().spr);
         if (set) k.face8 = dir8(t.x - k.x, t.y - k.y); // natočí sa k cieľu ešte pred výstrelom
         const tip = set ? set[k.face8].tip : { x: 5, y: -15 };
@@ -2058,7 +2058,7 @@
       if (cp && Math.hypot(cp.x - k.x, cp.y - k.y) > rng) { moveKnight(k, cp.x, cp.y, k.spd * waterMul(k), dt); k.anim += dt * 6; }
       else if (cp) {
         if (k.cd <= 0) {
-          k.cd = heroDef().cd * (1 - 0.12 * tal('swift')) * (st.cryT > 0 ? 0.6 : 1); k.swing = 0.15;
+          k.cd = heroDef().cd * (1 - 0.12 * tal('swift')) * (st.cryT > 0 ? 0.6 : 1); k.swing = hero8(heroDef().spr) && hero8(heroDef().spr).cast ? CAST_T : 0.15;
           const set = hero8(heroDef().spr), a = campAim(cp);
           if (set) k.face8 = dir8(cp.x - k.x, cp.y - k.y);
           const tip = set ? set[k.face8].tip : { x: 5, y: -15 };
@@ -3342,6 +3342,7 @@
   function smoothDir(u, mvx, mvy) { u._svx = (u._svx || 0) * 0.75 + mvx * 0.25; u._svy = (u._svy || 0) * 0.75 + mvy * 0.25; return dir8(u._svx, u._svy); }
   // chôdza s dobehom: krátke zastavenie na snímku-dve nezmení chôdzu na státie
   const stillFor = (u, moving) => (u._still = moving ? 0 : (u._still || 0) + 1);
+  const CAST_T = 0.36; // dĺžka kúzla čarodejky z PixelLabu (3 snímky po 0,12 s)
   const hero8 = spr => SPR[spr + '8']; // hrdinovia prerobení do 8 smerov (kráľ, paladin, čarodejka)
   function king8Frame(u, set) {
     const mvx = u.x - (u._lx == null ? u.x : u._lx), mvy = u.y - (u._ly == null ? u.y : u._ly);
@@ -3355,6 +3356,7 @@
     else if (Math.hypot(heroPos(u).x - u.x, heroPos(u).y - u.y) < 3) turn8(u, 6, 5);
     if (u.face8 == null) u.face8 = 6;
     const v = set[u.face8];
+    if (u.swing > 0 && set.cast) return v.atk[1 + Math.min(2, Math.floor((1 - u.swing / CAST_T) * 3))]; // kúzlo čarodejky: švih ohňa, výstrel, dokončenie
     if (u.swing > 0) return v.slash; // meč nahradí svetelný oblúk švihu (kladivo ostane dopadnuté)
     if (near && u.cd < 0.25) return v.atk[0]; // napriahnutie pred úderom
     if (moving) return v.walk[Math.floor(u.anim * 1.4) % 4];
@@ -3509,7 +3511,7 @@
       cryAura(u, true, true);
       g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), Math.round(u.y - fr.h) + K8_PB, fr.w, fr.h); // pod chodidlami je miesto na zbraň (jemná kresba paladina: w×h v bodoch hry)
       if (sprName === 'paladin') drawSmash(u);
-      else if (heroDef().range) drawCastFlare(u, hero8(sprName)[u.face8], heroDef().proj === 'spirit');
+      else if (heroDef().range && !hero8(sprName).cast) drawCastFlare(u, hero8(sprName)[u.face8], heroDef().proj === 'spirit');
       else if (u.swing > 0) drawSlash(u.x, u.y - (sprName === 'bearlord' ? 13 : 9), u.face8 * Math.PI / 4, 1 - u.swing / 0.3); // jazdec na medveďovi udiera zhora
       cryAura(u, true);
       return;
@@ -5522,24 +5524,20 @@
   }
   // ikony jednotiek a hrdinu podľa rasy (portrét = hlava a ramená zozadu, orezané z 8-smerovej sady)
   const portraitCache = new Map();
-  function heroPortrait(set, x, y, n) {
-    const key = x + ',' + y + ',' + n, hit = portraitCache.get(set); // sada je kľúčom mapy, výrez porovnáme
-    if (hit && hit.key === key) return hit.url;
-    const url = heroPortraitRaw(set, x, y, n); portraitCache.set(set, { key, url }); return url;
+  // portrét hrdinu: pohľad zo smeru juhovýchod (všade rovnaký), štvorec n pixelov plátna okolo stredu postavy od temena;
+  // jemná kresba (PixelLab) 2×, stará kresba 3×; sada je kľúčom vyrovnávacej pamäte
+  function heroPortrait(set, n) {
+    const fr = set[1].idle, hit = portraitCache.get(set);
+    if (hit && hit.key === n) return hit.url;
+    const url = hdPortrait(fr, fr.hd ? 30 : n, fr.hd ? 2 : 3); portraitCache.set(set, { key: n, url }); return url;
   }
-  // portrét z jemnej kresby (PixelLab): hlava a ramená zozadu, štvorec n pixelov plátna okolo stredu postavy od temena
-  function hdPortrait(fr, n) {
-    const W = fr.c.width, H = fr.c.height, d = fr.px.data;
+  function hdPortrait(fr, n, sc) {
+    const W = fr.c.width, H = fr.c.height, d = fr.px ? fr.px.data : fr.c.getContext('2d').getImageData(0, 0, W, H).data;
     let x0 = W, x1 = -1, y0 = H;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); }
     const c = document.createElement('canvas'); c.width = n; c.height = n;
     c.getContext('2d').drawImage(fr.c, Math.round((x0 + x1) / 2 - n / 2), y0 - 1, n, n, 0, 0, n, n);
-    return spriteURL({ c, w: n, h: n }, 2);
-  }
-  function heroPortraitRaw(set, x, y, n) {
-    const c = document.createElement('canvas'); c.width = n; c.height = n;
-    c.getContext('2d').drawImage(set[6].idle.c, x, y, n, n, 0, 0, n, n);
-    return spriteURL({ c, w: n, h: n }, 3);
+    return spriteURL({ c, w: n, h: n }, sc || 2);
   }
   // ikona jednotky: nová kresba z PixelLabu (jemná, státie tvárou k nám, orezané na postavu, 2× jej pixely), inak stará kresba 3×
   function unitIcon(k) {
@@ -5558,7 +5556,7 @@
     ICONS.u_spear = unitIcon('spear'); ICONS.u_rider = unitIcon('rider'); ICONS.u_monk = unitIcon('monk'); ICONS.u_craft = unitIcon('craft'); // aj oddiely pri útoku na hrad
     ICONS.u_falcon = isOrc() ? spriteURL(SPR.bat[0], 3) : unitIcon('falcon'); // sokol z PixelLabu
     for (const k of ['siegeRam', 'siegeCat', 'siegeFire', 'siegeTower']) ICONS['u_' + k] = spriteURL(trimmed(SPR[raceSpr(k) + '8'][1].idle), 2);
-    ICONS.king = ICONS.hero_king = isOrc() ? heroPortrait(SPR.chief8, 12, 5, 18) : heroPortrait(SPR.king8, 12, 6, 18);
+    ICONS.king = ICONS.hero_king = isOrc() ? heroPortrait(SPR.chief8, 18) : heroPortrait(SPR.king8, 18);
     ICONS.paving = spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3); // kamenná dlažba či orkské dosky
     ICONS.hedge = sprIcon(BSPR.hedge); ICONS.mud = spriteURL(BSPR.mud, 3);
     // ikony nepriateľov (novinky na mape, úspechy): za orkov ľudské jednotky
@@ -5573,17 +5571,12 @@
     ICONS.u_crossbow = spriteURL(SPR.knight[0], 3);
     ICONS.king = spriteURL(SPR.king[0], 3);
     for (const id of HERO_IDS) ICONS['hero_' + id] = spriteURL(SPR[HEROES[id].spr][0], 3);
-    // portréty hrdinov v 8 smeroch: zozadu so zbraňou, orezané na postavu (kladivo je dlhšie, výrez je väčší)
-    const portrait = (set, x, y, n) => {
-      const c = document.createElement('canvas'); c.width = n; c.height = n;
-      c.getContext('2d').drawImage(set[6].idle.c, x, y, n, n, 0, 0, n, n);
-      return spriteURL({ c, w: n, h: n }, 3);
-    };
-    if (SPR.king8) ICONS.king = ICONS.hero_king = portrait(SPR.king8, 12, 6, 18);
-    if (SPR.paladin8) ICONS.hero_paladin = SPR.paladin8[6].idle.hd ? hdPortrait(SPR.paladin8[6].idle, 30) : portrait(SPR.paladin8, 11, 4, 20);
-    if (SPR.sorc8) ICONS.hero_sorc = portrait(SPR.sorc8, 11, 3, 20);
-    if (SPR.oshaman8) ICONS.hero_oshaman = portrait(SPR.oshaman8, 11, 3, 20);
-    if (SPR.bearlord8) ICONS.hero_obear = portrait(SPR.bearlord8, 12, 10, 20);
+    // portréty hrdinov v 8 smeroch: pohľad z juhovýchodu, orezané na postavu od temena
+    if (SPR.king8) ICONS.king = ICONS.hero_king = heroPortrait(SPR.king8, 18);
+    if (SPR.paladin8) ICONS.hero_paladin = heroPortrait(SPR.paladin8, 20);
+    if (SPR.sorc8) ICONS.hero_sorc = heroPortrait(SPR.sorc8, 20);
+    if (SPR.oshaman8) ICONS.hero_oshaman = heroPortrait(SPR.oshaman8, 20);
+    if (SPR.bearlord8) ICONS.hero_obear = heroPortrait(SPR.bearlord8, 20);
     ICONS.u_knight = spriteURL(SPR.soldier[0], 3); ICONS.u_footArcher = spriteURL(SPR.footArcher[0], 3);
     unitIcons(); // jednotky, obliehacie stroje a portrét hrdinu podľa rasy
     $('icoHall').src = UI_ICONS.hall;
