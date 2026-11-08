@@ -817,7 +817,7 @@
       }
       for (const o of st.enemies.concat(st.soldiers)) { o.x += dc * T; o.y += dr * T; }
     }
-    if (st.king) { st.king.hx = G.hallCx; st.king.hy = G.hallTop - 12; }
+    if (st.king) { st.king.hx = G.hallCx; st.king.hy = G.hallTop - 12 - T; }
     rebuildOcc();
   }
 
@@ -854,7 +854,8 @@
     setTimeout(go, ms);
   }
   // postavička nasadeného hrdinu pri radnici
-  const makeHero = () => ({ x: G.hallCx, y: G.hallTop - 12, hx: G.hallCx, hy: G.hallTop - 12, hp: kingMax(), cd: 0, tgt: null, down: 0, anim: 0, flash: 0, isKing: true, spd: heroDef().spd });
+  const makeHero = () => ({ x: G.hallCx, y: G.hallTop - 12 - T, hx: G.hallCx, hy: G.hallTop - 12 - T, // pred radnicou o políčko ďalej k horde
+ hp: kingMax(), cd: 0, tgt: null, down: 0, anim: 0, flash: 0, isKing: true, spd: heroDef().spd });
   // výmena hrdinu pred vlnou: padnutý zostáva padnutý (až do oživenia), ostatní idú do boja zdraví
   function switchHero(id) {
     if (st.phase !== 'build' || id === st.hero || !ownsHero(id)) return;
@@ -3448,8 +3449,8 @@
     const sd = smoothDir(u, mvx, mvy);
     if (near) turn8(u, dir8(t.x - u.x, t.y - u.y), u.archer ? 8 : 3); // lukostrelec sa otáča pomalšie (cieľ prechádza medzi smermi)
     else if (moving) turn8(u, sd, 5);
-    else if (!t) turn8(u, 6, 5);
-    if (u.face8 == null) u.face8 = 6;
+    else if (!t) turn8(u, u.helper ? 2 : 6, 5); // bez cieľa: vojaci k horde, remeselník a liečiteľ k hráčovi (na juh)
+    if (u.face8 == null) u.face8 = u.helper ? 2 : 6;
     const v = set[u.face8];
     if (u.archer) { // lukostrelec: po výstrele chvíľu povolená tetiva, potom znova napne; s cieľom mieri aj pri presune v rade (striedanie s chôdzou blikalo)
       if (u.swing > 0 || (near && u.cd > ARCHER_CD * 0.6)) return v.atk[1];
@@ -3815,7 +3816,6 @@
       }
       if (iceMage(b) && Math.random() < 0.04) part(bx + spr.w / 2 + (Math.random() - 0.5) * 6, y0 + T + 1 - spr.h + 6, 0, 6, 0.6, '#e8f8ff', 10); // z ľadového plameňa padajú iskričky
     }
-    if (b.lvl > 1 && b.kind !== 'wall' && tabOf(b.kind) !== 'towers') pxText(g, String(b.lvl), x0 + bW(b) * T - 3, y0 + T - 6, '#f8d048'); // úroveň (veže ju majú len na vzhľade)
   }
   // hradba na políčku (x, y): spodok 2 body pod políčkom, jemná kresba je vyššia ako stará (24 bodov)
   // strana od hradu pre zvislý úsek hradby: 1 = vľavo (úsek pri ľavom okraji políčka), 2 = vpravo (pri pravom), 0 = nad/pod hradom (v strede)
@@ -3869,7 +3869,6 @@
     g.drawImage(spr.c, x, y);
     g.globalAlpha = 1;
     if (b.kind === 'firepit' && st.phase === 'battle' && Math.random() < 0.25) part(x + 4 + Math.random() * 8, y + 6, 0, -10 - Math.random() * 8, 0.5, Math.random() < 0.5 ? '#f89838' : '#fff070', -8);
-    if (b.lvl > 1) pxText(g, String(b.lvl), x + T - 3, y + T - 6, '#f8d048');
   }
 
   function corners(x0, y0, x1, y1, col) {
@@ -5349,6 +5348,8 @@
     for (const o of campLive()) if (o.hp < o.max) bar(o.x, o.y - o.skin.spr(o, 0).h - 4, 14, o.hp / o.max, '#e84838');
     if (!isAssault() && (st.phase === 'build' || st.phase === 'battle' || st.phase === 'pause')) drawHallBar(); // zdravie radnice pod radnicou
     if (st.king && !st.king.dead && st.king.hp < kingMax()) bar(st.king.x, Math.round(st.king.y - 19), 10, st.king.hp / kingMax(), '#f8d048');
+    // úroveň budov a pascí až nad všetkým (nezakryje ju budova, jednotka, hradba ani ukazovateľ zdravia); veže ju majú len na vzhľade
+    if (playing) for (const b of st.blds) if (b.lvl > 1 && b.kind !== 'wall' && b.kind !== 'mud' && tabOf(b.kind) !== 'towers') pxText(g, String(b.lvl), tileX(b.c) + bW(b) * T - 3, tileY(b.r) + T - 6, '#f8d048');
     for (const p of st.proj) drawProj(p);
     for (const p of st.eproj) { // šíp goblina (tmavý)
       const cols = ['#bcc0cc', '#3e2614', '#3e2614', '#3e2614', '#62a03a'];

@@ -916,62 +916,13 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard, terr, hd) {
       scatter(area / 900, (x, y) => { for (let dx = -4; dx <= 4; dx++) { set(x + dx, y, snowC[7]); if (Math.abs(dx) < 3) set(x + dx, y - 1, snowC[7]); set(x + dx, y + 1, snowC[4]); } }, 3);
       break;
     }
-    case 'desert': { // kaktusy, palmy, kamene a vybielené kosti
-      const cac = ['#1e3a1a', '#2a5224', '#3c6e30', '#56923a'].map(hexRGB), bone = hexRGB('#f0e8d0');
-      if (R > 1) { // jemná kresba: kaktus s rebrami a tŕňmi, palma s článkovaným kmeňom a listami, kamene a kosti
-        scatter(area / 1100, (x, y) => {
-          const h = (7 + Math.floor(rnd() * 5)) * R, X = x * R, Y = y * R + R - 1;
-          for (let i = -3; i < 9; i++) { darkenH(X + i, Y + 1, 0.7); darkenH(X + i, Y + 2, 0.8); }
-          const col = (cx, y0, y1) => {
-            for (let yy = y0; yy >= y1; yy--) { setH(cx - 2, yy, K); setH(cx - 1, yy, cac[3]); setH(cx, yy, cac[2]); setH(cx + 1, yy, cac[2]); setH(cx + 2, yy, cac[1]); setH(cx + 3, yy, K); if ((y0 - yy) % 4 === 2) setH(cx + 1, yy, cac[0]); }
-            for (let i = -1; i <= 2; i++) setH(cx + i, y1 - 1, K);
-            setH(cx, y1, cac[3]);
-          };
-          col(X, Y, Y - h);
-          const ay = Y - Math.floor(h * 0.5);
-          for (const s2 of [-1, 1]) if (rnd() > 0.3) {
-            const ax = s2 < 0 ? X - 6 : X + 7, top = ay - 6 - Math.floor(rnd() * 4);
-            col(ax, ay, top);
-            for (let q = 0; q < 4; q++) { const xx = s2 < 0 ? ax + 2 + q : ax - 1 - q; setH(xx, ay - 2, K); setH(xx, ay - 1, cac[2]); setH(xx, ay, cac[1]); setH(xx, ay + 1, K); }
-          }
-          for (let k = 0; k < 5; k++) setH(X + (k % 2 ? 4 : -3), Y - 3 - k * Math.floor(h / 6), bone); // tŕne
-        }, 6);
-        scatter(area / 2600, (x, y) => {
-          const X = x * R, Y = y * R + R - 1;
-          for (let i = -6; i <= 9; i++) { darkenH(X + i, Y + 1, 0.7); darkenH(X + i, Y + 2, 0.8); }
-          for (let k = 0; k < 18; k++) { const xx = X + Math.round(k * k / 110); setH(xx, Y - k, WOOD[k % 3 === 0 ? 1 : 4]); setH(xx + 1, Y - k, WOOD[k % 3 === 0 ? 1 : 2]); }
-          const tx = X + 3, ty = Y - 19;
-          for (const [dx, dy, s] of [[-1, 0, 1], [1, 0, 1], [-1, -0.35, 0.8], [1, -0.4, 0.8], [-0.3, -1, 0.6], [0.4, -1, 0.6]]) {
-            const len = 7 + s * 4;
-            for (let k = 0; k <= len; k++) { const px = Math.round(tx + dx * k), py = Math.round(ty + dy * k + (k * k) / (len * 2.2)); setH(px, py, RAMP.grass[k < len * 0.5 ? 5 : 3]); setH(px, py + 1, k % 2 ? RAMP.grass[1] : RAMP.grass[2]); }
-          }
-          setH(tx, ty, WOOD[1]); setH(tx + 1, ty + 1, WOOD[1]); // kokosy
-        }, 8);
-        scatter(area / 1300, (x, y) => blob(x, y, 1 + Math.floor(rnd() * 3), TR.desert, 0.35, K), 4);
-        scatter(area / 3000, (x, y) => { const X = x * R, Y = y * R; for (let i = 0; i < 6; i++) { setH(X + i, Y, bone); setH(X + i, Y + 1, hexRGB('#a8a088')); } setH(X - 1, Y - 1, bone); setH(X - 1, Y + 1, bone); setH(X + 6, Y - 1, bone); setH(X + 6, Y + 1, bone); }, 3);
-        break;
-      }
-      scatter(area / 1100, (x, y) => { // kaktus s ramenami
-        const h = 7 + Math.floor(rnd() * 5);
-        for (let dx = -2; dx < 5; dx++) darken(x + dx, y + 1, 0.7);
-        for (let dy = 0; dy < h; dy++) { set(x - 1, y - dy, K); set(x, y - dy, cac[2]); set(x + 1, y - dy, cac[1]); set(x + 2, y - dy, K); }
-        for (let dx = -1; dx <= 2; dx++) set(x + dx, y - h, K);
-        const ay = y - Math.floor(h * 0.55);
-        for (const s2 of [-1, 1]) if (rnd() > 0.3) {
-          const ax = s2 < 0 ? x - 3 : x + 4;
-          for (let dy = 0; dy < 4; dy++) { set(ax, ay - dy, cac[s2 < 0 ? 3 : 1]); set(ax - 1, ay - dy, K); set(ax + 1, ay - dy, K); }
-          set(ax, ay - 4, K);
-          for (let q = 1; q <= 2; q++) { const xx = s2 < 0 ? ax + q : ax - q; set(xx, ay, cac[2]); set(xx, ay + 1, K); }
-        }
-      }, 6);
-      scatter(area / 2600, (x, y) => { // palma
-        for (let dx = -3; dx <= 4; dx++) darken(x + dx, y + 1, 0.7);
-        for (let k = 0; k < 9; k++) set(x + (k > 5 ? 1 : 0), y - k, WOOD[k % 2 ? 2 : 3]);
-        const tx = x + 1, ty = y - 10;
-        for (const [dx, dy] of [[-5, 1], [-4, 0], [-3, -1], [-2, -1], [-1, -2], [0, -2], [1, -2], [2, -1], [3, -1], [4, 0], [5, 1], [-3, 1], [3, 1], [-1, 0], [1, 0]]) set(tx + dx, ty + dy, RAMP.grass[dy < 0 ? 5 : 3]);
-      }, 8);
-      scatter(area / 1300, (x, y) => blob(x, y, 1 + Math.floor(rnd() * 3), TR.desert, 0.35, K), 4);
-      scatter(area / 3000, (x, y) => { set(x, y, bone); set(x + 1, y, bone); set(x + 2, y + 1, bone); set(x - 1, y + 1, bone); set(x + 3, y, bone); }, 3);
+    case 'desert': { // len piesok: balvany a kamienky z pieskovca (bez zelene a kostí)
+      scatter(area / 1100, (x, y) => blob(x, y, 2 + Math.floor(rnd() * 3), SANDSTONE, 0.55, SANDSTONE[0]), 6); // balvany
+      scatter(area / 900, (x, y) => blob(x, y, 1 + Math.floor(rnd() * 2), SANDSTONE, 0.62, SANDSTONE[1]), 4);  // menšie kamene
+      scatter(area / 500, (x, y) => { // kamienky: pár pixelov so svetlým vrchom a tieňom
+        const X = x * R, Y = y * R;
+        for (let k = 0; k < 3; k++) { const px = X + Math.floor(rnd() * 6) - 3, py = Y + Math.floor(rnd() * 3); setH(px, py, SANDSTONE[6]); setH(px + 1, py, SANDSTONE[4]); setH(px, py + 1, SANDSTONE[2]); }
+      }, 2);
       break;
     }
     case 'jungle': { // husté koruny stromov, kry a paprade
