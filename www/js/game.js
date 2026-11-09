@@ -3715,16 +3715,21 @@
     const w = T * 2, h = (T + 4) * 2, c = document.createElement('canvas'); c.width = w; c.height = h;
     const x2 = c.getContext('2d'), id = x2.createImageData(w, h);
     const up = m & 1, rt = m & 2, dn = m & 4, lf = m & 8;
-    const top = up ? 0 : 12, x0 = lf ? 0 : 2, x1 = rt ? w - 1 : w - 3, face = dn ? h : h - 16; // od „face“ nadol je tienisté čelo plota
-    for (let y = top; y < h; y++) for (let x = x0; x <= x1; x++) {
+    const sx0 = 2, sx1 = w - 3; // zvislý pás má šírku samostatného plota – výbežok hore/dole ostane v ňom (na rohu a v T spoji nič netrčí)
+    const x0 = lf ? 0 : sx0, x1 = rt ? w - 1 : sx1;
+    for (let y = 0; y < h; y++) for (let x = x0; x <= x1; x++) {
+      const inS = x >= sx0 && x <= sx1, u = up && inS, d = dn && inS; // pokračuje plot hore / dole práve v tomto stĺpci?
+      const top = u ? 0 : 12, face = d ? h : h - 16; // od „face“ nadol je tienisté čelo plota
+      if (y < top) continue;
       // zaoblené rohy tam, kde plot nepokračuje
       const cx = !lf && x - x0 < 2 ? 2 - (x - x0) : !rt && x1 - x < 2 ? 2 - (x1 - x) : 0;
-      const cy = !up && y - top < 2 ? 2 - (y - top) : !dn && h - 1 - y < 2 ? 2 - (h - 1 - y) : 0;
+      const cy = !u && y - top < 2 ? 2 - (y - top) : !d && h - 1 - y < 2 ? 2 - (h - 1 - y) : 0;
       if (cx + cy > 2) continue;
       const n = hash2(x + m * 17, y, 41), clump = hash2(x >> 1, y >> 1, 42), leaf = hash2(x >> 2, (y + (x >> 2) % 2 * 2) >> 2, 43); // drobné lístky v trsoch
-      const edge = (!up && y === top) || (!lf && x === x0) || (!rt && x === x1) || (!dn && y === h - 1) || cx + cy === 2;
+      const side = (up && y < 12 || dn && y >= h - 16) && (x === sx0 && lf || x === sx1 && rt); // bok zvislého pásu nad / pod vodorovným plotom
+      const edge = (!u && y === top) || (!lf && x === x0) || (!rt && x === x1) || (!d && y === h - 1) || cx + cy === 2 || side;
       let ramp = RAMP.grass, v;
-      if (y < face) v = 0.6 + (leaf - 0.5) * 0.3 + (clump - 0.5) * 0.18 + (n - 0.5) * 0.12 - (y - top) * 0.005 + (!up && y <= top + 2 ? 0.18 : 0); // vrch na slnku
+      if (y < face) v = 0.6 + (leaf - 0.5) * 0.3 + (clump - 0.5) * 0.18 + (n - 0.5) * 0.12 - (y - top) * 0.005 + (!u && y <= top + 2 ? 0.18 : 0); // vrch na slnku
       else { ramp = RAMP.bush; v = 0.68 + (leaf - 0.5) * 0.26 + (clump - 0.5) * 0.14 + (n - 0.5) * 0.1 - (y - face) * 0.025 - (y <= face + 1 ? 0.25 : 0); } // čelo v tieni
       if (edge) { ramp = RAMP.bush; v = 0.02; }
       const rgb = n > 0.992 && !edge ? hexRGB('#f4d0e0') : pickRamp(ramp, v, x, y), k = (y * w + x) * 4; // tu a tam kvietok
