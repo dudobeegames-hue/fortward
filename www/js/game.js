@@ -149,7 +149,7 @@
   const uDmg = u => WUNIT[u.type].dmg * (1 + 0.4 * (u.lvl - 1)) * (1 + 0.04 * perk('fletching'));
   const uCd = u => WUNIT[u.type].cd * Math.pow(0.92, u.lvl - 1);
   const uRange = u => WUNIT[u.type].range + 4 * (u.lvl - 1);
-  const BUILD_ORDER = ['paving', 'hedge', 'mud', 'tower', 'stake', 'wall', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'mage', 'pitch', 'icetower', 'ballista', 'chapel', 'firepit', 'beartrap', 'workshop'];
+  const BUILD_ORDER = ['paving', 'hedge', 'mud', 'tower', 'stake', 'wall', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'pitch', 'mage', 'icetower', 'ballista', 'chapel', 'firepit', 'beartrap', 'workshop'];
   const ORC_ORDER = BUILD_ORDER.slice(); ORC_ORDER.splice(ORC_ORDER.indexOf('icetower'), 1); ORC_ORDER.splice(ORC_ORDER.indexOf('mage'), 0, 'icetower'); // za orkov kotol pred totemom
   const ENEMY = {
     goblin:  { spr: 'goblin',  hp: 12,  speed: 24, atk: 4,  atkCd: 0.8, gold: 3,  blood: '#62a03a' },
@@ -2205,9 +2205,16 @@
     const walls = st.blds.filter(w => w.kind === 'wall' && w.hp > 0 && Math.hypot(bCenter(w).x - c.x, bCenter(w).y - c.y) <= PITCH_WALL).map(bCenter);
     const hit = st.enemies.filter(e => !e.dead && !e.d.fly && e.y >= 4 && (Math.hypot(e.x - c.x, e.y - c.y) <= rng || walls.some(w => Math.hypot(e.x - w.x, e.y - w.y) <= PITCH_SPLASH)));
     if (!hit.length) return false;
-    const dmg = bDmg(b);
-    for (const e of hit) {
-      damage(e, dmg); e.chillT = Math.max(e.chillT || 0, 1.5 + 0.2 * (b.lvl - 1));
+    const dmg = bDmg(b), chill = 1.5 + 0.2 * (b.lvl - 1), ox = c.x, oy = tileY(b.r) + T + 1 - bsprOf('pitch', b.lvl).h + 7; // z kotla na vrchu veže
+    for (const e of hit.slice(0, 10)) { // chuchvalce smoly letia po oblúku (ako jed z orkského kotla), zraní a zlepí až pri dopade
+      const p = { k: 'pitch', x: ox, y: oy, sx: ox, sy: oy, tgt: e, tx: e.x, ty: e.y - e.h * 0.5, dmg, chill, spd: 120, vx: 0, vy: -1, lift: 0 };
+      p.d0 = Math.hypot(p.tx - p.x, p.ty - p.y) || 1;
+      st.proj.push(p);
+    }
+    for (let k = 0; k < 6; k++) part(ox + (Math.random() - 0.5) * 6, oy - 1, (Math.random() - 0.5) * 12, -10 - Math.random() * 12, 0.5, ['#2a1c12', '#4a3220', '#141008'][k % 3], 50); // šplechnutie z kotla
+    part(ox, oy - 2, (Math.random() - 0.5) * 4, -12, 0.9, '#4a4a52', -6); // dym
+    for (const e of hit.slice(10)) {
+      damage(e, dmg); e.chillT = Math.max(e.chillT || 0, chill);
       for (let k = 0; k < 5; k++) part(e.x + (Math.random() - 0.5) * 8, e.y - e.h - 4 - Math.random() * 6, (Math.random() - 0.5) * 10, 10 + Math.random() * 10, 0.5, k % 3 ? '#241c14' : '#5c4a30', 60); // padajúce kvapky smoly
       part(e.x, e.y - e.h * 0.6, (Math.random() - 0.5) * 6, -14, 0.8, '#4a4a52', -6); // dym
     }
@@ -2836,7 +2843,8 @@
       if (pl.tick <= 0) {
         pl.tick = 0.4;
         for (const e of st.enemies) if (!e.dead && !e.d.fly && Math.hypot(e.x - pl.x, (e.y - pl.y) / 0.5) < pl.R) {
-          e.chillT = Math.max(e.chillT || 0, pl.chill); e.venomT = Math.max(e.venomT || 0, 1); e.venomDps = Math.max(e.venomDps || 0, pl.dps);
+          e.chillT = Math.max(e.chillT || 0, pl.chill); if (pl.pitch) continue; // smola len zlepí
+          e.venomT = Math.max(e.venomT || 0, 1); e.venomDps = Math.max(e.venomDps || 0, pl.dps);
         }
       }
     }
@@ -2887,9 +2895,26 @@
       g.globalAlpha = 1;
     }
   }
+  // mláka smoly: tmavohnedá až čierna lesklá kaluž v jemnej mriežke (pol bodu), pomaly bublá a stmavne, kým zaschne
+  function fDisc(cx, cy, rx, ry, col) {
+    g.fillStyle = col;
+    for (let y = -ry; y <= ry + 0.01; y += 0.5) { const w = Math.round(rx * 2 * Math.sqrt(Math.max(0, 1 - (y / (ry + 0.25)) ** 2))) / 2; g.fillRect(h2(cx - w), h2(cy + y), w * 2 + 0.5, 0.5); }
+  }
+  function drawPitchPool(pl, time) {
+    const a = Math.min(1, pl.t / 0.6), R = pl.R * (0.55 + 0.45 * Math.min(1, (pl.max - pl.t) * 6)), ry = R * 0.5;
+    g.globalAlpha = 0.92 * a;
+    fDisc(pl.x, pl.y, R + 0.5, ry + 0.5, '#0c0806');
+    fDisc(pl.x, pl.y, R, ry, '#241810');
+    fDisc(pl.x - 0.5, pl.y - 0.5, Math.max(0.5, R - 2), Math.max(0.5, ry - 1.5), '#3a2818');
+    fpx(pl.x - R * 0.45, pl.y - ry * 0.45, '#8a6a48', 1, 0.5); fpx(pl.x - R * 0.45, pl.y - ry * 0.45, '#c8a880'); // lesk
+    const ph = (time * 1.2 + pl.x * 0.13) % 1; // bublina na hladine: nafúkne sa a praskne
+    if (ph < 0.6) { const bx = pl.x + R * 0.3, by = pl.y + ry * 0.1; fpx(bx - 0.5, by - 0.5, '#5a4430', ph < 0.3 ? 0.5 : 1, ph < 0.3 ? 0.5 : 1); fpx(bx - 0.5, by - 0.5, '#9a7a58'); }
+    g.globalAlpha = 1;
+  }
   // mláka jedu z orkského kotla: zelená kaluž na zemi, bublá a pomaly vysychá
   function drawPools(time) {
     for (const pl of st.pools) {
+      if (pl.pitch) { drawPitchPool(pl, time); continue; }
       const a = Math.min(1, pl.t / 0.5), R = pl.R * (0.6 + 0.4 * Math.min(1, (pl.max - pl.t) * 6)), ry = Math.round(R * 0.5);
       g.globalAlpha = 0.9 * a;
       pxDisc(pl.x, pl.y, R + 1, ry + 1, '#1e4a14');
@@ -3097,9 +3122,9 @@
       const dx = p.tx - p.x, dy = p.ty - p.y, dist = Math.hypot(dx, dy), step = p.spd * dt;
       if (dist > 0.001) { p.vx = dx / dist; p.vy = dy / dist; }
       if (p.k === 'fire' && Math.random() < 0.8) part(p.x, p.y, (Math.random() - 0.5) * 10, -Math.random() * 10, 0.3, Math.random() < 0.5 ? '#f89838' : '#d83818', 0);
-      if (p.k === 'venom') { // chuchvalec letí po oblúku a odkvapkáva
-        const done = 1 - Math.min(1, dist / p.d0); p.lift = Math.sin(done * Math.PI) * Math.min(26, p.d0 * 0.35);
-        if (Math.random() < 0.4) part(p.x, p.y - p.lift, (Math.random() - 0.5) * 6, 4, 0.35, Math.random() < 0.5 ? '#7cd04a' : '#4ca02a', 60);
+      if (p.k === 'venom' || p.k === 'pitch') { // chuchvalec (jed / smola) letí po oblúku a odkvapkáva
+        const done = 1 - Math.min(1, dist / p.d0); p.lift = Math.sin(done * Math.PI) * Math.min(p.k === 'pitch' ? 14 : 26, p.d0 * 0.35);
+        if (Math.random() < 0.4) part(p.x, p.y - p.lift, (Math.random() - 0.5) * 6, 4, 0.35, p.k === 'pitch' ? (Math.random() < 0.5 ? '#3a2818' : '#1e140c') : Math.random() < 0.5 ? '#7cd04a' : '#4ca02a', 60);
       }
       if (p.k === 'spirit' && Math.random() < 0.8) part(p.x, p.y, (Math.random() - 0.5) * 10, -Math.random() * 10, 0.35, Math.random() < 0.5 ? '#9cf060' : '#d8ffa0', 0);
       if (dist <= step) { impact(p); p.done = true; }
@@ -3181,6 +3206,14 @@
         const a = Math.random() * 6.28, s = 20 + Math.random() * 50;
         part(p.tx, p.ty, Math.cos(a) * s, Math.sin(a) * s, 0.25 + Math.random() * 0.3, (p.k === 'spirit' ? ['#ffffff', '#d8ffa0', '#62c030', '#24581a'] : ['#fff070', '#f89838', '#d83818', '#3e2614'])[k % 4], 0);
       }
+    } else if (p.k === 'pitch') { // smola zo smolnej veže: šplechne, zasiahnutého zraní a zlepí, na zemi ostane lepkavá tmavá mláka
+      const gy = p.tgt ? p.tgt.y : p.ty + 4;
+      for (const e of st.enemies) if (!e.dead && !e.d.fly && e !== p.tgt && Math.hypot(e.x - p.tx, (e.y - e.h * 0.5) - p.ty) < 8) e.chillT = Math.max(e.chillT || 0, p.chill * 0.6);
+      if (p.tgt && !p.tgt.dead) { damage(p.tgt, p.dmg); p.tgt.chillT = Math.max(p.tgt.chillT || 0, p.chill); }
+      st.pools.push({ x: p.tx, y: gy, R: 6, t: 2.2, max: 2.2, dps: 0, chill: p.chill * 0.5, tick: 0, pitch: true });
+      for (let k = 0; k < 12; k++) { const a = Math.PI + Math.random() * Math.PI, v = 12 + Math.random() * 26; part(p.tx, gy - 2, Math.cos(a) * v, Math.sin(a) * v, 0.45, ['#4a3220', '#2a1c12', '#140e08', '#6a4c30'][k % 4], 90); }
+      part(p.tx, gy - 3, (Math.random() - 0.5) * 4, -10, 0.8, '#4a4a52', -5); // obláčik dymu z horúcej smoly
+      AUDIO.play('hit');
     } else if (p.k === 'venom') { // jed z kotla: šplechne, okolo zostane mláka, zasiahnutí sú otrávení (jed + spomalenie)
       for (const e of st.enemies) if (!e.dead && !e.d.fly && Math.hypot(e.x - p.tx, (e.y - e.h * 0.5) - p.ty) < 12) {
         e.chillT = Math.max(e.chillT || 0, p.chill || 2); e.venomT = Math.max(e.venomT || 0, p.chill || 2); e.venomDps = Math.max(e.venomDps || 0, p.dmg * 0.4);
@@ -3766,6 +3799,37 @@
   }
   BSPR.mud = mudSpr(0);
   const drawMud = b => g.drawImage(mudSpr(mudMask(b.c, b.r, mudAt)).c, tileX(b.c), tileY(b.r));
+  // vrhnutý tieň budovy: kresby sú osvetlené zľava zhora, tieň padá po zemi doprava a trochu dole; vyrobí sa raz z obrysu kresby
+  // (každý pixel vo výške v nad pätou sa posunie o v·SH_X doprava a v·SH_Y nadol) a kreslí sa polopriehľadne pod budovy aj jednotky
+  const SH_X = 0.45, SH_Y = 0.28, SH_A = 0.3, shadowCache = new WeakMap();
+  function shadowOf(spr) {
+    let sh = shadowCache.get(spr);
+    if (sh) return sh;
+    const W = spr.c.width, H = spr.c.height, d = (spr.px || spr.c.getContext('2d').getImageData(0, 0, W, H)).data;
+    let base = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i]) base = Math.max(base, (i >> 2) / W | 0);
+    const c = document.createElement('canvas'); c.width = W + Math.ceil(H * SH_X) + 1; c.height = base + Math.ceil(H * SH_Y) + 2;
+    const x = c.getContext('2d'); x.fillStyle = '#0a1206';
+    for (let y = 0; y <= base; y++) for (let xx = 0; xx < W; xx++) if (d[(y * W + xx) * 4 + 3]) {
+      const v = base - y; x.fillRect(Math.round(xx + v * SH_X), Math.round(base + v * SH_Y), 1, 1);
+    }
+    sh = { c, k: W / spr.w }; shadowCache.set(spr, sh);
+    return sh;
+  }
+  function drawShadow(spr, x, y) { // x, y = ľavý horný roh kresby v bodoch hry (ako pri drawImage budovy)
+    const sh = shadowOf(spr);
+    g.drawImage(sh.c, x, y, sh.c.width / sh.k, sh.c.height / sh.k);
+  }
+  function drawShadows() {
+    g.globalAlpha = SH_A;
+    if (!isAssault()) { const spr = bsprOf('hall', st.hallLvl); drawShadow(spr, spr.hd ? G.hallCx - spr.w / 2 : Math.round(G.hallCx - spr.w / 2), G.hallBot + 1 - spr.h + (spr.hd ? 4 : 0)); }
+    for (const b of st.blds) {
+      if (TRAPS[b.kind] || b.kind === 'mud' || b.kind === 'hedge' || b.kind === 'wall') continue;
+      const spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl);
+      drawShadow(spr, tileX(b.c) + bW(b) * T / 2 - Math.floor(spr.w / 2), tileY(b.r) + T + 1 - spr.h);
+    }
+    g.globalAlpha = 1;
+  }
   function drawBuilding(b, time) {
     const x0 = tileX(b.c), y0 = tileY(b.r);
     let spr;
@@ -4105,6 +4169,14 @@
       const x = p.x, y = p.y;
       for (let k = 0; k < 8; k++) { g.fillStyle = k < 2 ? '#e8ecf4' : k > 5 ? '#e84838' : '#a86c38'; g.fillRect(r(x - p.vx * k), r(y - p.vy * k), 1, 1); }
       g.fillStyle = PAL.K; g.fillRect(r(x + p.vx), r(y + p.vy), 1, 1);
+      return;
+    }
+    if (p.k === 'pitch') { // chuchvalec smoly v jemnej mriežke: čierny obrys, tmavohnedé telo, slabý lesk; tieň na zemi
+      const x = h2(p.x), y = h2(p.y - (p.lift || 0));
+      g.fillStyle = 'rgba(10,8,6,0.3)'; g.fillRect(x - 1, h2(p.y) + 2, 2.5, 0.5);
+      fpx(x - 1.5, y - 1, '#0c0806', 3.5, 2.5); fpx(x - 1, y - 1.5, '#0c0806', 2.5, 3.5);
+      fpx(x - 1, y - 1, '#2a1c12', 2.5, 2.5); fpx(x - 0.5, y - 0.5, '#4a3220', 1.5, 1);
+      fpx(x - 0.5, y - 1, '#8a6a48', 1, 0.5); fpx(x - 0.5, y - 1, '#d0b090');
       return;
     }
     if (p.k === 'venom') { // chuchvalec jedu: zelená kvapka s tmavým okrajom a odleskom, tieň na zemi pod ňou
@@ -5305,6 +5377,7 @@
     if (st.phase === 'build') drawBuildOverlay(time);
     for (const m of st.marks) drawMark(m);
     if (st.king && st.king.post && !st.king.dead && st.phase === 'battle') drawPost(st.king.post, time);
+    if (playing) drawShadows(); // vrhnuté tiene budov a veží na zemi
     drawPools(time);
     drawClouds(time); // jedový mrak leží na zemi pod nohami jednotiek
     for (const fw of st.fireWalls || []) drawFireGround(fw, time);
@@ -5661,7 +5734,7 @@
   // záložky stavebného panela (druhy stavieb); riadok záložiek a riadok označenej stavby majú rovnakú výšku, aby obrazovka neskákala
   const BUILD_TABS = [
     { id: 'hall',    name: 'Radnica', kinds: ['paving', 'hedge', 'mud'] }, // hrdina (a oživenie) a ozdoby
-    { id: 'towers',  name: 'Veže',    kinds: ['tower', 'mage', 'pitch', 'icetower', 'ballista'] },
+    { id: 'towers',  name: 'Veže',    kinds: ['tower', 'pitch', 'mage', 'icetower', 'ballista'] },
     { id: 'walls',   name: 'Hradby',  kinds: ['wall', 'stake', 'pit', 'firepit', 'beartrap'] },
     { id: 'army',    name: 'Vojsko',  kinds: ['barracks', 'range', 'stables', 'armory', 'falconry'] },
     { id: 'siege',   name: 'Stroje',  kinds: [] },
