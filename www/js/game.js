@@ -2221,9 +2221,12 @@
     AUDIO.play('thud');
     return true;
   }
+  // otočná balista na plošine balistovej veže z PixelLabu: stred plošiny (os otáčania) v bodoch hry
+  const hasTurret = b => !isTreb(b) && !!BSPR.ballistaTurret;
+  const turretAt = b => ({ x: tileX(b.c) + bW(b) * T / 2 + 0.75, y: tileY(b.r) + T + 1 - 28.5 });
   // balista: šíp letí rovno cez cieľ až na koniec dosahu a zraní každého na zemi, koho cestou prebodne
   function fireBallista(b) {
-    const def = BUILD.ballista, c = bCenter(b), rng = bRange(b), ox = c.x, oy = tileY(b.r) + T - 26;
+    const def = BUILD.ballista, c = bCenter(b), rng = bRange(b), tp = hasTurret(b) && turretAt(b), ox = tp ? tp.x : c.x, oy = tp ? tp.y - 3 : tileY(b.r) + T - 26;
     let best = null, bd = 1e9;
     for (const e of st.enemies) {
       if (e.dead || e.d.fly || e.y < 4 || Math.hypot(e.x - c.x, e.y - c.y) > rng) continue;
@@ -2233,6 +2236,7 @@
     if (!best) return false;
     const dx = best.x - ox, dy = best.y - best.h * 0.5 - oy, d = Math.hypot(dx, dy) || 1;
     st.proj.push({ k: 'lance', lance: true, x: ox, y: oy, vx: dx / d, vy: dy / d, spd: def.speed, dmg: bDmg(b), trav: 0, max: rng + 24, hit: new Set() });
+    if (tp) { b.face = dir8(dx, dy); b.fired = 0.25; } // balista sa natočí k cieľu a pri výstrele trhne dozadu
     AUDIO.play('lance');
     return true;
   }
@@ -3805,14 +3809,60 @@
   function shadowOf(spr) {
     let sh = shadowCache.get(spr);
     if (sh) return sh;
-    const W = spr.c.width, H = spr.c.height, d = (spr.px || spr.c.getContext('2d').getImageData(0, 0, W, H)).data;
+    const W = spr.c.width, H = spr.c.height, d0 = (spr.px || spr.c.getContext('2d').getImageData(0, 0, W, H)).data;
+    const ns = spr.noShadow, d = ns ? new Uint8ClampedArray(d0) : d0; // vejúce zástavy so žrďami tieň nevrhajú (statický tieň by s nimi nesedel)
+    if (ns) for (const k of ns) d[k * 4 + 3] = 0;
+    // päta každého stĺpca = jeho najspodnejší pixel (pravá stena budovy v 3/4 pohľade stúpa dozadu, nemá pätu na spodku kresby);
+    // tieň vychádza z päty stĺpca, takže sa budovy drží a nepôsobí, že stavba visí vo vzduchu
+    const foot = new Int16Array(W).fill(-1);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3]) foot[x] = y;
+    // pevné stĺpce stoja na zemi, visiace (zástava, zub cimburia, lampáš) náhle vyskočia nahor oproti susedovi bližšie k stredu (o viac ako 4 px);
+    // ide sa od najnižšieho bodu doľava aj doprava, postupne ustupujúci roh budovy ostáva pevný
     let base = 0;
-    for (let i = 3; i < d.length; i += 4) if (d[i]) base = Math.max(base, (i >> 2) / W | 0);
-    const c = document.createElement('canvas'); c.width = W + Math.ceil(H * SH_X) + 1; c.height = base + Math.ceil(H * SH_Y) + 2;
-    const x = c.getContext('2d'); x.fillStyle = '#0a1206';
-    for (let y = 0; y <= base; y++) for (let xx = 0; xx < W; xx++) if (d[(y * W + xx) * 4 + 3]) {
-      const v = base - y; x.fillRect(Math.round(xx + v * SH_X), Math.round(base + v * SH_Y), 1, 1);
+    for (let x = 0; x < W; x++) if (foot[x] > base) base = foot[x];
+    const lows = []; for (let x = 0; x < W; x++) if (foot[x] === base) lows.push(x);
+    const xc = lows[lows.length >> 1], solid = new Uint8Array(W);
+    for (const dir of [1, -1]) {
+      let pf = -1;
+      for (let x = xc; x >= 0 && x < W; x += dir) { if (foot[x] < 0) continue; if (pf < 0 || foot[x] >= pf - 4) { solid[x] = 1; pf = foot[x]; } }
     }
+    // zem pod stavbou = spodná konvexná obálka päty pevných stĺpcov (rovná čiara po spodku, bez zubov – tieň nemá pruhy);
+    // za krajmi obálky (visiace stĺpce na boku) zem stúpa 1 px na 2 px
+    const hull = [];
+    for (let x = 0; x < W; x++) {
+      if (!solid[x]) continue;
+      while (hull.length >= 2) { const o = hull[hull.length - 2], a = hull[hull.length - 1]; if ((a[0] - o[0]) * (foot[x] - o[1]) - (a[1] - o[1]) * (x - o[0]) >= 0) hull.pop(); else break; }
+      hull.push([x, foot[x]]);
+    }
+    const hl = new Int16Array(W).fill(-1);
+    for (let i = 1; i < hull.length; i++) { const [x0, y0] = hull[i - 1], [x1, y1] = hull[i]; for (let x = x0; x <= x1; x++) hl[x] = Math.round(y0 + (y1 - y0) * (x - x0) / (x1 - x0)); }
+    hl[hull[0][0]] = hull[0][1];
+    const [lx, ly] = hull[0], [rx, ry] = hull[hull.length - 1], ground = new Int16Array(W);
+    for (let x = 0; x < W; x++) {
+      if (foot[x] < 0) continue;
+      const h = hl[x] >= 0 ? hl[x] : Math.round(x < lx ? ly - 0.5 * (lx - x) : ry - 0.5 * (x - rx));
+      ground[x] = hl[x] >= 0 && hl[x] - foot[x] > 16 ? foot[x] : Math.max(foot[x], h); // hlboký výrez (vjazd) má vlastnú zem
+    }
+    const SW = W + Math.ceil(H * SH_X) + 2, SHh = H + Math.ceil(H * SH_Y) + 3, m = new Uint8Array(SW * SHh), put = (px, py) => { if (px >= 0 && py >= 0 && px < SW && py < SHh) m[py * SW + px] = 1; };
+    // každý stĺpec kresby je pevný od zeme po svoj najvyšší pixel (budova je plná hmota): jeho tieň je súvislý šikmý pás od päty
+    // po tieň vrchu – tieň je plný, bez dier (rebríky, okná, trámy), bez bublín (terč, vozík) a drží tvar budovy
+    for (let xx = 0; xx < W; xx++) {
+      if (foot[xx] < 0) continue;
+      if (solid[xx]) { put(xx, foot[xx]); put(xx, foot[xx] - 1); } // kontaktný tieň pri päte (nie pod ňou – netrčí dopredu)
+      let top = 0; while (top < foot[xx] && !d[(top * W + xx) * 4 + 3]) top++;
+      const g0 = ground[xx], v = g0 - top;
+      for (let t = 0; t <= v * 2; t++) { const px = Math.round(xx + t / 2 * SH_X), py = Math.round(g0 + t / 2 * SH_Y); put(px, py); put(px + 1, py); }
+    }
+    // výrezy pod stavbou (medzi piliermi, nohami veže, pod terčom či vozíkom) sa vyplnia až po zem (obálku), takže pod budovou nesvieti piesok
+    for (let x = 0; x < W; x++) if (hl[x] >= 0) { const top = foot[x] >= 0 ? foot[x] : hl[x]; if (hl[x] - top <= 16) for (let y = top; y <= hl[x]; y++) put(x, y); }
+    if (spr.shadowNoFront) { // budova s rovným čelom (balistová veža): tieň nepadá pred čelo, začína až pri jej pravom spodnom rohu
+      let xr = 0; for (let x = 0; x < W; x++) if (foot[x] === base) xr = x;
+      for (let x = 0; x <= xr; x++) { const gy = hl[x] >= 0 ? hl[x] : foot[x]; for (let y = gy + 1; y < SHh; y++) m[y * SW + x] = 0; }
+    }
+    const c = document.createElement('canvas'); c.width = SW; c.height = SHh;
+    const x = c.getContext('2d'), id = x.createImageData(SW, SHh), q = id.data;
+    for (let i = 0; i < m.length; i++) if (m[i]) { q[i * 4] = 10; q[i * 4 + 1] = 18; q[i * 4 + 2] = 6; q[i * 4 + 3] = 255; }
+    x.putImageData(id, 0, 0);
     sh = { c, k: W / spr.w }; shadowCache.set(spr, sh);
     return sh;
   }
@@ -3877,6 +3927,10 @@
       const bx = x0 + bW(b) * T / 2 - Math.floor(spr.w / 2); // stred stavby (aj širšej na viacerých políčkach)
       g.drawImage(bldCanvas(spr, time, b.c * 0.7 + b.r * 0.3), bx + hitJit(b.flash), y0 + T + 1 - spr.h, spr.w, spr.h); // w, h v bodoch hry (jemná kresba má plátno 2×); zástavy vejú
       if (b.holyT > 0) holyGlow(spr, bx, y0 + T + 1 - spr.h, b.holyT, time);
+      if (b.kind === 'ballista' && hasTurret(b)) { // otočná balista na plošine (v pokoji mieri na sever k horde)
+        const f = b.face == null ? 6 : b.face, tu = BSPR.ballistaTurret[f], p = turretAt(b), a = f * Math.PI / 4, rec = b.fired > 0.13 ? 1 : 0;
+        g.drawImage(tu.c, Math.round((p.x - tu.w / 2 - Math.cos(a) * rec) * 2) / 2 + hitJit(b.flash), Math.round((p.y + 2 - tu.h - Math.sin(a) * rec * 0.6) * 2) / 2, tu.w, tu.h);
+      }
       if (b.spec) { // vlajočka špecializácie na veži
         const fx = x0 + 13, fy = y0 + T + 1 - spr.h - 4, wv = Math.floor(time * 6 + b.c) % 2;
         g.fillStyle = '#4a4e60'; g.fillRect(fx, fy, 1, 6);

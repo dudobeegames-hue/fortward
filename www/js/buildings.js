@@ -33,7 +33,7 @@ function artBuilding(art, i, anim) {
   if (anim === 'ice') recolorFlame(id, ICE_RAMP, i < 4); // úrovne 1–4: aj žiara pod strechou a okná; na 5. je tá istá farba v zlatých ozdobách
   const frames = anim === 'fire' ? fireFrames(id) : anim === 'ice' ? fireFrames(id, ICE_RAMP) : anim === false ? null : flagFrames(id); // zástavy sa prefarbia v id, preto pred vykreslením
   x.putImageData(id, 0, 0);
-  return lazyVariants({ c, w: c.width / 2, h: c.height / 2, hd: true, frames, fps: anim === 'fire' || anim === 'ice' ? 9 : 5, px: id }); // px: pixely na záblesk a siluetu bez čítania z plátna
+  return lazyVariants({ c, w: c.width / 2, h: c.height / 2, hd: true, frames, noShadow: frames && frames.noShadow, fps: anim === 'fire' || anim === 'ice' ? 9 : 5, px: id }); // px: pixely na záblesk a siluetu bez čítania z plátna
 }
 
 // Vejúce zástavy: v hornej tretine kresby nájde žrde (zvislý pás široký 1–3 px, nad ktorým je látka širšia ako žrď)
@@ -63,14 +63,19 @@ function flagFrames(id) {
     if (ext(0) < 3 || ext(0) < ext(1)) continue; // zástava je širšia ako vyššia
     const nr = px.filter(p => p[0] > pb).length, right = nr * 2 > px.length;
     if (Math.max(nr, px.length - nr) < px.length * 0.8) continue; // zástava visí na jednu stranu (súmerná guľa na špici nie)
-    flags.push({ px, edge: right ? pb : pa });
+    const pole = []; // žrď: stĺpce pa–pb od vrchu kresby nadol, kým je úzka (pod ňou už strecha či múr)
+    let yb = y; while (yb + 1 < h && narrow(x, yb + 1)) yb++;
+    for (let yy = 0; yy <= yb; yy++) for (let k = pa; k <= pb; k++) if (A(k, yy) && !cloth.has(yy * w + k)) pole.push(yy * w + k);
+    flags.push({ px, edge: right ? pb : pa, pole });
   }
   if (!flags.length) return null;
+  const noShadow = new Set(); // zástavy a žrde nevrhajú tieň: zástava veje, statický tieň by s ňou nesedel
+  for (const fl of flags) { for (const [cx, cy] of fl.px) noShadow.add(cy * w + cx); for (const k of fl.pole) noShadow.add(k); }
   for (const fl of flags) for (const [cx, cy] of fl.px) { // jednotná farba zástav: všetko okrem takmer čierneho obrysu
     const k = (cy * w + cx) * 4;
     if (Math.max(d[k], d[k + 1], d[k + 2]) >= 0x48) d.set(FLAG_BLUE, k);
   }
-  return [0, 1, 2, 3].map(f => {
+  const frames = [0, 1, 2, 3].map(f => {
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     const out = new ImageData(new Uint8ClampedArray(d), w, h), o = out.data;
     for (const fl of flags) {
@@ -81,6 +86,8 @@ function flagFrames(id) {
     c.getContext('2d').putImageData(out, 0, 0);
     return c;
   });
+  frames.noShadow = noShadow;
+  return frames;
 }
 // Plápolajúci plameň: pixely v 4 farbách ohňa v hornej tretine kresby; v každej snímke niektoré stĺpce plameňa
 // vyskočia o 1 px vyššie a farby sa o stupeň zosvetlia či stmavia (podľa náhody pevnej pre snímku)
@@ -1546,7 +1553,10 @@ function initBuildingSprites() {
   BSPR.mageIce = FIRE_TOWER_ART.lv.map((_, i) => artBuilding(FIRE_TOWER_ART, i, 'ice')); // ohnivá veža prepnutá na ľad: bledomodrý plameň
   BSPR.pitch = PITCH_TOWER_ART.lv.map((_, i) => artBuilding(PITCH_TOWER_ART, i)); // smolná veža z PixelLabu (pitch-tower-art.js), len ľudia
   BSPR.icetower = [1, 2, 3, 4, 5].map(l => makeIceTower(l));
-  BSPR.ballista = [1, 2, 3, 4, 5].map(l => makeBallistaTower(l));
+  // balistová veža z PixelLabu (ballista-tower-art.js, zatiaľ jedna kresba pre všetky úrovne) a na jej plošine otočná balista v 8 smeroch (ballista-turret-art.js)
+  if (typeof BALLISTA_TOWER_ART !== 'undefined') { const s = artBuilding(BALLISTA_TOWER_ART, 0, false); s.shadowNoFront = true; BSPR.ballista = [s, s, s, s, s]; } // rovné čelo: tieň nepadá pred vežu
+  else BSPR.ballista = [1, 2, 3, 4, 5].map(l => makeBallistaTower(l));
+  BSPR.ballistaTurret = typeof BALLISTA_TURRET_ART !== 'undefined' ? BALLISTA_TURRET_ART.lv.map((_, i) => artBuilding(BALLISTA_TURRET_ART, i, false)) : null; // smery ako postavy: 0 vpravo, 2 dole, 6 hore
   BSPR.barracks = artBuilding(BARRACKS_ART, 0, false); // kasárne z PixelLabu (barracks-art.js), jedna podoba pre všetky úrovne; stará kresba: makeBarracks
   BSPR.pit = makePit();
   BSPR.mine = artBuilding(MINE_ART, 0, false); // zlatá baňa z PixelLabu (mine-art.js); stará kresba: makeMine
