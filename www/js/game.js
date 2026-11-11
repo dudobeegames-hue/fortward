@@ -3704,14 +3704,15 @@
     if (o.kind === 'hall') return (previewCache[key] = spriteURL(bsprOf('hall', lv), 2));
     const c = document.createElement('canvas'), x = c.getContext('2d');
     if (o.kind === 'wall') {
-      const ws = wallsOf()[lv - 1][10], y0 = Math.max(o.gate ? 15 : u ? 9 : 6, ws.h - 18); // nad hradbou len toľko miesta, koľko treba (strážnica / strelec / vyššia jemná palisáda)
+      const ws = wallsOf()[lv - 1][10], thk = wallThick(lv - 1), uh = u ? SPR[raceSpr(WUNIT[u.type].spr)][0].h : 0, y0 = Math.max(o.gate ? 15 : u ? (thk ? uh - 3 : 9) : 6, ws.h - 18); // nad hradbou len toľko miesta, koľko treba (strážnica / strelec / vyššia jemná palisáda)
       c.width = T; c.height = y0 + 18; x.imageSmoothingEnabled = false;
       wallImg(x, ws, 0, y0);
       if (o.spikes) drawSpikes(x, 0, y0, o.spikeType);
       if (o.gate) x.drawImage(gatesOf()[lv - 1].c, 0, y0 - 15);
       else if (u) {
         const us = SPR[raceSpr(WUNIT[u.type].spr)][0];
-        x.drawImage(us.c, 0, 0, us.w, 11, 1, y0 - 9, us.w, 11);
+        if (thk) x.drawImage(us.c, 0, 0, us.c.width, us.c.height, Math.round(T / 2 - us.w / 2), y0 + 3 - us.h, us.w, us.h);
+        else x.drawImage(us.c, 0, 0, us.w, 11, 1, y0 - 9, us.w, 11);
         if (u.lvl > 1) pxText(x, String(u.lvl), 1, y0 - 8, '#88b4ff');
       }
     } else {
@@ -3964,7 +3965,11 @@
       } else if (b.unit) {
         // za orkov goblin či ork zo sady v 8 smeroch, otočený chrbtom (pozerá hore na nepriateľa ako ľudský strelec)
         const k = raceSpr(WUNIT[b.unit.type].spr), us = isOrc() && SPR[k + '8'] ? trimmed(SPR[k + '8'][6].idle) : SPR[k][0];
-        g.drawImage(us.c, 0, 0, us.w, 11, isOrc() ? Math.round(x0 + T / 2 - us.w / 2) : x0 + 1, y0 - 9, us.w, 11);
+        if (wallThick(wl)) { // hrubá hradba: strelec celý stojí na ochodzi (vodorovná za cimburím, zvislá v strede chodníka)
+          const vert = (m & 5) && !(m & 10), sd = wallSide(b.c), cxp = sd === 1 ? 7 : sd === 2 ? 9 : 8; // stred zvislého úseku = stred vežičky (pixellab2walls.py)
+          const ux = vert ? Math.round(x0 + cxp - us.w / 2) : Math.round(x0 + T / 2 - us.w / 2);
+          g.drawImage(us.c, 0, 0, us.c.width, us.c.height, ux, y0 + (vert ? 10 : 3) - us.h, us.w, us.h);
+        } else g.drawImage(us.c, 0, 0, us.w, 11, isOrc() ? Math.round(x0 + T / 2 - us.w / 2) : x0 + 1, y0 - 9, us.w, 11);
       }
     } else {
       spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl); // trebuchet po výstrele s ramenom hore; ohnivá veža na ľad má modrý plameň
@@ -3994,7 +3999,8 @@
   }
   // hradba na políčku (x, y): spodok 2 body pod políčkom, jemná kresba je vyššia ako stará (24 bodov)
   // strana od hradu pre zvislý úsek hradby: 1 = vľavo (úsek pri ľavom okraji políčka), 2 = vpravo (pri pravom), 0 = nad/pod hradom (v strede)
-  const wallSide = c => c < G.hc0 ? 1 : c > G.hc0 + 2 ? 2 : 0;
+  const wallThick = wl => BUILD_RACE !== 'orc' && typeof WALL_ART !== 'undefined' && WALL_ART.thick && WALL_ART.thick[wl]; // hradba s ochodzou (strelec na nej stojí celý)
+  const wallSide = c =>c < G.hc0 ? 1 : c > G.hc0 + 2 ? 2 : 0;
   const wallImg = (ctx, spr, x, y) => ctx.drawImage(spr.c, x, y + 18 - spr.h, spr.w, spr.h);
   const JOINERS = { wall: 1, tower: 1, mage: 1, pitch: 1, icetower: 1, ballista: 1 }; // hradby sa napájajú len na hradby a veže (strážna, mága) – na ostatné budovy nie
   const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL ? r === G.hr0 + 2 : !!JOINERS[o.kind]); }; // na hrad len zo spodného radu (tam má bočné múry)

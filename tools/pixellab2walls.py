@@ -1,6 +1,7 @@
 """Hradby z PixelLabu: zo vzorky rovnej hradby (jedno políčko, opakuje sa vedľa seba) poskladá 16 variantov podľa susedov.
 
 Použitie: python tools/pixellab2walls.py <výstup.js> <MENO_KONŠTANTY> <rovná hradba úrovne 1> [<úrovne 2> …]
+Súbor W*.png = hrubá hradba s ochodzou (zvislý úsek sa poskladá z nej, rohy a konce = vežička WT*.png vedľa nej, inak poskladaná), H*.png = stará plochá stena.
 Bitmaska susedov ako v hre: N=1 E=2 S=4 W=8. Sprite má 32×64 px (v hre 16×32 bodov, jemná kresba), spodok je 2 body pod políčkom.
 Každý variant je trikrát: zvislý úsek a pilier v strede políčka, pri jeho ľavom a pri pravom okraji.
 Zvislý úsek = úzky rad brvien zo vzorky radený za sebou (každé o 4 px vyššie), roh a koniec = pilier zo vzorky o kus vyšší (drevo previazané lanom).
@@ -94,12 +95,138 @@ def variants(s, cx=16):
     return out
 
 
+# ---- hrubá hradba s ochodzou (W*.png): vzadu kolová stena, v strede doskový chodník, vpredu čelo ----
+def thick_rows(s):
+    """riadky vzorky: vrch zadnej steny, zábradlie (tmavý riadok nad chodníkom), chodník, čelo"""
+    a = s.split()[3]
+    dark = lambda y: sum(1 for x in range(32) if a.getpixel((x, y)) and sum(s.getpixel((x, y))[:3]) < 140)
+    full = lambda y: all(a.getpixel((x, y)) for x in range(32))
+    rail = next(y for y in range(s.height) if full(y) and dark(y) > 20)      # tmavý pás pod hrotmi zadnej steny
+    walk0 = rail + 1
+    face = next(y for y in range(walk0 + 2, s.height) if dark(y) >= 6)      # prvý riadok hrotov čela
+    return rail, walk0, face
+
+
+def thick_parts(s):
+    rail, walk0, face = thick_rows(s)
+    walk = s.crop((0, walk0, 32, face))                       # doskový chodník (opakuje sa)
+    wd = sorted({walk.getpixel((x, y))[:3] for x in range(32) for y in range(walk.height) if walk.getpixel((x, y))[3]}, key=sum)
+    for y in range(walk.height):
+        for x in range(32):
+            c = walk.getpixel((x, y))
+            if c[3] and sum(c[:3]) < 150: walk.putpixel((x, y), wd[[sum(k) for k in wd].index(next(sum(k) for k in wd if sum(k) >= 150))] + (255,))
+    tips = s.crop((0, 0, 32, walk0))                          # zadná kolová stena s hrotmi
+    front = s.crop((0, face, 32, s.height))                   # čelo hradby (kolová stena smerom k hradu)
+    return tips, walk, front, rail, walk0, face
+
+
+def outline(p):
+    a = p.split()[3]
+    q = p.copy()
+    for y in range(p.height):
+        for x in range(p.width):
+            if a.getpixel((x, y)) == 0 and any(0 <= x + dx < p.width and 0 <= y + dy < p.height and a.getpixel((x + dx, y + dy)) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                q.putpixel((x, y), OUT)
+    return q
+
+
+def stake_piece(s):
+    """jeden kôl palisády pri pohľade zhora: hrot a kus čela, farby zo vzorky (od najsvetlejšej po najtmavšiu)"""
+    cols = sorted({s.getpixel((x, y))[:3] for x in range(32) for y in range(s.height) if s.getpixel((x, y))[3]}, key=sum, reverse=True)
+    wood = [c for c in cols if sum(c) > 150]
+    L, M, D, DD = wood[0], wood[1], wood[len(wood) // 2], wood[-1]
+    rows = ['.oLo.', 'oLLMo', 'oLMDo', 'oMDDo', 'oDDXo', 'ooooo']
+    pc = {'L': L, 'M': M, 'D': D, 'X': DD, 'o': OUT[:3]}
+    im = Image.new('RGBA', (5, len(rows)))
+    for y, r in enumerate(rows):
+        for x, ch in enumerate(r):
+            if ch != '.': im.putpixel((x, y), pc[ch] + (255,))
+    return im
+
+
+def vstakes(s, h, flip=False):
+    """zvislý rad kolov (pohľad zhora): kôl za kôlom po 3 px, vyčnievajú nad chodník"""
+    st = stake_piece(s)
+    if flip: st = st.transpose(Image.FLIP_LEFT_RIGHT)
+    col = Image.new('RGBA', (6, h + st.height))
+    for i, y in enumerate(range(0, h + 1, 3)):
+        col.alpha_composite(st, (i % 2, y))
+    return col
+
+
+def thick_variants(s, cx=16, tower=None):
+    tips, walk, front, rail, walk0, face = thick_parts(s)
+    sh = s.height
+    oy = FOOT - sh                                 # vodorovná vzorka: päta čela na FOOT
+    wy0, wy1 = oy + walk0, oy + face               # chodník vodorovného úseku v sprite
+    VW = 22                                        # šírka zvislého úseku (koly z oboch strán, chodník v strede)
+    TW = tower.width if tower is not None else VW
+    tc = max(TW // 2, min(W - TW // 2, cx))           # stred vežičky – zvislý úsek ide presne pod ňou
+    out = []
+    for m in range(16):
+        N, E, S, Wn = m & 1, m & 2, m & 4, m & 8
+        im = Image.new('RGBA', (W, H))
+        vx = max(0, min(W - VW, tc - VW // 2))
+        if N or S:
+            top = (FOOT + 2 - tower.height // 2 - 32 + 6 if tower is not None else 0) if N else wy0 - 3   # zhora kúsok pod polovicou vežičky vyššieho políčka (hradba vchádza do veže, nie ako vyššie poschodie)
+            bot = H if S else wy1
+            if tower is not None and m not in (5, 10):        # pod vežičkou: zvislý úsek len od jej stredu (nevytŕča spod šikmých rohov)
+                tmid = FOOT + 2 - tower.height // 2
+                if not N: top = tmid
+                if not S: bot = tmid
+            body = Image.new('RGBA', (VW, H))
+            for y in range(top - (top % walk.height) - walk.height, bot, walk.height):   # chodník (dosky naprieč)
+                body.alpha_composite(walk.crop((2, 0, 2 + VW, walk.height)), (0, y))
+            body = body.crop((0, 0, VW, H))
+            clip = Image.new('RGBA', (VW, H)); clip.alpha_composite(body.crop((0, top, VW, bot)), (0, top))
+            body = clip
+            sy = top - (0 if N and tower is not None else 7)
+            for flip, stx in ((False, 0), (True, VW - 6)):           # koly z oboch strán ako na vodorovnej hradbe
+                body.alpha_composite(vstakes(s, max(0, bot - sy - (0 if S else 7)), flip=flip), (stx, sy))
+            if not S and (tower is None or m in (5, 10)):             # čelo na južnom konci
+                body.alpha_composite(front.crop((3, 0, 3 + VW, front.height)), (0, wy1))
+            ob = outline(body)
+            if N and top > 0:                                         # bez obrysu na hornej hrane (tam nadväzuje úsek z vyššieho políčka – inak tmavý šev)
+                for x in range(VW):
+                    if body.getpixel((x, top - 1))[3] == 0: ob.putpixel((x, top - 1), (0, 0, 0, 0))
+            im.alpha_composite(ob, (vx, 0))
+        if Wn or E:
+            horiz = Image.new('RGBA', (W, H))
+            if Wn: horiz.alpha_composite(s.crop((0, 0, cx, sh)), (0, oy))
+            if E: horiz.alpha_composite(s.crop((cx, 0, 32, sh)), (cx, oy))
+            im.alpha_composite(horiz)
+        if (N or S) and (Wn or E) and S:                     # zvislá vetva nadol ide pred vodorovnú (bližšie k nám)
+            pass
+        if m not in (5, 10) and (Wn or E or (N and S) == 0):
+            # rohová vežička: kus vzorky 16 px, o 6 px vyšší, s lanom
+            if tower is not None:                             # vežička z PixelLabu (WTn.png): päta na päte hradby, stred nad zvislým úsekom
+                im.alpha_composite(tower, (tc - tower.width // 2, FOOT + 2 - tower.height))
+                out.append(im)
+                continue
+            px0 = vx
+            t = Image.new('RGBA', (VW, sh + 6))
+            t.alpha_composite(s.crop((0, 0, VW, walk0 + 2)), (0, 0))
+            t.alpha_composite(s.crop((0, walk0 - 4, VW, sh)), (0, walk0 + 2))
+            for x in range(VW):
+                if t.getpixel((x, sh + 6 - 14))[3]: t.putpixel((x, sh + 6 - 14), ROPE if x % 3 else OUT)
+            im.alpha_composite(outline(t), (px0, FOOT + 2 - t.height))
+        out.append(im)
+    return out
+
+
 def main():
     out, name, paths = sys.argv[1], sys.argv[2], sys.argv[3:]
-    pal, levels = [], []
+    pal, levels, thick = [], [], []
     for p in paths:
         rows_lv = []
-        for im in [v for cx in SIDES for v in variants(sample(p), cx)]:
+        thick.append(1 if os.path.basename(p).upper().startswith('W') else 0)
+        tw = None
+        if thick[-1]:                                         # k W1.png vežička WT1.png (roh a koniec hradby), ak je
+            tp = os.path.join(ROOT, os.path.dirname(p), 'WT' + os.path.basename(p)[1:])
+            if os.path.exists(tp):
+                tw = Image.open(tp).convert('RGBA'); tw = tw.crop(tw.split()[3].getbbox())
+        vf = (lambda sm, cx: thick_variants(sm, cx, tw)) if thick[-1] else variants
+        for im in [v for cx in SIDES for v in vf(sample(p), cx)]:
             rows = []
             for y in range(H):
                 r = ''
@@ -117,7 +244,7 @@ def main():
           '// %s: hradby z PixelLabu, jemná kresba. Vygenerované: tools/pixellab2walls.py – ručne neupravovať.' % name,
           '// lv[úroveň][maska susedov N=1 E=2 S=4 W=8 + 16 × strana] = riadky znakov (znak = index v pal, \'.\' = priehľadné);',
           '// strana 0 = zvislý úsek v strede políčka, 1 = pri ľavom okraji (vľavo od hradu), 2 = pri pravom okraji (vpravo od hradu)',
-          'const %s = %s;' % (name, json.dumps({'chars': ''.join(CHARS[:len(pal)]), 'pal': pal, 'lv': levels}, separators=(',', ':')).replace('],[', '],\n[')), '']
+          'const %s = %s;' % (name, json.dumps({'chars': ''.join(CHARS[:len(pal)]), 'pal': pal, 'thick': thick, 'lv': levels}, separators=(',', ':')).replace('],[', '],\n[')), '']
     open(os.path.join(ROOT, out), 'w', encoding='utf8').write('\n'.join(js))
     print('%s: %d úrovní, %d farieb' % (name, len(levels), len(pal)))
 
