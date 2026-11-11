@@ -3816,7 +3816,7 @@
     // tieň vychádza z päty stĺpca, takže sa budovy drží a nepôsobí, že stavba visí vo vzduchu
     const foot = new Int16Array(W).fill(-1);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3]) foot[x] = y;
-    // pevné stĺpce stoja na zemi, visiace (zástava, zub cimburia, lampáš) náhle vyskočia nahor oproti susedovi bližšie k stredu (o viac ako 4 px);
+    // pevné stĺpce stoja na zemi, visiace (zástava, zub cimburia, lampáš) náhle vyskočia nahor oproti susedovi bližšie k stredu (o viac ako 10 px);
     // ide sa od najnižšieho bodu doľava aj doprava, postupne ustupujúci roh budovy ostáva pevný
     let base = 0;
     for (let x = 0; x < W; x++) if (foot[x] > base) base = foot[x];
@@ -3824,10 +3824,9 @@
     const xc = lows[lows.length >> 1], solid = new Uint8Array(W);
     for (const dir of [1, -1]) {
       let pf = -1;
-      for (let x = xc; x >= 0 && x < W; x += dir) { if (foot[x] < 0) continue; if (pf < 0 || foot[x] >= pf - 4) { solid[x] = 1; pf = foot[x]; } }
+      for (let x = xc; x >= 0 && x < W; x += dir) { if (foot[x] < 0) continue; if (pf < 0 || foot[x] >= pf - 10) { solid[x] = 1; pf = foot[x]; } }
     }
     // zem pod stavbou = spodná konvexná obálka päty pevných stĺpcov (rovná čiara po spodku, bez zubov – tieň nemá pruhy);
-    // za krajmi obálky (visiace stĺpce na boku) zem stúpa 1 px na 2 px
     const hull = [];
     for (let x = 0; x < W; x++) {
       if (!solid[x]) continue;
@@ -3840,13 +3839,22 @@
     const [lx, ly] = hull[0], [rx, ry] = hull[hull.length - 1], ground = new Int16Array(W);
     for (let x = 0; x < W; x++) {
       if (foot[x] < 0) continue;
-      const h = hl[x] >= 0 ? hl[x] : Math.round(x < lx ? ly - 0.5 * (lx - x) : ry - 0.5 * (x - rx));
-      ground[x] = hl[x] >= 0 && hl[x] - foot[x] > 16 ? foot[x] : Math.max(foot[x], h); // hlboký výrez (vjazd) má vlastnú zem
+      const h = hl[x] >= 0 ? hl[x] : x < lx ? ly : ry; // visiace stĺpce na boku: zem na úrovni konca obálky (tieň zástavy nevyskočí za budovu)
+      ground[x] = Math.max(foot[x], h); // aj medzi nohami veže či pod oblúkom brány je zem na obálke – tieň sa nerozdelí na pásy
     }
     const SW = W + Math.ceil(H * SH_X) + 2, SHh = H + Math.ceil(H * SH_Y) + 3, m = new Uint8Array(SW * SHh), put = (px, py) => { if (px >= 0 && py >= 0 && px < SW && py < SHh) m[py * SW + px] = 1; };
     // každý stĺpec kresby je pevný od zeme po svoj najvyšší pixel (budova je plná hmota): jeho tieň je súvislý šikmý pás od päty
     // po tieň vrchu – tieň je plný, bez dier (rebríky, okná, trámy), bez bublín (terč, vozík) a drží tvar budovy
-    for (let xx = 0; xx < W; xx++) {
+    if (spr.shadowNoFront) { // rovné čelo (balistová veža): tieň od celého spodku čela sa zbieha do špice doprava dole (smer ako ostatné tiene)
+      let tp = H, xl = W, xr = -1; for (let x = 0; x < W; x++) if (solid[x]) { xl = Math.min(xl, x); xr = Math.max(xr, x); let t = 0; while (t < foot[x] && !d[(t * W + x) * 4 + 3]) t++; tp = Math.min(tp, t); }
+      const hm = base - tp, tx = xr + hm * SH_X, ty = base + hm * SH_Y;
+      for (let x = xl; x <= xr; x++) {
+        if (!solid[x]) continue;
+        const fy = foot[x]; put(x, fy); put(x, fy - 1); // každý stĺpec od svojej päty (ustupujúca ľavá stena nevrhá tieň pred vežu)
+        const ex = tx + (x - xr) * 0.2, n = Math.ceil(Math.hypot(ex - x, ty - fy)) * 2;
+        for (let i = 0; i <= n; i++) { const px = Math.round(x + (ex - x) * i / n), py = Math.round(fy + (ty - fy) * i / n); put(px, py); put(px + 1, py); }
+      }
+    } else for (let xx = 0; xx < W; xx++) {
       if (foot[xx] < 0) continue;
       if (solid[xx]) { put(xx, foot[xx]); put(xx, foot[xx] - 1); } // kontaktný tieň pri päte (nie pod ňou – netrčí dopredu)
       let top = 0; while (top < foot[xx] && !d[(top * W + xx) * 4 + 3]) top++;
@@ -3854,11 +3862,7 @@
       for (let t = 0; t <= v * 2; t++) { const px = Math.round(xx + t / 2 * SH_X), py = Math.round(g0 + t / 2 * SH_Y); put(px, py); put(px + 1, py); }
     }
     // výrezy pod stavbou (medzi piliermi, nohami veže, pod terčom či vozíkom) sa vyplnia až po zem (obálku), takže pod budovou nesvieti piesok
-    for (let x = 0; x < W; x++) if (hl[x] >= 0) { const top = foot[x] >= 0 ? foot[x] : hl[x]; if (hl[x] - top <= 16) for (let y = top; y <= hl[x]; y++) put(x, y); }
-    if (spr.shadowNoFront) { // budova s rovným čelom (balistová veža): tieň nepadá pred čelo, začína až pri jej pravom spodnom rohu
-      let xr = 0; for (let x = 0; x < W; x++) if (foot[x] === base) xr = x;
-      for (let x = 0; x <= xr; x++) { const gy = hl[x] >= 0 ? hl[x] : foot[x]; for (let y = gy + 1; y < SHh; y++) m[y * SW + x] = 0; }
-    }
+    for (let x = 0; x < W; x++) if (hl[x] >= 0 && solid[x] && hl[x] - foot[x] <= 6) for (let y = foot[x]; y <= hl[x]; y++) put(x, y); // len plytké výrezy pevných stĺpcov – medzi stojkami veže ani pod zástavou nič
     const c = document.createElement('canvas'); c.width = SW; c.height = SHh;
     const x = c.getContext('2d'), id = x.createImageData(SW, SHh), q = id.data;
     for (let i = 0; i < m.length; i++) if (m[i]) { q[i * 4] = 10; q[i * 4 + 1] = 18; q[i * 4 + 2] = 6; q[i * 4 + 3] = 255; }

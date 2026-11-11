@@ -1554,7 +1554,7 @@ function initBuildingSprites() {
   BSPR.pitch = PITCH_TOWER_ART.lv.map((_, i) => artBuilding(PITCH_TOWER_ART, i)); // smolná veža z PixelLabu (pitch-tower-art.js), len ľudia
   BSPR.icetower = [1, 2, 3, 4, 5].map(l => makeIceTower(l));
   // balistová veža z PixelLabu (ballista-tower-art.js, zatiaľ jedna kresba pre všetky úrovne) a na jej plošine otočná balista v 8 smeroch (ballista-turret-art.js)
-  if (typeof BALLISTA_TOWER_ART !== 'undefined') { const s = artBuilding(BALLISTA_TOWER_ART, 0, false); s.shadowNoFront = true; BSPR.ballista = [s, s, s, s, s]; } // rovné čelo: tieň nepadá pred vežu
+  if (typeof BALLISTA_TOWER_ART !== 'undefined') { const s = artBuilding(BALLISTA_TOWER_ART, 0, false); BSPR.ballista = [s, s, s, s, s]; }
   else BSPR.ballista = [1, 2, 3, 4, 5].map(l => makeBallistaTower(l));
   BSPR.ballistaTurret = typeof BALLISTA_TURRET_ART !== 'undefined' ? BALLISTA_TURRET_ART.lv.map((_, i) => artBuilding(BALLISTA_TURRET_ART, i, false)) : null; // smery ako postavy: 0 vpravo, 2 dole, 6 hore
   BSPR.barracks = artBuilding(BARRACKS_ART, 0, false); // kasárne z PixelLabu (barracks-art.js), jedna podoba pre všetky úrovne; stará kresba: makeBarracks
