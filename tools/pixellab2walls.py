@@ -198,6 +198,13 @@ def thick_variants(s, cx=16, tower=None):
                 tmid = FOOT + 2 - tower.height // 2
                 if not N: top = tmid
                 if not S: bot = tmid
+            cut = None
+            if N and tower is not None:                               # horný okraj do V podľa spodných hrán vežičky vyššieho políčka (kopíruje steny veže)
+                ta = tower.split()[3]
+                tbot = [max([y for y in range(tower.height) if ta.getpixel((x, y))] or [tower.height - 1]) for x in range(tower.width)]
+                tx = tc - tower.width // 2
+                cut = [FOOT + 2 - tower.height + tbot[min(tower.width - 1, max(0, vx + bx - tx))] - tower.height // 2 + 6 - 32 for bx in range(VW)]
+                top = max(0, min(cut))
             body = Image.new('RGBA', (VW, H))
             for y in range(top - (top % walk.height) - walk.height, bot, walk.height):   # chodník (dosky naprieč)
                 body.alpha_composite(walk.crop((2, 0, 2 + VW, walk.height)), (0, y))
@@ -210,8 +217,14 @@ def thick_variants(s, cx=16, tower=None):
                 body.alpha_composite(vstakes(s, hh, flip=flip) if wood else vmerlons(s, hh), (stx, sy))
             if not S and (tower is None or m in (5, 10)):             # čelo na južnom konci
                 body.alpha_composite(front.crop((3, 0, 3 + VW, front.height)), (0, wy1))
+            if cut:
+                for bx in range(VW):
+                    for y in range(0, max(0, cut[bx])): body.putpixel((bx, y), (0, 0, 0, 0))
             ob = outline(body)
-            if N and top > 0:                                         # bez obrysu na hornej hrane (tam nadväzuje úsek z vyššieho políčka – inak tmavý šev)
+            if cut:                                                   # bez obrysu na hornom okraji (nadväzuje na vežu či úsek nad ním)
+                for bx in range(VW):
+                    for y in range(0, max(0, cut[bx])): ob.putpixel((bx, y), (0, 0, 0, 0))
+            elif N and top > 0:                                         # bez obrysu na hornej hrane (tam nadväzuje úsek z vyššieho políčka – inak tmavý šev)
                 for x in range(VW):
                     if body.getpixel((x, top - 1))[3] == 0: ob.putpixel((x, top - 1), (0, 0, 0, 0))
             im.alpha_composite(ob, (vx, 0))
