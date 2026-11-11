@@ -3870,19 +3870,55 @@
     sh = { c, k: W / spr.w }; shadowCache.set(spr, sh);
     return sh;
   }
-  function drawShadow(spr, x, y) { // x, y = ľavý horný roh kresby v bodoch hry (ako pri drawImage budovy)
+  function drawShadow(ctx, spr, x, y) { // x, y = ľavý horný roh kresby v bodoch hry (ako pri drawImage budovy)
     const sh = shadowOf(spr);
-    g.drawImage(sh.c, x, y, sh.c.width / sh.k, sh.c.height / sh.k);
+    ctx.drawImage(sh.c, x, y, sh.c.width / sh.k, sh.c.height / sh.k);
+  }
+  // všetky tiene sa kreslia nepriehľadne do jednej vrstvy a tá sa na zem položí naraz polopriehľadne – kde sa tiene prekrývajú
+  // (súvislé hradby, budovy vedľa seba), nestmavnú dvakrát; vrstva sa prekreslí len keď sa zmenia stavby (inak len jedno vykreslenie)
+  const shLayer = document.createElement('canvas'), shCtx = shLayer.getContext('2d');
+  let shKey = '';
+  // zvislý úsek hradby: stena sa tiahne celým políčkom, takže jej tieň je rovnobežník – od pravej hrany steny doprava dole
+  // (o výšku hradby × smer tieňa), po celej dĺžke políčka; výška a hrana sa zmerajú z kresby (raz)
+  const wallInfo = new WeakMap();
+  function wallMeasure(spr) {
+    let w = wallInfo.get(spr);
+    if (w) return w;
+    const W = spr.c.width, H = spr.c.height, d = (spr.px || spr.c.getContext('2d').getImageData(0, 0, W, H)).data, k = W / spr.w;
+    let xr = -1, top = H, bot = -1;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3]) { xr = Math.max(xr, x); top = Math.min(top, y); bot = Math.max(bot, y); }
+    w = { xr: (xr + 1) / k, h: (bot - top + 1) / k }; wallInfo.set(spr, w);
+    return w;
+  }
+  function wallVShadow(ctx, ws, flat, x0, y0, m) {
+    const xr = x0 + wallMeasure(ws).xr, h = Math.max(4, wallMeasure(flat).h - 6); // výška steny nad zemou (bez hĺbky vrchu)
+    const yTop = y0 + (m & 1 ? 0 : 2), yBot = y0 + T + 2;
+    for (let t = 0; t <= h; t += 0.5) ctx.fillRect(Math.round((xr - 1 + t * SH_X) * 2) / 2, Math.round((yTop + t * SH_Y) * 2) / 2, 1, yBot - yTop);
   }
   function drawShadows() {
-    g.globalAlpha = SH_A;
-    if (!isAssault()) { const spr = bsprOf('hall', st.hallLvl); drawShadow(spr, spr.hd ? G.hallCx - spr.w / 2 : Math.round(G.hallCx - spr.w / 2), G.hallBot + 1 - spr.h + (spr.hd ? 4 : 0)); }
-    for (const b of st.blds) {
-      if (TRAPS[b.kind] || b.kind === 'mud' || b.kind === 'hedge' || b.kind === 'wall') continue;
-      const spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl);
-      drawShadow(spr, tileX(b.c) + bW(b) * T / 2 - Math.floor(spr.w / 2), tileY(b.r) + T + 1 - spr.h);
+    let key = buf.width + 'x' + buf.height + '|' + st.hallLvl + '|' + BUILD_RACE + '|' + isAssault();
+    for (const b of st.blds) if (!TRAPS[b.kind] && b.kind !== 'mud' && b.kind !== 'hedge') key += '|' + b.kind + b.c + ',' + b.r + ',' + b.lvl + (b.gate ? 'g' : '') + (iceMage(b) ? 'i' : '');
+    if (key !== shKey) {
+      shKey = key;
+      if (shLayer.width !== buf.width || shLayer.height !== buf.height) { shLayer.width = buf.width; shLayer.height = buf.height; }
+      shCtx.setTransform(1, 0, 0, 1, 0, 0); shCtx.clearRect(0, 0, shLayer.width, shLayer.height);
+      shCtx.setTransform(BR, 0, 0, BR, 0, 0); shCtx.imageSmoothingEnabled = false; shCtx.fillStyle = '#0a1206';
+      if (!isAssault()) { const spr = bsprOf('hall', st.hallLvl); drawShadow(shCtx, spr, spr.hd ? G.hallCx - spr.w / 2 : Math.round(G.hallCx - spr.w / 2), G.hallBot + 1 - spr.h + (spr.hd ? 4 : 0)); }
+      for (const b of st.blds) {
+        if (TRAPS[b.kind] || b.kind === 'mud' || b.kind === 'hedge') continue;
+        if (b.kind === 'wall') { // hradba: ten istý kúsok ako v drawBuilding (napojenie podľa susedov), brána navyše
+          const m = (joinsV(b.c, b.r - 1) ? 1 : 0) | (joins(b.c + 1, b.r) ? 2 : 0) | (joinsV(b.c, b.r + 1) ? 4 : 0) | (joins(b.c - 1, b.r) ? 8 : 0);
+          const wl = Math.max(1, Math.min(5, b.lvl)) - 1, ws = wallsOf()[wl][m + 16 * wallSide(b.c)] || wallsOf()[wl][m];
+          if (m & 5) wallVShadow(shCtx, ws, wallsOf()[wl][10] || ws, tileX(b.c), tileY(b.r), m); // zvislý úsek: súvislý pás tieňa doprava od celej steny
+          if (!(m & 5) || (m & 10)) drawShadow(shCtx, ws, tileX(b.c), tileY(b.r) + 18 - ws.h);
+          if (b.gate) drawShadow(shCtx, gatesOf()[wl], tileX(b.c), tileY(b.r) - 15);
+          continue;
+        }
+        const spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl);
+        drawShadow(shCtx, spr, tileX(b.c) + bW(b) * T / 2 - Math.floor(spr.w / 2), tileY(b.r) + T + 1 - spr.h);
+      }
     }
-    g.globalAlpha = 1;
+    g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = SH_A; g.drawImage(shLayer, 0, 0); g.restore();
   }
   function drawBuilding(b, time) {
     const x0 = tileX(b.c), y0 = tileY(b.r);
