@@ -268,7 +268,7 @@ def thick_variants(s, cx=16, tower=None, nt=(7, 11, 13, 14, 15)):   # T-spoje a 
 
 def main():
     out, name, paths = sys.argv[1], sys.argv[2], sys.argv[3:]
-    pal, levels, thick = [], [], []
+    pal, levels, thick, gates = [], [], [], []
     for p in paths:
         rows_lv = []
         thick.append(1 if os.path.basename(p).upper().startswith('W') else 0)
@@ -292,11 +292,26 @@ def main():
             rows_lv.append(rows)
         levels.append(rows_lv)
         print('%s: 3 × 16 variantov %dx%d px' % (p, W, H))
+        gp = os.path.join(ROOT, os.path.dirname(p), 'G' + os.path.basename(p)[1:])
+        if thick[-1] and os.path.exists(gp):                   # brána Gn.png: vodorovný úsek hradby s bránou, v tom istom ráme ako Wn.png
+            graw = Image.open(gp).convert('RGBA')
+            wraw = Image.open(os.path.join(ROOT, p)).convert('RGBA')
+            dy = FOOT - wraw.split()[3].getbbox()[3]             # spodok hradby na FOOT, brána posunutá rovnako (ostane v ráme PixelLabu)
+            gi = Image.new('RGBA', (W, H)); gi.alpha_composite(graw.crop((0, max(0, -dy), 32, graw.height)), (0, max(0, dy)))
+            ga = gi.split()[3]
+            tops = [min([y for y in range(H) if ga.getpixel((x, y))] or [H]) for x in range(W)]
+            fl = [min(range(4, 14), key=lambda x: (tops[x], abs(x - 7))), min(range(18, 28), key=lambda x: (tops[x], abs(x - 24)))]   # vlajočky na najvyšších bodoch pri bráne (stĺpy / vežičky), nie na okrajoch hradby
+            gates.append({'rows': [''.join('.' if gi.getpixel((x, y))[3] < 128 else CHARS[pal.index('#%02x%02x%02x' % gi.getpixel((x, y))[:3])] if ('#%02x%02x%02x' % gi.getpixel((x, y))[:3]) in pal or pal.append('#%02x%02x%02x' % gi.getpixel((x, y))[:3]) is None else '' for x in range(W)) for y in range(H)],
+                          'flags': [[x, tops[x]] for x in fl]})
+            print('%s: brána, vlajočky %s' % (gp, gates[-1]['flags']))
+        else:
+            gates.append(None)
     js = ["'use strict';",
           '// %s: hradby z PixelLabu, jemná kresba. Vygenerované: tools/pixellab2walls.py – ručne neupravovať.' % name,
           '// lv[úroveň][maska susedov N=1 E=2 S=4 W=8 + 16 × strana] = riadky znakov (znak = index v pal, \'.\' = priehľadné);',
           '// strana 0 = zvislý úsek v strede políčka, 1 = pri ľavom okraji (vľavo od hradu), 2 = pri pravom okraji (vpravo od hradu)',
-          'const %s = %s;' % (name, json.dumps({'chars': ''.join(CHARS[:len(pal)]), 'pal': pal, 'thick': thick, 'lv': levels}, separators=(',', ':')).replace('],[', '],\n[')), '']
+          '// gate[úroveň] = {rows: brána v ráme hradby, flags: [[x, y] vrcholy pre vlajočky v px]} alebo null',
+          'const %s = %s;' % (name, json.dumps({'chars': ''.join(CHARS[:len(pal)]), 'pal': pal, 'thick': thick, 'gate': gates, 'lv': levels}, separators=(',', ':')).replace('],[', '],\n[')), '']
     open(os.path.join(ROOT, out), 'w', encoding='utf8').write('\n'.join(js))
     print('%s: %d úrovní, %d farieb' % (name, len(levels), len(pal)))
 

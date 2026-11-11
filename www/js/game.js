@@ -3704,11 +3704,11 @@
     if (o.kind === 'hall') return (previewCache[key] = spriteURL(bsprOf('hall', lv), 2));
     const c = document.createElement('canvas'), x = c.getContext('2d');
     if (o.kind === 'wall') {
-      const ws = wallsOf()[lv - 1][10], thk = wallThick(lv - 1), uh = u ? SPR[raceSpr(WUNIT[u.type].spr)][0].h : 0, y0 = Math.max(o.gate ? 15 : u ? (thk ? uh - 3 : 9) : 6, ws.h - 18); // nad hradbou len toľko miesta, koľko treba (strážnica / strelec / vyššia jemná palisáda)
+      const ga = o.gate && gateArtOf(lv - 1), ws = ga || wallsOf()[lv - 1][10], thk = wallThick(lv - 1), uh = u ? SPR[raceSpr(WUNIT[u.type].spr)][0].h : 0, y0 = Math.max(o.gate && !ga ? 15 : u ? (thk ? uh - 3 : 9) : 6, ws.h - 18); // nad hradbou len toľko miesta, koľko treba (strážnica / strelec / vyššia jemná palisáda)
       c.width = T; c.height = y0 + 18; x.imageSmoothingEnabled = false;
       wallImg(x, ws, 0, y0);
       if (o.spikes) drawSpikes(x, 0, y0, o.spikeType);
-      if (o.gate) x.drawImage(gatesOf()[lv - 1].c, 0, y0 - 15);
+      if (o.gate && !ga) x.drawImage(gatesOf()[lv - 1].c, 0, y0 - 15);
       else if (u) {
         const us = SPR[raceSpr(WUNIT[u.type].spr)][0];
         if (thk) x.drawImage(us.c, 0, 0, us.c.width, us.c.height, Math.round(T / 2 - us.w / 2), y0 + 3 - us.h, us.w, us.h);
@@ -3915,8 +3915,9 @@
           const m = (joinsV(b.c, b.r - 1) ? 1 : 0) | (joins(b.c + 1, b.r) ? 2 : 0) | (joinsV(b.c, b.r + 1) ? 4 : 0) | (joins(b.c - 1, b.r) ? 8 : 0);
           const wl = Math.max(1, Math.min(5, b.lvl)) - 1, ws = wallsOf()[wl][m + 16 * wallSide(b.c)] || wallsOf()[wl][m];
           if (m & 5) wallVShadow(shCtx, ws, wallsOf()[wl][10] || ws, tileX(b.c), tileY(b.r), m); // zvislý úsek: súvislý pás tieňa doprava od celej steny
-          if (!(m & 5) || (m & 10)) drawShadow(shCtx, ws, tileX(b.c), tileY(b.r) + 18 - ws.h);
-          if (b.gate) drawShadow(shCtx, gatesOf()[wl], tileX(b.c), tileY(b.r) - 15);
+          const ga = b.gate && gateArtOf(wl), hs = ga && !(m & 5) ? ga : ws; // vodorovná brána z PixelLabu: tieň brány namiesto úseku
+          if (!(m & 5) || (m & 10)) drawShadow(shCtx, hs, tileX(b.c), tileY(b.r) + 18 - hs.h);
+          if (b.gate && !ga) drawShadow(shCtx, gatesOf()[wl], tileX(b.c), tileY(b.r) - 15);
           continue;
         }
         const spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl);
@@ -3937,7 +3938,10 @@
       const m = (joinsV(b.c, b.r - 1) ? 1 : 0) | (joins(b.c + 1, b.r) ? 2 : 0) | (joinsV(b.c, b.r + 1) ? 4 : 0) | (joins(b.c - 1, b.r) ? 8 : 0);
       const wl = Math.max(1, Math.min(5, b.lvl)) - 1;
       spr = wallsOf()[wl][m + 16 * wallSide(b.c)] || wallsOf()[wl][m];
+      const ga = b.gate && gateArtOf(wl), gv = ga && (m & 5); // brána z PixelLabu: na vodorovnej hradbe celý úsek, na zvislej stred brány na úseku
+      if (ga && !gv) spr = ga;
       wallImg(g, spr, x0, y0);
+      if (gv) g.drawImage(ga.c, 5, 0, 22, ga.c.height, x0 + [5, 3, 7][wallSide(b.c)] / 2, y0 + 18 - ga.h - (m & 4 ? 6 : 0), 11, ga.h); // nad úsekom pod ňou (ten sa kreslí neskôr a prekryl by vráta)
       if (b.holyT > 0) holyGlow(spr, x0, y0 + 18 - spr.h, b.holyT, time);
       // napojenie na susedné budovy (veže, radnica); k okrajom obrazovky sa hradby nenaťahujú
       const flat = wallsOf()[wl][spr.hd ? 10 : m | 2 | 8], fr = flat.c.width / flat.w; // jemná kresba: rovný úsek bez piliera, fr = 2
@@ -3951,16 +3955,19 @@
         if (b.spikeType === 'fire' && Math.random() < 0.04) part(x0 + 2 + Math.random() * (T - 4), y0 + 5, 0, -10, 0.4, '#f89838', -5);
       }
       if (b.gate) {
-        const gh = gatesOf()[wl];
-        g.drawImage(gh.c, x0, y0 - 15);
-        if (b.holyT > 0) holyGlow(gh, x0, y0 - 15, b.holyT, time); // brána prekrýva hradbu – leskne sa aj ona
-        for (const fx of [x0 + 2, x0 + 12]) { // vlajočky na pilieroch
-          const wv = Math.floor(time * 6 + fx * 0.7) % 2;
-          const fl = FLAG_COL[BUILD_RACE];
-          g.fillStyle = '#4a4e60'; g.fillRect(fx, y0 - 20, 1, 5);
-          g.fillStyle = fl[0]; g.fillRect(fx + 1, y0 - 20 + wv, 4, 2);
-          g.fillStyle = fl[1]; g.fillRect(fx + 1, y0 - 20 + wv, 2, 1);
-          g.fillStyle = fl[2]; g.fillRect(fx + 4, y0 - 19 - wv, 1, 1);
+        const flag = (fx, fy, left) => { // vlajočka na žrdi (fy = päta žrde); vľavo veje doľava, aby nezakryla bránu
+          const wv = Math.floor(time * 6 + fx * 0.7) % 2, fl = FLAG_COL[BUILD_RACE], d = left ? -1 : 1, cx0 = left ? fx - 4 : fx + 1;
+          g.fillStyle = '#4a4e60'; g.fillRect(fx, fy - 5, 1, 5);
+          g.fillStyle = fl[0]; g.fillRect(cx0, fy - 5 + wv, 4, 2);
+          g.fillStyle = fl[1]; g.fillRect(left ? fx - 2 : fx + 1, fy - 5 + wv, 2, 1);
+          g.fillStyle = fl[2]; g.fillRect(fx + 4 * d, fy - 4 - wv, 1, 1);
+        };
+        if (ga) { if (!gv) for (const [fx, fy] of ga.flags) flag(x0 + Math.round(fx / 2), y0 + 18 - ga.h + Math.round(fy / 2), fx < 16); }
+        else {
+          const gh = gatesOf()[wl];
+          g.drawImage(gh.c, x0, y0 - 15);
+          if (b.holyT > 0) holyGlow(gh, x0, y0 - 15, b.holyT, time); // brána prekrýva hradbu – leskne sa aj ona
+          for (const fx of [x0 + 2, x0 + 12]) flag(fx, y0 - 15, false); // vlajočky na pilieroch
         }
       } else if (b.unit) {
         // za orkov goblin či ork zo sady v 8 smeroch, otočený chrbtom (pozerá hore na nepriateľa ako ľudský strelec)

@@ -1596,10 +1596,13 @@ function initBuildingSprites() {
   BSPR.wall = [];
   for (let l = 1; l <= 5; l++) { BSPR.wall[l - 1] = []; const lv = WALL_ART.lv[l - 1]; for (let m = 0; m < (lv ? lv.length : 16); m++) BSPR.wall[l - 1][m] = lv ? artBuilding({ chars: WALL_ART.chars, pal: WALL_ART.pal, lv }, m, false) : makeWall(m, l); } // z PixelLabu: 3 × 16 variantov (zvislý úsek v strede, vľavo, vpravo) // hradby z PixelLabu (wall-art.js), chýbajúce úrovne stará kresba
   BSPR.gatehouse = [1, 2, 3, 4, 5].map(l => makeGatehouse(l));
+  // brány z PixelLabu (wall-art.js): vodorovný úsek hradby s bránou v ráme hradby, vrcholy pre vlajočky
+  BSPR.gateArt = (WALL_ART.gate || []).map(gt => gt ? Object.assign(artBuilding({ chars: WALL_ART.chars, pal: WALL_ART.pal, lv: [gt.rows] }, 0, false), { flags: gt.flags }) : null);
   // ikona brány: hradba + strážnica (kamenná)
   const ic = document.createElement('canvas'); ic.width = 16; ic.height = 33;
-  const ix = ic.getContext('2d');
-  ix.drawImage(BSPR.wall[1][10].c, 0, 9); ix.drawImage(BSPR.gatehouse[1].c, 0, 0);
+  const ix = ic.getContext('2d'); ix.imageSmoothingEnabled = false;
+  if (BSPR.gateArt[1]) ix.drawImage(BSPR.gateArt[1].c, 0, -5, 16, 32);
+  else { ix.drawImage(BSPR.wall[1][10].c, 0, 9); ix.drawImage(BSPR.gatehouse[1].c, 0, 0); }
   BSPR.gateIcon = spriteFromCanvas(ic);
   // orkské podoby stavieb hráča: budovy hordy, ktoré už poznáme z tábora, plus palisáda, brána a jedový kotol
   Object.assign(OBSPR, {
@@ -1624,6 +1627,7 @@ let BUILD_RACE = 'human';
 const OBSPR = {}; // orkské podoby stavieb hráča
 const wallsOf = () => BUILD_RACE === 'orc' ? OBSPR.wall : BSPR.wall;
 const gatesOf = () => BUILD_RACE === 'orc' ? OBSPR.gatehouse : BSPR.gatehouse;
+const gateArtOf = wl => BUILD_RACE !== 'orc' && BSPR.gateArt && BSPR.gateArt[wl]; // brána z PixelLabu (nahrádza úsek hradby) alebo nič
 function bsprOf(kind, lvl) {
   const v = (BUILD_RACE === 'orc' && OBSPR[kind]) || BSPR[kind];
   return Array.isArray(v) ? v[Math.max(1, Math.min(5, lvl || 1)) - 1] : v;
