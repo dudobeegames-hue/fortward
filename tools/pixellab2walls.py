@@ -101,7 +101,9 @@ def thick_rows(s):
     a = s.split()[3]
     dark = lambda y: sum(1 for x in range(32) if a.getpixel((x, y)) and sum(s.getpixel((x, y))[:3]) < 140)
     full = lambda y: all(a.getpixel((x, y)) for x in range(32))
-    rail = next(y for y in range(s.height) if full(y) and dark(y) > 20)      # tmavý pás pod hrotmi zadnej steny
+    from collections import Counter
+    uni = lambda y: Counter(s.getpixel((x, y))[:3] for x in range(32)).most_common(1)[0][1]
+    rail = next(y for y in range(s.height) if full(y) and uni(y) >= 24)      # pás pod hrotmi / zubmi zadnej steny (plný, jednej farby – tmavý aj zlatý)
     walk0 = rail + 1
     ink = lambda y: sum(1 for x in range(32) if a.getpixel((x, y)) and sum(s.getpixel((x, y))[:3]) <= 64)
     face = next(y for y in range(walk0 + 2, s.height) if ink(y) >= 6)       # prvý riadok hrotov / zubov čela (obrysová farba; tmavý kameň chodníka sa nepočíta)
@@ -177,7 +179,8 @@ def vmerlons(s, h):
     return col
 
 
-def thick_variants(s, cx=16, tower=None):
+def thick_variants(s, cx=16, tower=None, nt=(7, 11, 13, 14, 15)):   # T-spoje a kríženia bez vežičky (hradby sa len prekrížia; blok hradieb nie je plný vežičiek)
+    STR = {5, 10} | set(nt)                       # bez vežičky: rovné úseky (+ voliteľne T-spoje a kríženia)
     tips, walk, front, rail, walk0, face = thick_parts(s)
     sh = s.height
     wood = is_wood(s)
@@ -194,7 +197,7 @@ def thick_variants(s, cx=16, tower=None):
         if N or S:
             top = (FOOT + 2 - tower.height // 2 - 32 + 6 if tower is not None else 0) if N else wy0 - 3   # zhora kúsok pod polovicou vežičky vyššieho políčka (hradba vchádza do veže, nie ako vyššie poschodie)
             bot = H if S else wy1
-            if tower is not None and m not in (5, 10):        # pod vežičkou: zvislý úsek len od jej stredu (nevytŕča spod šikmých rohov)
+            if tower is not None and m not in STR:        # pod vežičkou: zvislý úsek len od jej stredu (nevytŕča spod šikmých rohov)
                 tmid = FOOT + 2 - tower.height // 2
                 if not N: top = tmid
                 if not S: bot = tmid
@@ -211,11 +214,12 @@ def thick_variants(s, cx=16, tower=None):
             body = body.crop((0, 0, VW, H))
             clip = Image.new('RGBA', (VW, H)); clip.alpha_composite(body.crop((0, top, VW, bot)), (0, top))
             body = clip
-            sy = top - (0 if N and tower is not None else 7)
+            plain = body.copy()                                       # samotný chodník bez kolov (na prechody v T-spojoch a kríženiach)
+            sy = top - (0 if (N and tower is not None) or (not N and (Wn or E)) else 7)   # vetva T-spoja nevytŕča nad vodorovnú hradbu
             for flip, stx in ((False, 0), (True, VW - 6)):           # koly z oboch strán ako na vodorovnej hradbe
                 hh = max(0, bot - sy - (0 if S else 7))
                 body.alpha_composite(vstakes(s, hh, flip=flip) if wood else vmerlons(s, hh), (stx, sy))
-            if not S and (tower is None or m in (5, 10)):             # čelo na južnom konci
+            if not S and (tower is None or m in STR):             # čelo na južnom konci
                 body.alpha_composite(front.crop((3, 0, 3 + VW, front.height)), (0, wy1))
             if cut:
                 for bx in range(VW):
@@ -233,9 +237,19 @@ def thick_variants(s, cx=16, tower=None):
             if Wn: horiz.alpha_composite(s.crop((0, 0, cx, sh)), (0, oy))
             if E: horiz.alpha_composite(s.crop((cx, 0, 32, sh)), (cx, oy))
             im.alpha_composite(horiz)
+            if (N or S) and m in STR and m not in (5, 10):          # T-spoj / kríženie: priechodné – chodníky sa spoja, koly a zuby neprekážajú
+                if S:                                             # zvislá hradba nadol ide pred čelom vodorovnej (jej vrch, nie stena)
+                    low = Image.new('RGBA', (VW, H)); low.alpha_composite(ob.crop((0, wy1, VW, H)), (0, wy1))
+                    im.alpha_composite(low, (vx, 0))
+                r0, r1 = (oy if N else wy0), (H if S else wy1)
+                inner = Image.new('RGBA', (VW - 12, H)); inner.alpha_composite(plain.crop((6, r0, VW - 6, r1)), (0, r0))
+                im.alpha_composite(inner, (vx + 6, 0))               # chodník zvislej hradby cez zadný / predný rad kolov
+                hw = s.crop((0, walk0, 32, face))                 # bočné koly zvislej hradby prerušené tam, kam vedie vodorovný chodník (jeho vlastné dosky / kameň)
+                if Wn: im.alpha_composite(hw.crop((vx, 0, vx + 6, hw.height)), (vx, wy0))
+                if E: im.alpha_composite(hw.crop((vx + VW - 6, 0, vx + VW, hw.height)), (vx + VW - 6, wy0))
         if (N or S) and (Wn or E) and S:                     # zvislá vetva nadol ide pred vodorovnú (bližšie k nám)
             pass
-        if m not in (5, 10) and (Wn or E or (N and S) == 0):
+        if m not in STR and (Wn or E or (N and S) == 0):
             # rohová vežička: kus vzorky 16 px, o 6 px vyšší, s lanom
             if tower is not None:                             # vežička z PixelLabu (WTn.png): päta na päte hradby, stred nad zvislým úsekom
                 im.alpha_composite(tower, (tc - tower.width // 2, FOOT + 2 - tower.height))
