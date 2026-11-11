@@ -1933,6 +1933,8 @@
     }
     return best;
   }
+  // nepriateľ pri hrade (útočí naň alebo k nemu tesne dorazil) – vojaci ho idú brániť prednostne
+  const atHall = e => { if (e.dead || e.d.fly || isAssault()) return false; const hr = hallRect(); return e.x > hr.x0 - 14 && e.x < hr.x1 + 14 && e.y > hr.y0 - 14 && e.y < hr.y1 + 6; };
   function nearestEnemy(x, y, rad, preferFree) {
     let best = null, bd = 1e9;
     for (const e of st.enemies) {
@@ -2113,7 +2115,7 @@
     if (u.tgt && (u.tgt.dead || far(u.tgt))) u.tgt = null;
     // jazdec si vyberá strelcov, šamanov a podkopníkov; ostatní najbližšieho
     if (!u.tgt && u.ktype === 'rider') u.tgt = priorityEnemy(homeX, homeY, aggro, RIDER_PRIO);
-    if (u.ktype === 'spear' && !(u.tgt && u.tgt.d.cav)) { const c = priorityEnemy(u.x, u.y, 90, e => e.d.cav); if (c) u.tgt = c; } // kopijník vyráža proti jazde
+    if (u.ktype === 'spear' && !(u.tgt && (u.tgt.d.cav || (!u.isKing && atHall(u.tgt))))) { const c = priorityEnemy(u.x, u.y, 90, e => e.d.cav); if (c) u.tgt = c; } // kopijník vyráža proti jazde
     // hrdina nevyráža po nepriateľovi, ktorého aj tak zničia iní skôr, než k nemu dôjde (inak by len poskakoval tam a späť)
     if (!u.tgt) u.tgt = u.isKing ? nearestEnemyWhere(u.x, u.y, e => heroReaches(e, aggro) && !doomed(e, heroEta(u, e, 8)), true) : nearestEnemy(homeX, homeY, aggro, true);
     const t = u.tgt;
@@ -3047,8 +3049,10 @@
         const sl = s.fslot || { x: G.gx0 + G.cols * T / 2, y: musterY };
         const atk = armyAttacks();
         let aggro = s.ktype === 'rider' ? (atk ? 9999 : RIDER_GUARD) : F.contact ? CLASH : ENGAGE;
+        // obrana hradu má prednosť: kto búcha do hradu, po tom ide každý pešiak a jazdec (aj keby mal iný cieľ pri hradbách)
+        if (!(s.tgt && !s.tgt.dead && atHall(s.tgt))) { const ht = nearestEnemyWhere(s.x, s.y, atHall, true); if (ht) s.tgt = ht; }
         if (!s.tgt || s.tgt.dead) { const leak = nearestEnemyWhere(s.x, s.y, e => e.y > F.inf.y + 14 && e.y > 4, true); if (leak) s.tgt = leak; }
-        if (s.tgt && !s.tgt.dead && s.tgt.y > F.inf.y + 14) aggro = 9999;
+        if (s.tgt && !s.tgt.dead && (s.tgt.y > F.inf.y + 14 || atHall(s.tgt))) aggro = 9999;
         // nikto z hordy na dosah zrážky a nikto neprerazil za šík – tlačí dopredu a búra tábor (hordu stretne cestou)
         // búra len stavbu tábora, ku ktorej vedie cesta (najprv hradby a brány, potom to, čo sa za nimi otvorí)
         const cp = atk && st.camp && (!s.tgt || s.tgt.dead) && !nearestEnemy(s.x, s.y, ENGAGE) ? nearestReachablePart(s, dt) : null;
