@@ -103,7 +103,8 @@ def thick_rows(s):
     full = lambda y: all(a.getpixel((x, y)) for x in range(32))
     rail = next(y for y in range(s.height) if full(y) and dark(y) > 20)      # tmavý pás pod hrotmi zadnej steny
     walk0 = rail + 1
-    face = next(y for y in range(walk0 + 2, s.height) if dark(y) >= 6)      # prvý riadok hrotov čela
+    ink = lambda y: sum(1 for x in range(32) if a.getpixel((x, y)) and sum(s.getpixel((x, y))[:3]) <= 64)
+    face = next(y for y in range(walk0 + 2, s.height) if ink(y) >= 6)       # prvý riadok hrotov / zubov čela (obrysová farba; tmavý kameň chodníka sa nepočíta)
     return rail, walk0, face
 
 
@@ -111,7 +112,7 @@ def thick_parts(s):
     rail, walk0, face = thick_rows(s)
     walk = s.crop((0, walk0, 32, face))                       # doskový chodník (opakuje sa)
     wd = sorted({walk.getpixel((x, y))[:3] for x in range(32) for y in range(walk.height) if walk.getpixel((x, y))[3]}, key=sum)
-    for y in range(walk.height):
+    for y in range(walk.height if is_wood(s) else 0):          # drevený chodník bez tmavých klincov (kameň ostáva)
         for x in range(32):
             c = walk.getpixel((x, y))
             if c[3] and sum(c[:3]) < 150: walk.putpixel((x, y), wd[[sum(k) for k in wd].index(next(sum(k) for k in wd if sum(k) >= 150))] + (255,))
@@ -132,7 +133,8 @@ def outline(p):
 
 def stake_piece(s):
     """jeden kôl palisády pri pohľade zhora: hrot a kus čela, farby zo vzorky (od najsvetlejšej po najtmavšiu)"""
-    cols = sorted({s.getpixel((x, y))[:3] for x in range(32) for y in range(s.height) if s.getpixel((x, y))[3]}, key=sum, reverse=True)
+    rail = thick_rows(s)[0]                     # farby len z hrotov zadnej steny (kôl, nie kameň chodníka či čela)
+    cols = sorted({s.getpixel((x, y))[:3] for x in range(32) for y in range(rail) if s.getpixel((x, y))[3]}, key=sum, reverse=True)
     wood = [c for c in cols if sum(c) > 150]
     L, M, D, DD = wood[0], wood[1], wood[len(wood) // 2], wood[-1]
     rows = ['.oLo.', 'oLLMo', 'oLMDo', 'oMDDo', 'oDDXo', 'ooooo']
@@ -154,9 +156,31 @@ def vstakes(s, h, flip=False):
     return col
 
 
+def is_wood(s):
+    rail = thick_rows(s)[0]
+    px = [s.getpixel((x, y)) for x in range(32) for y in range(rail) if s.getpixel((x, y))[3] and sum(s.getpixel((x, y))[:3]) > 150]
+    return sum(1 for c in px if c[0] > c[2] + 20) > len(px) // 2
+
+
+def vmerlons(s, h):
+    """zvislý rad zubov cimburia (kamenné hradby): zub zo zadného radu vzorky, za ním medzera"""
+    rail = thick_rows(s)[0]
+    a = s.split()[3]
+    x0 = next(x for x in range(32) if a.getpixel((x, 1)) and (x == 0 or not a.getpixel((x - 1, 1))))
+    x1 = next(x for x in range(x0, 32) if not a.getpixel((x, 1)))
+    mw = x1 - x0
+    mer = s.crop((x0, 0, x1, rail))
+    if mw != 6: mer = mer.resize((6, rail), Image.NEAREST)
+    col = Image.new('RGBA', (6, h + rail))
+    for y in range(0, h + 1, rail + 2):
+        col.alpha_composite(mer, (0, y))
+    return col
+
+
 def thick_variants(s, cx=16, tower=None):
     tips, walk, front, rail, walk0, face = thick_parts(s)
     sh = s.height
+    wood = is_wood(s)
     oy = FOOT - sh                                 # vodorovná vzorka: päta čela na FOOT
     wy0, wy1 = oy + walk0, oy + face               # chodník vodorovného úseku v sprite
     VW = 22                                        # šírka zvislého úseku (koly z oboch strán, chodník v strede)
@@ -182,7 +206,8 @@ def thick_variants(s, cx=16, tower=None):
             body = clip
             sy = top - (0 if N and tower is not None else 7)
             for flip, stx in ((False, 0), (True, VW - 6)):           # koly z oboch strán ako na vodorovnej hradbe
-                body.alpha_composite(vstakes(s, max(0, bot - sy - (0 if S else 7)), flip=flip), (stx, sy))
+                hh = max(0, bot - sy - (0 if S else 7))
+                body.alpha_composite(vstakes(s, hh, flip=flip) if wood else vmerlons(s, hh), (stx, sy))
             if not S and (tower is None or m in (5, 10)):             # čelo na južnom konci
                 body.alpha_composite(front.crop((3, 0, 3 + VW, front.height)), (0, wy1))
             ob = outline(body)
