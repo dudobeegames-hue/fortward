@@ -638,7 +638,8 @@
   // ---------------- Mriežka ----------------
   const tileX = c => G.gx0 + c * T;
   const tileY = r => G.gy0 + r * T;
-  const hallTile = (c, r) => c >= G.hc0 && c < G.hc0 + 3 && r >= G.hr0 && r < G.hr0 + 3;
+  const HALL_ROWS = 2; // hrad zaberá 3 stĺpce × 2 riadky (spodok na tom istom mieste ako pri pôvodnom 3 × 3)
+  const hallTile = (c, r) => c >= G.hc0 && c < G.hc0 + 3 && r >= G.hr0 && r < G.hr0 + HALL_ROWS;
   const inHall = hallTile;
   const zoneTopRow = () => G.rows - zoneRows();
   const inZone = (c, r) => c >= 0 && c < G.cols && r >= zoneTopRow() && r <= G.rows - 1;
@@ -652,7 +653,7 @@
 
   function rebuildOcc() {
     st.occ = new Array(G.cols * G.rows).fill(null);
-    if (!isAssault()) for (let r = G.hr0; r < G.hr0 + 3; r++) for (let c = G.hc0; c < G.hc0 + 3; c++) st.occ[r * G.cols + c] = HALL; // pri útoku na hrad radnica nie je
+    if (!isAssault()) for (let r = G.hr0; r < G.hr0 + HALL_ROWS; r++) for (let c = G.hc0; c < G.hc0 + 3; c++) st.occ[r * G.cols + c] = HALL; // pri útoku na hrad radnica nie je
     for (const b of st.blds) for (let k = 0; k < bW(b); k++) if (b.c + k < G.cols) st.occ[b.r * G.cols + b.c + k] = b;
     for (const b of st.blds) if (b.kind === 'wall') {
       let nb = 0;
@@ -763,8 +764,8 @@
     const fh = H + (m > HOME_PROVINCES && !endless ? Math.round(H * CAMP_EXTRA) : 0), g2 = Object.assign({}, G);
     g2.cols = Math.min(GRID_COLS, Math.floor(W / T)); g2.gx0 = Math.floor((W - g2.cols * T) / 2);
     g2.rows = Math.floor((fh - GROUND_PAD) / T); g2.gy0 = fh - GROUND_PAD - g2.rows * T;
-    g2.hc0 = Math.floor(g2.cols / 2) - 1; g2.hr0 = g2.rows - 3;
-    g2.hallCx = g2.gx0 + g2.hc0 * T + 1.5 * T; g2.hallTop = g2.gy0 + g2.hr0 * T; g2.hallBot = g2.hallTop + 3 * T;
+    g2.hc0 = Math.floor(g2.cols / 2) - 1; g2.hr0 = g2.rows - HALL_ROWS;
+    g2.hallCx = g2.gx0 + g2.hc0 * T + 1.5 * T; g2.hallTop = g2.gy0 + g2.hr0 * T; g2.hallBot = g2.hallTop + HALL_ROWS * T;
     g2.zoneTopMax = g2.gy0 + (g2.rows - (5 + MAX_LVL)) * T;
     return { fh, g2 };
   }
@@ -795,8 +796,8 @@
     // pevný počet stĺpcov na každom zariadení (zmestí sa aj do najužšej plochy 180 px) – zmena okna tak mriežku neposúva
     G.cols = Math.min(GRID_COLS, Math.floor(W / T)); G.gx0 = Math.floor((W - G.cols * T) / 2);
     G.rows = Math.floor((FH - GROUND_PAD) / T); G.gy0 = FH - GROUND_PAD - G.rows * T;
-    G.hc0 = Math.floor(G.cols / 2) - 1; G.hr0 = G.rows - 3;
-    G.hallCx = tileX(G.hc0) + 1.5 * T; G.hallTop = tileY(G.hr0); G.hallBot = G.hallTop + 3 * T;
+    G.hc0 = Math.floor(G.cols / 2) - 1; G.hr0 = G.rows - HALL_ROWS;
+    G.hallCx = tileX(G.hc0) + 1.5 * T; G.hallTop = tileY(G.hr0); G.hallBot = G.hallTop + HALL_ROWS * T;
     G.zoneTopMax = tileY(G.rows - (5 + MAX_LVL));
     scene = sceneFor(st.mission, st.endless);
     if (had) { // posuň stavby, ak sa zmenila mriežka
@@ -1800,7 +1801,7 @@
     // pri radnici?
     const hr = hallRect();
     const qx = Math.max(hr.x0 + 2, Math.min(hr.x1 - 2, e.x)), qy = Math.max(hr.y0 - 1, Math.min(hr.y1 - 1, e.y));
-    const nearHall = Math.abs(c - (G.hc0 + 1)) <= 2 && r >= G.hr0 - 1 && r <= G.hr0 + 3;
+    const nearHall = Math.abs(c - (G.hc0 + 1)) <= 2 && r >= G.hr0 - 1 && r <= G.hr0 + HALL_ROWS;
     if (nearHall) {
       let tx = qx, ty = qy;
       if (e.y < hr.y0) ty = hr.y0 - 1; // zhora
@@ -3710,14 +3711,30 @@
   }
   // zdravie radnice: tenký pruh pod radnicou, široký ako radnica (3 políčka); farba podľa zdravia.
   // Číslo „zdravie/max“ nie je pixelové – kreslí ho present() hladkým písmom v plnom rozlíšení obrazovky (hallLbl)
-  let hallLbl = null;
+  let hallLbl = null, hallLag = null; // hallLag: podiel zdravia, ktorý ešte svieti po zásahu
   function drawHallBar() {
+    // jemná kresba (pol bodu = 1 pixel vyrovnávacej pamäte): tmavý obrys, bronzový rám, žľab, výplň s odleskom a tieňom,
+    // čerstvo stratené zdravie chvíľu svieti (stráca sa za výplňou), ryhy po štvrtinách
     const hp = Math.max(0, Math.ceil(st.hallHp)), max = hallMax(), r = Math.min(1, hp / max), w = 3 * T - 4, x = Math.round(G.hallCx - w / 2), y = G.hallBot + 9; // pod hradom (ten siaha 4 body pod svoje políčka)
-    g.fillStyle = PAL.K; g.fillRect(x - 1, y - 1, w + 2, 4);
-    g.fillStyle = '#3a1410'; g.fillRect(x, y, w, 2);
-    g.fillStyle = r < 0.3 ? '#e84838' : r < 0.6 ? '#f8a838' : '#7cd04a'; g.fillRect(x, y, Math.round(w * r), 2);
-    if (r > 0) { g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(x, y, Math.round(w * r), 1); } // lesk
-    hallLbl = { s: hp + '/' + max, x: G.hallCx, y: y + 1 };
+    const h = 2.5, q = 0.5, fill = Math.round(w * r * 2) / 2;
+    if (hallLag == null || hallLag < r) hallLag = r; else hallLag = Math.max(r, hallLag - 0.004); // biela stopa po zásahu
+    const col = r < 0.3 ? '#e84838' : r < 0.6 ? '#f8a838' : '#7cd04a', sh = barShades(col);
+    g.fillStyle = PAL.K; g.fillRect(x - 2 * q, y - 2 * q, w + 4 * q, h + 4 * q);
+    g.fillStyle = '#c08a28'; g.fillRect(x - q, y - q, w + 2 * q, h + 2 * q);           // bronzový rám
+    g.fillStyle = '#7a5418'; g.fillRect(x - q, y + h, w + 2 * q, q);                  // tieň rámu dole
+    g.fillStyle = '#f8d048'; g.fillRect(x - q, y - q, w + 2 * q, q);                  // lesk rámu hore
+    g.fillStyle = '#2a0e0a'; g.fillRect(x, y, w, h);                                  // žľab
+    g.fillStyle = '#1a0806'; g.fillRect(x, y, w, q);
+    const lag = Math.round(w * hallLag * 2) / 2;
+    if (lag > fill) { g.fillStyle = '#fff2d0'; g.fillRect(x + fill, y, lag - fill, h); }
+    if (fill > 0) {
+      g.fillStyle = col; g.fillRect(x, y, fill, h);
+      g.fillStyle = sh[0]; g.fillRect(x, y, fill, q * 2);                              // odlesk
+      g.fillStyle = 'rgba(255,255,255,0.45)'; g.fillRect(x, y, fill, q);
+      g.fillStyle = sh[1]; g.fillRect(x, y + h - q, fill, q);                           // tieň
+    }
+    g.fillStyle = 'rgba(0,0,0,0.35)'; for (let k = 1; k < 4; k++) g.fillRect(x + Math.round(w * k / 4 * 2) / 2, y, q, h); // ryhy po štvrtinách
+    hallLbl = { s: hp + '/' + max, x: G.hallCx, y: y + h / 2 };
   }
   function bar(cx, y, w, ratio, col) {
     // jemná kresba (pol bodu = 1 pixel vyrovnávacej pamäte, ako jednotky): tenký obrys, výplň 3 pixely – svetlý odlesk, farba, tieň
@@ -3998,8 +4015,8 @@
       const slice = (dx, w) => { for (let k = 0; k < w; k += 4) { const ww = Math.min(4, w - k); g.drawImage(flat.c, 6 * fr, 0, ww * fr, flat.c.height, dx + k, y0 + 18 - flat.h, ww, flat.h); } };
       if (joinsBuilding(b.c + 1, b.r)) slice(x0 + T, 4);
       if (joinsBuilding(b.c - 1, b.r)) slice(x0 - 4, 4);
-      if (b.r === G.hr0 + 2 && occAt(b.c + 1, b.r) === HALL) slice(x0 + T, 8); // pod okraj hradu (hrad sa kreslí neskôr a koniec prekryje)
-      if (b.r === G.hr0 + 2 && occAt(b.c - 1, b.r) === HALL) slice(x0 - 8, 8);
+      if (b.r === G.hr0 + HALL_ROWS - 1 && occAt(b.c + 1, b.r) === HALL) slice(x0 + T, 8); // pod okraj hradu (hrad sa kreslí neskôr a koniec prekryje)
+      if (b.r === G.hr0 + HALL_ROWS - 1 && occAt(b.c - 1, b.r) === HALL) slice(x0 - 8, 8);
       if (b.gate) {
         if (!ga) { // stará kresba (orkovia): strážnica a vlajočky na pilieroch; brána z PixelLabu má zástavy v kresbe
           const gh = gatesOf()[wl];
@@ -4062,7 +4079,7 @@
   const wallSide = c =>c < G.hc0 ? 1 : c > G.hc0 + 2 ? 2 : 0;
   const wallImg = (ctx, spr, x, y) => ctx.drawImage(spr.c, x, y + 18 - spr.h, spr.w, spr.h);
   const JOINERS = { wall: 1, tower: 1, mage: 1, pitch: 1, icetower: 1, ballista: 1 }; // hradby sa napájajú len na hradby a veže (strážna, mága) – na ostatné budovy nie
-  const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL ? r === G.hr0 + 2 : !!JOINERS[o.kind]); }; // na hrad len zo spodného radu (tam má bočné múry)
+  const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL ? r === G.hr0 + HALL_ROWS - 1 : !!JOINERS[o.kind]); }; // na hrad len zo spodného radu (tam má bočné múry)
   const joinsV = (c, r) => occAt(c, r) !== HALL && joins(c, r); // na radnicu sa hradby napájajú len z bokov, nie zhora
   const joinsBuilding = (c, r) => { const o = occAt(c, r); return !!o && o !== HALL && o.kind !== 'wall' && !!JOINERS[o.kind]; };
 
