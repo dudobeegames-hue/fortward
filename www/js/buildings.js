@@ -1596,8 +1596,8 @@ function initBuildingSprites() {
   BSPR.wall = [];
   for (let l = 1; l <= 5; l++) { BSPR.wall[l - 1] = []; const lv = WALL_ART.lv[l - 1]; for (let m = 0; m < (lv ? lv.length : 16); m++) BSPR.wall[l - 1][m] = lv ? artBuilding({ chars: WALL_ART.chars, pal: WALL_ART.pal, lv }, m, false) : makeWall(m, l); } // z PixelLabu: 3 × 16 variantov (zvislý úsek v strede, vľavo, vpravo) // hradby z PixelLabu (wall-art.js), chýbajúce úrovne stará kresba
   BSPR.gatehouse = [1, 2, 3, 4, 5].map(l => makeGatehouse(l));
-  // brány z PixelLabu (wall-art.js): vodorovný úsek hradby s bránou v ráme hradby, vrcholy pre vlajočky
-  BSPR.gateArt = (WALL_ART.gate || []).map(gt => gt ? Object.assign(artBuilding({ chars: WALL_ART.chars, pal: WALL_ART.pal, lv: [gt.rows] }, 0, false), { flags: gt.flags }) : null);
+  // brány z PixelLabu (wall-art.js): vodorovný úsek hradby s bránou v ráme hradby, zástavy ako na vežiach vejú
+  BSPR.gateArt = (WALL_ART.gate || []).map(gt => gt ? Object.assign(artBuilding({ chars: WALL_ART.chars, pal: WALL_ART.pal, lv: [gt.rows] }, 0), { flags: gt.flags }) : null);
   // ikona brány: hradba + strážnica (kamenná)
   const ic = document.createElement('canvas'); ic.width = 16; ic.height = 33;
   const ix = ic.getContext('2d'); ix.imageSmoothingEnabled = false;

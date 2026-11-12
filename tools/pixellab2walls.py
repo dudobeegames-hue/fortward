@@ -300,7 +300,17 @@ def main():
             gi = Image.new('RGBA', (W, H)); gi.alpha_composite(graw.crop((0, max(0, -dy), 32, graw.height)), (0, max(0, dy)))
             ga = gi.split()[3]
             tops = [min([y for y in range(H) if ga.getpixel((x, y))] or [H]) for x in range(W)]
-            fl = [min(range(4, 14), key=lambda x: (tops[x], abs(x - 7))), min(range(18, 28), key=lambda x: (tops[x], abs(x - 24)))]   # vlajočky na najvyšších bodoch pri bráne (stĺpy / vežičky), nie na okrajoch hradby
+            xl = min(range(6, 14), key=lambda x: (max(tops[x], tops[31 - x]), abs(x - 7)))   # zástavy súmerne na najvyššej dvojici stĺpov pri bráne
+            fl = [xl, 31 - xl]   # vlajočky na najvyšších bodoch pri bráne (stĺpy / vežičky), nie na okrajoch hradby
+            if fl[1] - fl[0] < 10: fl = [min(range(10, 22), key=lambda x: (tops[x], abs(x - 15.5)))]   # stĺpy pri sebe (štít strechy): jedna zástava na vrchole
+            FLAG = ['aaba', 'abbcbdb', 'abbbbaa', 'aaa'] + ['aa'] * 5   # zástava ako na vežiach z PixelLabu (hra ju rozpozná a nechá viať)
+            FCOL = {'a': (0x1c, 0x14, 0x0e, 255), 'b': (0x22, 0x33, 0x7a, 255), 'c': (0x3c, 0x64, 0xc8, 255), 'd': (0x3e, 0x26, 0x14, 255)}
+            for k, fx in enumerate(fl):
+                y0 = tops[fx] - len(FLAG)                         # päta žrde na vrchole stĺpa
+                for ry, row in enumerate(FLAG):
+                    for off, ch in enumerate(row):
+                        x = fx + off                              # všetky zástavy vejú doprava ako na ostatných budovách
+                        if 0 <= x < W and 0 <= y0 + ry < H: gi.putpixel((x, y0 + ry), FCOL[ch])
             gates.append({'rows': [''.join('.' if gi.getpixel((x, y))[3] < 128 else CHARS[pal.index('#%02x%02x%02x' % gi.getpixel((x, y))[:3])] if ('#%02x%02x%02x' % gi.getpixel((x, y))[:3]) in pal or pal.append('#%02x%02x%02x' % gi.getpixel((x, y))[:3]) is None else '' for x in range(W)) for y in range(H)],
                           'flags': [[x, tops[x]] for x in fl]})
             print('%s: brána, vlajočky %s' % (gp, gates[-1]['flags']))
