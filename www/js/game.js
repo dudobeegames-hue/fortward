@@ -4103,10 +4103,12 @@
     }
   }
 
+  // pasca na políčku: stará kresba 16×16 v ľavom hornom rohu, jemná kresba (w, h v bodoch) v strede políčka
+  const trapImg = (ctx, spr, x, y) => spr.hd ? ctx.drawImage(spr.c, x + Math.round((T - spr.w) / 2), y + Math.round((T - spr.h) / 2), spr.w, spr.h) : ctx.drawImage(spr.c, x, y);
   function drawPit(b, time) {
     const spr = BSPR[b.kind], x = tileX(b.c), y = tileY(b.r);
     g.globalAlpha = b.kind === 'beartrap' && b.armT > 0 ? 0.45 : 1; // nabíjajúca sa pasca
-    g.drawImage(spr.c, x, y);
+    trapImg(g, spr, x, y);
     g.globalAlpha = 1;
     if (b.kind === 'firepit' && st.phase === 'battle' && Math.random() < 0.25) part(x + 4 + Math.random() * 8, y + 6, 0, -10 - Math.random() * 8, 0.5, Math.random() < 0.5 ? '#f89838' : '#fff070', -8);
   }
@@ -4185,7 +4187,7 @@
     const spr = kind === 'wall' ? wallsOf()[0][10] : TRAPS[kind] ? BSPR[kind] : isPave(kind) ? { c: paveAt(hx, hy, PAVE[kind]) } : bsprOf(kind, 1);
     g.globalAlpha = ok ? 0.75 : 0.45;
     if (kind === 'wall') wallImg(g, spr, hx, hy);
-    else if (TRAPS[kind]) g.drawImage(spr.c, hx, hy);
+    else if (TRAPS[kind]) trapImg(g, spr, hx, hy);
     else if (isPave(kind)) drawPave(g, hx, hy, PAVE[kind]);
     else g.drawImage(spr.c, hx + pw / 2 - Math.floor(spr.w / 2), hy + T + 1 - spr.h, spr.w, spr.h);
     g.globalAlpha = 1;
@@ -4277,7 +4279,7 @@
         const spr = mv.kind === 'wall' ? wallsOf()[Math.max(1, Math.min(5, mv.lvl)) - 1][10] : TRAPS[mv.kind] ? BSPR[mv.kind] : bsprOf(mv.kind, mv.lvl);
         g.globalAlpha = 0.7;
         if (mv.kind === 'wall') wallImg(g, spr, hx, hy);
-        else if (TRAPS[mv.kind]) g.drawImage(spr.c, hx, hy);
+        else if (TRAPS[mv.kind]) trapImg(g, spr, hx, hy);
         else g.drawImage(spr.c, hx + mw / 2 - Math.floor(spr.w / 2), hy + T + 1 - spr.h, spr.w, spr.h);
         g.globalAlpha = 1;
       } else corners(ox, oy, ox + mw - 1, oy + T - 1, blink ? '#9cd45a' : '#ffffff');
@@ -5711,7 +5713,7 @@
   const sprIcon = spr => spr.hd ? spriteURL({ c: spr.c, w: spr.c.width, h: spr.c.height }, 1) : spriteURL(spr, 3);
   function buildingIcons() {
     for (const k of ['tower', 'barracks', 'mage', 'mageIce', 'pitch', 'icetower', 'ballista', 'mine', 'chapel', 'workshop', 'range', 'stables', 'armory', 'falconry']) ICONS[k] = sprIcon(bsprOf(k, 1));
-    ICONS.pit = spriteURL(BSPR.pit, 3);
+    ICONS.pit = sprIcon(BSPR.pit);
     for (const k of ['firepit', 'beartrap']) ICONS[k] = spriteURL(BSPR[k], 3);
     ICONS.stake = spriteURL(BSPR.stake, 3);
     ICONS.wall = spriteURL(wallsOf()[0][10], 3);
