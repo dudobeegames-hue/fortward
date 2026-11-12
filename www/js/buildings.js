@@ -104,8 +104,8 @@ function recolorFlame(id, ramp, full) {
   }
 }
 const FLAME_EDGE = ['#e87850', '#d05634', '#b03c24'].map(hexRGB); // farby strechy, ktorými PixelLab dokreslil okraj plamienka (úrovne 1–2)
-function fireFrames(id, ramp = FIRE_RAMP) {
-  const w = id.width, h = id.height, d = id.data, lim = Math.floor(h * 0.35);
+function fireFrames(id, ramp = FIRE_RAMP, full) { // full: oheň kdekoľvek v kresbe (horiaca jama), inak len v hornej tretine (veže)
+  const w = id.width, h = id.height, d = id.data, lim = full ? h : Math.floor(h * 0.35);
   const lvl = (x, y) => { const k = (y * w + x) * 4; return d[k + 3] ? ramp.findIndex(c => c[0] === d[k] && c[1] === d[k + 1] && c[2] === d[k + 2]) : -1; };
   const cols = new Map(); // stĺpec -> riadky plameňa (zhora)
   for (let y = 0; y < lim; y++) for (let x = 0; x < w; x++) if (lvl(x, y) >= 0) { if (!cols.has(x)) cols.set(x, []); cols.get(x).push(y); }
@@ -1561,7 +1561,11 @@ function initBuildingSprites() {
   BSPR.pit = typeof PIT_ART !== 'undefined' ? artBuilding(PIT_ART, 0, false) : makePit(); // jama s ostňami z PixelLabu (jemná kresba, jedno políčko)
   BSPR.mine = artBuilding(MINE_ART, 0, false); // zlatá baňa z PixelLabu (mine-art.js); stará kresba: makeMine
   BSPR.chapel = artBuilding(CHAPEL_ART, 0, false); // kaplnka z PixelLabu (chapel-art.js), jedna podoba pre všetky úrovne; stará kresba: makeChapel
-  BSPR.firepit = makeFirepit();
+  if (typeof FIRETRAP_ART !== 'undefined') { // horiaca jama z PixelLabu: žeravé uhlíky plápolajú (farby ohňa v celej kresbe)
+    const fp = artBuilding(FIRETRAP_ART, 0, false);
+    fp.frames = fireFrames(fp.px, FIRE_RAMP, true); fp.fps = 9;
+    BSPR.firepit = fp;
+  } else BSPR.firepit = makeFirepit();
   BSPR.beartrap = makeBeartrap();
   BSPR.workshop = artBuilding(WORKSHOP_ART, 0, false); // dielňa z PixelLabu (workshop-art.js); stará kresba: makeWorkshop
   BSPR.range = artBuilding(RANGE_ART, 0, false); // strelnica z PixelLabu (range-art.js), jedna podoba pre všetky úrovne; stará kresba: makeRange

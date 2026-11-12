@@ -261,8 +261,8 @@ const UNLOCKS = [
   [{ id: 'falconry', name: 'Sokoliareň a sokoly', icon: 'falconry', desc: 'Sokoly letia ponad hradby a lovia netopiere, šamanov a podkopníkov. Pechota na ne nedosiahne, strelci ich však ľahko zostrelia.' }, { id: 'lvl5', name: 'Radnica a stavby úrovne 5', icon: 'hall', desc: 'Vylepši radnicu na kráľovský kameň – a s ňou všetky stavby.' }, { id: 'spec', name: 'Špecializácia veží', icon: 'tower', desc: 'Veža od úrovne 3 dostane ohnivé šípy, rýchlu streľbu alebo ostreľovača.' },{ id: 'spikeTypes', name: 'Ohnivé a ľadové ostne', icon: 'wall', desc: 'Ostne na hradbách môžu útočníka podpáliť alebo spomaliť.' }],
   [{ id: 'siegeTower', name: 'Obliehacia veža', icon: 'u_siegeTower', desc: 'Obliehací stroj zo záložky Stroje. Dvaja lukostrelci strieľajú z výšky ďaleko, aj na netopiere. Sprevádza ostatné stroje k táboru hordy.' }],
 ];
-// ostnaté hradby (aj ohnivé a ľadové) a kušník na hradbách sú z hry vyradené – neodomykajú sa
-for (const l of UNLOCKS) for (let i = l.length - 1; i >= 0; i--) if (['spikes', 'spikeTypes', 'wallCrossbow'].includes(l[i].id)) l.splice(i, 1);
+// ostnaté hradby (aj ohnivé a ľadové), kušník na hradbách a medvedia pasca sú z hry vyradené – neodomykajú sa
+for (const l of UNLOCKS) for (let i = l.length - 1; i >= 0; i--) if (['spikes', 'spikeTypes', 'wallCrossbow', 'beartrap'].includes(l[i].id)) l.splice(i, 1);
 // noví nepriatelia – predstavia sa v danej misii (jeden alebo zoznam)
 const ENEMY_INTRO = {
   3: { id: 'garcher', name: 'Goblin-lukostrelec', desc: 'strieľa na budovy z diaľky' },

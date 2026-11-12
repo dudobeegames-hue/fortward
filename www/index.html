@@ -1034,7 +1034,7 @@
 <script>
   // hra sa načíta až po vykreslení úvodnej obrazovky (inak by ťažké skripty zdržali jej prvé zobrazenie)
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    const list = ['audio', 'knight-art', 'archer-art', 'spear-art', 'rider-art', 'tower-art', 'fire-tower-art', 'castle-art', 'pitch-tower-art', 'ballista-tower-art', 'ballista-turret-art', 'wall-art', 'pit-art', 'barracks-art', 'stables-art', 'range-art', 'falconry-art', 'armory-art', 'mine-art', 'workshop-art', 'chapel-art', 'healer-art', 'carpenter-art', 'falcon-art', 'paladin-art', 'sorc-art', 'king-art', 'sprites', 'orcs8', 'scene', 'buildings', 'siege', 'map', 'camp', 'castles', 'paper', 'world', 'icons', 'game'];
+    const list = ['audio', 'knight-art', 'archer-art', 'spear-art', 'rider-art', 'tower-art', 'fire-tower-art', 'castle-art', 'pitch-tower-art', 'ballista-tower-art', 'ballista-turret-art', 'wall-art', 'pit-art', 'firetrap-art', 'barracks-art', 'stables-art', 'range-art', 'falconry-art', 'armory-art', 'mine-art', 'workshop-art', 'chapel-art', 'healer-art', 'carpenter-art', 'falcon-art', 'paladin-art', 'sorc-art', 'king-art', 'sprites', 'orcs8', 'scene', 'buildings', 'siege', 'map', 'camp', 'castles', 'paper', 'world', 'icons', 'game'];
     list.forEach((n, i) => {
       const s = document.createElement('script'); s.src = 'js/' + n + '.js?v=__BUILD__'; s.async = false; // verziu doplní nasadenie, mobil tak nevezme starý skript z pamäte
       document.body.appendChild(s);

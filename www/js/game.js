@@ -142,7 +142,7 @@
   const uDmg = u => WUNIT[u.type].dmg * (1 + 0.4 * (u.lvl - 1)) * (1 + 0.04 * perk('fletching'));
   const uCd = u => WUNIT[u.type].cd * Math.pow(0.92, u.lvl - 1);
   const uRange = u => WUNIT[u.type].range + 4 * (u.lvl - 1);
-  const BUILD_ORDER = ['paving', 'hedge', 'mud', 'tower', 'stake', 'wall', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'pitch', 'mage', 'icetower', 'ballista', 'chapel', 'firepit', 'beartrap', 'workshop'];
+  const BUILD_ORDER = ['paving', 'hedge', 'mud', 'tower', 'stake', 'wall', 'pit', 'mine', 'barracks', 'range', 'stables', 'armory', 'falconry', 'pitch', 'mage', 'icetower', 'ballista', 'chapel', 'firepit', 'workshop']; // medvedia pasca vyradená (ostáva len v táboroch hordy)
   const ORC_ORDER = BUILD_ORDER.slice(); ORC_ORDER.splice(ORC_ORDER.indexOf('icetower'), 1); ORC_ORDER.splice(ORC_ORDER.indexOf('mage'), 0, 'icetower'); // za orkov kotol pred totemom
   const ENEMY = {
     goblin:  { spr: 'goblin',  hp: 12,  speed: 24, atk: 4,  atkCd: 0.8, gold: 3,  blood: '#62a03a' },
@@ -3713,28 +3713,31 @@
   // Číslo „zdravie/max“ nie je pixelové – kreslí ho present() hladkým písmom v plnom rozlíšení obrazovky (hallLbl)
   let hallLbl = null, hallLag = null; // hallLag: podiel zdravia, ktorý ešte svieti po zásahu
   function drawHallBar() {
-    // jemná kresba (pol bodu = 1 pixel vyrovnávacej pamäte): tmavý obrys, bronzový rám, žľab, výplň s odleskom a tieňom,
-    // čerstvo stratené zdravie chvíľu svieti (stráca sa za výplňou), ryhy po štvrtinách
+    // v štýle načítavacieho pásika z úvodu (jemná kresba, pol bodu = 1 px): tenký tmavomodrý rám so zaoblenými rohmi,
+    // tmavý priesvitný žľab, výplň s prechodom svetlá → farba → tmavá; čerstvo stratené zdravie chvíľu svieti
     const hp = Math.max(0, Math.ceil(st.hallHp)), max = hallMax(), r = Math.min(1, hp / max), w = 3 * T - 4, x = Math.round(G.hallCx - w / 2), y = G.hallBot + 9; // pod hradom (ten siaha 4 body pod svoje políčka)
-    const h = 2.5, q = 0.5, fill = Math.round(w * r * 2) / 2;
-    if (hallLag == null || hallLag < r) hallLag = r; else hallLag = Math.max(r, hallLag - 0.004); // biela stopa po zásahu
+    const q = 0.5, h = 2.5, fill = Math.round(w * r * 2) / 2;
+    if (hallLag == null || hallLag < r) hallLag = r; else hallLag = Math.max(r, hallLag - 0.004);
     const col = r < 0.3 ? '#e84838' : r < 0.6 ? '#f8a838' : '#7cd04a', sh = barShades(col);
-    g.fillStyle = PAL.K; g.fillRect(x - 2 * q, y - 2 * q, w + 4 * q, h + 4 * q);
-    g.fillStyle = '#c08a28'; g.fillRect(x - q, y - q, w + 2 * q, h + 2 * q);           // bronzový rám
-    g.fillStyle = '#7a5418'; g.fillRect(x - q, y + h, w + 2 * q, q);                  // tieň rámu dole
-    g.fillStyle = '#f8d048'; g.fillRect(x - q, y - q, w + 2 * q, q);                  // lesk rámu hore
-    g.fillStyle = '#2a0e0a'; g.fillRect(x, y, w, h);                                  // žľab
-    g.fillStyle = '#1a0806'; g.fillRect(x, y, w, q);
+    const box = (bx, by, bw, bh, c) => { g.fillStyle = c; g.fillRect(bx + q, by, bw - 2 * q, bh); g.fillRect(bx, by + q, bw, bh - 2 * q); }; // obdĺžnik so zrezanými rohmi
+    box(x - q, y - q, w + 2 * q, h + 2 * q, '#0c1232');                                // tenký tmavomodrý rám (1 px)
+    g.fillStyle = 'rgba(8,12,34,0.85)'; g.fillRect(x, y, w, h);                        // žľab
     const lag = Math.round(w * hallLag * 2) / 2;
     if (lag > fill) { g.fillStyle = '#fff2d0'; g.fillRect(x + fill, y, lag - fill, h); }
-    if (fill > 0) {
-      g.fillStyle = col; g.fillRect(x, y, fill, h);
-      g.fillStyle = sh[0]; g.fillRect(x, y, fill, q * 2);                              // odlesk
-      g.fillStyle = 'rgba(255,255,255,0.45)'; g.fillRect(x, y, fill, q);
-      g.fillStyle = sh[1]; g.fillRect(x, y + h - q, fill, q);                           // tieň
+    if (fill > 0) { // prechod ako na načítavacom pásiku: svetlá hore, farba v strede, tmavá dole
+      g.fillStyle = sh[0]; g.fillRect(x, y, fill, q);
+      g.fillStyle = col; g.fillRect(x, y + q, fill, 2 * q);
+      g.fillStyle = mixHex(col, sh[1]); g.fillRect(x, y + 3 * q, fill, q);
+      g.fillStyle = sh[1]; g.fillRect(x, y + 4 * q, fill, q);
     }
-    g.fillStyle = 'rgba(0,0,0,0.35)'; for (let k = 1; k < 4; k++) g.fillRect(x + Math.round(w * k / 4 * 2) / 2, y, q, h); // ryhy po štvrtinách
     hallLbl = { s: hp + '/' + max, x: G.hallCx, y: y + h / 2 };
+  }
+  const mixCache = {};
+  function mixHex(a, b) { // farba presne medzi dvoma (#rrggbb)
+    const k = a + b;
+    if (mixCache[k]) return mixCache[k];
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    return (mixCache[k] = '#' + [16, 8, 0].map(sft => (((pa >> sft) & 255) + ((pb >> sft) & 255)) >> 1).map(v => v.toString(16).padStart(2, '0')).join(''));
   }
   function bar(cx, y, w, ratio, col) {
     // jemná kresba (pol bodu = 1 pixel vyrovnávacej pamäte, ako jednotky): tenký obrys, výplň 3 pixely – svetlý odlesk, farba, tieň
@@ -3823,18 +3826,19 @@
     const w = T * 2, h = (T + 4) * 2, c = document.createElement('canvas'); c.width = w; c.height = h;
     const x2 = c.getContext('2d'), id = x2.createImageData(w, h);
     const up = m & 1, rt = m & 2, dn = m & 4, lf = m & 8;
-    const sx0 = 2, sx1 = w - 3; // zvislý pás má šírku samostatného plota – výbežok hore/dole ostane v ňom (na rohu a v T spoji nič netrčí)
+    const vert = up || dn, TOPY = 18, FACE = 10; // nižší plot: vrch od 18. riadku, čelo 10 riadkov (pôvodne 12 a 16)
+    const sx0 = vert ? 9 : 2, sx1 = vert ? w - 10 : w - 3; // zvislý pás je polovičný (v strede políčka); vodorovný plot ide k nemu, na rohu a v T spoji nič netrčí
     const x0 = lf ? 0 : sx0, x1 = rt ? w - 1 : sx1;
     for (let y = 0; y < h; y++) for (let x = x0; x <= x1; x++) {
       const inS = x >= sx0 && x <= sx1, u = up && inS, d = dn && inS; // pokračuje plot hore / dole práve v tomto stĺpci?
-      const top = u ? 0 : 12, face = d ? h : h - 16; // od „face“ nadol je tienisté čelo plota
+      const top = u ? 0 : TOPY, face = d ? h : h - FACE; // od „face“ nadol je tienisté čelo plota
       if (y < top) continue;
       // zaoblené rohy tam, kde plot nepokračuje
       const cx = !lf && x - x0 < 2 ? 2 - (x - x0) : !rt && x1 - x < 2 ? 2 - (x1 - x) : 0;
       const cy = !u && y - top < 2 ? 2 - (y - top) : !d && h - 1 - y < 2 ? 2 - (h - 1 - y) : 0;
       if (cx + cy > 2) continue;
       const n = hash2(x + m * 17, y, 41), clump = hash2(x >> 1, y >> 1, 42), leaf = hash2(x >> 2, (y + (x >> 2) % 2 * 2) >> 2, 43); // drobné lístky v trsoch
-      const side = (up && y < 12 || dn && y >= h - 16) && (x === sx0 && lf || x === sx1 && rt); // bok zvislého pásu nad / pod vodorovným plotom
+      const side = (up && y < TOPY || dn && y >= h - FACE) && (x === sx0 && lf || x === sx1 && rt); // bok zvislého pásu nad / pod vodorovným plotom
       const edge = (!u && y === top) || (!lf && x === x0) || (!rt && x === x1) || (!d && y === h - 1) || cx + cy === 2 || side;
       let ramp = RAMP.grass, v;
       if (y < face) v = 0.6 + (leaf - 0.5) * 0.3 + (clump - 0.5) * 0.18 + (n - 0.5) * 0.12 - (y - top) * 0.005 + (!u && y <= top + 2 ? 0.18 : 0); // vrch na slnku
@@ -4121,13 +4125,14 @@
   }
 
   // pasca na políčku: stará kresba 16×16 v ľavom hornom rohu, jemná kresba (w, h v bodoch) v strede políčka
-  const trapImg = (ctx, spr, x, y) => spr.hd ? ctx.drawImage(spr.c, x + Math.round((T - spr.w) / 2), y + Math.round((T - spr.h) / 2), spr.w, spr.h) : ctx.drawImage(spr.c, x, y);
+  const trapImg = (ctx, spr, x, y, cv) => spr.hd ? ctx.drawImage(cv || spr.c, x + Math.round((T - spr.w) / 2), y + Math.round((T - spr.h) / 2), spr.w, spr.h) : ctx.drawImage(cv || spr.c, x, y); // cv: snímka plápolajúceho ohňa
+  let firepitN = 0; // počet ohnivých jám: pri mnohých jamách menej iskier na jamu (spolu ako pri ôsmich), aby slabší tablet nesekal
   function drawPit(b, time) {
     const spr = BSPR[b.kind], x = tileX(b.c), y = tileY(b.r);
     g.globalAlpha = b.kind === 'beartrap' && b.armT > 0 ? 0.45 : 1; // nabíjajúca sa pasca
-    trapImg(g, spr, x, y);
+    trapImg(g, spr, x, y, bldCanvas(spr, time, b.c * 0.7 + b.r * 0.3));
     g.globalAlpha = 1;
-    if (b.kind === 'firepit' && st.phase === 'battle' && Math.random() < 0.25) part(x + 4 + Math.random() * 8, y + 6, 0, -10 - Math.random() * 8, 0.5, Math.random() < 0.5 ? '#f89838' : '#fff070', -8);
+    if (b.kind === 'firepit' && st.phase === 'battle' && Math.random() < 0.25 * Math.min(1, 8 / Math.max(1, firepitN))) part(x + 4 + Math.random() * 8, y + 6, 0, -10 - Math.random() * 8, 0.5, Math.random() < 0.5 ? '#f89838' : '#fff070', -8);
   }
 
   function corners(x0, y0, x1, y1, col) {
@@ -5554,6 +5559,7 @@
     drawSceneFx(time);
     const playing = st.phase !== 'title';
     if (playing) for (const key in st.paving) { const [pc, pr] = key.split(','), px = tileX(+pc), py = tileY(+pr); drawPave(g, px, py, st.paving[key]); } // dlažba pod všetkým
+    if (playing) { firepitN = 0; for (const b of st.blds) if (b.kind === 'firepit') firepitN++; }
     if (playing) for (const b of st.blds) if (TRAPS[b.kind]) drawPit(b, time); else if (b.kind === 'mud') drawMud(b); // pasce a bahno ležia na zemi
     if (playing && st.camp) for (const o of st.camp.parts) if (o.role === 'trap') drawPit({ kind: o.kind, c: o.c, r: o.r, lvl: 1, armT: o.armT }, time); // pasce tábora tiež na zemi
     if (st.phase === 'build') drawBuildOverlay(time);
@@ -5731,7 +5737,7 @@
   function buildingIcons() {
     for (const k of ['tower', 'barracks', 'mage', 'mageIce', 'pitch', 'icetower', 'ballista', 'mine', 'chapel', 'workshop', 'range', 'stables', 'armory', 'falconry']) ICONS[k] = sprIcon(bsprOf(k, 1));
     ICONS.pit = sprIcon(BSPR.pit);
-    for (const k of ['firepit', 'beartrap']) ICONS[k] = spriteURL(BSPR[k], 3);
+    for (const k of ['firepit', 'beartrap']) ICONS[k] = BSPR[k].hd ? sprIcon(BSPR[k]) : spriteURL(BSPR[k], 3);
     ICONS.stake = spriteURL(BSPR.stake, 3);
     ICONS.wall = spriteURL(wallsOf()[0][10], 3);
     ICONS.gate = spriteURL(BUILD_RACE === 'orc' ? OBSPR.gateIcon : BSPR.gateIcon, 3);
@@ -5917,7 +5923,7 @@
   const BUILD_TABS = [
     { id: 'hall',    name: 'Radnica', kinds: ['paving', 'hedge', 'mud'] }, // hrdina (a oživenie) a ozdoby
     { id: 'towers',  name: 'Veže',    kinds: ['tower', 'pitch', 'mage', 'icetower', 'ballista'] },
-    { id: 'walls',   name: 'Hradby',  kinds: ['wall', 'stake', 'pit', 'firepit', 'beartrap'] },
+    { id: 'walls',   name: 'Hradby',  kinds: ['wall', 'stake', 'pit', 'firepit'] },
     { id: 'army',    name: 'Vojsko',  kinds: ['barracks', 'range', 'stables', 'armory', 'falconry'] },
     { id: 'siege',   name: 'Stroje',  kinds: [] },
     { id: 'support', name: 'Podpora', kinds: ['mine', 'chapel', 'workshop'] },
