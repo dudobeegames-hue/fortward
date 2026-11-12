@@ -686,8 +686,19 @@
   }
   // poistka: vojak hráča (aj stroj a hrdina) nikdy neostane v hradbe – vlastnej (mimo brány) ani tábora, ani v radnici;
   // keď ho tam niečo zatlačí (odtláčanie v tlačenici, odhodenie), vráti sa na posledné voľné miesto – hradbami sa chodí len bránou
+  // more nie je brod: kto chodí po zemi, ostane na pevnine (najviac na piesku pri vode)
+  function keepAshore(list) {
+    const sx = scene && scene.seaX;
+    if (!sx) return;
+    for (const o of list) {
+      if (!o || o.dead || o.fly || (o.d && o.d.fly)) continue;
+      const lim = sx(o.y);
+      if (o.x < lim) o.x = lim;
+    }
+  }
   function keepOutOfWalls() {
     const us = st.king && !st.king.dead ? st.soldiers.concat([st.king]) : st.soldiers;
+    keepAshore(us);
     for (const u of us) {
       if (u.dead || u.fly) continue;
       const t = tileAt(u.x, u.y);
@@ -3012,6 +3023,7 @@
     for (const e of st.enemies) { if (!e.dead) updateEnemy(e, dt); if (st.phase !== 'battle') return; }
     updateCamp(dt);
     separate();
+    keepAshore(st.enemies);
     // budovy
     for (const b of st.blds) {
       b.flash = Math.max(0, b.flash - dt);
@@ -3940,8 +3952,9 @@
       spr = wallsOf()[wl][m + 16 * wallSide(b.c)] || wallsOf()[wl][m];
       const ga = b.gate && gateArtOf(wl), gv = ga && (m & 5); // brána z PixelLabu: na vodorovnej hradbe celý úsek, na zvislej stred brány na úseku
       if (ga && !gv) spr = ga;
-      wallImg(g, spr, x0, y0);
-      if (gv) g.drawImage(ga.c, 5, 0, 22, ga.c.height, x0 + [5, 3, 7][wallSide(b.c)] / 2, y0 + 18 - ga.h - (m & 4 ? 6 : 0), 11, ga.h); // nad úsekom pod ňou (ten sa kreslí neskôr a prekryl by vráta)
+      if (ga && !gv) g.drawImage(bldCanvas(ga, time, b.c * 0.7 + b.r * 0.3), x0, y0 + 18 - ga.h, ga.w, ga.h); // zástavy vejú
+      else wallImg(g, spr, x0, y0);
+      if (gv) g.drawImage(bldCanvas(ga, time, b.c * 0.7 + b.r * 0.3), 5, 0, 22, ga.c.height, x0 + [5, 3, 7][wallSide(b.c)] / 2, y0 + 18 - ga.h - (m & 4 ? 6 : 0), 11, ga.h); // nad úsekom pod ňou (ten sa kreslí neskôr a prekryl by vráta)
       if (b.holyT > 0) holyGlow(spr, x0, y0 + 18 - spr.h, b.holyT, time);
       // napojenie na susedné budovy (veže, radnica); k okrajom obrazovky sa hradby nenaťahujú
       const flat = wallsOf()[wl][spr.hd ? 10 : m | 2 | 8], fr = flat.c.width / flat.w; // jemná kresba: rovný úsek bez piliera, fr = 2
@@ -3955,19 +3968,18 @@
         if (b.spikeType === 'fire' && Math.random() < 0.04) part(x0 + 2 + Math.random() * (T - 4), y0 + 5, 0, -10, 0.4, '#f89838', -5);
       }
       if (b.gate) {
-        const flag = (fx, fy, left) => { // vlajočka na žrdi (fy = päta žrde); vľavo veje doľava, aby nezakryla bránu
-          const wv = Math.floor(time * 6 + fx * 0.7) % 2, fl = FLAG_COL[BUILD_RACE], d = left ? -1 : 1, cx0 = left ? fx - 4 : fx + 1;
-          g.fillStyle = '#4a4e60'; g.fillRect(fx, fy - 5, 1, 5);
-          g.fillStyle = fl[0]; g.fillRect(cx0, fy - 5 + wv, 4, 2);
-          g.fillStyle = fl[1]; g.fillRect(left ? fx - 2 : fx + 1, fy - 5 + wv, 2, 1);
-          g.fillStyle = fl[2]; g.fillRect(fx + 4 * d, fy - 4 - wv, 1, 1);
-        };
-        if (ga) { if (!gv) for (const [fx, fy] of ga.flags) flag(x0 + Math.round(fx / 2), y0 + 18 - ga.h + Math.round(fy / 2), fx < 16); }
-        else {
+        if (!ga) { // stará kresba (orkovia): strážnica a vlajočky na pilieroch; brána z PixelLabu má zástavy v kresbe
           const gh = gatesOf()[wl];
           g.drawImage(gh.c, x0, y0 - 15);
           if (b.holyT > 0) holyGlow(gh, x0, y0 - 15, b.holyT, time); // brána prekrýva hradbu – leskne sa aj ona
-          for (const fx of [x0 + 2, x0 + 12]) flag(fx, y0 - 15, false); // vlajočky na pilieroch
+          for (const fx of [x0 + 2, x0 + 12]) {
+            const wv = Math.floor(time * 6 + fx * 0.7) % 2;
+            const fl = FLAG_COL[BUILD_RACE];
+            g.fillStyle = '#4a4e60'; g.fillRect(fx, y0 - 20, 1, 5);
+            g.fillStyle = fl[0]; g.fillRect(fx + 1, y0 - 20 + wv, 4, 2);
+            g.fillStyle = fl[1]; g.fillRect(fx + 1, y0 - 20 + wv, 2, 1);
+            g.fillStyle = fl[2]; g.fillRect(fx + 4, y0 - 19 - wv, 1, 1);
+          }
         }
       } else if (b.unit) {
         // za orkov goblin či ork zo sady v 8 smeroch, otočený chrbtom (pozerá hore na nepriateľa ako ľudský strelec)

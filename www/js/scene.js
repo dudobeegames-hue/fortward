@@ -221,12 +221,14 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard, terr, hd) {
   let mill = null;                     // poloha otáčajúceho sa kolesa mlyna a hladina vody pod ním
   const water = new Uint8Array(W * H); // 1 = voda (spomalí), 2 = plytčina brodu (spomalí menej)
   let spawn = [G.gx0 + 8, G.gx0 + G.cols * G.T - 8];
+  let seaX = null;                     // y -> najmenšie x na pevnine (more na ľavom okraji), inak null
 
   if (th.sea) { // more na ľavom okraji
     const rawEdge = y => 36 - 24 * (y / H) + Math.sin(y * 0.05 + seed) * 4 + (fbm(0.5, y * 0.04, seed + 41) - 0.5) * 8;
     // voda nesmie siahať do zóny na stavanie: pri zóne končí pred mriežkou (piesok smie), nad ňou sa plynulo vracia
     const shore = y => G.gx0 + 5 + Math.max(0, zoneTop - 10 - y) * 0.7;
-    const edge = y => Math.min(rawEdge(y), shore(y));
+    const wob = y => 1 + fbm(0.3, y * 0.035, seed + 77) * 7 + Math.sin(y * 0.09 + seed * 2) * 1.5 + Math.sin(y * 0.23 + seed) * 0.8; // pri zóne pobrežie nie ako podľa pravítka: zátočiny a výbežky, voda nikdy za hranicou
+    const edge = y => Math.min(rawEdge(y), shore(y) - Math.max(0, wob(y)));
     for (let py = 0; py < HR; py++) {
       const y = R === 1 ? py : (py + 0.5) / R, yi = py / R | 0, e = edge(y);
       for (let px = 0; px < (Math.ceil(e) + 1) * R && px < WR; px++) {
@@ -282,6 +284,7 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard, terr, hd) {
       for (let i = 1; i <= Math.floor(15 * 0.62); i++) setH(ox + 10 + i, oy - 2, sailD); // spodný lem plachty
     }
     spawn = [Math.round(edge(0)) + 10, spawn[1]];
+    seaX = y => edge(y) - 3; // hranica pevniny (piesok): pešo sa do mora nevojde
   }
 
   if (th.river && R === 1) { // potok / rieka naprieč poľom
@@ -1039,5 +1042,5 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard, terr, hd) {
   }
 
   bx.putImageData(img, 0, 0);
-  return { bg, R, theme: th, foam, lava, spawn, water, mill, fortX };
+  return { bg, R, theme: th, foam, lava, spawn, water, mill, fortX, seaX };
 }
