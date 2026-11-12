@@ -3734,17 +3734,25 @@
     if (o.kind === 'hall') return (previewCache[key] = spriteURL(bsprOf('hall', lv), 2));
     const c = document.createElement('canvas'), x = c.getContext('2d');
     if (o.kind === 'wall') {
-      const ga = o.gate && gateArtOf(lv - 1), ws = ga || wallsOf()[lv - 1][10], thk = wallThick(lv - 1), uh = u ? SPR[raceSpr(WUNIT[u.type].spr)][0].h : 0, y0 = Math.max(o.gate && !ga ? 15 : u ? (thk ? uh - 3 : 9) : 6, ws.h - 18); // nad hradbou len toľko miesta, koľko treba (strážnica / strelec / vyššia jemná palisáda)
-      c.width = T; c.height = y0 + 18; x.imageSmoothingEnabled = false;
+      const ga = o.gate && gateArtOf(lv - 1), ws = ga || wallsOf()[lv - 1][10], thk = wallThick(lv - 1);
+      const a8 = u && u.type === 'archer' && !isOrc() && thk && SPR.footArcher8 ? SPR.footArcher8[1].idle : null; // lukostrelec z PixelLabu (otočený k nám, nohy za cimburím)
+      const uh = a8 ? a8.h - U8_PB - 8 : u ? (thk ? SPR[raceSpr(WUNIT[u.type].spr)][0].h - 3 : 9) : 0;
+      const y0 = Math.max(o.gate && !ga ? 15 : u ? uh : 6, ws.h - 18), R = ws.hd ? 2 : 1; // nad hradbou len toľko miesta, koľko treba; jemná kresba v jej rozlíšení
+      c.width = T * R; c.height = (y0 + 18) * R; x.scale(R, R); x.imageSmoothingEnabled = false;
       wallImg(x, ws, 0, y0);
       if (o.spikes) drawSpikes(x, 0, y0, o.spikeType);
       if (o.gate && !ga) x.drawImage(gatesOf()[lv - 1].c, 0, y0 - 15);
-      else if (u) {
+      else if (a8) {
+        x.drawImage(a8.c, Math.round(T / 2 - a8.w / 2), y0 + 8 - a8.h + U8_PB, a8.w, a8.h);
+        const yr = WALL_FRONT_PX; x.drawImage(ws.c, 0, yr, ws.c.width, ws.c.height - yr, 0, y0 + 18 - ws.h + yr / 2, ws.w, (ws.c.height - yr) / 2); // predné cimburie cez nohy ako v hre
+        if (u.lvl > 1) pxText(x, String(u.lvl), 1, y0 - 8, '#88b4ff');
+      } else if (u) {
         const us = SPR[raceSpr(WUNIT[u.type].spr)][0];
         if (thk) x.drawImage(us.c, 0, 0, us.c.width, us.c.height, Math.round(T / 2 - us.w / 2), y0 + 3 - us.h, us.w, us.h);
         else x.drawImage(us.c, 0, 0, us.w, 11, 1, y0 - 9, us.w, 11);
         if (u.lvl > 1) pxText(x, String(u.lvl), 1, y0 - 8, '#88b4ff');
       }
+      if (R === 2) return (previewCache[key] = spriteURL({ c, w: c.width, h: c.height }, 1));
     } else {
       const spr = bsprOf(iceMage(o) ? 'mageIce' : o.kind, lv), w = Math.max(T, spr.w), tx = Math.floor((w - T) / 2), R = spr.hd ? 2 : 1; // jemná kresba: náhľad v jej rozlíšení
       c.width = w * R; c.height = (spr.h + 5) * R; x.scale(R, R); x.imageSmoothingEnabled = false;
@@ -6023,7 +6031,7 @@
         }
         const free = grp.filter(w => !w.gate && !w.unit && wallNoTower(w)); // strelci na hradbách sa nevylepšujú; nie na vežičky (rohy a konce)
         if (has('wallArcher') && free.length) for (const type in WUNIT) {
-          if (type === 'crossbow' && isOrc()) continue; // kušník na hradbách je len pre ľudí
+          if (type === 'crossbow') continue; // kušník z ponuky vyradený (na hradby len lukostrelec)
           const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
           if (!has(tid)) { lockAct(ICONS['u_' + type], wd.name, unlockMissionOf(tid)); continue; }
           bulk(after(free[0], { unit: { type, lvl: 1 }, gate: false }), wd.name, free, () => wd.cost, w => { st.gold -= wd.cost; w.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit');
@@ -6094,7 +6102,7 @@
           const ur = Math.floor(u.spent * sellShare());
           act(I.actDown, 'Odvolať', '+' + ur, true, () => { st.gold += ur; b.unit = null; }, 'sell', true);
         } else if (!b.gate && has('wallArcher') && wallNoTower(b)) for (const type in WUNIT) { // strelci nie na vežičkách (rohy a konce hradby)
-          if (type === 'crossbow' && isOrc()) continue; // kušník na hradbách je len pre ľudí
+          if (type === 'crossbow') continue; // kušník z ponuky vyradený (na hradby len lukostrelec)
           const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
           if (!has(tid)) { lockAct(ICONS['u_' + type], wd.name, unlockMissionOf(tid)); continue; }
           shineTech(act(after(b, { unit: { type, lvl: 1 } }), wd.name, coinTxt(wd.cost), st.gold >= wd.cost, () => { st.gold -= wd.cost; b.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit'), tid);
@@ -7572,7 +7580,7 @@
     } else { acc = 0; updateFx(dt); mapTick(dt); heroWalkHome(dt); }
     camTick(dt);
     render(now / 1000);
-    hudTick();
+    if (st.phase !== 'title') hudTick(); // na úvodnej obrazovke je HUD skrytý – neprepisovať jeho štýly každú snímku (spomaľovalo ťuky na slabších tabletoch)
     requestAnimationFrame(frame);
   }
 

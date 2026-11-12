@@ -12,6 +12,13 @@ const AUDIO = (() => {
 
   // ---- kontext sa smie spustiť až po dotyku používateľa (mobil) ----
   function ensure() {
+    if (!build()) return false;
+    if (ctx.state !== 'running') ctx.resume(); // 'suspended' aj iOS 'interrupted' (napr. po hovore)
+    return true;
+  }
+  // zvukový graf sa vyrobí vopred, keď je prehliadač voľný (kontext ostane pozastavený); prvý dotyk ho už len spustí –
+  // vytvorenie kontextu priamo v ťuku trvalo na slabších tabletoch citeľne dlho a tlačidlá menu reagovali oneskorene
+  function build() {
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return false;
@@ -31,9 +38,9 @@ const AUDIO = (() => {
       const nd = noiseBuf.getChannelData(0);
       for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
     }
-    if (ctx.state !== 'running') ctx.resume(); // 'suspended' aj iOS 'interrupted' (napr. po hovore)
     return true;
   }
+  window.addEventListener('load', () => setTimeout(() => { try { build(); } catch (e) { /* bez zvuku */ } }, 1500));
 
   // iOS: pri tichom prepínači je Web Audio stlmené. Prehrávanie tichej <audio> stopy
   // prepne zvukovú reláciu do režimu „playback“, v ktorom hra znie aj v tichom režime.

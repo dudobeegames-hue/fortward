@@ -47,8 +47,17 @@ const SPLASH = (() => {
     btn.addEventListener('click', () => {
       if (leaving) return;
       leaving = true;
-      if (api.onPlay) api.onPlay();                    // menu sa pripraví pod obrázkom
-      el.classList.add('out'); hideT = setTimeout(() => { el.hidden = true; leaving = false; }, 900);
+      btn.classList.add('pressed');                    // tlačidlo sa zatlačí hneď, príprava menu až v ďalšej snímke
+      let started = false;
+      const go = () => {
+        if (started) return; started = true;
+        setTimeout(() => {
+          if (api.onPlay) api.onPlay();                // menu sa pripraví pod obrázkom
+          btn.classList.remove('pressed');
+          el.classList.add('out'); hideT = setTimeout(() => { el.hidden = true; leaving = false; }, 900);
+        }, 0);
+      };
+      requestAnimationFrame(go); setTimeout(go, 120);
     });
   }
   // shown: zavolá sa, až keď obrázok úplne zakryje obrazovku (dovtedy má zostať viditeľné, čo je pod ním)
