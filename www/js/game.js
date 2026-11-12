@@ -295,6 +295,7 @@
     { id: 'command', name: 'Velenie',         desc: 'Rytieri o 10 % silnejší a odolnejší',              icon: 'barracks', need: 'barracks' },
   ];
   // hrdinovia ľudí: kráľ od začiatku, paladin a čarodejka za gemy; do vlny ide vždy len jeden (vyberá sa pred vlnou)
+  const HERO_SPD = 1.15; // hrdinovia o kúsok rýchlejší, aby stíhali pešiakom
   const HEROES = {
     king:    { name: 'Kráľ',      spr: 'king',    hp: 1,    dmg: 1,    cd: 0.8, spd: 26, reach: 40, powers: ['volley', 'freeze', 'lightning'],
       desc: 'Vyvážený bojovník, mečom zasiahne celú skupinu.' },
@@ -867,7 +868,7 @@
   }
   // postavička nasadeného hrdinu pri radnici
   const makeHero = () => ({ x: G.hallCx, y: G.hallTop - 12 - T, hx: G.hallCx, hy: G.hallTop - 12 - T, // pred radnicou o políčko ďalej k horde
- hp: kingMax(), cd: 0, tgt: null, down: 0, anim: 0, flash: 0, isKing: true, spd: heroDef().spd });
+ hp: kingMax(), cd: 0, tgt: null, down: 0, anim: 0, flash: 0, isKing: true, spd: heroDef().spd * HERO_SPD });
   // výmena hrdinu pred vlnou: padnutý zostáva padnutý (až do oživenia), ostatní idú do boja zdraví
   function switchHero(id) {
     if (st.phase !== 'build' || id === st.hero || !ownsHero(id)) return;
@@ -2275,8 +2276,25 @@
     b.fired = 0.9; AUDIO.play('bolt');
     return true;
   }
+  // kde stojí strelec na hrubej hradbe (päta): vodorovná za cimburím, zvislá v strede chodníka (= stred vežičky, pixellab2walls.py)
+  const WALL_FRONT_PX = 36; // riadok hrotov / zubov predného radu v sprite hradby (jemná kresba; pixellab2walls.py: FOOT − výška vzorky + čelo)
+  const wallMask = b => (joinsV(b.c, b.r - 1) ? 1 : 0) | (joins(b.c + 1, b.r) ? 2 : 0) | (joinsV(b.c, b.r + 1) ? 4 : 0) | (joins(b.c - 1, b.r) ? 8 : 0);
+  const wallNoTower = b => { const m = wallMask(b); return m === 5 || m === 10 || m === 7 || m === 11 || m === 13 || m === 14 || m === 15; }; // strelec smie na rovný úsek, T-spoj a kríženie; nie na rohy a konce s vežičkou
+  function wallFoot(b) {
+    const m = wallMask(b);
+    const vert = (m & 5) && !(m & 10), sd = wallSide(b.c), x0 = tileX(b.c), y0 = tileY(b.r);
+    return vert ? { x: x0 + (sd === 1 ? 7 : sd === 2 ? 9 : 8), y: y0 + 10, vert } : { x: x0 + T / 2, y: y0 + 8, vert }; // vodorovná: päta za predným cimburím (nohy skryje)
+  }
+  // ľudský lukostrelec na hrubej hradbe kreslený sadou z PixelLabu v 8 smeroch (inak null)
+  const wallArcher8 = (b, wl) => b.unit && b.unit.type === 'archer' && !isOrc() && wallThick(wl) && SPR.footArcher8 || null; // ten istý lukostrelec ako v armáde
   function fireWallUnit(b) {
-    const u = b.unit, d = WUNIT[u.type], c = bCenter(b);
+    const u = b.unit, d = WUNIT[u.type], c = bCenter(b), wl = Math.max(1, Math.min(5, b.lvl)) - 1;
+    if (wallArcher8(b, wl)) { // šíp letí z luku natočeného strelca
+      const f = wallFoot(b), n = st.proj.length;
+      if (!shoot(c.x, c.y, f.x, f.y - 9, uRange(u), d.proj, d.speed, uDmg(u), 0)) return false;
+      u.aimT = st.proj.length > n ? st.proj[st.proj.length - 1].tgt : null; u.swing = 0.25;
+      return true;
+    }
     return shoot(c.x, c.y, c.x, tileY(b.r) - 6, uRange(u), d.proj, d.speed, uDmg(u), 0);
   }
   function shoot(cx, cy, ox, oy, rng, proj, speed, dmg, splash, prio) {
@@ -3031,7 +3049,7 @@
       else if (b.kind === 'icetower' || iceMage(b)) { b.cd -= dt; if (b.cd <= 0 && fireIce(b)) b.cd = bCd(b); }
       else if (b.kind === 'pitch') { b.cd -= dt; if (b.cd <= 0 && firePitch(b)) b.cd = bCd(b); }
       else if (b.kind === 'ballista') { b.cd -= dt; b.fired = Math.max(0, (b.fired || 0) - dt); if (b.cd <= 0 && (isTreb(b) ? fireTrebuchet(b) : fireBallista(b))) b.cd = bCd(b); }
-      else if (b.unit) { b.unit.cd -= dt; if (b.unit.cd <= 0 && fireWallUnit(b)) b.unit.cd = uCd(b.unit); }
+      else if (b.unit) { b.unit.cd -= dt; b.unit.swing = Math.max(0, (b.unit.swing || 0) - dt); if (b.unit.cd <= 0 && fireWallUnit(b)) b.unit.cd = uCd(b.unit); }
       else if (UNIT_HOME[b.kind]) updateBarracks(b, dt);
       else if (b.kind === 'range') updateRange(b, dt);
       else if (b.kind === 'falconry') updateFalconry(b, dt);
@@ -3604,7 +3622,7 @@
   function drawDeadKing(k, time) {
     const set = hero8(heroDef().spr);
     if (set && set.kneel) return drawKneelingKing(k, time, set);
-    const k8 = !!set, fr = k8 ? set[k.face8 == null ? 6 : k.face8].idle : SPR[heroDef().spr][0], t = k.deadT;
+    const k8 = !!set, fr = k8 ? set[6].idle : SPR[heroDef().spr][0], t = k.deadT; // padne vždy otočený na sever (k horde)
     const fall = Math.min(1, t / 0.45), drop = Math.round(4 * fall * fall);
     const alpha = k.fadeT == null ? 1 : Math.max(0, 1 - k.fadeT / KING_FADE);
     const x0 = Math.round(k.x - fr.w / 2), y0 = Math.round(k.y - fr.h) + drop, gy = Math.round(k.y);
@@ -3984,10 +4002,17 @@
       } else if (b.unit) {
         // za orkov goblin či ork zo sady v 8 smeroch, otočený chrbtom (pozerá hore na nepriateľa ako ľudský strelec)
         const k = raceSpr(WUNIT[b.unit.type].spr), us = isOrc() && SPR[k + '8'] ? trimmed(SPR[k + '8'][6].idle) : SPR[k][0];
-        if (wallThick(wl)) { // hrubá hradba: strelec celý stojí na ochodzi (vodorovná za cimburím, zvislá v strede chodníka)
-          const vert = (m & 5) && !(m & 10), sd = wallSide(b.c), cxp = sd === 1 ? 7 : sd === 2 ? 9 : 8; // stred zvislého úseku = stred vežičky (pixellab2walls.py)
-          const ux = vert ? Math.round(x0 + cxp - us.w / 2) : Math.round(x0 + T / 2 - us.w / 2);
-          g.drawImage(us.c, 0, 0, us.c.width, us.c.height, ux, y0 + (vert ? 10 : 3) - us.h, us.w, us.h);
+        const s8 = wallArcher8(b, wl);
+        if (s8) { // lukostrelec z PixelLabu v 8 smeroch: natočí sa k cieľu, mieri, po výstrele povolí tetivu
+          const u = b.unit, f = wallFoot(b), t = u.aimT && !u.aimT.dead && Math.hypot(u.aimT.x - f.x, u.aimT.y - f.y) < uRange(u) + 12 ? u.aimT : null;
+          if (!t) u.aimT = null;
+          turn8(u, t ? dir8(t.x - f.x, t.y - f.y) : 6, t ? 4 : 10); // bez cieľa pozerá k horde (na sever)
+          const v = s8[u.face8], fr = u.swing > 0 ? v.atk[1] : t ? v.atk[0] : v.idle;
+          g.drawImage(u.flash > 0 && fr.f ? fr.f : fr.c, Math.round(f.x - fr.w / 2), Math.round(f.y - fr.h) + U8_PB, fr.w, fr.h);
+          if (!f.vert) { const yr = WALL_FRONT_PX; g.drawImage(spr.c, 0, yr, spr.c.width, spr.c.height - yr, x0, y0 + 18 - spr.h + yr / 2, spr.w, (spr.c.height - yr) / 2); } // predné cimburie a čelo cez nohy (ako na zvislej hradbe, strelec nie je obrovský)
+        } else if (wallThick(wl)) { // hrubá hradba: strelec celý stojí na ochodzi (vodorovná za cimburím, zvislá v strede chodníka)
+          const f = wallFoot(b);
+          g.drawImage(us.c, 0, 0, us.c.width, us.c.height, Math.round(f.x - us.w / 2), f.y - us.h, us.w, us.h);
         } else g.drawImage(us.c, 0, 0, us.w, 11, isOrc() ? Math.round(x0 + T / 2 - us.w / 2) : x0 + 1, y0 - 9, us.w, 11);
       }
     } else {
@@ -5996,7 +6021,7 @@
           if (!has('spikeTypes')) lockAct(after(plain[0], { spikeType: 'fire', unit: null, gate: false }), 'Ohnivé/ľadové', unlockMissionOf('spikeTypes'));
           else for (const k in SPIKE_TYPES) bulk(after(plain[0], { spikeType: k, unit: null, gate: false }), SPIKE_TYPES[k].name.split(' ')[0], plain, () => SPIKE_TYPE_COST, w => { st.gold -= SPIKE_TYPE_COST; w.spent += SPIKE_TYPE_COST; w.spikeType = k; }, '', true);
         }
-        const free = grp.filter(w => !w.gate && !w.unit); // strelci na hradbách sa nevylepšujú
+        const free = grp.filter(w => !w.gate && !w.unit && wallNoTower(w)); // strelci na hradbách sa nevylepšujú; nie na vežičky (rohy a konce)
         if (has('wallArcher') && free.length) for (const type in WUNIT) {
           if (type === 'crossbow' && isOrc()) continue; // kušník na hradbách je len pre ľudí
           const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
@@ -6068,7 +6093,7 @@
         if (u) {
           const ur = Math.floor(u.spent * sellShare());
           act(I.actDown, 'Odvolať', '+' + ur, true, () => { st.gold += ur; b.unit = null; }, 'sell', true);
-        } else if (!b.gate && has('wallArcher')) for (const type in WUNIT) {
+        } else if (!b.gate && has('wallArcher') && wallNoTower(b)) for (const type in WUNIT) { // strelci nie na vežičkách (rohy a konce hradby)
           if (type === 'crossbow' && isOrc()) continue; // kušník na hradbách je len pre ľudí
           const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
           if (!has(tid)) { lockAct(ICONS['u_' + type], wd.name, unlockMissionOf(tid)); continue; }
