@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Baranidlo z PixelLabu</title>
+<title>Obliehacie stroje z PixelLabu</title>
 <style>
   body { margin: 0; padding: 16px; background: #222; color: #eee; font: 14px sans-serif; }
   canvas { image-rendering: pixelated; display: block; margin: 6px 0 18px; max-width: 100%; }
 </style>
 </head>
 <body>
-<div>Ako na telefóne (bod hry = 6 px), mriežka = políčka 16 bodov. Hore: jazda v 8 smeroch (kolesá dokreslené). Dole: úder zdola a zhora vedľa veže, rytiera a jazdca.</div>
+<div>Ako na telefóne (bod hry = 6 px), mriežka = políčka 16 bodov. Baranidlo: jazda v 8 smeroch a úder zdola a zhora. Katapult: jazda v 8 smeroch a výstrel na sever a na juh.</div>
 <canvas id="v"></canvas>
 <script src="../js/archer-art.js"></script>
 <script src="../js/armory-art.js"></script>
@@ -40,6 +40,7 @@
 <script src="../js/wall-art.js"></script>
 <script src="../js/workshop-art.js"></script>
 <script src="../js/ram-art.js"></script>
+<script src="../js/catapult-art.js"></script>
 <script src="../js/sprites.js"></script>
 <script src="../js/orcs8.js"></script>
 <script src="../js/scene.js"></script>
@@ -47,7 +48,7 @@
 <script src="../js/siege.js"></script>
 <script>
 initSprites(); initOrcSprites(); initBuildingSprites(); initSiegeSprites();
-const SCR = 6, BW = 16 * 9, rows = [36, 84], BH = 94, set = SPR.siegeRam8;
+const SCR = 6, BW = 16 * 9, rows = [36, 84, 126, 174], BH = 184, set = SPR.siegeRam8, cat = SPR.siegeCat8;
 const buf = document.createElement('canvas'); buf.width = BW * 2; buf.height = BH * 2;
 const b = buf.getContext('2d'); b.imageSmoothingEnabled = false;
 const v = document.getElementById('v'); v.width = BW * SCR; v.height = BH * SCR;
@@ -70,6 +71,14 @@ function draw(now) {
   unit(SPR.soldier8[6].idle, 34, rows[1]);
   for (const [d, x] of [[6, 54], [2, 86]]) { shadow(x, rows[1], 9); put(sw > 0 ? siegeAtkFrame(set[d], sw, 0.55) : set[d].idle, x, rows[1]); }
   unit(SPR.rider8[0].idle, 112, rows[1]);
+  for (let d = 0; d < 8; d++) { // katapult: jazda (13 bodov za sekundu)
+    const x = 9 + d * 18; shadow(x, rows[2], 9);
+    put(cat[d].walk[Math.floor(t * 19.5 / cat.stride) % 4], x, rows[2]);
+  }
+  const fired = 1 - (t % 3.6); // výstrel každých 3,6 s
+  unit(SPR.soldier8[6].idle, 34, rows[3]);
+  for (const [d, x] of [[6, 54], [2, 86]]) { shadow(x, rows[3], 9); put(fired > 0.3 ? siegeFireFrame(cat[d], fired) : cat[d].idle, x, rows[3]); }
+  unit(SPR.rider8[0].idle, 112, rows[3]);
   g.drawImage(buf, 0, 0, v.width, v.height);
   requestAnimationFrame(draw);
 }

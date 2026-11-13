@@ -242,13 +242,13 @@ function buildSiege8(make, stride) {
   set.vox = true;
   return set;
 }
-// stroj nakreslený v PixelLabe (tools/pixellab2js.py --hd, jazdu dokresľuje tools/ram_walk.py): rovnaký tvar sady ako buildSiege8,
+// stroj nakreslený v PixelLabe (tools/pixellab2js.py --hd, jazdu a výstrel katapultu dokresľuje tools/siege_anim.py): rovnaký tvar sady ako buildSiege8,
 // navyše atk = snímky úderu (napriahnutie … náraz); úder má kresbu len zhora a zdola, preto stroj útočí iba v týchto dvoch smeroch
-function buildSiegeArt8(art) {
+function buildSiegeArt8(art, ay) {
   const set = buildArt8(art, null, 1.05);
-  for (const v of set) {
+  for (const [d, v] of set.entries()) {
     v.idle = v.walk[0]; // státie = prvá snímka jazdy (kolesá nepreskočia)
-    for (const fr of [v.idle, ...v.walk, ...v.atk]) { fr.ax = fr.w / 2; fr.ay = 21.5; } // stred stroja na zemi (v bodoch hry)
+    for (const fr of [v.idle, ...v.walk, ...v.atk]) { fr.ax = fr.w / 2; fr.ay = ay ? ay[d] : 21.5; } // stred stroja na zemi (v bodoch hry); ay = podľa smeru
     v.act = v.atk[v.atk.length - 1];
   }
   set.vox = true; set.art = true; // kreslí sa ako ostatné stroje (kotva ax, ay)
@@ -258,6 +258,11 @@ function buildSiegeArt8(art) {
 function siegeAtkFrame(v, t, dur) {
   if (!v.atk) return v.act;
   return v.atk[Math.min(v.atk.length - 1, Math.floor((1 - t / dur) * v.atk.length))];
+}
+// snímka výstrelu katapultu podľa času od výstrelu (fired 1 → 0,3): rameno v polovici, hore s prázdnou lyžicou, odraz, návrat
+function siegeFireFrame(v, fired) {
+  const p = 1 - (fired - 0.3) / 0.7;
+  return v.atk[p < 0.14 ? 0 : p < 0.3 ? 1 : p < 0.7 ? 2 : 3];
 }
 // ---- horda: orkský baran, obrí baran, vojnový mamut (idú dopredu = k pevnosti) ----
 // orkský baran: kolesá z kmeňov, strecha zo surových koží s kostenými hrotmi, okovaná lebka na kmeni, tlačia ho orkovia
@@ -338,7 +343,8 @@ function orcify(md) {
 }
 function initSiegeSprites() {
   lazySpr('siegeRam8', () => typeof RAM_ART !== 'undefined' ? buildSiegeArt8(RAM_ART) : buildSiege8(voxRam)); // baranidlo z PixelLabu (ram-art.js)
-  lazySpr('siegeCat8', () => buildSiege8(voxCat));
+  // katapult z PixelLabu (catapult-art.js): spredu a zozadu je vidno celý podvozok, stred na zemi je preto vyššie než z boku
+  lazySpr('siegeCat8', () => typeof CAT_ART !== 'undefined' ? buildSiegeArt8(CAT_ART, [21.5, 20, 17.5, 20, 21.5, 20, 17.5, 20]) : buildSiege8(voxCat));
   lazySpr('siegeFire8', () => buildSiege8(voxFire));
   lazySpr('siegeTower8', () => buildSiege8(voxTower));
   lazySpr('ram8', () => buildSiege8((f, act) => voxOrcRam(f, act, false)));

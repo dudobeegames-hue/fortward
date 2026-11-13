@@ -624,7 +624,7 @@
   const castleLay = m => typeof CASTLES !== 'undefined' && CASTLES[foeRace()] && CASTLES[foeRace()][missionDef(m).castle || m];
   // jednotky hráča za orkov: rovnaké roly, orkský vzhľad (rytier → ork, kopijník → surovec, jazdec → vlčí jazdec, …)
   const ORC_SPR = { soldier: 'orc', spear: 'brute', rider: 'wolf', footArcher: 'garcher', monk: 'shaman', monkCast: 'shaman', craft: 'goblin',
-    archer: 'garcher', knight: 'orc', siegeRam: 'oSiegeRam', siegeCat: 'oSiegeCat', siegeFire: 'oSiegeFire', siegeTower: 'oSiegeTower' };
+    archer: 'garcher', knight: 'orc', siegeRam: 'oSiegeRam', siegeCat: 'oSiegeCat' };
   const raceSpr = k => (isOrc() && ORC_SPR[k]) || k;
   // za orkov útočia ľudia: rovnaké druhy nepriateľov, vzhľad ľudských jednotiek (goblin → rytier, ork → kopijník, …)
   // surovec = ťažký rytier (tmavá oceľ), vojvodca a veľkráľ = kapitán jazdy v pozlátenej zbroji
@@ -1019,10 +1019,8 @@
 
   // ---- obliehacie stroje hráča: kupujú sa v záložke Stroje, vyrazia so začiatkom vlny a ostávajú na bojisku ----
   const SIEGE = {
-    ram:   { hp: 340, spd: 11, dmg: 70, cd: 1.6,  armor: 0.5, spr: 'siegeRam' },                // ide rovno na tábor a rozbíja ho; bez tábora rozráža hordu
-    cat:   { hp: 170, spd: 13, dmg: 55, cd: 3.6,  armor: 0.8, spr: 'siegeCat', range: 105 },   // balvany do najhustejšej hordy, inak na stavby tábora
-    fire:  { hp: 210, spd: 12, dmg: 12, cd: 0.6,  armor: 0.7, spr: 'siegeFire', range: 30 },   // strieka grécky oheň: podpáli hordu aj drevené stavby tábora
-    tower: { hp: 420, spd: 9,  dmg: 8,  cd: 0.45, armor: 0.6, spr: 'siegeTower', range: 96 },  // dvaja lukostrelci z výšky – ďaleký dostrel, aj na letcov; sprevádza ostatné stroje
+    ram:   { hp: 340, spd: 11, dmg: 70, cd: 1.6,  armor: 0.5, spr: 'siegeRam' },                // ide rovno na tábor a rozbíja ho
+    cat:   { hp: 170, spd: 13, dmg: 55, cd: 3.6,  armor: 0.8, spr: 'siegeCat', range: 105 },   // balvany na stavby tábora
   };
   function spawnSiege(kind, x, y) {
     const d = SIEGE[kind], a = Math.max(0, diffM(st.mission) - HOME_PROVINCES - 1), sm = 1 + 0.06 * perk('siege'), hp = d.hp * (1 + 0.15 * a) * sm;
@@ -1035,30 +1033,6 @@
     let best = null, bd = rad;
     for (const e of st.enemies) if (!e.dead && e.d.giant) { const d = Math.hypot(e.x - x, e.y - y); if (d < bd) { bd = d; best = e; } }
     return best;
-  }
-  // ohnivý voz: prúd ohňa k bodu (tx, ty) – zraní a podpáli každého na zemi v úzkom kuželi pred vozom
-  // ústie sifónu ohnivého voza voči stredu na zemi (model: 9,5 kocky vpredu, 9,5 kocky vysoko), podľa natočenia
-  const fireNozzle = u => { const a = (u.face8 == null ? 6 : u.face8) * Math.PI / 4; return { x: Math.cos(a) * 9.5, y: Math.sin(a) * 9.5 * VOX_DEPTH - 9.5 * VOX_UP }; };
-  function sprayFire(u, tx, ty) {
-    u.aimP = { x: tx, y: ty }; // natočí sa k cieľu
-    const nz = fireNozzle(u), ox = u.x + nz.x, oy = u.y + nz.y, dx = tx - ox, dy = ty - oy, d = Math.hypot(dx, dy) || 1, rng = SIEGE.fire.range + 6;
-    for (const e of st.enemies) {
-      if (e.dead || e.d.fly) continue;
-      const ex = e.x - ox, ey = e.y - e.h * 0.4 - oy, along = (ex * dx + ey * dy) / d, side = Math.abs(ex * dy - ey * dx) / d;
-      if (along < -2 || along > rng || side > 5 + along * 0.25) continue;
-      damage(e, u.dmg * (st.cryT > 0 ? CRY_DMG : 1), true); e.burnT = Math.max(e.burnT || 0, 2.5); e.burnDps = Math.max(e.burnDps || 0, u.dmg * 0.5);
-    }
-    for (let k = 0; k < 10; k++) { const t = Math.random(), sp = (Math.random() - 0.5) * (4 + t * 10); part(ox + dx * t + dy / d * sp, oy + dy * t - dx / d * sp, dx / d * 30, dy / d * 30 - 10, 0.25 + Math.random() * 0.2, ['#fff7c8', '#f8d048', '#f89838', '#d83818'][k % 4], -20); }
-    u.fired = 0.3; AUDIO.play('fire');
-  }
-  // obliehacia veža: šíp z cimburia na nepriateľa v dosahu, alebo (o) na stavbu tábora
-  function towerArrow(u, o) {
-    const sy = u.y - 18, dmg = u.dmg * (st.cryT > 0 ? CRY_DMG : 1); // z cimburia veže
-    if (o) { const a = campAim(o); st.proj.push({ k: 'arrow', x: u.x, y: sy, tgt: null, tx: a.x + (Math.random() - 0.5) * 6, ty: a.y, dmg, spd: 200, splash: 0, vx: 0, vy: -1, campT: o }); AUDIO.play('arrow'); }
-    else if (!shoot(u.x, u.y, u.x, sy, SIEGE.tower.range, 'arrow', 200, dmg, 0, ARCHER_PRIO)) return false;
-    else st.proj[st.proj.length - 1].siege = true;
-    u.fired = 0.2; u.cd = SIEGE.tower.cd;
-    return true;
   }
   // katapult: balvan na bod; campT = stavba tábora, ktorú má zasiahnuť
   function catRock(u, tx, ty, dmg, campT) {
@@ -1094,8 +1068,8 @@
     }
     return (u.ramSlot = best);
   }
-  // baranidlo a ohnivý voz idú na tábor, katapult ho ostreľuje z dostrelu, obliehacia veža ich sprevádza;
-  // keď tábor nie je (alebo padol), baranidlo rozráža hordu, katapult hádže spoza šíku, ohnivý voz ide so šíkom;
+  // obliehacie stroje útočia len na stavby (tábor hordy) a na obrov (ich slabina), na bežnú hordu nie:
+  // baranidlo ide na tábor, katapult ho ostreľuje z dostrelu; bez tábora čakajú pri šíku
   // tlačidlo obrana/útok ich neovplyvňuje – tábor hordy idú búrať vždy
   function updateSiege(u, dt) {
     u.flash = Math.max(0, u.flash - dt); u.cd = Math.max(0, u.cd - dt); u.fired = Math.max(0, u.fired - dt);
@@ -1128,9 +1102,8 @@
         return;
       }
       if (camp) { go(clampX(fm.inf.x + side), fm.inf.y - 6); return; } // všetky políčka sú obsadené inými baranidlami – čaká pri šíku
-      if (u.tgt && (u.tgt.dead || u.tgt.d.fly)) u.tgt = null;
-      if (!u.tgt) u.tgt = nearestFoe(u.x, u.y, false);
-      const t = u.tgt;
+      if (u.tgt && (u.tgt.dead || !u.tgt.d.giant)) u.tgt = null;
+      const t = u.tgt; // bez tábora búši len do obra – na bežnú hordu nejde
       if (!t) { go(clampX(fm.inf.x + side), fm.inf.y - 6); return; }
       const up = u.y >= t.y; // útočí len zdola alebo zhora: postaví sa pod cieľ (nad cieľ) a búši kolmo
       if (Math.abs(t.x - u.x) > 5 || Math.abs(t.y - u.y) > 10) { go(t.x, t.y + (up ? 6 : -6)); return; }
@@ -1141,49 +1114,14 @@
       return;
     }
     if (u.siege === 'cat') {
-      if (u.cd <= 0) { // najprv zhluk hordy v dosahu, inak stavba tábora na dostrel
-        let best = null, bn = camp ? 2 : 0;
-        for (const e of st.enemies) {
-          if (e.dead || e.d.fly || e.y < 4) continue;
-          const d = Math.hypot(e.x - u.x, e.y - u.y);
-          if (d > SIEGE.cat.range + 15 || d < 28) continue;
-          let n = 0; for (const o of st.enemies) if (!o.dead && Math.hypot(o.x - e.x, o.y - e.y) < 20) n++;
-          if (n > bn) { bn = n; best = e; }
-        }
+      if (u.cd <= 0) { // obor na dostrel, inak stavba tábora – do bežnej hordy nestrieľa
         if (giant && Math.hypot(giant.x - u.x, giant.y - u.y) <= SIEGE.cat.range + 15) catRock(u, giant.x, giant.y - 4, u.dmg);
-        else if (best) catRock(u, best.x, best.y - 3, u.dmg * 0.5);
         else if (camp && Math.hypot(camp.x - u.x, camp.y - u.y) <= SIEGE.cat.range + 6) catRock(u, camp.x, camp.y - 4, u.dmg, camp);
       }
+      if (u.fired > 0.3) return; // kým rameno letí, stojí na mieste
       if (giant) go(clampX(giant.x + side * 0.5), Math.max(giant.y + SIEGE.cat.range - 20, fm.inf.y - 20));
       else if (camp) go(clampX(camp.x + side * 0.5), camp.y + SIEGE.cat.range - 12);
       else go(clampX(fm.arc.x + side * 1.4), fm.arc.y + 18);
-      return;
-    }
-    if (u.siege === 'fire') {
-      const e = nearestFoe(u.x, u.y - 8, false);
-      if (e && Math.hypot(e.x - u.x, e.y - u.y) <= SIEGE.fire.range) { if (u.cd <= 0) { u.cd = SIEGE.fire.cd; sprayFire(u, e.x, e.y - e.h * 0.4); } return; }
-      if (giant) { go(giant.x, giant.y + SIEGE.fire.range - 8); return; } // podíde k obrovi na dosah plameňa
-      if (camp) { // podíde k stavbe tábora a podpáli ju (chatrče a stany horia najlepšie)
-        const a = campAim(camp);
-        if (Math.hypot(a.x - u.x, a.y - (u.y - 14)) > SIEGE.fire.range - 4) { go(clampX(camp.x + (u.x < camp.x ? -6 : 6)), camp.y + 18); return; }
-        if (u.cd > 0) return;
-        u.cd = SIEGE.fire.cd; sprayFire(u, a.x, a.y);
-        hitCamp(camp, u.dmg * 2.2 * (camp.role === 'spawn' ? 1.5 : 1)); // chatrče a stany horia najlepšie
-        return;
-      }
-      if (e && Math.hypot(e.x - fm.inf.x, e.y - fm.inf.y) < 60) { go(e.x, e.y + SIEGE.fire.range - 8); return; } // horda pri šíku – podíde na dosah
-      go(clampX(fm.inf.x + side), fm.inf.y + 12);
-      return;
-    }
-    if (u.siege === 'tower') {
-      if (u.cd <= 0 && !towerArrow(u, null) && camp && Math.hypot(camp.x - u.x, camp.y - u.y) <= SIEGE.tower.range) towerArrow(u, camp);
-      if (camp) { // sprevádza stroj, ktorý je najbližšie k táboru, inak ide sama na dostrel
-        const lead = st.soldiers.filter(s => s.siege && s.siege !== 'tower' && !s.dead).sort((p, q) => p.y - q.y)[0];
-        if (lead) go(clampX(lead.x + side * 0.6), lead.y + 18);
-        else go(clampX(camp.x + side * 0.5), camp.y + SIEGE.tower.range - 16);
-        return;
-      }
-      go(clampX(fm.arc.x + side), fm.arc.y + 6);
     }
   }
 
@@ -1327,6 +1265,7 @@
     st.viewUp = Math.max(0, (st.viewUp || 0) - panelLow()); // rovnaký pohľad aj bez panela
     $('build').hidden = true; $('bottom').hidden = false;
     for (const b of st.blds) if (UNIT_HOME[b.kind] || b.kind === 'range' || b.kind === 'falconry' || HELPERS[b.kind]) { b.spawnT = helperKey(b) ? 0.6 : 0.3; b.squadUp = true; }
+    if (st.form) { st.form.arcTy = 0; st.form.arcSlots = null; } // rad lukostrelcov sa v novej vlne postaví nanovo
     banner(isAssault() ? 'Do útoku!' : st.endless ? 'Vlna ' + st.wave : st.wave === missionWaves(st.mission) ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + missionWaves(st.mission));
     syncStance();
     updateHud();
@@ -2238,10 +2177,19 @@
     u.swing = Math.max(0, (u.swing || 0) - dt);
   }
 
-  // vojenská budova vyšle na začiatku vlny celý oddiel naraz (toľko vojakov, aká je jej úroveň; b.squadUp nastaví startWave);
-  // padlého vojaka nahradí jednotlivo po krátkom nábore (asi 45 % pôvodného času oddielu). Vráti, koľko vojakov má vyjsť.
+  // vojenská budova vyšle na začiatku vlny celý oddiel (toľko vojakov, aká je jej úroveň; b.squadUp nastaví startWave) – vojaci
+  // vychádzajú jeden po druhom (SQUAD_GAP), aby sa netlačili pred budovou; padlého vojaka nahradí jednotlivo po krátkom nábore
+  // (asi 45 % pôvodného času oddielu). Vráti, koľko vojakov má vyjsť.
+  const SQUAD_GAP = 0.5;
   function squadDue(b, dt, every, cap) {
-    if (b.squadUp) { b.squadUp = false; b.refT = 0; return cap; }
+    if (b.squadUp) { b.squadUp = false; b.refT = 0; b.outQ = cap; b.outT = 0; }
+    if (b.outQ > 0) { // oddiel práve vychádza
+      b.outT -= dt;
+      if (b.outT > 0) return 0;
+      if (st.soldiers.filter(s => s.home === b && !s.extra && !s.dead).length >= cap) { b.outQ = 0; return 0; }
+      b.outQ--; b.outT = SQUAD_GAP; b.refT = 0;
+      return 1;
+    }
     const alive = st.soldiers.filter(s => s.home === b && !s.extra && !s.dead).length;
     if (alive >= cap) { b.refT = 0; return 0; }
     b.refT = (b.refT || 0) + dt;
@@ -2531,17 +2479,45 @@
       // zrazil sa šík s hordou? potom sa pešiaci pustia aj do nepriateľov o kus ďalej
       F.contact = live.some(s => s.ktype && s.tgt && !s.tgt.dead && Math.hypot(s.tgt.x - s.x, s.tgt.y - s.y) < 14);
     }
-    // lukostrelci: rad na dostrel od najbližšieho nepriateľa (aj letca), vždy za pešiakmi
-    if (archers.length) {
+    // lukostrelci: v útoku rad na dostrel od najbližšieho nepriateľa (aj letca), vždy za pešiakmi
+    if (archers.length && !armyAttacks()) holdArchers(archers, cx, Math.max(musterY + 16, infBack + 10), dt);
+    else if (archers.length) {
+      F.arcSlots = null; F.arcTy = 0; for (const u of archers) u.dslot = null;
       let tx = cx, ty = Math.max(musterY + 16, infBack + 10);
-      const th = nearestFoe(F.arc.x, F.arc.y, true), cp = th || !armyAttacks() ? null : nearestCampPart(F.arc.x, F.arc.y);
-      if (!armyAttacks()) { if (th) tx = th.x; } // obrana: rad stojí za šíkom
-      else if (th) { tx = th.x; ty = Math.max(G.gy0 + 30, Math.min(ty, Math.max(th.y + ARCHER_RANGE - 14, infBack + 10))); }
+      const th = nearestFoe(F.arc.x, F.arc.y, true), cp = th ? null : nearestCampPart(F.arc.x, F.arc.y);
+      if (th) { tx = th.x; ty = Math.max(G.gy0 + 30, Math.min(ty, Math.max(th.y + ARCHER_RANGE - 14, infBack + 10))); }
       else if (cp) { tx = cp.x; ty = cp.y + ARCHER_RANGE - 12; } // horda nikde – rad lukostrelcov na dostrel od tábora
       stepAnchor(F.arc, tx, ty, dt);
       assignSlots(archers, formSlots(archers.length, F.arc.x, F.arc.y));
       for (const u of archers) u.fslot = passSlot(u.fslot);
     }
+  }
+  // obrana: rad lukostrelcov stojí pevne za šíkom (nejde za hordou) a každý drží svoje miesto – po padlom ostane medzera,
+  // ktorú zaplní až nový lukostrelec; rad sa celý preskupí, len keď lukostrelcov pribudne viac, než je miest.
+  // Strieľa len ten, kto má niekoho na dostrel (updateArcher).
+  function holdArchers(archers, cx, ty, dt) {
+    const F = st.form;
+    F.arcTy = Math.max(F.arcTy || 0, ty); // rad cúvne, keď pribudnú rady pešiakov, ale dopredu sa neposúva
+    stepAnchor(F.arc, cx, F.arcTy, dt);
+    const key = Math.round(F.arc.x) + ',' + Math.round(F.arc.y);
+    if (!F.arcSlots || F.arcKey !== key || archers.length > F.arcSlots.length) {
+      F.arcKey = key;
+      F.arcSlots = formSlots(archers.length, F.arc.x, F.arc.y).map(passSlot);
+      assignSlots(archers, F.arcSlots.map((p, i) => ({ x: p.x, y: p.y, i })));
+      for (const u of archers) u.dslot = u.fslot.i;
+    } else {
+      const used = new Set();
+      for (const u of archers) {
+        if (u.dslot != null && u.dslot < F.arcSlots.length && !used.has(u.dslot)) used.add(u.dslot);
+        else u.dslot = null;
+      }
+      for (const u of archers) if (u.dslot == null) { // nový lukostrelec: najbližšia voľná medzera
+        let bi = 0, bd = 1e9;
+        F.arcSlots.forEach((p, i) => { const d = Math.hypot(p.x - u.x, p.y - u.y); if (!used.has(i) && d < bd) { bd = d; bi = i; } });
+        u.dslot = bi; used.add(bi);
+      }
+    }
+    for (const u of archers) u.fslot = F.arcSlots[u.dslot];
   }
 
   // lukostrelci a obliehacie stroje cúvajú (smerom k radnici) o polovicu pomalšie, než idú dopredu
@@ -3610,12 +3586,13 @@
     const mvx = u.x - (u._lx == null ? u.x : u._lx), mvy = u.y - (u._ly == null ? u.y : u._ly);
     u._lx = u.x; u._ly = u.y;
     const d = Math.hypot(mvx, mvy), moving = d > 0.03;
-    if (moving) { u._wd = (u._wd || 0) + d; u.face8 = dir8(mvx, mvy); }
-    else if (u.aimP && (u.fired > 0 || u.cd > 0)) u.face8 = dir8(u.aimP.x - u.x, u.aimP.y - u.y);
+    const busy = set.art && (u.siege === 'cat' ? u.fired > 0.3 : u.siege === 'ram' && u.swing > 0); // pri výstrele či údere sa neotáča, ani keď ho susedia odtlačia
+    if (moving && !busy) { u._wd = (u._wd || 0) + d; u.face8 = dir8(mvx, mvy); }
+    else if (u.aimP && (u.fired > 0 || u.cd > 0)) u.face8 = set.art && u.siege === 'cat' ? (u.aimP.y <= u.y ? 6 : 2) : dir8(u.aimP.x - u.x, u.aimP.y - u.y); // katapult z PixelLabu strieľa len na sever alebo na juh
     if (u.face8 == null) u.face8 = 6;
     const v = set[u.face8], k = u.siege;
-    const act = k === 'ram' ? u.swing > 0 && (set.art || u.swing < 0.25) : k === 'cat' ? u.fired > 0.4 : k === 'tower' ? u.fired > 0 : u.cd > SIEGE.fire.cd - 0.25;
-    const fr = act ? (k === 'ram' ? siegeAtkFrame(v, u.swing, RAM_SWING) : v.act) : moving ? v.walk[Math.floor(u._wd / set.stride) % 4] : v.idle;
+    const act = k === 'ram' ? u.swing > 0 && (set.art || u.swing < 0.25) : u.fired > (set.art ? 0.3 : 0.4);
+    const fr = act ? (k === 'ram' ? siegeAtkFrame(v, u.swing, RAM_SWING) : k === 'cat' && set.art ? siegeFireFrame(v, u.fired) : v.act) : moving ? v.walk[Math.floor(u._wd / set.stride) % 4] : v.idle;
     shadow(u.x, u.y, 9);
     g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.ax), Math.round(u.y - fr.ay), fr.w, fr.h); // jemná kresba má plátno 2× väčšie
   }
@@ -5874,7 +5851,7 @@
     ICONS.u_archer = spriteURL(sp('archer'), 3); ICONS.u_crossbow = spriteURL(sp('knight'), 3);
     ICONS.u_spear = unitIcon('spear'); ICONS.u_rider = unitIcon('rider'); ICONS.u_monk = unitIcon('monk'); ICONS.u_craft = unitIcon('craft'); // aj oddiely pri útoku na hrad
     ICONS.u_falcon = isOrc() ? spriteURL(SPR.bat[0], 3) : unitIcon('falcon'); // sokol z PixelLabu
-    for (const k of ['siegeRam', 'siegeCat', 'siegeFire', 'siegeTower']) { const sp = SPR[raceSpr(k) + '8'][1].idle; ICONS['u_' + k] = sp.hd ? spriteURL(trimmed({ c: sp.c, sil: sp.sil, w: sp.c.width, h: sp.c.height }), 1) : spriteURL(trimmed(sp), 2); } // jemná kresba v jej rozlíšení
+    for (const k of ['siegeRam', 'siegeCat']) { const sp = SPR[raceSpr(k) + "8"][1].idle; ICONS['u_' + k] = sp.hd ? spriteURL(trimmed({ c: sp.c, sil: sp.sil, w: sp.c.width, h: sp.c.height }), 1) : spriteURL(trimmed(sp), 2); } // jemná kresba v jej rozlíšení
     ICONS.king = ICONS.hero_king = isOrc() ? heroPortrait(SPR.chief8, 18) : heroPortrait(SPR.king8, 18);
     ICONS.paving = spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3); // kamenná dlažba či orkské dosky
     ICONS.hedge = sprIcon(BSPR.hedge); ICONS.mud = spriteURL(BSPR.mud, 3);
@@ -6616,8 +6593,6 @@
   const BUY = {
     ram:   { cost: 90,  siege: 'siegeRam',   name: 'Baranidlo',     plural: 'baranidlá' },
     cat:   { cost: 120, siege: 'siegeCat',   name: 'Voz. katapult', plural: 'katapulty' },
-    fire:  { cost: 110, siege: 'siegeFire',  name: 'Ohnivý voz',    plural: 'ohnivé vozy' },
-    tower: { cost: 150, siege: 'siegeTower', name: 'Obl. veža',     plural: 'obliehacie veže' },
   };
   const SIEGE_MAX = 2;
   // ---- útok na hrad: posledná misia ostrova (za ľudí aj za orkov) ----
@@ -6634,8 +6609,6 @@
     monk:   { home: 'chapel',   n: 1, cost: 60 },
     ram:    { siege: 'ram',   n: 1, cost: 120 },
     cat:    { siege: 'cat',   n: 1, cost: 150 },
-    fire:   { siege: 'fire',  n: 1, cost: 140 },
-    tower:  { siege: 'tower', n: 1, cost: 170 },
   };
   const ASSAULT_BACK = 0.5; // pri prehre sa vráti polovica minutých zlatiek
   // na útok treba v truhlici aspoň 70 % sumy, za ktorú automatický hráč hrad spoľahlivo dobyl (dev/assault-sim.js: ~3000 za ľudí, ~2500 za orkov);
@@ -6989,7 +6962,7 @@
     $('mMeta').innerHTML = missionWaves(m) + ' vĺn · obtiažnosť <span class="stars">' + '●'.repeat(diff) + '<i>' + '●'.repeat(5 - diff) + '</i></span>' + (done ? ' · <span class="ok">splnená ✓</span>' : '');
     const foes = [].concat(enemyIntro(m) || []);
     $('mNew').innerHTML = (foes.length ? '<span>' + (foes.length > 1 ? 'Nepriatelia:' : 'Nepriateľ:') + '</span>' + foes.map(foe => '<em class="foe"><img src="' + ICONS['e_' + foe.id] + '">' + foe.name + '</em>').join('') : '') +
-      (unlocksOf()[m - 1] ? '<span>' + (m === 1 ? 'Výbava:' : 'Novinka:') + '</span>' + unlocksOf()[m - 1].map(u => '<em><img src="' + ICONS[u.icon] + '">' + unlockName(u) + '</em>').join('')
+      ((unlocksOf()[m - 1] || []).length ? '<span>' + (m === 1 ? 'Výbava:' : 'Novinka:') + '</span>' + unlocksOf()[m - 1].map(u => '<em><img src="' + ICONS[u.icon] + '">' + unlockName(u) + '</em>').join('')
         : m === landLast(landOfMission(m)) && landOfMission(m).reward ? '<span>Odmena za územie:</span><em>' + landOfMission(m).reward.txt + '</em>' : ''); // mimo domovského ostrova nové stavby nie sú, posledná misia územia dá odmenu
     // úroveň misie: predvolene prvá otvorená bez plných 3 hviezd
     if (st.mapTierFor !== m) {
