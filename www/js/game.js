@@ -1067,11 +1067,40 @@
     st.proj.push({ k: 'rock', arc: true, sx, sy, x: sx, y: sy, tx, ty, t: 0, dur: Math.max(0.5, dist / 120), h: 14 + dist * 0.25, dmg, splash: 20, campT, siege: true });
     u.cd = SIEGE.cat.cd; u.fired = 1.0; AUDIO.play('bolt');
   }
+  // úder baranidla: kmeň sa napriahne a vyrazí, náraz (hit) padne RAM_HIT pred koncom
+  const RAM_SWING = 0.55, RAM_HIT = 0.12;
+  function ramStrike(u, hit) { u.cd = SIEGE.ram.cd; u.swing = RAM_SWING; u.ramHit = () => { AUDIO.play('crumble'); hit(); }; }
+  // miesto baranidla pri tábore: baranidlo útočí len zdola alebo zhora, preto stojí na voľnom políčku pod políčkom stavby
+  // (alebo nad ním) a na jedno políčko stavby útočí najviac jedno baranidlo; vyberie najbližšie voľné a drží ho, kým stavba stojí
+  function ramSlot(u) {
+    if (u.ramV !== st.campV || !u.ramBad) { u.ramV = st.campV; u.ramBad = new Set(); } // zbúraná hradba otvorila cestu – nedostupné skúsi znova
+    if (u.ramSlot && u.ramSlot.o.hp > 0) return u.ramSlot;
+    const live = campLive(), full = new Set(), taken = new Set();
+    for (const o of live) { const [w, h] = campSize(o.skin); for (let k = 0; k < w; k++) for (let j = 0; j < h; j++) full.add((o.c + k) + ',' + (o.r + j)); }
+    for (const q of st.soldiers) if (q !== u && q.siege === 'ram' && !q.dead && q.ramSlot && q.ramSlot.o.hp > 0) taken.add(q.ramSlot.key);
+    let best = null, bd = 1e9;
+    for (const o of live) {
+      const [w, h] = campSize(o.skin);
+      for (let k = 0; k < w; k++) {
+        const c = o.c + k, key = c + ',' + o.r;
+        if (taken.has(key) || u.ramBad.has(key)) continue;
+        for (const up of [true, false]) { // up = stojí pod stavbou a búši nahor
+          const r = up ? o.r + h : o.r - 1;
+          if (r < 0 || r >= G.rows || full.has(c + ',' + r)) continue;
+          const x = tileX(c) + T / 2, y = up ? o.y + 6 : tileY(o.r) - 6, d = Math.hypot(x - u.x, y - u.y);
+          if (d < bd) { bd = d; best = { o, key, up, x, y }; }
+        }
+      }
+    }
+    return (u.ramSlot = best);
+  }
   // baranidlo a ohnivý voz idú na tábor, katapult ho ostreľuje z dostrelu, obliehacia veža ich sprevádza;
   // keď tábor nie je (alebo padol), baranidlo rozráža hordu, katapult hádže spoza šíku, ohnivý voz ide so šíkom;
   // tlačidlo obrana/útok ich neovplyvňuje – tábor hordy idú búrať vždy
   function updateSiege(u, dt) {
-    u.flash = Math.max(0, u.flash - dt); u.cd = Math.max(0, u.cd - dt); u.fired = Math.max(0, u.fired - dt); u.swing = 0;
+    u.flash = Math.max(0, u.flash - dt); u.cd = Math.max(0, u.cd - dt); u.fired = Math.max(0, u.fired - dt);
+    if (u.swing > 0) { u.swing = Math.max(0, u.swing - dt); if (u.ramHit && u.swing <= RAM_HIT) { const hit = u.ramHit; u.ramHit = null; hit(); } } // náraz padne ku koncu úderu
+    else u.ramHit = null;
     const fm = st.form || { inf: { x: G.hallCx, y: musterYOf() }, arc: { x: G.hallCx, y: musterYOf() + 16 } };
     const side = (u.slot % 2 ? 1 : -1) * (14 + 10 * (Math.floor(u.slot / 2) % 3));
     const clampX = x => Math.max(G.gx0 + 8, Math.min(G.gx0 + G.cols * T - 8, x));
@@ -1084,22 +1113,31 @@
     const camp = !giant ? nearestCampPart(u.x, u.y) : null; // tábor hordy je ich prednostný cieľ – tlačidlo obrana/útok sa ich netýka
     if (u.siege === 'ram') {
       if (giant) u.tgt = giant;
-      if (camp) { // tábor má prednosť – hordy si nevšíma
-        if (Math.hypot(camp.x - u.x, camp.y + 6 - u.y) > 8) { go(camp.x, camp.y + 6); return; }
+      if (u.swing > 0) return; // dokončí rozbehnutý úder
+      const slot = camp ? ramSlot(u) : null;
+      if (slot) { // tábor má prednosť – hordy si nevšíma; postaví sa pod políčko stavby (alebo nad ne) a búši kolmo
+        if (Math.hypot(slot.x - u.x, slot.y - u.y) > 1.5) {
+          go(slot.x, slot.y);
+          const a = tileAt(u.x, u.y), b = tileAt(slot.x, slot.y);
+          if (!u.next && (a.c !== b.c || a.r !== b.r)) { u.ramBad.add(slot.key); u.ramSlot = null; } // k tomuto políčku cesta nevedie – skúsi iné
+          return;
+        }
+        u.face8 = slot.up ? 6 : 2;
         if (u.cd > 0) return;
-        u.cd = SIEGE.ram.cd; u.swing = 0.2; AUDIO.play('crumble'); st.shake = Math.max(st.shake, 0.08);
-        hitCamp(camp, u.dmg);
+        ramStrike(u, () => { st.shake = Math.max(st.shake, 0.08); hitCamp(slot.o, u.dmg); });
         return;
       }
+      if (camp) { go(clampX(fm.inf.x + side), fm.inf.y - 6); return; } // všetky políčka sú obsadené inými baranidlami – čaká pri šíku
       if (u.tgt && (u.tgt.dead || u.tgt.d.fly)) u.tgt = null;
       if (!u.tgt) u.tgt = nearestFoe(u.x, u.y, false);
       const t = u.tgt;
       if (!t) { go(clampX(fm.inf.x + side), fm.inf.y - 6); return; }
-      if (Math.hypot(t.x - u.x, t.y - u.y) > 10) { go(t.x, t.y + 6); return; }
+      const up = u.y >= t.y; // útočí len zdola alebo zhora: postaví sa pod cieľ (nad cieľ) a búši kolmo
+      if (Math.abs(t.x - u.x) > 5 || Math.abs(t.y - u.y) > 10) { go(t.x, t.y + (up ? 6 : -6)); return; }
+      u.face8 = up ? 6 : 2;
       if (!t.foe) t.foe = u; // horda sa s ním pobije (má hrubé pancierovanie)
       if (u.cd > 0) return;
-      u.cd = SIEGE.ram.cd; u.swing = 0.2; AUDIO.play('crumble'); st.shake = Math.max(st.shake, 0.06);
-      damage(t, u.dmg * (t.d.giant ? 1 : 0.6), true);
+      ramStrike(u, () => { st.shake = Math.max(st.shake, 0.06); if (!t.dead && Math.hypot(t.x - u.x, t.y - u.y) < 16) damage(t, u.dmg * (t.d.giant ? 1 : 0.6), true); });
       return;
     }
     if (u.siege === 'cat') {
@@ -1785,13 +1823,22 @@
     }
     // budova na dosah? horda ničí všetko, čo jej príde pod ruku
     let nearB = null, nd = 3.5;
+    if (e.d.ram) e.ramKey = null;
     for (const b of st.blds) {
       if (!BUILD[b.kind].block) continue;
       const x0 = tileX(b.c), y0 = tileY(b.r);
+      if (e.d.ram) { // baranidlo útočí len zhora alebo zdola (stojí v stĺpci stavby) a na jedno políčko stavby najviac jedno
+        if (e.x < x0 - 1 || e.x > x0 + bW(b) * T + 1) continue;
+        const key = Math.max(b.c, Math.min(b.c + bW(b) - 1, tileAt(e.x, e.y).c)) + ',' + b.r;
+        if (st.enemies.some(o => o !== e && !o.dead && o.d.ram && o.ramKey === key)) continue;
+      }
       const d = Math.hypot(Math.max(x0 - e.x, 0, e.x - x0 - bW(b) * T), Math.max(y0 - e.y, 0, e.y - y0 - T));
       if (d < nd) { nd = d; nearB = b; }
     }
-    if (nearB) { e.aimP = bCenter(nearB); attack(() => hitBuilding(nearB, e.d.atk, e)); return; }
+    if (nearB) {
+      if (e.d.ram) e.ramKey = Math.max(nearB.c, Math.min(nearB.c + bW(nearB) - 1, tileAt(e.x, e.y).c)) + ',' + nearB.r; // toto políčko je jeho
+      e.aimP = bCenter(nearB); attack(() => hitBuilding(nearB, e.d.atk, e)); return;
+    }
     // podkopník beží rovno k najbližšej hradbe
     if (e.d.sapper && e.y > 4) {
       let tw = null, td = 1e9;
@@ -3348,10 +3395,10 @@
         e._lx = e.x; e._ly = e.y;
         const moving = d > 0.02 && !e.attacking;
         if (moving) { e._wd = (e._wd || 0) + d; e.face8 = dir8(mvx, mvy); }
-        else if ((e.attacking || e.lunge > 0) && e.aimP) e.face8 = dir8(e.aimP.x - e.x, e.aimP.y - e.y);
+        else if ((e.attacking || e.lunge > 0) && e.aimP) e.face8 = e.d.ram ? (e.aimP.y < e.y ? 6 : 2) : dir8(e.aimP.x - e.x, e.aimP.y - e.y); // baranidlo búši len nahor alebo nadol
         if (e.face8 == null) e.face8 = 2;
         const v = set8[e.face8];
-        fr = e.lunge > 0 ? v.act : moving ? v.walk[Math.floor(e._wd / set8.stride) % 4] : v.idle;
+        fr = e.lunge > 0 ? v.act : set8.art && e.attacking && e.atk < 0.4 ? v.atk[Math.floor((1 - e.atk / 0.4) * (v.atk.length - 1))] : moving ? v.walk[Math.floor(e._wd / set8.stride) % 4] : v.idle; // kresba z PixelLabu: napriahnutie pred nárazom
         x = Math.round(e.x - fr.ax); y = Math.round(e.y - fr.ay);
       } else {
         fr = enemy8Frame(e, set8); x = Math.round(e.x - fr.w / 2); y = Math.round(e.y - fr.h) + U8_PB;
@@ -3567,10 +3614,10 @@
     else if (u.aimP && (u.fired > 0 || u.cd > 0)) u.face8 = dir8(u.aimP.x - u.x, u.aimP.y - u.y);
     if (u.face8 == null) u.face8 = 6;
     const v = set[u.face8], k = u.siege;
-    const act = k === 'ram' ? u.swing > 0 : k === 'cat' ? u.fired > 0.4 : k === 'tower' ? u.fired > 0 : u.cd > SIEGE.fire.cd - 0.25;
-    const fr = act ? v.act : moving ? v.walk[Math.floor(u._wd / set.stride) % 4] : v.idle;
+    const act = k === 'ram' ? u.swing > 0 && (set.art || u.swing < 0.25) : k === 'cat' ? u.fired > 0.4 : k === 'tower' ? u.fired > 0 : u.cd > SIEGE.fire.cd - 0.25;
+    const fr = act ? (k === 'ram' ? siegeAtkFrame(v, u.swing, RAM_SWING) : v.act) : moving ? v.walk[Math.floor(u._wd / set.stride) % 4] : v.idle;
     shadow(u.x, u.y, 9);
-    g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.ax), Math.round(u.y - fr.ay));
+    g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.ax), Math.round(u.y - fr.ay), fr.w, fr.h); // jemná kresba má plátno 2× väčšie
   }
   function drawFighter(u, sprName) {
     if (u.siege) return drawSiege8(u, SPR[sprName + '8']);
@@ -5587,7 +5634,7 @@
       }
       if (st.phase === 'build') for (const o of st.siegeOrder) { // kúpené obliehacie stroje čakajú na mieste, odkiaľ vyrazia
         const sp = SPR[raceSpr(BUY[o.key].siege) + '8'][6].idle; // otočený k horde
-        objs.push({ y: o.y, f: () => { shadow(o.x, o.y, 9); g.drawImage(sp.c, Math.round(o.x - sp.ax), Math.round(o.y - sp.ay)); } });
+        objs.push({ y: o.y, f: () => { shadow(o.x, o.y, 9); g.drawImage(sp.c, Math.round(o.x - sp.ax), Math.round(o.y - sp.ay), sp.w, sp.h); } });
       }
       if (st.king && !st.king.dead) objs.push({ y: st.king.y, f: () => drawFighter(st.king, heroDef().spr) });
       else if (st.king && kingLying(st.king)) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
@@ -5827,7 +5874,7 @@
     ICONS.u_archer = spriteURL(sp('archer'), 3); ICONS.u_crossbow = spriteURL(sp('knight'), 3);
     ICONS.u_spear = unitIcon('spear'); ICONS.u_rider = unitIcon('rider'); ICONS.u_monk = unitIcon('monk'); ICONS.u_craft = unitIcon('craft'); // aj oddiely pri útoku na hrad
     ICONS.u_falcon = isOrc() ? spriteURL(SPR.bat[0], 3) : unitIcon('falcon'); // sokol z PixelLabu
-    for (const k of ['siegeRam', 'siegeCat', 'siegeFire', 'siegeTower']) ICONS['u_' + k] = spriteURL(trimmed(SPR[raceSpr(k) + '8'][1].idle), 2);
+    for (const k of ['siegeRam', 'siegeCat', 'siegeFire', 'siegeTower']) { const sp = SPR[raceSpr(k) + '8'][1].idle; ICONS['u_' + k] = sp.hd ? spriteURL(trimmed({ c: sp.c, sil: sp.sil, w: sp.c.width, h: sp.c.height }), 1) : spriteURL(trimmed(sp), 2); } // jemná kresba v jej rozlíšení
     ICONS.king = ICONS.hero_king = isOrc() ? heroPortrait(SPR.chief8, 18) : heroPortrait(SPR.king8, 18);
     ICONS.paving = spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3); // kamenná dlažba či orkské dosky
     ICONS.hedge = sprIcon(BSPR.hedge); ICONS.mud = spriteURL(BSPR.mud, 3);

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Baranidlo z PixelLabu</title>
+<style>
+  body { margin: 0; padding: 16px; background: #222; color: #eee; font: 14px sans-serif; }
+  canvas { image-rendering: pixelated; display: block; margin: 6px 0 18px; max-width: 100%; }
+</style>
+</head>
+<body>
+<div>Ako na telefóne (bod hry = 6 px), mriežka = políčka 16 bodov. Hore: jazda v 8 smeroch (kolesá dokreslené). Dole: úder zdola a zhora vedľa veže, rytiera a jazdca.</div>
+<canvas id="v"></canvas>
+<script src="../js/archer-art.js"></script>
+<script src="../js/armory-art.js"></script>
+<script src="../js/ballista-tower-art.js"></script>
+<script src="../js/ballista-turret-art.js"></script>
+<script src="../js/barracks-art.js"></script>
+<script src="../js/carpenter-art.js"></script>
+<script src="../js/castle-art.js"></script>
+<script src="../js/chapel-art.js"></script>
+<script src="../js/falcon-art.js"></script>
+<script src="../js/falconry-art.js"></script>
+<script src="../js/fire-tower-art.js"></script>
+<script src="../js/firetrap-art.js"></script>
+<script src="../js/healer-art.js"></script>
+<script src="../js/king-art.js"></script>
+<script src="../js/knight-art.js"></script>
+<script src="../js/mine-art.js"></script>
+<script src="../js/paladin-art.js"></script>
+<script src="../js/pit-art.js"></script>
+<script src="../js/pitch-tower-art.js"></script>
+<script src="../js/range-art.js"></script>
+<script src="../js/rider-art.js"></script>
+<script src="../js/sorc-art.js"></script>
+<script src="../js/spear-art.js"></script>
+<script src="../js/stables-art.js"></script>
+<script src="../js/tower-art.js"></script>
+<script src="../js/wall-art.js"></script>
+<script src="../js/workshop-art.js"></script>
+<script src="../js/ram-art.js"></script>
+<script src="../js/sprites.js"></script>
+<script src="../js/orcs8.js"></script>
+<script src="../js/scene.js"></script>
+<script src="../js/buildings.js"></script>
+<script src="../js/siege.js"></script>
+<script>
+initSprites(); initOrcSprites(); initBuildingSprites(); initSiegeSprites();
+const SCR = 6, BW = 16 * 9, rows = [36, 84], BH = 94, set = SPR.siegeRam8;
+const buf = document.createElement('canvas'); buf.width = BW * 2; buf.height = BH * 2;
+const b = buf.getContext('2d'); b.imageSmoothingEnabled = false;
+const v = document.getElementById('v'); v.width = BW * SCR; v.height = BH * SCR;
+const g = v.getContext('2d'); g.imageSmoothingEnabled = false;
+const put = (fr, x, y) => b.drawImage(fr.c, Math.round((x - fr.ax) * 2), Math.round((y - fr.ay) * 2), fr.w * 2, fr.h * 2);
+const unit = (fr, x, y) => b.drawImage(fr.c, Math.round((x - fr.w / 2) * 2), Math.round((y - fr.h + 4) * 2), fr.w * 2, fr.h * 2);
+const shadow = (x, y, r) => { b.fillStyle = 'rgba(10,8,6,.38)'; b.fillRect((x - r) * 2, (y - 1) * 2, r * 4, 4); };
+window.FRAME = null; // skúška: pevná snímka namiesto času
+function draw(now) {
+  const t = window.FRAME != null ? window.FRAME : now / 1000;
+  b.fillStyle = '#4c6a34'; b.fillRect(0, 0, buf.width, buf.height);
+  b.strokeStyle = 'rgba(0,0,0,.22)';
+  for (let x = 0; x <= BW; x += 16) { b.beginPath(); b.moveTo(x * 2 + 0.5, 0); b.lineTo(x * 2 + 0.5, buf.height); b.stroke(); }
+  for (let d = 0; d < 8; d++) { // jazda: 11 bodov za sekundu ako v hre, snímka každých 1,05 bodu
+    const x = 9 + d * 18; shadow(x, rows[0], 9);
+    put(set[d].walk[Math.floor(t * 16.5 / set.stride) % 4], x, rows[0]);
+  }
+  const cyc = t % 1.6, sw = cyc < 0.55 ? 0.55 - cyc : 0; // úder každých 1,6 s
+  const t1 = BSPR.tower[0]; b.drawImage(t1.c, 4 * 2, (rows[1] + 4 - t1.h) * 2, t1.w * 2, t1.h * 2);
+  unit(SPR.soldier8[6].idle, 34, rows[1]);
+  for (const [d, x] of [[6, 54], [2, 86]]) { shadow(x, rows[1], 9); put(sw > 0 ? siegeAtkFrame(set[d], sw, 0.55) : set[d].idle, x, rows[1]); }
+  unit(SPR.rider8[0].idle, 112, rows[1]);
+  g.drawImage(buf, 0, 0, v.width, v.height);
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

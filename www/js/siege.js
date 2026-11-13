@@ -242,6 +242,23 @@ function buildSiege8(make, stride) {
   set.vox = true;
   return set;
 }
+// stroj nakreslený v PixelLabe (tools/pixellab2js.py --hd, jazdu dokresľuje tools/ram_walk.py): rovnaký tvar sady ako buildSiege8,
+// navyše atk = snímky úderu (napriahnutie … náraz); úder má kresbu len zhora a zdola, preto stroj útočí iba v týchto dvoch smeroch
+function buildSiegeArt8(art) {
+  const set = buildArt8(art, null, 1.05);
+  for (const v of set) {
+    v.idle = v.walk[0]; // státie = prvá snímka jazdy (kolesá nepreskočia)
+    for (const fr of [v.idle, ...v.walk, ...v.atk]) { fr.ax = fr.w / 2; fr.ay = 21.5; } // stred stroja na zemi (v bodoch hry)
+    v.act = v.atk[v.atk.length - 1];
+  }
+  set.vox = true; set.art = true; // kreslí sa ako ostatné stroje (kotva ax, ay)
+  return set;
+}
+// snímka úderu baranidla podľa času, ktorý z úderu ostáva (t z dur): napriahnutie, výpad, náraz
+function siegeAtkFrame(v, t, dur) {
+  if (!v.atk) return v.act;
+  return v.atk[Math.min(v.atk.length - 1, Math.floor((1 - t / dur) * v.atk.length))];
+}
 // ---- horda: orkský baran, obrí baran, vojnový mamut (idú dopredu = k pevnosti) ----
 // orkský baran: kolesá z kmeňov, strecha zo surových koží s kostenými hrotmi, okovaná lebka na kmeni, tlačia ho orkovia
 function voxOrcRam(f, act, big) {
@@ -320,7 +337,7 @@ function orcify(md) {
   return md;
 }
 function initSiegeSprites() {
-  lazySpr('siegeRam8', () => buildSiege8(voxRam));
+  lazySpr('siegeRam8', () => typeof RAM_ART !== 'undefined' ? buildSiegeArt8(RAM_ART) : buildSiege8(voxRam)); // baranidlo z PixelLabu (ram-art.js)
   lazySpr('siegeCat8', () => buildSiege8(voxCat));
   lazySpr('siegeFire8', () => buildSiege8(voxFire));
   lazySpr('siegeTower8', () => buildSiege8(voxTower));
