@@ -483,7 +483,7 @@
     [['hall', 1, 0], ['tower', 1, 0], ['wall', 1, 0], ['pit', 1, 80], ['wallArcher', 0, 120], ['paving', 0, 40, 1]],
     [['hall', 2, 400], ['tower', 2, 150], ['pitch', 2, 200], ['wall', 2, 150], ['mine', 1, 200], ['workshop', 1, 200], ['pit', 2, 120]],
     [['hall', 3, 900], ['tower', 3, 300], ['pitch', 3, 300], ['mage', 3, 450], ['wall', 3, 300], ['firepit', 1, 250], ['pit', 3, 220],
-      ['barracks', 1, 400], ['barracks', 2, 300, 1], ['range', 1, 400], ['range', 2, 300, 1], ['hedge', 0, 150], ['mine', 2, 300], ['workshop', 2, 300], ['chapel', 1, 400],
+      ['barracks', 1, 400], ['barracks', 2, 300, 1], ['range', 1, 400], ['range', 2, 300, 1], ['hedge', 0, 150, 1], ['mine', 2, 300], ['workshop', 2, 300], ['chapel', 1, 400],
       ['siegeRam', 0, 450], ['spear', 0, 350]],
     [['hall', 4, 1800], ['tower', 4, 550], ['pitch', 4, 550], ['mage', 4, 650], ['ice', 0, 400, 1], ['wall', 4, 500], ['pit', 4, 350], ['firepit', 2, 400],
       ['barracks', 3, 550], ['barracks', 4, 500, 1], ['stables', 1, 700], ['stables', 2, 500, 1], ['stables', 3, 550, 1], ['range', 3, 550], ['range', 4, 500, 1],
@@ -555,11 +555,11 @@
     // úplne nový hráč (len 1. misia) má ako novinky aj všetky stavby z prvej misie, aby sa s nimi zoznámil
     seenNew = loadJSON(sk('seenNew'), null);
     if (!Array.isArray(seenNew)) {
-      seenNew = Object.keys(BUILD).concat(Object.keys(SHINE_TECH)).filter(id => has(id) && (st.unlocked > 1 || !BUILD[id]));
+      seenNew = Object.keys(BUILD).concat(Object.keys(SHINE_TECH), Object.keys(RES_BY)).filter(id => has(id) && (st.unlocked > 1 || !BUILD[id]));
       saveJSON(sk('seenNew'), seenNew);
     }
   }
-  const isNew = id => (!!BUILD[id] || !!SHINE_TECH[id]) && has(id) && !seenNew.includes(id);
+  const isNew = id => (!!BUILD[id] || !!SHINE_TECH[id] || !!RES_BY[id]) && has(id) && !seenNew.includes(id);
   function markSeen(id) { if (seenNew.includes(id)) return; seenNew.push(id); saveJSON(sk('seenNew'), seenNew); }
   // novo odomknutý hrdina (pre celý účet)
   const HEROES_SEEN_KEY = 'fortward.heroesSeen';
@@ -582,7 +582,14 @@
       setTimeout(() => { seen(); refreshTabShine(); }, FLASH_MS);
     }
     const age = now - flashedNew.get(id);
-    if (age < FLASH_MS) { el.classList.add('newFlash'); el.querySelector('.face').style.animationDelay = (-age) + 'ms'; }
+    if (age < FLASH_MS) {
+      el.classList.add('newFlash'); el.querySelector('.face').style.animationDelay = (-age) + 'ms';
+      const pic = el.querySelector('.pic');
+      if (pic && age < 1100) { // zámok, ktorý tu doteraz bol, sa otvorí a odletí – hráč vidí, čo sa práve odomklo
+        const fx = document.createElement('img'); fx.className = 'unlockFx'; fx.src = FINE_ICONS.lockOpen; fx.alt = '';
+        fx.style.animationDelay = (-age) + 'ms'; pic.appendChild(fx);
+      }
+    }
     return el;
   }
   // lesk (.shine): dráha prúžku siaha za pravý okraj prvku a dĺžka cyklu rastie so šírkou – každý prvok prejde celý
@@ -6153,17 +6160,18 @@
     const shineTech = (el, id) => flashIf(el, isNew(id), id, () => markSeen(id));
     const I = UI_ICONS;
     // zamknutá karta: m = číslo misie (staré odomykanie), alebo meno veci vo výskume – tá chýba vo výskume, alebo na ňu nestačí úroveň hradu
-    const lockAct = (icon, label, m, px) => typeof m === 'number' ? act(icon, label, '🔒 misia ' + m, false, label + ' sa odomkne v misii ' + m, 'locked', px)
-      : !has(m) ? act(icon, label, '🔒 výskum', false, label + ': najprv treba vyskúmať (záložka Výskum na mape)', 'locked', px)
-      : act(icon, label, '🔒 ' + hallWord() + ' ' + needHall(m), false, label + ': najprv vylepši ' + hallWord() + ' na úroveň ' + needHall(m), 'locked', px);
+    const lockCard = (hint, msg) => act(FINE_ICONS.lock, '', hint, false, msg, 'locked lockCard');
+    const lockAct = (icon, label, m) => typeof m === 'number' ? lockCard('misia ' + m, label + ' sa odomkne v misii ' + m)
+      : !has(m) ? lockCard('výskum', 'Najprv treba vyskúmať (záložka Výskum na mape)')
+      : lockCard(hallWord() + ' ' + needHall(m), 'Najprv vylepši ' + hallWord() + ' na úroveň ' + needHall(m));
     // ďalšia úroveň: kúpiť / najprv radnica / zamknutá do misie / maximum
     // icon = náhľad stavby na ďalšej úrovni
     const upAct = (lvl, cap, cost, apply, label, icon, newId, kind) => {
       const nx = RES.find(r => r.kind === resKindOf(kind) && r.lvl === lvl + 1); // výskum ďalšej úrovne
-      if (lvl < cap) shineTech(act(icon, label || 'Vylepšiť', coinTxt(cost), st.gold >= cost, apply, 'up'), newId);
+      if (lvl < cap) shineTech(act(icon, label || 'Vylepšiť', coinTxt(cost), st.gold >= cost, apply, 'up'), newId || (nx && nx.id));
       else if (lvl >= resMax(kind)) act(I.star, 'Max. úr.', '', false, null, 'max', true);
-      else if (nx && resHas(nx.id) && kind !== 'hall') act(icon, 'Úr. ' + (lvl + 1), '🔒 ' + hallWord() + ' ' + nx.c, false, 'Najprv vylepši ' + hallWord() + ' na úroveň ' + nx.c, 'locked');
-      else act(icon, 'Úr. ' + (lvl + 1), '🔒 výskum', false, 'Úroveň ' + (lvl + 1) + ' treba najprv vyskúmať (záložka Výskum na mape)', 'locked');
+      else if (nx && resHas(nx.id) && kind !== 'hall') lockCard(hallWord() + ' ' + nx.c, 'Najprv vylepši ' + hallWord() + ' na úroveň ' + nx.c);
+      else lockCard('výskum', 'Úroveň ' + (lvl + 1) + ' treba najprv vyskúmať (záložka Výskum na mape)');
     };
     const selRow = (icon, title, stats) => {
       const d = document.createElement('div'); d.className = 'selLine';
@@ -6353,9 +6361,9 @@
         const b = document.createElement('button');
         if (!open(kind)) { // zamknutá stavba: chýba výskum, alebo na ňu nestačí úroveň hradu
           const why = !has(kind) ? 'výskum' : hallWord() + ' ' + needHall(kind);
-          b.className = 'pcard locked';
-          b.innerHTML = '<span class="pin"><span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost">🔒 ' + why + '</span></span></span>';
-          b.addEventListener('click', () => { toast(!has(kind) ? d.name + ': najprv treba vyskúmať (záložka Výskum na mape)' : d.name + ': najprv vylepši ' + hallWord() + ' na úroveň ' + needHall(kind)); AUDIO.play('deny'); });
+          b.className = 'pcard locked lockCard';
+          b.innerHTML = '<span class="pin"><span class="face front"><span class="pic"><img src="' + FINE_ICONS.lock + '" alt=""></span><b></b><span class="cost">' + why + '</span></span></span>';
+          b.addEventListener('click', () => { toast(!has(kind) ? 'Najprv treba vyskúmať (záložka Výskum na mape)' : 'Najprv vylepši ' + hallWord() + ' na úroveň ' + needHall(kind)); AUDIO.play('deny'); });
           pal.appendChild(b);
           continue;
         }
@@ -7340,6 +7348,7 @@
   }
   // ---- Výskum: 5 veľkých kariet nad sebou (I dole, V hore), posúvajú sa prstom; ťuk na výskum ho označí, druhý ťuk kúpi za zlatky z truhlice ----
   let resPick = null; // označený výskum (čaká na potvrdenie druhým ťukom)
+  let resFlash = null; // hrad práve otvorenej karty – po dokončení predošlej karty zabliká
   const RES_NAME = { hall: () => isOrc() ? 'Pevnosť' : 'Hrad', wallArcher: () => isOrc() ? 'Strelec na palisáde' : 'Lukostrelci na hradbách', spear: () => isOrc() ? 'Zbrojnica' : 'Kopijníci',
     ice: () => 'Ľadový plameň', siegeRam: () => BUY.ram.name, siegeCat: () => 'Katapult', hedge: () => BUILD[isOrc() ? 'mud' : 'hedge'].name };
   const resBuild = r => r.kind === 'pitch' && isOrc() ? 'icetower' : r.kind; // za orkov je na mieste smolnej veže jedový kotol
@@ -7361,11 +7370,18 @@
   }
   function buyResearch(r) {
     if (resHas(r.id) || resBlock(r) || (st.chest || 0) < r.cost) return;
+    const wasOpen = r.c < 5 && resCardOpen(r.c + 1);
     st.chest -= r.cost; saveJSON(sk('chest'), st.chest);
     st.res.add(r.id); saveRes();
     resPick = null;
     AUDIO.play('upgrade'); toast('Vyskúmané: ' + resName(r));
+    const next = r.c < 5 && !wasOpen && resCardOpen(r.c + 1) ? r.c + 1 : 0; // karta je hotová – otvorí sa ďalšia
+    if (next) { resFlash = 'hall' + next; setTimeout(() => { if (resFlash === 'hall' + next) { resFlash = null; if (mapTab === 'research') renderResearch(); } }, 4200); }
     renderResearch(); renderMapHead();
+    if (next) { // obrazovka sa plynulo posunie hore na ďalšiu kartu, jej hrad potom zabliká
+      const scr = $('research'), card = $('resList').querySelectorAll('.resCard')[5 - next];
+      setTimeout(() => { AUDIO.play('unlock'); scr.scrollTo({ top: Math.max(0, card.offsetTop - 62), behavior: 'smooth' }); }, 350);
+    }
   }
   function renderResearch(scroll) {
     const list = $('resList'), keep = $('research').scrollTop;
@@ -7381,7 +7397,7 @@
       for (const r of items) {
         const done = resHas(r.id), why = done ? null : resBlock(r), poor = !done && !why && (st.chest || 0) < r.cost, pick = resPick === r.id && !done && !why && !poor;
         const b = document.createElement('button');
-        b.className = 'resItem' + (done ? ' done' : why ? ' locked' : poor ? ' poor' : ' buy') + (r.kind === 'hall' ? ' hall' : '') + (pick ? ' sel' : '');
+        b.className = 'resItem' + (done ? ' done' : why ? ' locked' : poor ? ' poor' : ' buy') + (r.kind === 'hall' ? ' hall' : '') + (pick ? ' sel' : '') + (resFlash === r.id ? ' resNew' : '');
         b.innerHTML = (r.opt ? '<em class="opt">nepovinné</em>' : '') + '<span class="pic"><img src="' + resIcon(r) + '" alt=""></span><b>' + resName(r) + '</b>' +
           '<span class="cost">' + (done ? (r.cost ? '✓ vyskúmané' : '✓ od začiatku') : pick ? 'Vyskúmať?' : '<img src="' + UI_ICONS.coinsFine + '" alt="">' + r.cost) + '</span>';
         b.addEventListener('click', () => {

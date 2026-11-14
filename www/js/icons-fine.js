@@ -203,5 +203,32 @@ const FINE_ICONS = (() => {
     });
   });
 
-  return { swords, hall, globe, trophy, trophySmall, research, chest, home, map: mapIcon(false), mapOn: mapIcon(true) };
+  // ---- zámok (zamknutá ponuka v stavebnom paneli): oceľový strmeň a zlaté telo s kľúčovou dierkou; open = strmeň vytiahnutý a pootočený ----
+  const lockIcon = open => icon(32, 32, each => {
+    each((px, py, x, y) => {
+      const lift = open ? 5 : 0;
+      // strmeň: oblúk s dvoma nožičkami (pri otvorenom je pravá nožička vonku z tela)
+      const cx = 16, cy = 11 - lift, ro = 7.5, ri = 4.6, d = Math.hypot(px - cx, py - cy);
+      const arc = py <= cy && d <= ro && d >= ri;
+      const legL = px >= cx - ro && px < cx - ri && py > cy && py < 17 - (open ? 0 : 0);
+      const legR = px > cx + ri && px <= cx + ro && py > cy && py < (open ? cy + 4 : 17);
+      if (arc || legL || legR) {
+        const lit = px < cx ? (px < cx - ro + 1.3 ? 5 : 4) : (px > cx + ro - 1.3 ? 1 : 2);
+        return STEEL[Math.min(5, lit + (py < cy - ro + 2 ? 1 : 0))];
+      }
+      if (y >= 15 && y <= 28 && x >= 6 && x <= 25) { // telo zámku
+        const kh = (Math.hypot(px - 16, py - 20) < 2.2) || (x >= 15 && x <= 16 && y >= 21 && y <= 25); // kľúčová dierka
+        if (kh) return y >= 23 ? K : '#2a1a0e';
+        if (y === 15) return GOLD[6];
+        if (y === 28) return GOLD[1];
+        if (x === 6) return GOLD[5];
+        if (x === 25) return GOLD[1];
+        if (y === 18 || y === 25) return GOLD[2]; // pásy kovania
+        return pick(GOLD, 4.4 - (px - 6) * 0.09 - (py - 15) * 0.08);
+      }
+      return null;
+    });
+  });
+
+  return { swords, hall, globe, trophy, trophySmall, research, chest, home, map: mapIcon(false), mapOn: mapIcon(true), lock: lockIcon(false), lockOpen: lockIcon(true) };
 })();
