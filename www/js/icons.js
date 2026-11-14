@@ -128,6 +128,60 @@ const UI_ICONS = (() => {
     '.KK.....KK.',
   ];
   const star = fromMap(STAR_MAP, PAL);
+  // ---- jemné ikonky horného riadku mapy (1 bod kresby = 1 bod obrazovky): kôpka zlatiek a hviezda ----
+  // paint(put) nakreslí výplň, obrys (tmavý lem okolo siluety) sa doplní sám; svetlo zľava zhora
+  const GOLDF = ['#5a3a0c', '#8a5c14', '#b88420', '#e0a830', '#f8d048', '#ffec90', '#fffbe0'];
+  function fine(w, h, paint) {
+    const a = Array.from({ length: h }, () => new Array(w).fill(null));
+    paint((x, y, c) => { if (x >= 0 && y >= 0 && x < w && y < h) a[y][x] = c; });
+    const at = (x, y) => x >= 0 && y >= 0 && x < w && y < h && a[y][x];
+    return pix(w, h, (x, y) => a[y][x] || (at(x - 1, y) || at(x + 1, y) || at(x, y - 1) || at(x, y + 1) ? PAL.K : null));
+  }
+  const goldAt = v => GOLDF[Math.max(0, Math.min(6, Math.round(v)))];
+  const coinsFine = fine(26, 24, put => {
+    // ležiaca minca: vrchná plocha (elipsa so svetlým lemom) a ryhovaný bok s tmavou spodnou hranou, ktorá ju oddelí od mince pod ňou
+    const flat = (cx, cy, rx, ry, t) => {
+      for (let y = Math.floor(cy - ry); y <= cy + ry + t; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
+        const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry;
+        if (dx * dx + dy * dy <= 1) {
+          const r = Math.hypot(dx, dy);
+          put(x, y, goldAt(r > 0.78 ? 5.4 - dx * 0.8 : r > 0.5 ? 2.8 : 4.2 - dx * 0.8 - dy * 0.5));
+        } else if (Math.abs(dx) <= 1) {
+          const edge = cy + ry * Math.sqrt(1 - dx * dx);
+          if (y + 0.5 > cy && y + 0.5 <= edge + t) put(x, y, y + 1.5 > edge + t ? PAL.K : goldAt((x % 2 ? 1.7 : 2.9) - dx * 1.2));
+        }
+      }
+    };
+    flat(8.5, 17.5, 7.5, 2.4, 3.2); flat(7.5, 13.3, 7.5, 2.4, 3.2); flat(9, 9.1, 7.5, 2.4, 3.2);
+    // stojaca minca opretá vpravo vpredu: tmavý obrys (oddelí ju od kôpky), lem s drážkou, plocha a vyrazený kosoštvorec
+    const cx = 18.5, cy = 15, R = 6.5;
+    for (let y = 0; y < 24; y++) for (let x = 0; x < 26; x++) {
+      const dx = x + 0.5 - cx, dy = y + 0.5 - cy, r = Math.hypot(dx, dy);
+      if (r > R + 0.75) continue;
+      const lit = (-dx - dy) / (R * 1.41); // −1 (tieň vpravo dole) … 1 (svetlo vľavo hore)
+      put(x, y, r > R ? PAL.K : r > R - 1.3 ? goldAt(3.6 + lit * 2.4) : r > R - 2.3 ? goldAt(1.8 + lit * 0.8) : goldAt(3.9 + lit * 1.5));
+    }
+    for (const [dx, dy] of [[0, -2], [-1, -1], [0, -1], [1, -1], [-2, 0], [-1, 0], [0, 0], [1, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [0, 2]])
+      put(18 + dx, 15 + dy, GOLDF[dx + dy > 0 ? 6 : dx + dy < 0 ? 2 : 3]); // kosoštvorec: tmavá horná a svetlá spodná hrana (vyrazený do mince)
+  });
+  const starFine = fine(24, 24, put => {
+    // päťcípa hviezda z desiatich plôšok: každý cíp má svetlú a tmavú polovicu podľa natočenia k svetlu
+    const cx = 12, cy = 12.6, Ro = 11, Ri = 4.9, V = [];
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? Ri : Ro; V.push([Math.cos(a) * r, Math.sin(a) * r, a]); }
+    for (let y = 0; y < 24; y++) for (let x = 0; x < 24; x++) {
+      const px = x + 0.5 - cx, py = y + 0.5 - cy;
+      for (let i = 0; i < 10; i++) {
+        const A = V[i], B = V[(i + 1) % 10];
+        const c1 = A[0] * py - A[1] * px, c2 = (B[0] - A[0]) * (py - A[1]) - (B[1] - A[1]) * (px - A[0]), c3 = -(B[0] * py - B[1] * px);
+        if (c1 < 0 || c2 < 0 || c3 < 0) continue;
+        const tip = i % 2 ? B : A, side = i % 2 ? -1 : 1; // plôška leží po jednej strane hrebeňa stred → cíp
+        const n = tip[2] + side * Math.PI / 2, lit = Math.cos(n + Math.PI * 0.75); // svetlo zľava zhora
+        const ridge = Math.abs(tip[0] * py - tip[1] * px) / Ro; // vzdialenosť od hrebeňa
+        put(x, y, goldAt(3.4 + lit * 1.9 + (lit > 0 && ridge < 0.7 ? 0.9 : 0) - (Math.hypot(px, py) < 2 ? -0.6 : 0)));
+        break;
+      }
+    }
+  });
   // hviezdy podľa úrovne misie: medená, strieborná, zlatá (Kráľovská sieň)
   const tierStars = ['#e0905a', '#c8ccd8', '#f8d048'].map(c => fromMap(STAR_MAP, { K: PAL.K, Y: c }));
 
@@ -628,6 +682,6 @@ const UI_ICONS = (() => {
 
   // papier a tyče zvitku sa pre rovnakú veľkosť kreslia len raz (menu sa otvára opakovane)
   const memo = fn => { const m = new Map(); return (...a) => { const k = a.join('x'); if (!m.has(k)) m.set(k, fn(...a)); return m.get(k); }; };
-  return { pix, music, sound, plus, home, hall, trophy, star, swords, shieldDefend, chest, spellVolley, spellFire, spellFrost, spellBolt, spellHorn, spellShield, spellHeal, spellFirewall, spellTeleport, spellRage, spellRoar, spellAxe, spellTotem, spellPoison, spellHex, spellCharge, spellHide, spellFeast, scrollPaper: memo(scrollPaper), scrollRod: memo(scrollRod), scrollTag, flags, langs,
+  return { pix, music, sound, plus, home, hall, trophy, star, coinsFine, starFine, swords, shieldDefend, chest, spellVolley, spellFire, spellFrost, spellBolt, spellHorn, spellShield, spellHeal, spellFirewall, spellTeleport, spellRage, spellRoar, spellAxe, spellTotem, spellPoison, spellHex, spellCharge, spellHide, spellFeast, scrollPaper: memo(scrollPaper), scrollRod: memo(scrollRod), scrollTag, flags, langs,
     actDown, actRepair, actSpec, homeTab, tierStars, endless, mapPaper, mapPaperOn };
 })();

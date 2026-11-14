@@ -545,22 +545,46 @@
   /* ---- Mapa ostrova ---- */
   #map { position: absolute; inset: 0; pointer-events: none; }
   #map > * { pointer-events: auto; }
+  /* horný riadok: úzky pás, ktorý sa vľavo pod okienkom hrdinu šikmo rozšíri nadol (tvar = výrez, tmavý lem je spodná vrstva o 3 px väčšia) */
   .mapHead {
-    position: absolute; left: 0; right: 0; top: 0;
-    padding: calc(env(safe-area-inset-top) + 10px) 12px 10px;
-    display: flex; justify-content: space-between; align-items: center;
-    background: linear-gradient(rgba(8,14,30,.85), rgba(8,14,30,0));
+    --st: env(safe-area-inset-top); --thin: calc(var(--st) + 40px); /* výška úzkeho pásu */
+    position: absolute; left: 0; right: 0; top: 0; z-index: 9; box-sizing: border-box; height: calc(var(--st) + 80px);
+    padding: calc(var(--st) + 6px) 10px 0;
+    display: flex; align-items: flex-start; gap: 8px; pointer-events: none;
   }
+  #map > .mapHead { pointer-events: none; }
+  .mapHead > * { pointer-events: auto; }
+  .mapHead::before, .mapHead::after { content: ''; position: absolute; inset: 0; z-index: -1; }
+  .mapHead::before { background: var(--ink); clip-path: polygon(0 0, 100% 0, 100% var(--thin), 122px var(--thin), 90px 100%, 0 100%); }
+  .mapHead::after { background: linear-gradient(#2a1f18, #16100c);
+    clip-path: polygon(0 0, 100% 0, 100% calc(var(--thin) - 3px), 120px calc(var(--thin) - 3px), 88px calc(100% - 3px), 0 calc(100% - 3px)); }
+  /* zlatky a hviezdy: podlhovasté kapsuly s jemnou ikonkou na ľavom konci */
+  .capsule { position: relative; flex: 1 1 0; min-width: 64px; max-width: 112px; height: 24px; margin-top: 2px; box-sizing: border-box; border-radius: 999px;
+    display: flex; align-items: center; justify-content: flex-end; padding: 0 12px 0 30px;
+    background: linear-gradient(#0e0906, #241a12); border: 2px solid var(--ink); box-shadow: 0 0 0 1px #6a5030, inset 0 2px 3px rgba(0,0,0,.6);
+    font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 16px; font-weight: 700; color: var(--gold); text-shadow: 1px 1px 0 var(--ink); font-variant-numeric: tabular-nums; }
+  .capsule img { position: absolute; left: -5px; top: 50%; transform: translateY(-50%); image-rendering: pixelated; filter: drop-shadow(1px 1px 0 rgba(0,0,0,.5)); }
+  #icoCoins { width: 26px; height: 24px; }
+  #icoStar { width: 24px; height: 24px; }
+  #chestBox { margin-left: 52px; } /* za šikmou hranou pri okienku hrdinu */
+  /* hrdina vľavo hore: väčšie okienko, ktoré presahuje pod riadok; otvorí Hrdinov (zvolené = zlatý rám) */
+  #heroBtn { position: relative; flex: 0 0 auto; align-self: flex-start; width: 62px; height: 62px; padding: 0; display: grid; place-items: center;
+    border: 3px solid var(--ink); border-radius: 12px; background: linear-gradient(#5a4836, #3a2c22);
+    box-shadow: inset 0 -4px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.15), 0 4px 10px rgba(0,0,0,.45); }
+  #heroBtn img { height: 48px; width: auto; image-rendering: pixelated; }
+  #heroBtn.on { border-color: #b88420; background: linear-gradient(#7a6248, #4a3828); box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px #f8d048, inset 0 -4px 0 rgba(0,0,0,.35); }
+  #heroBtn:active { transform: translateY(2px); }
+  #heroBtn .badge { position: absolute; top: -7px; right: -9px; min-width: 22px; height: 22px; padding: 0 5px; box-sizing: border-box; border-radius: 11px; border: 2px solid var(--ink); z-index: 4;
+    background: var(--gold); color: var(--ink); font-style: normal; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 13px; line-height: 18px; text-align: center; text-shadow: none; }
+  #heroBtn .badge[hidden] { display: none; }
+  #pctBox { margin-left: auto; margin-top: 1px; font-weight: 700; color: var(--gold); }
+  /* vpravo hore pod riadkom: hlavné menu a prepínač vzhľadu mapy */
+  #mapTools { position: absolute; right: 10px; top: calc(env(safe-area-inset-top) + 50px); z-index: 5; display: flex; flex-direction: column; gap: 8px; }
+  #mapTools [hidden] { display: none; }
   .mapHead b { white-space: nowrap; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 20px; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
   /* okno misie po ťuknutí na hrad */
   #missionBox { z-index: 6; background: rgba(8,6,4,.55); }
   #missionBox[hidden] { display: none; }
-  #mapSide { position: absolute; left: 12px; bottom: calc(128px + env(safe-area-inset-bottom)); z-index: 8; display: flex; flex-direction: column; gap: 8px; }
-  #mapSide .mapIc.locked img { filter: grayscale(1); opacity: .55; }
-  /* mapa sveta: zemeguľa (obrys), zapnutá = zlatá */
-  #worldBtn svg { width: 28px; height: 28px; fill: none; stroke: #e8d4a8; stroke-width: 1.8; stroke-linecap: round; filter: drop-shadow(1px 1px 0 var(--ink)); }
-  #worldBtn.on svg { stroke: var(--gold); }
-  #mapTitle { flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; font-size: 17px; }
   .trophy.record { grid-column: 1 / -1; }
   .trophy.record .primary { margin-top: 4px; padding: 6px 22px; }
   .mCastle { display: block; width: 100%; max-height: 42vh; object-fit: cover; object-position: top; image-rendering: pixelated; border: 2px solid var(--ink); border-radius: 6px; margin: 6px 0; }
@@ -586,13 +610,16 @@
   #mapHome:active { transform: translateY(1px); }
   /* spodný riadok 4 kariet; zvolená karta sa povysunie a jej obsah je nad riadkom */
   #mapBar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 9; height: calc(86px + env(safe-area-inset-bottom)); box-sizing: border-box;
-    padding: 12px 10px env(safe-area-inset-bottom); display: flex; gap: 8px; align-items: flex-start;
+    padding: 12px 10px env(safe-area-inset-bottom); display: flex; gap: 8px; align-items: flex-start; pointer-events: none; }
+  /* pozadie panela je posunuté nižšie – karty z neho vyčnievajú nahor */
+  #mapBar::before { content: ''; position: absolute; left: 0; right: 0; top: 28px; bottom: 0; z-index: -1;
     background: linear-gradient(#2a1f18, #16100c); border-top: 3px solid var(--ink); box-shadow: inset 0 2px 0 rgba(255,255,255,.06); }
+  #map > #mapBar { pointer-events: none; }
+  #mapBar .tabCard { pointer-events: auto; }
   .tabCard { flex: 1; height: 64px; position: relative; display: grid; place-items: center; padding: 0 0 4px; border: 3px solid var(--ink); border-radius: 12px;
     background: linear-gradient(#4e3e2e, #34271e); box-shadow: inset 0 -4px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.12);
     transition: transform .18s ease, background-color .18s ease; }
-  .tabCard img { image-rendering: pixelated; opacity: .7; transition: opacity .18s ease; }
-  #icoHero { height: 44px; width: auto; } /* portrét hrdinu rovnako veľký ako ostatné ikonky kariet */
+  .tabCard img { width: 40px; height: 40px; image-rendering: pixelated; opacity: .7; transition: opacity .18s ease; } /* jemná kresba: 1 bod ikonky = 1 bod obrazovky */
   .tabCard.on { transform: translateY(-18px); background: linear-gradient(#7a6248, #4a3828); border-color: #b88420;
     box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px #f8d048, inset 0 -4px 0 rgba(0,0,0,.35), 0 6px 14px rgba(0,0,0,.5); }
   .tabCard.on img { opacity: 1; }
@@ -646,7 +673,8 @@
   .shopItem.bundle { position: relative; overflow: hidden; border-color: #b88420; background: linear-gradient(rgba(248,208,72,.18), rgba(248,208,72,.05)); box-shadow: inset 0 0 0 1px #f8d048; }
   .shopItem.bundle b { color: var(--gold); font-size: 18px; }
   .shopItem .sil { filter: brightness(0); opacity: .45; }
-  .tabScreen.screenOverlay { bottom: calc(86px + env(safe-area-inset-bottom)); }
+  .tabScreen.screenOverlay { top: calc(env(safe-area-inset-top) + 37px); bottom: calc(58px + env(safe-area-inset-bottom)); padding-top: 22px; padding-bottom: 40px; }
+  .tabScreen .perkHead { padding-left: 122px; box-sizing: border-box; min-height: 34px; } /* nadpis vedľa okienka hrdinu, ktoré presahuje pod horný riadok */
   .setIc .badge, .tabCard .badge { position: absolute; top: -9px; right: -11px; min-width: 22px; height: 22px; padding: 0 5px; box-sizing: border-box; border-radius: 11px; border: 2px solid var(--ink);
     background: var(--gold); color: var(--ink); font-style: normal; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 13px; line-height: 18px; text-align: center; text-shadow: none; }
   .setIc .badge[hidden], .tabCard .badge[hidden] { display: none; }
@@ -924,23 +952,25 @@
   </div>
 
   <div id="map" hidden>
+    <!-- horný riadok: hrdina (otvorí Hrdinov), zlatky v truhlici, získané hviezdy, vpravo percentá dobytého sveta -->
     <div class="mapHead">
-      <button id="mapHome" class="mapIc" title="Menu" aria-label="Menu"><img id="icoHome" alt=""></button>
-      <b id="mapTitle"></b>
-      <div id="chestBox" class="pill" title="Truhlica"><img class="chest" alt=""><span>0</span></div>
+      <button id="heroBtn" title="Hrdinovia" aria-label="Hrdinovia"><img id="icoHero" alt=""><em id="heroTxt" class="badge" hidden>0</em></button>
+      <div id="chestBox" class="capsule" title="Zlatky z misií"><img id="icoCoins" alt=""><span>0</span></div>
+      <div id="starBox" class="capsule" title="Získané hviezdy"><img id="icoStar" alt=""><span>0</span></div>
+      <div id="pctBox" class="pill" title="Dobyté územia sveta"><span>0</span> %</div>
     </div>
-    <!-- spodný riadok kariet: Boj (mapa), Sieň, Hrdinovia, Trofeje; zvolená karta je povysunutá -->
+    <!-- vpravo hore pod riadkom: hlavné menu a prepínač vzhľadu mapy -->
+    <div id="mapTools">
+      <button id="mapHome" class="mapIc" title="Menu" aria-label="Menu"><img id="icoHome" alt=""></button>
+      <button id="mapStyleBtn" class="mapIc" title="Vzhľad mapy" aria-label="Vzhľad mapy"><img id="icoMapStyle" alt=""></button>
+    </div>
+    <!-- spodný riadok kariet: Boj (mapa územia), Sieň, Mapa sveta, Trofeje, Nákupy; zvolená karta je povysunutá -->
     <div id="mapBar">
       <button class="tabCard on" data-tab="map" title="Boj"><img id="icoSwords" alt="Boj"></button>
       <button class="tabCard" data-tab="hall" title="Sieň"><img id="icoHall" alt="Sieň"><em id="hallBtnTxt" class="badge" hidden>0</em></button>
-      <button class="tabCard" data-tab="heroes" title="Hrdinovia"><img id="icoHero" alt="Hrdinovia"><em id="heroTxt" class="badge" hidden>0</em></button>
+      <button class="tabCard" data-tab="world" title="Mapa sveta" aria-label="Mapa sveta"><img id="icoWorld" alt="Mapa sveta"></button>
       <button class="tabCard" data-tab="trophies" title="Trofeje"><img id="icoTrophy" alt="Trofeje"><em id="trophyTxt" class="badge" hidden>0</em></button>
       <button class="tabCard shop shine" data-tab="shop" title="Nákupy"><img id="icoShop" alt="Nákupy"></button>
-    </div>
-    <!-- vľavo dole: prepínač vzhľadu mapy a pod ním mapa sveta (stĺpec je ukotvený zdola – zemeguľa ostáva na mieste aj na mape sveta) -->
-    <div id="mapSide">
-      <button id="mapStyleBtn" class="mapIc" title="Vzhľad mapy" aria-label="Vzhľad mapy"><img id="icoMapStyle" alt=""></button>
-      <button id="worldBtn" class="mapIc" title="Mapa sveta" aria-label="Mapa sveta" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M11.5 3a17 17 0 0 0 0 18"/><path d="M12.5 3a17 17 0 0 1 0 18"/></svg></button>
     </div>
     <!-- okno misie: zjaví sa až po ťuknutí na hrad -->
     <div id="missionBox" class="screenOverlay" hidden>
@@ -1034,7 +1064,7 @@
 <script>
   // hra sa načíta až po vykreslení úvodnej obrazovky (inak by ťažké skripty zdržali jej prvé zobrazenie)
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    const list = ['audio', 'knight-art', 'archer-art', 'spear-art', 'rider-art', 'tower-art', 'fire-tower-art', 'castle-art', 'pitch-tower-art', 'ballista-tower-art', 'ballista-turret-art', 'wall-art', 'pit-art', 'firetrap-art', 'barracks-art', 'stables-art', 'range-art', 'falconry-art', 'armory-art', 'mine-art', 'workshop-art', 'chapel-art', 'healer-art', 'carpenter-art', 'falcon-art', 'paladin-art', 'sorc-art', 'king-art', 'ram-art', 'catapult-art', 'sprites', 'orcs8', 'scene', 'buildings', 'siege', 'map', 'camp', 'castles', 'paper', 'world', 'icons', 'game'];
+    const list = ['audio', 'knight-art', 'archer-art', 'spear-art', 'rider-art', 'tower-art', 'fire-tower-art', 'castle-art', 'pitch-tower-art', 'ballista-tower-art', 'ballista-turret-art', 'wall-art', 'pit-art', 'firetrap-art', 'barracks-art', 'stables-art', 'range-art', 'falconry-art', 'armory-art', 'mine-art', 'workshop-art', 'chapel-art', 'healer-art', 'carpenter-art', 'falcon-art', 'paladin-art', 'sorc-art', 'king-art', 'ram-art', 'catapult-art', 'sprites', 'orcs8', 'scene', 'buildings', 'siege', 'map', 'camp', 'castles', 'paper', 'world', 'icons', 'icons-fine', 'game'];
     list.forEach((n, i) => {
       const s = document.createElement('script'); s.src = 'js/' + n + '.js?v=__BUILD__'; s.async = false; // verziu doplní nasadenie, mobil tak nevezme starý skript z pamäte
       document.body.appendChild(s);

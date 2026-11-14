@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jazdec z PixelLabu</title>
+<style>
+  body { margin: 0; padding: 16px; background: #222; color: #eee; font: 14px sans-serif; }
+  canvas { image-rendering: pixelated; display: block; margin: 6px 0 18px; max-width: 100%; }
+</style>
+</head>
+<body>
+<div>Jazdec v 8 smeroch (V, JV, J, JZ, Z, SZ, S, SV), bod hry = 6 px ako na telefóne, mriežka = políčka 16 bodov.
+1. rad klus, 2. rad útok (napriahnutie, výpad, návrat), 3. rad státie vedľa rytiera, 4. rad zlaté brnenie (stajne 5. úrovne).</div>
+<canvas id="v"></canvas>
+<script src="../js/archer-art.js"></script>
+<script src="../js/carpenter-art.js"></script>
+<script src="../js/falcon-art.js"></script>
+<script src="../js/healer-art.js"></script>
+<script src="../js/king-art.js"></script>
+<script src="../js/knight-art.js"></script>
+<script src="../js/paladin-art.js"></script>
+<script src="../js/rider-art.js"></script>
+<script src="../js/sorc-art.js"></script>
+<script src="../js/spear-art.js"></script>
+<script src="../js/sprites.js"></script>
+<script>
+initSprites();
+const SCR = 6, COL = 32, BW = COL * 8, ROWH = 40, BH = ROWH * 4, set = SPR.rider8, gold = SPR.riderG8;
+const buf = document.createElement('canvas'); buf.width = BW * 2; buf.height = BH * 2;
+const b = buf.getContext('2d'); b.imageSmoothingEnabled = false;
+const v = document.getElementById('v'); v.width = BW * SCR; v.height = BH * SCR;
+const g = v.getContext('2d'); g.imageSmoothingEnabled = false;
+const unit = (fr, x, y) => b.drawImage(fr.c, Math.round((x - fr.w / 2) * 2), Math.round((y - fr.h + 4) * 2), fr.w * 2, fr.h * 2); // ako v hre (U8_PB = 4)
+const shadow = (x, y, r) => { b.fillStyle = 'rgba(10,8,6,.38)'; b.fillRect((x - r) * 2, (y - 1) * 2, r * 4, 4); };
+window.FRAME = null; // skúška: pevný čas namiesto hodín
+function draw(now) {
+  const t = window.FRAME != null ? window.FRAME : now / 1000;
+  b.fillStyle = '#4c6a34'; b.fillRect(0, 0, buf.width, buf.height);
+  b.strokeStyle = 'rgba(0,0,0,.22)';
+  for (let x = 0; x <= BW; x += 16) { b.beginPath(); b.moveTo(x * 2 + 0.5, 0); b.lineTo(x * 2 + 0.5, buf.height); b.stroke(); }
+  const c = t % 1.0, swing = c < 0.15 ? 0.15 - c : 0; // úder raz za sekundu, švih 0,15 s (ako v hre)
+  for (let d = 0; d < 8; d++) {
+    const x = COL / 2 + d * COL, vv = set[d];
+    shadow(x, ROWH - 6, 6); unit(vv.walk[Math.floor(t * 40 / set.stride) % 4], x, ROWH - 6); // klus 40 bodov za sekundu
+    shadow(x, ROWH * 2 - 6, 6); unit(swing > 0 ? vv.atk[swing > 0.075 ? 1 : 2] : 1 - c < 0.25 ? vv.atk[0] : vv.idle, x, ROWH * 2 - 6);
+    shadow(x, ROWH * 3 - 6, 6); unit(vv.idle, x, ROWH * 3 - 6);
+    shadow(x, ROWH * 4 - 6, 6); unit(gold[d].walk[Math.floor(t * 40 / set.stride) % 4], x, ROWH * 4 - 6);
+  }
+  unit(SPR.soldier8[6].idle, COL - 2, ROWH * 3 - 6);
+  g.drawImage(buf, 0, 0, v.width, v.height);
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

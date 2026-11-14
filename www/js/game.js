@@ -607,7 +607,10 @@
   let MH = 400 + 2 * MAP_PAD; // výška mapy práve zobrazeného územia (ostrovčeky sú nižšie)
   // mapa sa vycentruje; námornícka mapa širšia ako obrazovka sa posúva do strán (mapCamX)
   const mapOX = () => !st.world && island && island.seaMap && island.w > W ? -Math.round(mapCamX) : Math.round((W - (!st.world && island && island.w || MW)) / 2);
-  const mapViewBottom = () => mapCamMax() + H - $('mapBar').offsetHeight * DPR / S; // najnižší viditeľný riadok mapy (pri posunutí nadol)
+  // výška spodného panela mapy v bodoch obrazovky: pozadie panela začína 28 bodov pod vrchom riadku kariet (karty z neho vyčnievajú),
+  // mapa je preto viditeľná až po túto hranu – podľa nej sa ráta výška máp aj posun
+  const mapBarH = () => Math.max(0, ($('mapBar').offsetHeight || 86) - 28);
+  const mapViewBottom = () => mapCamMax() + H - mapBarH() * DPR / S; // najnižší viditeľný riadok mapy (pri posunutí nadol)
   // hra za orkov: kampaň ide po mape opačne (orkská misia 1 = pevnosť orkov hore, uzol 10)
   const isOrc = () => st.race === 'Orkovia';
   // územie, ktorého mapa je práve zobrazená (st.land); domovský ostrov má pri orkoch opačné poradie, ostatné územia nie
@@ -5261,7 +5264,7 @@
     const seen = landsSeen(), key = st.unlocked + ':' + st.race + ':' + seen.join(',');
     if (worldImg && worldImgKey === key) return worldImg;
     const G0 = worldG(), mis = worldMissions(), li = id => LANDS.findIndex(l => l.id === id);
-    worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), rose: [PPX + 22, PPY + 40], roseImg: true, noEdge: true });
+    worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), rose: [PPX + 22, PPY + 68], roseImg: true, noEdge: true });
     // územia, ktoré sú ešte zamknuté, sú vyšedené (súš aj pobrežie)
     const locked = new Set(LANDS.filter(l => !landReached(l)).flatMap(l => l.wl));
     if (locked.size) {
@@ -5282,7 +5285,7 @@
   function paperLand(l) {
     const G0 = worldG(), WS = worldSpec(), mis = worldMissions();
     let spec, w = (l.view && l.view.w) || MW, h = 400, wids = null;
-    const bar = $('mapBar').offsetHeight || 86, vis = Math.round(H - bar * DPR / S); // viditeľná výška mapy (pod hlavičkou a nad kartami)
+    const bar = mapBarH(), vis = Math.round(H - bar * DPR / S); // viditeľná výška mapy (pod hlavičkou a nad kartami)
     if (l.own) { // vlastná mapa (ostrov roja): kopce sa vycentrujú do viditeľnej časti mapy
       const p0 = G0.provs.find(p => p.land === l.wl[0]), C = l.own.circles;
       const y0 = Math.min(...C.map(q => q[1] - q[2])), y1 = Math.max(...C.map(q => q[1] + q[2])), x0 = Math.min(...C.map(q => q[0] - q[2])), x1 = Math.max(...C.map(q => q[0] + q[2]));
@@ -5336,7 +5339,7 @@
     const G0 = I.geom;
     const raceOf = j => { const k = I.node[j], num = l.first + k; return num < st.unlocked && k !== skip ? myRace() : G0.provs[j].race; }, keep = I.nodes.map(n => [n.x + PPX, n.y + PPY - 4]);
     I.pimg[key] = live ? PAPER.paintLive(G0, { raceOf, keep }) // kreslená mapa (ako domovský ostrov)
-      : PAPER.paint(G0, { raceOf, keep, rose: [PPX + 22, PPY + 46], roseImg: true, noEdge: true, noRhumb: I.w > W }); // kompas hore vľavo (pod domčekom); široká mapa bez kurzových čiar
+      : PAPER.paint(G0, { raceOf, keep, rose: [PPX + 22, PPY + 72], roseImg: true, noEdge: true, noRhumb: I.w > W }); // kompas hore vľavo (pod okienkom hrdinu); široká mapa bez kurzových čiar
     for (const k in I.pimg) if (k !== key && !k.startsWith(st.unlocked + ':' + st.race + ':')) delete I.pimg[k]; // staré stavy preč
     return I.pimg[key];
   }
@@ -5362,7 +5365,7 @@
   // okraje papiera patria mape (posúvajú sa s ňou): hore pri y = 0, dole tam, kde končí mapa pri najnižšom posune;
   // mapa širšia ako obrazovka má okraje aj vľavo a vpravo na svojich krajoch, užšia na krajoch obrazovky
   const drawPaperEdges = () => {
-    const hv = Math.max(60, Math.round(H - $('mapBar').offsetHeight * DPR / S)) + Math.round(mapCamMax());
+    const hv = Math.max(60, Math.round(H - mapBarH() * DPR / S)) + Math.round(mapCamMax());
     const wide = !st.world && island && island.w > W;
     g.drawImage(paperEdges(hv, wide ? island.w : W), wide ? mapOX() : 0, 0);
   };
@@ -5430,7 +5433,7 @@
     const G0 = worldG(), mis = worldMissions(), anim = new Set();
     G0.provs.forEach((p, i) => { if (mis[i] >= seenU && mis[i] < st.unlocked) anim.add(i); });
     if (!anim.size) return null;
-    const img = worldPaint(), old = PAPER.paint(G0, { raceOf: i => anim.has(i) ? G0.provs[i].race : provRaceW(G0.provs[i], mis[i]), rose: [PPX + 22, PPY + 40], roseImg: true, noEdge: true });
+    const img = worldPaint(), old = PAPER.paint(G0, { raceOf: i => anim.has(i) ? G0.provs[i].race : provRaceW(G0.provs[i], mis[i]), rose: [PPX + 22, PPY + 68], roseImg: true, noEdge: true });
     const { W: GW, H: GH, prov } = G0, nd = img.canvas.getContext('2d').getImageData(0, 0, GW, GH).data, od = old.canvas.getContext('2d').getImageData(0, 0, GW, GH).data;
     let x0 = GW, y0 = GH, x1 = 0, y1 = 0;
     for (let k = 0; k < GW * GH; k++) if (anim.has(prov[k])) { const x = k % GW, y = (k / GW) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
@@ -5528,10 +5531,18 @@
   }
   // ovládanie mapy podľa režimu: tlačidlo sveta, názov územia / sveta v hlavičke; námornícke územia nemajú prepínač vzhľadu
   function updateMapUi() {
-    $('worldBtn').hidden = false; // mapa sveta je prístupná od začiatku
-    $('worldBtn').classList.toggle('on', !!st.world);
     $('mapStyleBtn').hidden = !!st.world;
-    $('mapTitle').textContent = st.world ? 'Svet · dobyté ' + worldPct() + ' %' : curLand().name;
+    if (mapTab === 'map' || mapTab === 'world') { // karta Boj = mapa územia, karta Mapa = svet (aj po plavbe či ťuknutí na územie)
+      mapTab = st.world ? 'world' : 'map';
+      document.querySelectorAll('.tabCard').forEach(b => b.classList.toggle('on', b.dataset.tab === mapTab));
+    }
+    renderMapHead();
+  }
+  // horný riadok mapy: zlatky v truhlici, získané hviezdy, percentá dobytého sveta
+  function renderMapHead() {
+    updateChest();
+    $('starBox').querySelector('span').textContent = starsTotal();
+    $('pctBox').querySelector('span').textContent = worldPct();
   }
 
   const COMPASS = new Image(); COMPASS.src = 'img/compass.png'; // veterná ružica na námorníckych mapách (predloha hráča)
@@ -5569,9 +5580,9 @@
   const clampMapX = v => Math.max(0, Math.min(mapCamXMax(), v));
   const MAP_HEAD = 26; // hlavička mapy (v herných px)
   function mapCamMax() {
-    if (st.world) return Math.max(0, WORLD_H + 8 - (H - $('mapBar').offsetHeight * DPR / S));
+    if (st.world) return Math.max(0, WORLD_H + 8 - (H - mapBarH() * DPR / S));
     if (!island) return 0;
-    const panelLow = $('mapBar').offsetHeight * DPR / S;
+    const panelLow = mapBarH() * DPR / S;
     const lowest = Math.max(Math.max(...island.nodes.map(n => n.y)) + 22, island.landBot + 14); // hrad s tabuľkou aj voda pod južným pobrežím
     return Math.max(0, Math.min(MH, lowest) - (H - panelLow));
   }
@@ -5579,7 +5590,7 @@
   function focusMapNode(num, instant) {
     const n = island && island.nodes[nodeOf(num)];
     if (!n) return;
-    const panelLow = $('mapBar').offsetHeight * DPR / S;
+    const panelLow = mapBarH() * DPR / S;
     const mid = MAP_HEAD + (H - panelLow - MAP_HEAD) / 2;
     mapCamTarget = clampMap(n.y - 6 - mid);
     mapCamXTarget = clampMapX(n.x - W / 2);
@@ -5938,7 +5949,7 @@
     if (SPR.bearlord8) ICONS.hero_obear = heroPortrait(SPR.bearlord8, 20);
     ICONS.u_knight = spriteURL(SPR.soldier[0], 3); ICONS.u_footArcher = spriteURL(SPR.footArcher[0], 3);
     unitIcons(); // jednotky, obliehacie stroje a portrét hrdinu podľa rasy
-    $('icoHall').src = UI_ICONS.hall;
+    $('icoHall').src = FINE_ICONS.hall;
     syncHeroIcons(); updateGems();
     ICONS.coin = spriteURL(SPR.coin[0], 4);
     ICONS.paving = spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3);
@@ -7060,10 +7071,11 @@
     $('hallBtnTxt').textContent = '★' + free; $('hallBtnTxt').hidden = !free;
     $('trophyTxt').textContent = fresh; $('trophyTxt').hidden = !fresh;
     const es = emptySlots(); $('heroTxt').textContent = es; $('heroTxt').hidden = !es; // voľný slot na schopnosť
-    document.querySelector('.tabCard[data-tab=heroes]').classList.toggle('shine', heroIds().some(heroIsNew));
+    $('heroBtn').classList.toggle('shine', heroIds().some(heroIsNew));
+    renderMapHead();
   }
   $('heroHome').querySelector('img').src = UI_ICONS.homeTab;
-  $('icoHome').src = UI_ICONS.homeTab; $('icoTrophy').src = UI_ICONS.trophy; $('icoSwords').src = UI_ICONS.swords; $('icoShop').src = UI_ICONS.chest;
+  $('icoHome').src = FINE_ICONS.home; $('icoTrophy').src = FINE_ICONS.trophy; $('icoSwords').src = FINE_ICONS.swords; $('icoShop').src = FINE_ICONS.chest; $('icoWorld').src = FINE_ICONS.globe; // ikonky menu v jemnej kresbe (icons-fine.js)
   let boxDown = false; // položil sa prst/myš do okna misie od jeho otvorenia?
   const openMission = () => { renderMapPanel(); boxDown = false; $('missionBox').hidden = false; };
   const closeMission = () => { $('missionBox').hidden = true; };
@@ -7217,8 +7229,12 @@
   // ---- karty pod mapou: Boj (mapa), Sieň, Hrdinovia, Trofeje – prepína sa len medzi nimi ----
   let mapTab = 'map';
   function setTab(t, quiet) {
+    if (t === 'world' && (st.mapAnim || st.provAnim)) return; // počas animácie na mape sa svet neotvára
     mapTab = t;
     document.querySelectorAll('.tabCard').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+    $('heroBtn').classList.toggle('on', t === 'heroes'); // Hrdinovia sa otvárajú okienkom hrdinu vľavo hore
+    if (t === 'world' && !st.world) openWorld(); // karta Mapa = mapa sveta, karta Boj = mapa územia
+    if (t === 'map' && st.world && !st.sail && st.phase === 'map') enterLand(st.land);
     $('perks').hidden = t !== 'hall'; $('heroes').hidden = t !== 'heroes'; $('trophies').hidden = t !== 'trophies'; $('shop').hidden = t !== 'shop';
     if (t === 'shop') renderShop();
     if (t === 'hall') renderPerks();
@@ -7256,6 +7272,10 @@
     }
   }
   document.querySelectorAll('.tabCard').forEach(b => b.addEventListener('click', () => { if (b.dataset.tab !== mapTab) setTab(b.dataset.tab); }));
+  $('heroBtn').addEventListener('click', () => setTab(mapTab === 'heroes' ? (st.world ? 'world' : 'map') : 'heroes')); // druhé ťuknutie Hrdinov zavrie
+  $('icoStar').src = UI_ICONS.starFine; $('icoCoins').src = UI_ICONS.coinsFine;
+  $('starBox').addEventListener('click', () => toast('Hviezdy získané v misiách – míňajú sa v Kráľovskej sieni'));
+  $('pctBox').addEventListener('click', () => toast('Dobyté územia v celom svete'));
 
   function tapMap(x, y) {
     if (st.world) { tapWorld(x, y); return; }
@@ -7432,10 +7452,9 @@
   $('overRetry').addEventListener('click', () => startMission(st.mission, st.tier, st.endless));
   // ikonka vzhľadu mapy
   function renderMapStyleBtn() {
-    $('icoMapStyle').src = mapStyle === 'paper' ? UI_ICONS.mapPaperOn : UI_ICONS.mapPaper; // zapnutá námornícka mapa: zelená ikonka
+    $('icoMapStyle').src = mapStyle === 'paper' ? FINE_ICONS.mapOn : FINE_ICONS.map; // zapnutá námornícka mapa: zelená ikonka
   }
-  $('icoMapStyle').src = UI_ICONS.mapPaper;
-  $('worldBtn').addEventListener('click', () => { AUDIO.play('click'); if (st.world) { if (!st.sail) enterLand(st.land); } else openWorld(); });
+  $('icoMapStyle').src = FINE_ICONS.map;
   $('mapStyleBtn').addEventListener('click', () => { // pohyblivá farebná mapa ↔ papierová námornícka mapa
     mapStyle = mapStyle === 'paper' ? 'live' : 'paper';
     AUDIO.play('click'); renderMapStyleBtn();
