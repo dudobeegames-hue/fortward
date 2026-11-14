@@ -1079,8 +1079,8 @@
     const side = (u.slot % 2 ? 1 : -1) * (14 + 10 * (Math.floor(u.slot / 2) % 3));
     const clampX = x => Math.max(G.gx0 + 8, Math.min(G.gx0 + G.cols * T - 8, x));
     const spd = u.spd * 1.5 * waterMul(u), go = (x, y) => moveKnight(u, x, y, spd * backMul(u, x, y), dt); // po vlastnej ceste rýchlejšie, aby stačili šíku
-    if (st.phase !== 'battle' && u.hx != null) { // medzi vlnami stojí na svojom štartovom mieste pred zónou
-      if (Math.hypot(u.hx - u.x, u.hy - u.y) > 1) go(u.hx, u.hy); else u.face8 = 6;
+    if (st.phase !== 'battle' && u.hx != null) { // po vlne dôjde sám (rýchlejšie, ako hrdina) na svoje štartové miesto pred zónou a otočí sa k horde
+      if (Math.hypot(u.hx - u.x, u.hy - u.y) > 1) moveKnight(u, u.hx, u.hy, Math.max(30, spd * 1.4), dt); else u.face8 = 6;
       return;
     }
     const giant = nearestGiant(u.x, u.y, GIANT_HUNT); // obor nablízku má prednosť pred táborom aj pred šíkom
@@ -1265,7 +1265,8 @@
     st.viewUp = Math.max(0, (st.viewUp || 0) - panelLow()); // rovnaký pohľad aj bez panela
     $('build').hidden = true; $('bottom').hidden = false;
     for (const b of st.blds) if (UNIT_HOME[b.kind] || b.kind === 'range' || b.kind === 'falconry' || HELPERS[b.kind]) { b.spawnT = helperKey(b) ? 0.6 : 0.3; b.squadUp = true; }
-    if (st.form) { st.form.arcTy = 0; st.form.arcSlots = null; } // rad lukostrelcov sa v novej vlne postaví nanovo
+    if (st.form) st.form.arcSlots = null;
+    st.arcPlan = st.blds.reduce((n, b) => n + (b.kind === 'range' ? archerCap(b) : 0), 0); // toľko miest bude mať rad lukostrelcov // rad lukostrelcov sa v novej vlne postaví nanovo
     banner(isAssault() ? 'Do útoku!' : st.endless ? 'Vlna ' + st.wave : st.wave === missionWaves(st.mission) ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + missionWaves(st.mission));
     syncStance();
     updateHud();
@@ -2186,6 +2187,9 @@
     if (b.outQ > 0) { // oddiel práve vychádza
       b.outT -= dt;
       if (b.outT > 0) return 0;
+      const dx = bCenter(b).x + 1, dy = tileY(b.r) + T + 1; // pred dverami ešte niekto stojí – počká (najviac 1,5 s), nech sa netlačia
+      if (st.soldiers.some(s => !s.dead && !s.siege && !s.fly && Math.abs(s.x - dx) < 7 && Math.abs(s.y - dy) < 7) && (b.waitT = (b.waitT || 0) + dt) < 1.5) return 0;
+      b.waitT = 0;
       if (st.soldiers.filter(s => s.home === b && !s.extra && !s.dead).length >= cap) { b.outQ = 0; return 0; }
       b.outQ--; b.outT = SQUAD_GAP; b.refT = 0;
       return 1;
@@ -2446,6 +2450,13 @@
     return best;
   }
   // rozmiestni šíky (pešiaci + lukostrelci); volá sa raz za snímku
+  // obrana: posledný rad (lukostrelci, bez nich zadný rad pešiakov) stojí 2 stavebné políčka nad najvyššou stavbou
+  // (bez stavieb na hornom okraji zóny)
+  function defLineY() {
+    let r = null;
+    for (const b of st.blds) if (r == null || b.r < r) r = b.r;
+    return r == null ? tileY(zoneTopRow()) + 2 : Math.max(G.gy0 + 24, tileY(r - 2) + T / 2);
+  }
   function updateFormations(dt, musterY) {
     const cx = G.gx0 + G.cols * T / 2;
     if (!st.form) st.form = { inf: { x: cx, y: musterY }, arc: { x: cx, y: musterY + 16 }, contact: false };
@@ -2458,7 +2469,12 @@
       // šík ide oproti najbližšej pozemnej horde, no nie hlbšie než k zhromaždisku pred zónou
       const th = nearestFoe(F.inf.x, F.inf.y, false);
       const atk = armyAttacks(), cp = th || !atk ? null : nearestCampPart(F.inf.x, F.inf.y);
-      if (!atk) stepAnchor(F.inf, th ? th.x : cx, Math.max(musterY, tileY(zoneTopRow()) + 2), dt); // obrana: šík stojí na hornom okraji zóny (bližšie k hradu), len sa natočí k horde
+      if (!atk) { // obrana: celý šík sa poskladá dopredu od posledného radu, ktorý stojí 2 políčka nad najvyššou stavbou; len sa natočí k horde
+        const back = defLineY(), iRows = formRows(knights.length) + formRows(spears.length);
+        const aN = archers.length ? Math.max(archers.length, F.arcSlots ? F.arcSlots.length : 0, st.arcPlan || 0) : 0; F.arcN = aN; // podľa miest v rade – padlý lukostrelec rad neposunie
+        F.arcY = back - Math.max(0, formRows(aN) - 1) * FORM_ROW;
+        stepAnchor(F.inf, th ? th.x : cx, aN ? F.arcY - 10 - iRows * FORM_ROW : back - Math.max(0, iRows - 1) * FORM_ROW, dt);
+      }
       else if (th) stepAnchor(F.inf, th.x, Math.max(G.gy0 + 24, Math.min(musterY, th.y + 18)), dt);
       else if (cp) stepAnchor(F.inf, cp.x, cp.y + 16, dt); // horda nikde – šík sa presunie k táboru
       else stepAnchor(F.inf, cx, musterY, dt);
@@ -2480,9 +2496,9 @@
       F.contact = live.some(s => s.ktype && s.tgt && !s.tgt.dead && Math.hypot(s.tgt.x - s.x, s.tgt.y - s.y) < 14);
     }
     // lukostrelci: v útoku rad na dostrel od najbližšieho nepriateľa (aj letca), vždy za pešiakmi
-    if (archers.length && !armyAttacks()) holdArchers(archers, cx, Math.max(musterY + 16, infBack + 10), dt);
+    if (archers.length && !armyAttacks()) holdArchers(archers, cx, F.arcY, dt); // posledný rad, hneď za šíkom
     else if (archers.length) {
-      F.arcSlots = null; F.arcTy = 0; for (const u of archers) u.dslot = null;
+      F.arcSlots = null; for (const u of archers) u.dslot = null;
       let tx = cx, ty = Math.max(musterY + 16, infBack + 10);
       const th = nearestFoe(F.arc.x, F.arc.y, true), cp = th ? null : nearestCampPart(F.arc.x, F.arc.y);
       if (th) { tx = th.x; ty = Math.max(G.gy0 + 30, Math.min(ty, Math.max(th.y + ARCHER_RANGE - 14, infBack + 10))); }
@@ -2491,21 +2507,22 @@
       assignSlots(archers, formSlots(archers.length, F.arc.x, F.arc.y));
       for (const u of archers) u.fslot = passSlot(u.fslot);
     }
+    F.rearY = Math.max(infBack, ...archers.map(u => u.fslot ? u.fslot.y : u.y)); // zadný okraj armády – za ním sa držia liečitelia
   }
   // obrana: rad lukostrelcov stojí pevne za šíkom (nejde za hordou) a každý drží svoje miesto – po padlom ostane medzera,
   // ktorú zaplní až nový lukostrelec; rad sa celý preskupí, len keď lukostrelcov pribudne viac, než je miest.
   // Strieľa len ten, kto má niekoho na dostrel (updateArcher).
   function holdArchers(archers, cx, ty, dt) {
     const F = st.form;
-    F.arcTy = Math.max(F.arcTy || 0, ty); // rad cúvne, keď pribudnú rady pešiakov, ale dopredu sa neposúva
-    stepAnchor(F.arc, cx, F.arcTy, dt);
+    stepAnchor(F.arc, cx, ty, dt);
     const key = Math.round(F.arc.x) + ',' + Math.round(F.arc.y);
-    if (!F.arcSlots || F.arcKey !== key || archers.length > F.arcSlots.length) {
+    if (!F.arcSlots || F.arcKey !== key || archers.length > F.arcSlots.length) { // rad je od začiatku vlny v plnej veľkosti (st.arcPlan)
+      const n = Math.max(archers.length, F.arcN || 0), same = F.arcSlots && F.arcSlots.length === n; // pri posune radu si každý drží svoje miesto
       F.arcKey = key;
-      F.arcSlots = formSlots(archers.length, F.arc.x, F.arc.y).map(passSlot);
-      assignSlots(archers, F.arcSlots.map((p, i) => ({ x: p.x, y: p.y, i })));
-      for (const u of archers) u.dslot = u.fslot.i;
-    } else {
+      F.arcSlots = formSlots(n, F.arc.x, F.arc.y).map(passSlot);
+      if (!same) for (const u of archers) u.dslot = null;
+    }
+    {
       const used = new Set();
       for (const u of archers) {
         if (u.dslot != null && u.dslot < F.arcSlots.length && !used.has(u.dslot)) used.add(u.dslot);
@@ -2532,7 +2549,11 @@
     let near = false, nd = 1e9;
     const prev = u.aimT;
     u.aimT = null; // na koho mieri (natočí sa k nemu a napne luk)
-    for (const e of st.enemies) {
+    { // ústup: miesto v rade je o kus nižšie (k radnici) – otočí sa a ide dole, necúva so zameraným lukom
+      const sl = u.fslot, dx = sl ? sl.x - u.x : 0, dy = sl ? sl.y - u.y : 0, d = Math.hypot(dx, dy);
+      u.retreat = d > (u.retreat ? 2 : 5) && dy > d * 0.5;
+    }
+    if (!u.retreat) for (const e of st.enemies) {
       if (e.dead || e.y <= 4) continue;
       const d = Math.hypot(e.x - u.x, e.y - u.y);
       if (d <= ARCHER_RANGE) { near = true; if (d < nd) { nd = d; u.aimT = e; } }
@@ -2543,7 +2564,7 @@
       u.cd = ARCHER_CD / (st.cryT > 0 ? CRY_SPD : 1) * rageMul(u); u.swing = 0.1;
       u.aimT = st.proj[st.proj.length - 1].tgt || u.aimT; // vystrelil na prednostný cieľ – k nemu sa otočí
     }
-    else if (!near) { // nikto z hordy v dosahu – strieľa na stavbu tábora, ak na ňu dostrelí
+    else if (!near && !u.retreat) { // nikto z hordy v dosahu – strieľa na stavbu tábora, ak na ňu dostrelí
       const o = nearestCampPart(u.x, u.y);
       if (o && Math.hypot(o.x - u.x, o.y - u.y) <= ARCHER_RANGE) u.aimT = campAim(o);
       if (u.cd <= 0 && o && Math.hypot(o.x - u.x, o.y - u.y) <= ARCHER_RANGE) {
@@ -2556,7 +2577,7 @@
     const sl = u.fslot;
     if (!sl || Math.hypot(sl.x - u.x, sl.y - u.y) < 1) return;
     const sp = (u.spd || 24) * waterMul(u) * (u.swing > 0 ? 0.3 : 1);
-    moveKnight(u, sl.x, sl.y, sp * backMul(u, sl.x, sl.y), dt);
+    moveKnight(u, sl.x, sl.y, sp * (u.retreat ? 1 : backMul(u, sl.x, sl.y)), dt); // pri ústupe ide normálnou chôdzou
   }
 
   // pomocník vyjde z budovy, keď žiadny jej pomocník nežije (prvý hneď na začiatku vlny)
@@ -2616,9 +2637,8 @@
     const tgt = u.tgt;
     let tx = 0, ty = 0;
     const monk = u.helper === 'chapel';
-    if (tgt && monk) { // mních lieči kúzlom na diaľku: zastaví v dosahu, z boku od cieľa
-      const d = Math.hypot(tgt.x - u.x, tgt.y - u.y);
-      if (d <= HEAL_RANGE) { tx = u.x; ty = u.y; } else { const k = (HEAL_RANGE - 6) / d; tx = tgt.x + (u.x - tgt.x) * k; ty = tgt.y + (u.y - tgt.y) * k; }
+    if (tgt && monk) { // liečiteľ lieči kúzlom na diaľku: postaví sa za zraneného (bližšie k radnici), nie pred neho
+      tx = tgt.x; ty = tgt.y + HEAL_RANGE - 10;
     }
     else if (tgt) { // viacerí remeselníci pri jednej budove: každý má svoje dosiahnuteľné miesto okolo nej a opravy sa sčítajú
       const crew = st.soldiers.filter(o => o.helper === u.helper && !o.dead && o.tgt === tgt);
@@ -2629,11 +2649,17 @@
     const casting = u.working; // kto už lieči, prestane až o kus ďalej (na hranici dosahu neprepína tam a späť)
     u.working = false;
     const spd = u.spd * waterMul(u);
-    if (!tgt) { // nikto nepotrebuje pomoc – remeselník sa vráti k budove, liečiteľ v boji počká, kde je (inak behal tam a späť)
+    if (!tgt && monk && st.phase === 'battle' && st.form) { // nikto nie je zranený – liečiteľ ide hneď za armádou a drží sa za jej posledným radom
+      const ms = st.soldiers.filter(o => o.helper === 'chapel' && !o.dead), i = ms.indexOf(u), n = ms.length;
+      const x = Math.max(formLeft(), Math.min(formRight(), st.form.inf.x + (i - (n - 1) / 2) * FORM_GAP * 2)), y = (st.form.rearY || st.form.inf.y) + 14;
+      if (Math.hypot(x - u.x, y - u.y) > 2) moveKnight(u, x, y, spd, dt);
+      return;
+    }
+    if (!tgt) { // nikto nepotrebuje pomoc – remeselník sa vráti k budove
       if (u.home && !(monk && st.phase === 'battle')) moveKnight(u, tileX(u.home.c) + T / 2 + 1, tileY(u.home.r) + T + 2, spd * 0.85, dt);
       return;
     }
-    if (monk ? Math.hypot(tgt.x - u.x, tgt.y - u.y) > HEAL_RANGE + (casting ? 6 : 0) : Math.hypot(tx - u.x, ty - u.y) > 7 && !(casting && Math.hypot(bCenter(tgt).x - u.x, bCenter(tgt).y - u.y) < T + 6)) {
+    if (monk ? Math.hypot(tgt.x - u.x, tgt.y - u.y) > HEAL_RANGE + (casting ? 6 : 0) || (!casting && u.y < tgt.y + 4 && Math.hypot(tx - u.x, ty - u.y) > 8) /* pred zraneným ani vedľa neho neostane – obíde ho dozadu */ : Math.hypot(tx - u.x, ty - u.y) > 7 && !(casting && Math.hypot(bCenter(tgt).x - u.x, bCenter(tgt).y - u.y) < T + 6)) {
       const x0 = u.x, y0 = u.y;
       moveKnight(u, tx, ty, spd, dt);
       if (!monk) u.stuckT = Math.hypot(u.x - x0, u.y - y0) < spd * dt * 0.2 ? (u.stuckT || 0) + dt : 0; // remeselník stojí na mieste, hoci má ísť – zasekol sa
@@ -6842,7 +6868,7 @@
     if (c < 0 || c >= G.cols || r < 0 || r >= G.rows) return false;
     if (r < siegeRow0() || r >= zoneTopRow()) return false;
     if (occAt(c, r)) return false;
-    const taken = o => o !== self && (o.siege ? !o.dead : true) && (q => q.c === c && q.r === r)(siegeCell(o.x, o.y));
+    const taken = o => o !== self && (o.siege ? !o.dead : true) && (q => q.c === c && q.r === r)(siegeCell(o.hx != null ? o.hx : o.x, o.hy != null ? o.hy : o.y)); // stroj na ceste domov už má miesto svoje
     return !st.siegeOrder.some(taken) && !st.soldiers.some(u => u.siege && taken(u));
   }
   // voľné štartové miesto najbližšie k x (najprv rad tesne pri zóne)
@@ -6858,8 +6884,7 @@
       const hx = u.hx != null ? u.hx : u.x, hy = u.hy != null ? u.hy : u.y, cell = siegeCell(hx, hy);
       const p = siegeSpotOk(cell.c, cell.r, u) ? siegeCellPos(cell.c, cell.r) : freeSiegeSpot(hx, u);
       if (!p) continue;
-      for (let k = 0; k < 6; k++) part(u.x, u.y - 5, (Math.random() - 0.5) * 20, -Math.random() * 20, 0.4, '#c6a272', 30);
-      u.x = u.hx = p.x; u.y = u.hy = p.y; u.tgt = null; u.aimP = null; u.face8 = 6; u.fslot = null;
+      u.hx = p.x; u.hy = p.y; u.tgt = null; u.aimP = null; u.fslot = null; u.ramSlot = null; // domov dôjde sám (siegeWalkHome), ako hrdina
     }
   }
   // stroj na bojisku pod prstom (čakajúca objednávka alebo stroj, čo prežil vlnu)
@@ -7575,9 +7600,14 @@
   function heroWalkHome(dt) {
     const k = st.king;
     if (!k || k.dead || !(st.phase === 'pause' || st.phase === 'build')) return;
-    k.tgt = null; k.flash = Math.max(0, (k.flash || 0) - dt); k.swing = Math.max(0, (k.swing || 0) - dt);
+    k.tgt = null; k.aim = null; k.flash = Math.max(0, (k.flash || 0) - dt); k.swing = Math.max(0, (k.swing || 0) - dt); // aim: po búraní tábora by mieril na stavbu a kĺzal v postoji útoku
     if (Math.hypot(k.hx - k.x, k.hy - k.y) <= 1) return;
     moveKnight(k, k.hx, k.hy, (k.spd || 26) * 1.15, dt); // len po ceste ako vojaci – cez hradby neprejde
+  }
+  // obliehacie stroje po vlne dôjdu samy na svoje štartové miesto (updateSiege mimo boja ide domov a doma sa otočí k horde)
+  function siegeWalkHome(dt) {
+    if (!(st.phase === 'pause' || st.phase === 'build')) return;
+    for (const u of st.soldiers) if (u.siege && !u.dead) updateSiege(u, dt);
   }
   // ---- strážca plátien: prehliadač môže v karte na pozadí uspať plátna (šetrí grafickú pamäť) a pri návrate ich vrátiť
   // prázdne – ostrov, hrady, budovy a jednotky sa potom nevykreslia a ostane len to, čo sa kreslí priamo (čísla, hviezdy).
@@ -7612,7 +7642,7 @@
       slowmoT = Math.max(0, slowmoT - dt);
       acc += dt * st.speed * slow;
       while (acc >= DT && st.phase === 'battle') { update(DT); acc -= DT; }
-    } else { acc = 0; updateFx(dt); mapTick(dt); heroWalkHome(dt); }
+    } else { acc = 0; updateFx(dt); mapTick(dt); heroWalkHome(dt); siegeWalkHome(dt); }
     camTick(dt);
     render(now / 1000);
     if (st.phase !== 'title') hudTick(); // na úvodnej obrazovke je HUD skrytý – neprepisovať jeho štýly každú snímku (spomaľovalo ťuky na slabších tabletoch)
@@ -7667,6 +7697,6 @@
     for (const s of list) { x.drawImage(s.c, px * scale, (h - 3 - s.h) * scale, s.w * scale, s.h * scale); px += s.w + 3; }
     return postPNG(c, name);
   }
-  window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, HEROES, switchHero, setActiveHero, ownedHeroes, heroDef, heroWalkHome,
+  window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, HEROES, switchHero, setActiveHero, ownedHeroes, heroDef, heroWalkHome, siegeWalkHome,
     enterBuild, enterLand, openWorld, worldLandAt, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, openHeroUp, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, orderSiege, SIEGE_BUY: BUY, knightsBlocked, applyRace, placeAt, bldLimit, deployArmy, ARMY, depAt, get island() { return island; }, mapOX };
 })();
