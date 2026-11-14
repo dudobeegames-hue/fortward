@@ -164,6 +164,8 @@ const UI_ICONS = (() => {
     for (const [dx, dy] of [[0, -2], [-1, -1], [0, -1], [1, -1], [-2, 0], [-1, 0], [0, 0], [1, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [0, 2]])
       put(18 + dx, 15 + dy, GOLDF[dx + dy > 0 ? 6 : dx + dy < 0 ? 2 : 3]); // kosoštvorec: tmavá horná a svetlá spodná hrana (vyrazený do mince)
   });
+  const STARF = ['#22408c', '#3c64c8', '#5c8ce0', '#88b4ff', '#b4d2ff', '#dcecff', '#ffffff']; // bledomodrá hviezda
+  const starAt = v => STARF[Math.max(0, Math.min(6, Math.round(v)))];
   const starFine = fine(24, 24, put => {
     // päťcípa hviezda z desiatich plôšok: každý cíp má svetlú a tmavú polovicu podľa natočenia k svetlu
     const cx = 12, cy = 12.6, Ro = 11, Ri = 4.9, V = [];
@@ -177,7 +179,7 @@ const UI_ICONS = (() => {
         const tip = i % 2 ? B : A, side = i % 2 ? -1 : 1; // plôška leží po jednej strane hrebeňa stred → cíp
         const n = tip[2] + side * Math.PI / 2, lit = Math.cos(n + Math.PI * 0.75); // svetlo zľava zhora
         const ridge = Math.abs(tip[0] * py - tip[1] * px) / Ro; // vzdialenosť od hrebeňa
-        put(x, y, goldAt(3.4 + lit * 1.9 + (lit > 0 && ridge < 0.7 ? 0.9 : 0) - (Math.hypot(px, py) < 2 ? -0.6 : 0)));
+        put(x, y, starAt(3.4 + lit * 1.9 + (lit > 0 && ridge < 0.7 ? 0.9 : 0) - (Math.hypot(px, py) < 2 ? -0.6 : 0)));
         break;
       }
     }

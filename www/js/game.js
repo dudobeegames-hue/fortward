@@ -5264,7 +5264,7 @@
     const seen = landsSeen(), key = st.unlocked + ':' + st.race + ':' + seen.join(',');
     if (worldImg && worldImgKey === key) return worldImg;
     const G0 = worldG(), mis = worldMissions(), li = id => LANDS.findIndex(l => l.id === id);
-    worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), rose: [PPX + 22, PPY + 68], roseImg: true, noEdge: true });
+    worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), rose: [PPX + 80, PPY + 36], roseImg: true, noEdge: true });
     // územia, ktoré sú ešte zamknuté, sú vyšedené (súš aj pobrežie)
     const locked = new Set(LANDS.filter(l => !landReached(l)).flatMap(l => l.wl));
     if (locked.size) {
@@ -5433,7 +5433,7 @@
     const G0 = worldG(), mis = worldMissions(), anim = new Set();
     G0.provs.forEach((p, i) => { if (mis[i] >= seenU && mis[i] < st.unlocked) anim.add(i); });
     if (!anim.size) return null;
-    const img = worldPaint(), old = PAPER.paint(G0, { raceOf: i => anim.has(i) ? G0.provs[i].race : provRaceW(G0.provs[i], mis[i]), rose: [PPX + 22, PPY + 68], roseImg: true, noEdge: true });
+    const img = worldPaint(), old = PAPER.paint(G0, { raceOf: i => anim.has(i) ? G0.provs[i].race : provRaceW(G0.provs[i], mis[i]), rose: [PPX + 80, PPY + 36], roseImg: true, noEdge: true });
     const { W: GW, H: GH, prov } = G0, nd = img.canvas.getContext('2d').getImageData(0, 0, GW, GH).data, od = old.canvas.getContext('2d').getImageData(0, 0, GW, GH).data;
     let x0 = GW, y0 = GH, x1 = 0, y1 = 0;
     for (let k = 0; k < GW * GH; k++) if (anim.has(prov[k])) { const x = k % GW, y = (k / GW) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
@@ -5542,6 +5542,7 @@
   function renderMapHead() {
     updateChest();
     $('starBox').querySelector('span').textContent = starsTotal();
+    $('heroLvl').textContent = kingMeta.lvl; // úroveň nasadeného hrdinu
     $('pctBox').querySelector('span').textContent = worldPct();
   }
 

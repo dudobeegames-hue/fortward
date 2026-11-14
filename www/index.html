@@ -548,36 +548,43 @@
   /* horný riadok: úzky pás, ktorý sa vľavo pod okienkom hrdinu šikmo rozšíri nadol (tvar = výrez, tmavý lem je spodná vrstva o 3 px väčšia) */
   .mapHead {
     --st: env(safe-area-inset-top); --thin: calc(var(--st) + 40px); /* výška úzkeho pásu */
-    position: absolute; left: 0; right: 0; top: 0; z-index: 9; box-sizing: border-box; height: calc(var(--st) + 80px);
+    position: absolute; left: 0; right: 0; top: 0; z-index: 9; box-sizing: border-box; height: calc(var(--st) + 94px);
     padding: calc(var(--st) + 6px) 10px 0;
     display: flex; align-items: flex-start; gap: 8px; pointer-events: none;
   }
   #map > .mapHead { pointer-events: none; }
-  .mapHead > * { pointer-events: auto; }
-  .mapHead::before, .mapHead::after { content: ''; position: absolute; inset: 0; z-index: -1; }
-  .mapHead::before { background: var(--ink); clip-path: polygon(0 0, 100% 0, 100% var(--thin), 122px var(--thin), 90px 100%, 0 100%); }
+  .mapHead > * { pointer-events: auto; position: relative; }
+  /* obrys ako spodný panel kariet: tmavá linka 3 px a hneď za ňou jemný svetlý prúžok 2 px; tri vrstvy toho istého tvaru (lem, prúžok, výplň) */
+  .mapHead::before, .mapHead::after, .mapHead > .headHi { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+  .mapHead::before { background: var(--ink); clip-path: polygon(0 0, 100% 0, 100% var(--thin), 134px var(--thin), 100px 100%, 0 100%); }
+  .mapHead > .headHi { background: #3a2e26;
+    clip-path: polygon(0 0, 100% 0, 100% calc(var(--thin) - 3px), 132px calc(var(--thin) - 3px), 98px calc(100% - 3px), 0 calc(100% - 3px)); }
   .mapHead::after { background: linear-gradient(#2a1f18, #16100c);
-    clip-path: polygon(0 0, 100% 0, 100% calc(var(--thin) - 3px), 120px calc(var(--thin) - 3px), 88px calc(100% - 3px), 0 calc(100% - 3px)); }
-  /* zlatky a hviezdy: podlhovasté kapsuly s jemnou ikonkou na ľavom konci */
-  .capsule { position: relative; flex: 1 1 0; min-width: 64px; max-width: 112px; height: 24px; margin-top: 2px; box-sizing: border-box; border-radius: 999px;
-    display: flex; align-items: center; justify-content: flex-end; padding: 0 12px 0 30px;
+    clip-path: polygon(0 0, 100% 0, 100% calc(var(--thin) - 5px), 131px calc(var(--thin) - 5px), 97px calc(100% - 5px), 0 calc(100% - 5px)); }
+  /* zlatky a hviezdy: podlhovasté kapsuly, jemná ikonka je celá vnútri vľavo a v strede výšky, číslo vpravo (rovnaké písmo ako percentá) */
+  .capsule { flex: 0 1 100px; min-width: 62px; height: 28px; margin-top: -1px; box-sizing: border-box; border-radius: 999px;
+    display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 0 11px 0 4px;
     background: linear-gradient(#0e0906, #241a12); border: 2px solid var(--ink); box-shadow: 0 0 0 1px #6a5030, inset 0 2px 3px rgba(0,0,0,.6);
-    font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 16px; font-weight: 700; color: var(--gold); text-shadow: 1px 1px 0 var(--ink); font-variant-numeric: tabular-nums; }
-  .capsule img { position: absolute; left: -5px; top: 50%; transform: translateY(-50%); image-rendering: pixelated; filter: drop-shadow(1px 1px 0 rgba(0,0,0,.5)); }
-  #icoCoins { width: 26px; height: 24px; }
-  #icoStar { width: 24px; height: 24px; }
-  #chestBox { margin-left: 52px; } /* za šikmou hranou pri okienku hrdinu */
-  /* hrdina vľavo hore: väčšie okienko, ktoré presahuje pod riadok; otvorí Hrdinov (zvolené = zlatý rám) */
-  #heroBtn { position: relative; flex: 0 0 auto; align-self: flex-start; width: 62px; height: 62px; padding: 0; display: grid; place-items: center;
-    border: 3px solid var(--ink); border-radius: 12px; background: linear-gradient(#5a4836, #3a2c22);
+    font-size: 13px; font-weight: 700; color: var(--gold); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .capsule img { display: block; flex: 0 0 auto; image-rendering: pixelated; }
+  #icoCoins { width: 26px; height: 24px; margin-top: -1px; }
+  #icoStar { width: 24px; height: 24px; margin-top: -1px; }
+  #chestBox { margin-left: auto; } /* obe kapsuly sú v strede medzi okienkom hrdinu a percentami */
+  #starBox { color: #fff; }
+  /* hrdina vľavo hore: veľké okienko, ktoré presahuje pod riadok; otvorí Hrdinov (zvolené = zlatý rám); vpravo dole modrá bublinka s úrovňou */
+  #heroBtn { flex: 0 0 auto; align-self: flex-start; width: 76px; height: 76px; padding: 0; display: grid; place-items: center;
+    border: 3px solid var(--ink); border-radius: 13px; background: linear-gradient(#5a4836, #3a2c22);
     box-shadow: inset 0 -4px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.15), 0 4px 10px rgba(0,0,0,.45); }
-  #heroBtn img { height: 48px; width: auto; image-rendering: pixelated; }
+  #heroBtn img { height: 62px; width: auto; image-rendering: pixelated; }
   #heroBtn.on { border-color: #b88420; background: linear-gradient(#7a6248, #4a3828); box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px #f8d048, inset 0 -4px 0 rgba(0,0,0,.35); }
   #heroBtn:active { transform: translateY(2px); }
   #heroBtn .badge { position: absolute; top: -7px; right: -9px; min-width: 22px; height: 22px; padding: 0 5px; box-sizing: border-box; border-radius: 11px; border: 2px solid var(--ink); z-index: 4;
     background: var(--gold); color: var(--ink); font-style: normal; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 13px; line-height: 18px; text-align: center; text-shadow: none; }
   #heroBtn .badge[hidden] { display: none; }
-  #pctBox { margin-left: auto; margin-top: 1px; font-weight: 700; color: var(--gold); }
+  #heroLvl { position: absolute; right: -8px; bottom: -8px; min-width: 26px; height: 26px; padding: 0 5px; box-sizing: border-box; border-radius: 13px; z-index: 4;
+    border: 2px solid var(--ink); background: linear-gradient(#6ea0f0, #2a4ea8); box-shadow: inset 0 0 0 1px rgba(196,220,255,.55), 0 2px 4px rgba(0,0,0,.5);
+    color: #fff; font-style: normal; font-size: 13px; font-weight: 700; line-height: 22px; text-align: center; text-shadow: 1px 1px 0 #16285a; }
+  #pctBox { margin-left: auto; font-weight: 700; color: var(--gold); }
   /* vpravo hore pod riadkom: hlavné menu a prepínač vzhľadu mapy */
   #mapTools { position: absolute; right: 10px; top: calc(env(safe-area-inset-top) + 50px); z-index: 5; display: flex; flex-direction: column; gap: 8px; }
   #mapTools [hidden] { display: none; }
@@ -674,7 +681,7 @@
   .shopItem.bundle b { color: var(--gold); font-size: 18px; }
   .shopItem .sil { filter: brightness(0); opacity: .45; }
   .tabScreen.screenOverlay { top: calc(env(safe-area-inset-top) + 37px); bottom: calc(58px + env(safe-area-inset-bottom)); padding-top: 22px; padding-bottom: 40px; }
-  .tabScreen .perkHead { padding-left: 122px; box-sizing: border-box; min-height: 34px; } /* nadpis vedľa okienka hrdinu, ktoré presahuje pod horný riadok */
+  .tabScreen .perkHead { padding-left: 136px; box-sizing: border-box; min-height: 34px; } /* nadpis vedľa okienka hrdinu, ktoré presahuje pod horný riadok */
   .setIc .badge, .tabCard .badge { position: absolute; top: -9px; right: -11px; min-width: 22px; height: 22px; padding: 0 5px; box-sizing: border-box; border-radius: 11px; border: 2px solid var(--ink);
     background: var(--gold); color: var(--ink); font-style: normal; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 13px; line-height: 18px; text-align: center; text-shadow: none; }
   .setIc .badge[hidden], .tabCard .badge[hidden] { display: none; }
@@ -954,7 +961,8 @@
   <div id="map" hidden>
     <!-- horný riadok: hrdina (otvorí Hrdinov), zlatky v truhlici, získané hviezdy, vpravo percentá dobytého sveta -->
     <div class="mapHead">
-      <button id="heroBtn" title="Hrdinovia" aria-label="Hrdinovia"><img id="icoHero" alt=""><em id="heroTxt" class="badge" hidden>0</em></button>
+      <i class="headHi"></i>
+      <button id="heroBtn" title="Hrdinovia" aria-label="Hrdinovia"><img id="icoHero" alt=""><em id="heroTxt" class="badge" hidden>0</em><em id="heroLvl" title="Úroveň hrdinu">1</em></button>
       <div id="chestBox" class="capsule" title="Zlatky z misií"><img id="icoCoins" alt=""><span>0</span></div>
       <div id="starBox" class="capsule" title="Získané hviezdy"><img id="icoStar" alt=""><span>0</span></div>
       <div id="pctBox" class="pill" title="Dobyté územia sveta"><span>0</span> %</div>
