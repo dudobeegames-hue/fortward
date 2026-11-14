@@ -317,6 +317,10 @@
   .pcard.locked .cost { color: var(--muted); font-size: 10px; }
   /* zamknutá ponuka: namiesto vyšedenej stavby len zámok (jemná kresba 32×32) */
   .pcard.lockCard { opacity: 1; filter: none; }
+  /* vyskúmaná vec, na ktorú ešte nestačí úroveň hradu: nevyfarbená (rámik a neón novinky ostanú farebné) */
+  .pcard.waitHall .pic img:not(.unlockFx) { filter: grayscale(1) brightness(.85); opacity: .75; }
+  .pcard.waitHall .front b { color: var(--muted); }
+  .pcard.waitHall .cost { color: #8a7a68; font-size: 10px; }
   .pcard.lockCard .face { background: #140e0a; }
   .pcard.lockCard .pic { align-items: center; justify-content: center; }
   .pcard.lockCard .pic img { width: 32px; height: 32px; max-width: none; max-height: none; image-rendering: pixelated; opacity: .85; }

@@ -6182,16 +6182,18 @@
     const I = UI_ICONS;
     // zamknutá karta: m = číslo misie (staré odomykanie), alebo meno veci vo výskume – tá chýba vo výskume, alebo na ňu nestačí úroveň hradu
     const lockCard = (hint, msg, id) => { markLocked(id); return act(FINE_ICONS.lock, '', hint, false, msg, 'locked lockCard'); };
-    const lockAct = (icon, label, m) => typeof m === 'number' ? lockCard('misia ' + m, label + ' sa odomkne v misii ' + m)
+    // vyskúmané, ale hrad v misii má nízku úroveň: zámok sa otvorí a vec sa ukáže ako novinka, no nevyfarbená – vyfarbí sa po vylepšení hradu
+    const waitCard = (icon, label, need, id, px) => shineTech(act(icon, label, hallWord() + ' ' + need, false, 'Najprv vylepši ' + hallWord() + ' na úroveň ' + need, 'waitHall', px), id);
+    const lockAct = (icon, label, m, px) => typeof m === 'number' ? lockCard('misia ' + m, label + ' sa odomkne v misii ' + m)
       : !has(m) ? lockCard('výskum', 'Najprv treba vyskúmať (záložka Výskum na mape)', m)
-      : lockCard(hallWord() + ' ' + needHall(m), 'Najprv vylepši ' + hallWord() + ' na úroveň ' + needHall(m), m);
+      : waitCard(icon, label, needHall(m), m, px);
     // ďalšia úroveň: kúpiť / najprv radnica / zamknutá do misie / maximum
     // icon = náhľad stavby na ďalšej úrovni
     const upAct = (lvl, cap, cost, apply, label, icon, newId, kind) => {
       const nx = RES.find(r => r.kind === resKindOf(kind) && r.lvl === lvl + 1); // výskum ďalšej úrovne
       if (lvl < cap) shineTech(act(icon, label || 'Vylepšiť', coinTxt(cost), st.gold >= cost, apply, 'up'), newId || (nx && nx.id));
       else if (lvl >= resMax(kind)) act(I.star, 'Max. úr.', '', false, null, 'max', true);
-      else if (nx && resHas(nx.id) && kind !== 'hall') lockCard(hallWord() + ' ' + nx.c, 'Najprv vylepši ' + hallWord() + ' na úroveň ' + nx.c, nx.id);
+      else if (nx && resHas(nx.id) && kind !== 'hall') waitCard(icon, 'Úr. ' + (lvl + 1), nx.c, nx.id);
       else lockCard('výskum', 'Úroveň ' + (lvl + 1) + ' treba najprv vyskúmať (záložka Výskum na mape)', nx ? nx.id : newId);
     };
     const selRow = (icon, title, stats) => {
@@ -6380,7 +6382,15 @@
       for (const kind of order.filter(k => tab.kinds.includes(k) && (!BUILD[k].orc || isOrc()) && (!BUILD[k].human || !isOrc()))) {
         const d = BUILD[kind];
         const b = document.createElement('button');
-        if (!open(kind)) { // zamknutá stavba: chýba výskum, alebo na ňu nestačí úroveň hradu
+        if (has(kind) && !open(kind)) { // vyskúmaná, no hrad má nízku úroveň: novinka (zámok sa otvorí, zabliká), ale nevyfarbená, kým sa hrad nevylepší
+          b.className = 'pcard waitHall';
+          b.innerHTML = '<span class="pin"><span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost">' + hallWord() + ' ' + needHall(kind) + '</span></span></span>';
+          flashIf(b, isNew(kind), kind, () => markSeen(kind));
+          b.addEventListener('click', () => { toast(d.name + ': najprv vylepši ' + hallWord() + ' na úroveň ' + needHall(kind)); AUDIO.play('deny'); });
+          pal.appendChild(b);
+          continue;
+        }
+        if (!open(kind)) { // zamknutá stavba: chýba výskum
           const why = !has(kind) ? 'výskum' : hallWord() + ' ' + needHall(kind);
           b.className = 'pcard locked lockCard'; markLocked(kind);
           b.innerHTML = '<span class="pin"><span class="face front"><span class="pic"><img src="' + FINE_ICONS.lock + '" alt=""></span><b></b><span class="cost">' + why + '</span></span></span>';
