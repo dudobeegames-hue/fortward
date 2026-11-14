@@ -84,26 +84,51 @@ const FINE_ICONS = (() => {
     });
   });
 
-  // ---- Trofeje: zlatý pohár s uškami na podstavci ----
-  const trophy = icon(40, 40, each => {
-    const cyl = (px, x0, x1) => { const t = (px - x0) / (x1 - x0); return 4.3 - Math.abs(t - 0.3) * 5 + (t > 0.24 && t < 0.36 ? 1.2 : 0); }; // lesklý valec: svetlý pruh vľavo
-    each((px, py, x, y) => {
+  // ---- Trofeje: zlatý pohár s uškami na podstavci; N = veľkosť ikonky (kreslí sa v súradniciach 40×40 prepočítaných na N) ----
+  const trophyN = N => icon(N, N, each => {
+    const k = N / 40;
+    const cyl = (u, x0, x1) => { const t = (u - x0) / (x1 - x0); return 4.3 - Math.abs(t - 0.3) * 5 + (t > 0.22 && t < 0.38 ? 1.2 : 0); }; // lesklý valec: svetlý pruh vľavo
+    each((px, py) => {
+      const u = px / k, v = py / k;
       for (const s of [-1, 1]) { // ušká: prstence po bokoch
-        const hx = 20 + s * 12.5, d = Math.hypot((px - hx) / 1.15, py - 12.5);
-        if (d < 5.4 && d > 3 && s * (px - 20) > 9.5) return pick(GOLD, s < 0 ? 4.4 - (d - 3) : 3 - (d - 3) * 0.6);
+        const hx = 20 + s * 12.5, d = Math.hypot((u - hx) / 1.15, v - 12.5);
+        if (d < 5.4 && d > 3 && s * (u - 20) > 9.5) return pick(GOLD, s < 0 ? 4.4 - (d - 3) : 3 - (d - 3) * 0.6);
       }
-      if (y >= 5 && y <= 7) return x >= 9 && x <= 30 ? (y === 5 ? GOLD[6] : y === 6 ? pick(GOLD, cyl(px, 9, 31) + 0.6) : GOLD[2]) : null; // okraj
-      if (y >= 8 && y <= 22) { // miska sa zužuje dole
-        const half = 10.5 * Math.sqrt(Math.max(0, 1 - ((py - 8) / 15.5) ** 2));
-        if (Math.abs(px - 20) > half) return null;
-        if (Math.hypot(px - 20, py - 14) < 3.2 && Math.abs(px - 20) + Math.abs(py - 14) < 3.6) return GOLD[Math.abs(px - 20) + Math.abs(py - 14) < 1.6 ? 6 : 2]; // vyrazený kosoštvorec
-        return pick(GOLD, cyl(px, 20 - half, 20 + half) - (py > 19 ? 0.8 : 0));
+      if (v >= 5 && v < 8) return u >= 9 && u < 31 ? (v < 6 ? GOLD[6] : v < 7 ? pick(GOLD, cyl(u, 9, 31) + 0.6) : GOLD[2]) : null; // okraj
+      if (v >= 8 && v < 23) { // miska sa zužuje dole
+        const half = 10.5 * Math.sqrt(Math.max(0, 1 - ((v - 8) / 15.5) ** 2));
+        if (Math.abs(u - 20) > half) return null;
+        const dm = Math.abs(u - 20) + Math.abs(v - 14);
+        if (dm < 3.6) return GOLD[dm < 1.6 ? 6 : 2]; // vyrazený kosoštvorec
+        return pick(GOLD, cyl(u, 20 - half, 20 + half) - (v > 19 ? 0.8 : 0));
       }
-      if (y >= 23 && y <= 28) return Math.abs(px - 20) < (y === 25 || y === 26 ? 3.2 : 2.2) ? pick(GOLD, cyl(px, 17, 23) - (y === 25 ? -0.8 : 0.4)) : null; // stopka s prstencom
-      if (y >= 29 && y <= 31) return Math.abs(px - 20) < 6.2 ? pick(GOLD, cyl(px, 13.5, 26.5) - (y === 31 ? 1.2 : 0)) : null;
-      if (y >= 32 && y <= 36) return Math.abs(px - 20) < 9.2 ? (y === 32 ? WOOD[5] : y === 36 ? WOOD[1] : pick(WOOD, 4.2 - (px - 11) * 0.12)) : null; // drevený podstavec
+      if (v >= 23 && v < 29) return Math.abs(u - 20) < (v >= 25 && v < 27 ? 3.2 : 2.2) ? pick(GOLD, cyl(u, 17, 23) - (v >= 25 && v < 26 ? -0.8 : 0.4)) : null; // stopka s prstencom
+      if (v >= 29 && v < 32) return Math.abs(u - 20) < 6.2 ? pick(GOLD, cyl(u, 13.5, 26.5) - (v >= 31 ? 1.2 : 0)) : null;
+      if (v >= 32 && v < 37) return Math.abs(u - 20) < 9.2 ? (v < 33 ? WOOD[5] : v >= 36 ? WOOD[1] : pick(WOOD, 4.2 - (u - 11) * 0.12)) : null; // drevený podstavec
       return null;
     });
+  });
+  const trophy = trophyN(40), trophySmall = trophyN(28);
+
+  // ---- Výskum: sklenená banka s modrou tekutinou a bublinkami, zazátkovaná korkom ----
+  const research = icon(40, 40, (each, put) => {
+    const cx = 20, cy = 25, R = 11.5;
+    each((px, py, x, y) => {
+      const dx = px - cx, dy = py - cy, r = Math.hypot(dx, dy);
+      if (y >= 2 && y <= 5 && Math.abs(px - 20) < 3.2) return pick(WOOD, 4.4 - (px - 17) * 0.45 - (y === 5 ? 1 : 0));          // korková zátka
+      if (y >= 6 && y <= 7 && Math.abs(px - 20) < 5.2) return y === 6 ? '#f4fbff' : '#a8c8e8';                               // okraj hrdla
+      const neck = y >= 8 && y <= 16 && Math.abs(px - 20) < 3.6, body = r < R;
+      if (!neck && !body) return null;
+      const glass = neck && !body ? Math.abs(px - 20) > 2.4 : r > R - 1.5;                                                   // stena skla
+      if (glass) return dx < -1 ? '#f4fbff' : dy > 6 ? '#6a90b8' : '#a8c8e8';
+      const level = 22.5 + Math.sin(x * 0.9) * 0.6;                                                                          // hladina tekutiny
+      if (py < level) return (px - 20 < -1.2 && px - 20 > -2.2) || (r > R - 3.4 && r < R - 2.4 && dx < -3 && dy < 0) ? '#f4fbff' : '#2a3a52'; // prázdne sklo s odleskom
+      if (py < level + 1) return SEA[5];                                                                                     // svetlá hladina
+      const lit = (-dx - dy) / (R * 1.41);
+      return pick(SEA, 2.6 + lit * 2.2 + ((x + y) % 2 ? 0.25 : -0.25) - (r > R - 3 ? 0.8 : 0));
+    });
+    for (const [x, y] of [[16, 27], [23, 30], [19, 32], [25, 25]]) { put(x, y, SEA[5]); put(x + 1, y, '#ffffff'); put(x, y + 1, SEA[4]); put(x + 1, y + 1, SEA[5]); } // bublinky
+    put(21, 19, SEA[5]); put(18, 14, SEA[4]); put(21, 11, SEA[5]);                                                           // bublinky stúpajú hrdlom
   });
 
   // ---- Nákupy: truhlica s oblým vekom, zlatým kovaním a zámkom ----
@@ -178,5 +203,5 @@ const FINE_ICONS = (() => {
     });
   });
 
-  return { swords, hall, globe, trophy, chest, home, map: mapIcon(false), mapOn: mapIcon(true) };
+  return { swords, hall, globe, trophy, trophySmall, research, chest, home, map: mapIcon(false), mapOn: mapIcon(true) };
 })();

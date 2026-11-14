@@ -588,6 +588,11 @@
   /* vpravo hore pod riadkom: hlavné menu a prepínač vzhľadu mapy */
   #mapTools { position: absolute; right: 10px; top: calc(env(safe-area-inset-top) + 56px); z-index: 5; display: flex; flex-direction: column; gap: 8px; }
   #mapTools [hidden] { display: none; }
+  #mapTools .mapIc, #mapCorner .mapIc { position: relative; }
+  #trophyBtn.on { border-color: #b88420; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px #f8d048, inset 0 -4px 0 rgba(0,0,0,.35); } /* otvorené Trofeje */
+  /* vpravo dole nad kartami: prepínač vzhľadu mapy */
+  #mapCorner { position: absolute; right: 10px; bottom: calc(102px + env(safe-area-inset-bottom)); z-index: 5; }
+  #mapCorner [hidden] { display: none; }
   .mapHead b { white-space: nowrap; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 20px; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
   /* okno misie po ťuknutí na hrad */
   #missionBox { z-index: 6; background: rgba(8,6,4,.55); }
@@ -667,6 +672,36 @@
   }
   .tabCard.shop img { opacity: 1; }
   .tabCard.shop.on { background: linear-gradient(#a07a38, #5a4020); }
+  /* výskum: 5 veľkých kariet nad sebou (V hore, I dole) */
+  #resList { display: flex; flex-direction: column; gap: 14px; width: 100%; }
+  .resCard { box-sizing: border-box; min-height: calc(100vh - 190px); padding: 10px; border-radius: 14px; border: 3px solid var(--ink);
+    background: linear-gradient(#3a2c22, #241a12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 6px 14px rgba(0,0,0,.45); }
+  .resCard.cur { border-color: #b88420; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px #f8d048, 0 6px 14px rgba(0,0,0,.45); }
+  .resCard.locked { filter: saturate(.35) brightness(.8); }
+  .resCard header { display: flex; align-items: center; gap: 12px; padding: 2px 4px 10px; }
+  .resCard .roman { flex: 0 0 auto; min-width: 54px; text-align: center; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 40px; line-height: 1; color: var(--gold); text-shadow: 3px 3px 0 var(--ink); }
+  .resCard header b { display: block; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 20px; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
+  .resCard header small { color: var(--muted); font-size: 12px; }
+  .resCard.done header small { color: #9cd45a; }
+  .resGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .resItem { position: relative; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px 6px; min-height: 104px; border-radius: 10px; border: 2px solid var(--ink);
+    background: rgba(0,0,0,.3); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); color: inherit; font: inherit; }
+  .resItem.hall { grid-column: 1 / -1; flex-direction: row; justify-content: center; gap: 12px; min-height: 76px; }
+  .resItem .pic { display: grid; place-items: center; width: 52px; height: 52px; }
+  .resItem .pic img { max-width: 52px; max-height: 52px; image-rendering: pixelated; }
+  .resItem b { font-size: 12px; line-height: 1.15; text-align: center; }
+  .resItem.hall b { font-size: 16px; }
+  .resItem .cost { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 700; color: var(--gold); white-space: nowrap; }
+  .resItem .cost img { width: 20px; height: 18px; image-rendering: pixelated; }
+  .resItem.buy { border-color: #6a5030; background: linear-gradient(rgba(248,208,72,.14), rgba(248,208,72,.04)); }
+  .resItem.sel { border-color: #f8d048; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px #f8d048; }
+  .resItem.poor .cost { color: #e07060; }
+  .resItem.done { background: rgba(98,160,58,.16); border-color: #3e6a2a; }
+  .resItem.done .cost { color: #9cd45a; }
+  .resItem.locked { opacity: .5; }
+  .resItem.locked .pic img { filter: grayscale(1); }
+  .resItem .opt { position: absolute; top: -7px; right: -3px; padding: 1px 5px; border-radius: 7px; border: 2px solid var(--ink); background: #5c8ce0; color: #fff; font-style: normal; font-size: 9px; font-weight: 700; }
+  .resItem:active { transform: translateY(1px); }
   /* obchod */
   #shopList { display: flex; flex-direction: column; gap: 8px; width: 100%; }
   .shopSec { margin: 6px 0 -2px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
@@ -682,9 +717,9 @@
   .shopItem .sil { filter: brightness(0); opacity: .45; }
   .tabScreen.screenOverlay { top: calc(env(safe-area-inset-top) + 43px); bottom: calc(58px + env(safe-area-inset-bottom)); padding-top: 22px; padding-bottom: 40px; }
   .tabScreen .perkHead { padding-left: 136px; box-sizing: border-box; min-height: 34px; } /* nadpis vedľa okienka hrdinu, ktoré presahuje pod horný riadok */
-  .setIc .badge, .tabCard .badge { position: absolute; top: -9px; right: -11px; min-width: 22px; height: 22px; padding: 0 5px; box-sizing: border-box; border-radius: 11px; border: 2px solid var(--ink);
+  .setIc .badge, .tabCard .badge, .mapIc .badge { position: absolute; top: -9px; right: -11px; min-width: 22px; height: 22px; padding: 0 5px; box-sizing: border-box; border-radius: 11px; border: 2px solid var(--ink);
     background: var(--gold); color: var(--ink); font-style: normal; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 13px; line-height: 18px; text-align: center; text-shadow: none; }
-  .setIc .badge[hidden], .tabCard .badge[hidden] { display: none; }
+  .setIc .badge[hidden], .tabCard .badge[hidden], .mapIc .badge[hidden] { display: none; }
   /* hrdinovia */
   #heroList { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
   .hero { width: 220px; height: 220px; box-sizing: border-box; flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
@@ -970,6 +1005,10 @@
     <!-- vpravo hore pod riadkom: hlavné menu a prepínač vzhľadu mapy -->
     <div id="mapTools">
       <button id="mapHome" class="mapIc" title="Menu" aria-label="Menu"><img id="icoHome" alt=""></button>
+      <button id="trophyBtn" class="mapIc" title="Trofeje" aria-label="Trofeje"><img id="icoTrophy" alt=""><em id="trophyTxt" class="badge" hidden>0</em></button>
+    </div>
+    <!-- vpravo dole nad kartami: prepínač vzhľadu mapy -->
+    <div id="mapCorner">
       <button id="mapStyleBtn" class="mapIc" title="Vzhľad mapy" aria-label="Vzhľad mapy"><img id="icoMapStyle" alt=""></button>
     </div>
     <!-- spodný riadok kariet: Boj (mapa územia), Sieň, Mapa sveta, Trofeje, Nákupy; zvolená karta je povysunutá -->
@@ -977,7 +1016,7 @@
       <button class="tabCard on" data-tab="map" title="Boj"><img id="icoSwords" alt="Boj"></button>
       <button class="tabCard" data-tab="hall" title="Sieň"><img id="icoHall" alt="Sieň"><em id="hallBtnTxt" class="badge" hidden>0</em></button>
       <button class="tabCard" data-tab="world" title="Mapa sveta" aria-label="Mapa sveta"><img id="icoWorld" alt="Mapa sveta"></button>
-      <button class="tabCard" data-tab="trophies" title="Trofeje"><img id="icoTrophy" alt="Trofeje"><em id="trophyTxt" class="badge" hidden>0</em></button>
+      <button class="tabCard" data-tab="research" title="Výskum"><img id="icoResearch" alt="Výskum"></button>
       <button class="tabCard shop shine" data-tab="shop" title="Nákupy"><img id="icoShop" alt="Nákupy"></button>
     </div>
     <!-- okno misie: zjaví sa až po ťuknutí na hrad -->
@@ -1025,6 +1064,11 @@
     <div class="perkHead"><b>Hrdinovia</b></div>
     <p class="perkNote">Vyber hrdinu, ktorý pôjde s tvojím vojskom do boja. Hrdina získava skúsenosti za každú prežitú vlnu.</p>
     <div id="heroList"></div>
+  </div>
+
+  <div id="research" class="screenOverlay perksScreen tabScreen" hidden>
+    <div class="perkHead"><b>Výskum</b></div>
+    <div id="resList"></div>
   </div>
 
   <div id="trophies" class="screenOverlay perksScreen tabScreen" hidden>

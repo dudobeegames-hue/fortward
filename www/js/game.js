@@ -475,7 +475,79 @@
   };
   // postup na mape: unlocked = najvyššia odomknutá misia (11 = ostrov oslobodený)
   Object.assign(st, { mission: 1, unlocked: 1, mapSel: 1, mapAnim: null, tech: techFor(1) });
-  const has = id => id === 'stake' ? isOrc() && st.tech.has('wall') : st.tech.has(id); // koly: len orkovia, spolu s hradbami
+  // ---- Výskum: 5 kariet podľa úrovne hradu (I–V). Hráč kupuje výskumy za zlatky z truhlice; karta N+1 sa otvorí, keď má
+  // vyskúmané všetky povinné výskumy karty N (opt = nepovinný). Prvý výskum karty je hrad danej úrovne, ostatné až po ňom.
+  // V misii sa dá stavať / vylepšovať len to, čo je vyskúmané A na čo má hrad (radnica) v misii dosť vysokú úroveň (= číslo karty).
+  // Položka: [druh, úroveň (0 = bez úrovne), cena, nepovinné]
+  const RES_DEF = [
+    [['hall', 1, 0], ['tower', 1, 0], ['wall', 1, 0], ['pit', 1, 80], ['wallArcher', 0, 120], ['paving', 0, 40, 1]],
+    [['hall', 2, 400], ['tower', 2, 150], ['pitch', 2, 200], ['wall', 2, 150], ['mine', 1, 200], ['workshop', 1, 200], ['pit', 2, 120]],
+    [['hall', 3, 900], ['tower', 3, 300], ['pitch', 3, 300], ['mage', 3, 450], ['wall', 3, 300], ['firepit', 1, 250], ['pit', 3, 220],
+      ['barracks', 1, 400], ['barracks', 2, 300, 1], ['range', 1, 400], ['range', 2, 300, 1], ['hedge', 0, 150], ['mine', 2, 300], ['workshop', 2, 300], ['chapel', 1, 400],
+      ['siegeRam', 0, 450], ['spear', 0, 350]],
+    [['hall', 4, 1800], ['tower', 4, 550], ['pitch', 4, 550], ['mage', 4, 650], ['ice', 0, 400, 1], ['wall', 4, 500], ['pit', 4, 350], ['firepit', 2, 400],
+      ['barracks', 3, 550], ['barracks', 4, 500, 1], ['stables', 1, 700], ['stables', 2, 500, 1], ['stables', 3, 550, 1], ['range', 3, 550], ['range', 4, 500, 1],
+      ['falconry', 1, 700], ['falconry', 2, 500, 1], ['falconry', 3, 550, 1], ['mine', 3, 450], ['workshop', 3, 450], ['chapel', 2, 500], ['siegeCat', 0, 800]],
+    [['hall', 5, 3200], ['tower', 5, 900], ['pitch', 5, 900], ['mage', 5, 1000], ['ballista', 1, 1200], ['wall', 5, 800], ['pit', 5, 550], ['firepit', 3, 600],
+      ['barracks', 5, 900], ['range', 5, 900], ['stables', 4, 800], ['stables', 5, 900], ['falconry', 4, 800], ['falconry', 5, 900],
+      ['mine', 4, 700], ['workshop', 4, 700], ['chapel', 3, 800]],
+  ];
+  const RES = []; // všetky položky: { id, kind, lvl, cost, opt, c (karta 1–5) }
+  RES_DEF.forEach((card, ci) => card.forEach(([kind, lvl, cost, opt]) => RES.push({ id: kind + (lvl || ''), kind, lvl, cost, opt: !!opt, c: ci + 1 })));
+  const RES_BY = Object.fromEntries(RES.map(r => [r.id, r]));
+  st.res = new Set(); // vyskúmané (kúpené) položky; zadarmo (cena 0) platia vždy
+  const resHas = id => !!RES_BY[id] && (RES_BY[id].cost === 0 || st.res.has(id));
+  // druh stavby → druh vo výskume: za orkov je jedový kotol na mieste smolnej veže a bahno na mieste živého plota; zbrojnica ide s kasárňami
+  const resKindOf = kind => kind === 'icetower' && isOrc() ? 'pitch' : kind === 'mud' ? 'hedge' : kind === 'armory' ? 'barracks' : kind;
+  const resLevels = kind => RES.filter(r => r.kind === resKindOf(kind) && r.lvl > 0).sort((a, b) => a.lvl - b.lvl);
+  // najvyššia vyskúmaná úroveň druhu (úrovne idú za sebou); 0 = nevyskúmané
+  const resLvl = kind => { let l = 0; for (const r of resLevels(kind)) { if (!resHas(r.id)) break; l = r.lvl; } return l; };
+  const resMax = kind => { const L = resLevels(kind); return L.length ? L[L.length - 1].lvl : MAX_LVL; }; // najvyššia úroveň druhu v hre
+  const resMin = kind => { const L = resLevels(kind); return L.length ? L[0].lvl : 1; };                    // úroveň, na ktorej sa stavba stavia (smolná veža 2, ohnivá 3)
+  // najvyššia úroveň stavby v tejto misii: vyskúmaná a zároveň na ňu stačí úroveň hradu
+  function kindCap(kind) {
+    const L = resLevels(kind);
+    if (!L.length) return st.hallLvl;
+    let cap = 0;
+    for (const r of L) { if (!resHas(r.id) || r.c > st.hallLvl) break; cap = r.lvl; }
+    return cap;
+  }
+  // položka výskumu, ktorá stojí za odomknutím (stavby, strelca na hradbách, režimu, stroja); null = nie je vo výskume
+  function resItemOf(id) {
+    if (id === 'icetower' && !isOrc()) return RES_BY.ice;
+    if (id === 'armory') return RES_BY.spear;
+    if (/^lvl\d$/.test(id)) return RES_BY['hall' + id[3]];
+    if (id === 'gate' || id === 'stake') return RES_BY.wall1;
+    const k = resKindOf(id);
+    return RES_BY[k] || resLevels(k)[0] || null;
+  }
+  const has = id => { const r = resItemOf(id); return id === 'stake' ? isOrc() : r ? resHas(r.id) : st.tech.has(id); };
+  const needHall = id => { const r = resItemOf(id); return r ? r.c : 1; };          // úroveň hradu, ktorú vec v misii potrebuje
+  const open = id => has(id) && (isAssault() || st.hallLvl >= needHall(id));     // dá sa práve teraz v misii použiť (pri útoku na hrad radnica nie je)
+  const hallWord = () => isOrc() ? 'pevnosť' : 'hrad';
+  // karta výskumu je otvorená, keď sú vyskúmané všetky povinné výskumy predošlej karty
+  const resCardOpen = c => c <= 1 || RES.every(r => r.c !== c - 1 || r.opt || resHas(r.id));
+  // prečo sa položka nedá kúpiť (null = dá sa)
+  function resBlock(r) {
+    if (!resCardOpen(r.c)) return 'Najprv dokonči kartu ' + ROMAN[r.c - 1];
+    if (r.kind !== 'hall' && !resHas('hall' + r.c)) return 'Najprv vyskúmaj ' + hallWord() + ' ' + r.c;
+    const prev = r.lvl > 1 && RES.find(q => q.kind === r.kind && q.lvl === r.lvl - 1);
+    if (prev && !resHas(prev.id)) return 'Najprv vyskúmaj úroveň ' + prev.lvl;
+    return null;
+  }
+  const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
+  const saveRes = () => saveJSON(sk('research'), [...st.res]);
+  // načítanie pozície: hráč, ktorý hral pred zavedením výskumu, dostane vyskúmané všetko po úroveň, ktorú už mal odomknutú postupom
+  function loadRes() {
+    const v = loadJSON(sk('research'), null);
+    st.res = new Set(Array.isArray(v) ? v.filter(id => RES_BY[id]) : []);
+    if (!Array.isArray(v) && st.unlocked > 1) {
+      let l = 1; while (l < MAX_LVL && st.unlocked >= LVL_FROM_OLD[l + 1]) l++;
+      for (const r of RES) if (r.c <= l && r.cost) st.res.add(r.id);
+      saveRes();
+    }
+  }
+  const LVL_FROM_OLD = [0, 1, 2, 4, 6, 9]; // pôvodné odomykanie úrovní podľa misie (len na prevod starých pozícií)
   // novinky: odomknutá stavba / vylepšenie / hrdina, na ktoré hráč ešte neťukol – jeho karta a záložka sa lesknú
   const SHINE_TECH = { gate: 1, wallArcher: 1, spec: 1, lvl2: 1, lvl3: 1, lvl4: 1, lvl5: 1 };
   let seenNew = [];
@@ -483,11 +555,11 @@
     // úplne nový hráč (len 1. misia) má ako novinky aj všetky stavby z prvej misie, aby sa s nimi zoznámil
     seenNew = loadJSON(sk('seenNew'), null);
     if (!Array.isArray(seenNew)) {
-      seenNew = [...techFor(st.unlocked)].filter(id => st.unlocked > 1 || !BUILD[id]);
+      seenNew = Object.keys(BUILD).concat(Object.keys(SHINE_TECH)).filter(id => has(id) && (st.unlocked > 1 || !BUILD[id]));
       saveJSON(sk('seenNew'), seenNew);
     }
   }
-  const isNew = id => (!!BUILD[id] || !!SHINE_TECH[id]) && techFor(st.unlocked).has(id) && (unlockMissionOf(id) > 1 || !!BUILD[id]) && !seenNew.includes(id);
+  const isNew = id => (!!BUILD[id] || !!SHINE_TECH[id]) && has(id) && !seenNew.includes(id);
   function markSeen(id) { if (seenNew.includes(id)) return; seenNew.push(id); saveJSON(sk('seenNew'), seenNew); }
   // novo odomknutý hrdina (pre celý účet)
   const HEROES_SEEN_KEY = 'fortward.heroesSeen';
@@ -542,9 +614,10 @@
   const LVL_FROM = [0, 1, 2, 4, 6, 9];
   const lvlMission = l => LVL_FROM[l];
   // platí najvyššia odomknutá misia, takže aj v skoršej misii má hráč všetky úrovne, ktoré už odomkol
-  const lvlCap = () => { const m = Math.max(st.mission, st.unlocked); let l = 1; while (l < MAX_LVL && m >= lvlMission(l + 1)) l++; return l; };
+  // úroveň radnice (hradu) je obmedzená výskumom: najvyššia vyskúmaná úroveň hradu
+  const lvlCap = () => Math.max(1, resLvl('hall'));
   const hallCap = lvlCap;
-  // stavby majú najviac úroveň radnice: drevená radnica = drevené stavby, kameň až po jej vylepšení
+  // stavby majú najviac úroveň radnice (podrobne podľa druhu: kindCap)
   const bCap = () => Math.min(lvlCap(), st.hallLvl);
   const LVL_NAME = ['', 'drevo', 'kameň', 'kameň s kovaním', 'tmavé opevnenie', 'kráľovský kameň'];
   const saveProgress = () => { try { localStorage.setItem(sk('unlocked'), String(st.unlocked)); } catch (e) { } };
@@ -565,6 +638,7 @@
     Object.assign(ach, loadJSON(sk('ach'), {}));
     achSeen = loadJSON(sk('achSeen'), 0);
     st.unlocked = Math.max(1, Math.min(MAX_MISSION + 1, parseInt(localStorage.getItem(sk('unlocked')) || '1', 10) || 1));
+    loadRes(); // výskum pozície (pred novinkami – tie sa rátajú z vyskúmaného)
     loadSeen();
     // prejdené misie bez záznamu hviezd (vyhrané pred zavedením hviezd) dostanú 1 bronzovú – víťazstvo dáva vždy aspoň 1
     let fixed = false;
@@ -850,7 +924,7 @@
   function bCenter(b) { return { x: tileX(b.c) + bW(b) * T / 2, y: tileY(b.r) + T / 2 }; }
 
   function addBuilding(kind, c, r) {
-    const b = { kind, c, r, lvl: 1, hp: 0, cd: 0.5, spent: costOf(kind), flash: 0, spawnT: 1 };
+    const b = { kind, c, r, lvl: resMin(kind), hp: 0, cd: 0.5, spent: costOf(kind), flash: 0, spawnT: 1 }; // smolná veža sa stavia od úrovne 2, ohnivá od 3
     b.hp = bMaxHp(b);
     st.blds.push(b);
     rebuildOcc();
@@ -6078,14 +6152,18 @@
     };
     const shineTech = (el, id) => flashIf(el, isNew(id), id, () => markSeen(id));
     const I = UI_ICONS;
-    const lockAct = (icon, label, m, px) => act(icon, label, '🔒 misia ' + m, false, label + ' sa odomkne v misii ' + m, 'locked', px);
+    // zamknutá karta: m = číslo misie (staré odomykanie), alebo meno veci vo výskume – tá chýba vo výskume, alebo na ňu nestačí úroveň hradu
+    const lockAct = (icon, label, m, px) => typeof m === 'number' ? act(icon, label, '🔒 misia ' + m, false, label + ' sa odomkne v misii ' + m, 'locked', px)
+      : !has(m) ? act(icon, label, '🔒 výskum', false, label + ': najprv treba vyskúmať (záložka Výskum na mape)', 'locked', px)
+      : act(icon, label, '🔒 ' + hallWord() + ' ' + needHall(m), false, label + ': najprv vylepši ' + hallWord() + ' na úroveň ' + needHall(m), 'locked', px);
     // ďalšia úroveň: kúpiť / najprv radnica / zamknutá do misie / maximum
     // icon = náhľad stavby na ďalšej úrovni
-    const upAct = (lvl, cap, cost, apply, label, icon, newId) => {
+    const upAct = (lvl, cap, cost, apply, label, icon, newId, kind) => {
+      const nx = RES.find(r => r.kind === resKindOf(kind) && r.lvl === lvl + 1); // výskum ďalšej úrovne
       if (lvl < cap) shineTech(act(icon, label || 'Vylepšiť', coinTxt(cost), st.gold >= cost, apply, 'up'), newId);
-      else if (lvl < lvlCap()) act(icon, 'Úr. ' + (lvl + 1), '🔒 radnica', false, 'Najprv vylepši radnicu', 'locked');
-      else if (lvl < MAX_LVL) lockAct(icon, 'Úr. ' + (lvl + 1), lvlMission(lvl + 1));
-      else act(I.star, 'Max. úr.', '', false, null, 'max', true);
+      else if (lvl >= resMax(kind)) act(I.star, 'Max. úr.', '', false, null, 'max', true);
+      else if (nx && resHas(nx.id) && kind !== 'hall') act(icon, 'Úr. ' + (lvl + 1), '🔒 ' + hallWord() + ' ' + nx.c, false, 'Najprv vylepši ' + hallWord() + ' na úroveň ' + nx.c, 'locked');
+      else act(icon, 'Úr. ' + (lvl + 1), '🔒 výskum', false, 'Úroveň ' + (lvl + 1) + ' treba najprv vyskúmať (záložka Výskum na mape)', 'locked');
     };
     const selRow = (icon, title, stats) => {
       const d = document.createElement('div'); d.className = 'selLine';
@@ -6106,7 +6184,7 @@
         st.armyPick ? 'ťukni do zóny · ťuk na oddiel ho vráti do truhlice' : 'vyber oddiel, ťukni do zóny a potom Do útoku');
       for (const k in ARMY) {
         const a = ARMY[k], name = armyName(k) + (a.n > 1 ? ' ×' + a.n : '');
-        if (!armyOpen(k)) { lockAct(armyIcon(k), name, armyUnlock(k), !!a.siege); continue; }
+        if (!armyOpen(k)) { lockAct(armyIcon(k), name, armyTech(k), !!a.siege); continue; }
         const full = a.siege && depSiege(k) >= SIEGE_MAX, picked = st.armyPick === k;
         act(armyIcon(k), name + (a.siege ? ' ' + depSiege(k) + '/' + SIEGE_MAX : ''), full ? 'plné' : chestTxt(a.cost), !full && st.gold >= a.cost,
           full ? null : () => { st.armyPick = picked ? null : k; }, 'pick' + (picked ? ' sel' : ''), !!a.siege);
@@ -6122,7 +6200,7 @@
     // karta oživenia padnutého hrdinu raz preblikne v každom stavebnom kole
     const reviveAct = () => { const k = st.king; if (k && k.dead) { const c = reviveCost(); flashIf(act(heroIcon(st.hero), 'Oživiť', coinTxt(c), st.gold >= c, reviveKing, 'up'), true, 'revive' + st.mission + '.' + st.wave, () => saveJSON(sk('reviveSeen'), true)); } };
     const hallActs = () => {
-      upAct(st.hallLvl, hallCap(), hallUpCost(), () => { const c = hallUpCost(), lost = hallMax() - st.hallHp; st.gold -= c; st.hallLvl++; st.hallHp = Math.max(1, hallMax() - lost); st.king.hp = kingMax(); siegeGoHome(); }, null, bPreview({ kind: 'hall', lvl: st.hallLvl + 1 }), 'lvl' + (st.hallLvl + 1));
+      upAct(st.hallLvl, hallCap(), hallUpCost(), () => { const c = hallUpCost(), lost = hallMax() - st.hallHp; st.gold -= c; st.hallLvl++; st.hallHp = Math.max(1, hallMax() - lost); st.king.hp = kingMax(); siegeGoHome(); }, null, bPreview({ kind: 'hall', lvl: st.hallLvl + 1 }), 'lvl' + (st.hallLvl + 1), 'hall');
       reviveAct();
     };
     // informačná karta (nedá sa na ňu ťuknúť): obrázok, názov a údaj namiesto ceny
@@ -6137,7 +6215,7 @@
       hallActs();
     } else if (selGroup()) {
       // hromadné akcie pre označenú skupinu (rad hradieb alebo všetky stavby jedného druhu)
-      const grp = st.selGroup, kind = grp[0].kind, d = BUILD[kind], isWall = kind === 'wall', cap = bCap();
+      const grp = st.selGroup, kind = grp[0].kind, d = BUILD[kind], isWall = kind === 'wall', cap = kindCap(kind);
       const minL = Math.min(...grp.map(w => w.lvl)), maxL = Math.max(...grp.map(w => w.lvl));
       selRow(after(grp.find(w => w.lvl === maxL) || grp[0], { unit: null, gate: false }), (isWall ? 'Rad hradieb' : d.name + ' – všetky') + ' · ' + grp.length + ' ks', 'úroveň ' + (minL === maxL ? minL : minL + '–' + maxL) + ' · akcie platia pre celú skupinu, najprv pre najslabšie');
       // karta „pre všetky“: ak zlato nestačí, urobí toľko, koľko sa dá („3/6“)
@@ -6156,7 +6234,7 @@
         st.gold -= c; w.spent += c; w.lvl++;
         if (d.hp) w.hp = Math.ceil(bMaxHp(w) * ratio);
       }, 'up');
-      else upAct(maxL, maxL, 0, null, null, bPreview({ kind, lvl: maxL + 1 }));
+      else upAct(maxL, maxL, 0, null, null, bPreview({ kind, lvl: maxL + 1 }), null, kind);
       if (d.hp) bulk(I.actRepair, 'Opraviť', grp.filter(w => bRepairCost(w) > 0), bRepairCost, w => { st.gold -= bRepairCost(w); w.hp = bMaxHp(w); }, '', true);
       const refund = grp.reduce((t, w) => t + Math.floor(w.spent * sellShare()) + (w.unit ? Math.floor(w.unit.spent * sellShare()) : 0), 0);
       act(ICONS.coin, 'Predať ' + grp.length + '×', '+' + refund, true, sellAll(grp, refund), 'sell', true);
@@ -6165,7 +6243,7 @@
         if (has('wallArcher') && free.length) for (const type in WUNIT) {
           if (type === 'crossbow') continue; // kušník z ponuky vyradený (na hradby len lukostrelec)
           const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
-          if (!has(tid)) { lockAct(ICONS['u_' + type], wd.name, unlockMissionOf(tid)); continue; }
+          if (!open(tid)) { lockAct(ICONS['u_' + type], wd.name, tid); continue; }
           bulk(after(free[0], { unit: { type, lvl: 1 }, gate: false }), wd.name, free, () => wd.cost, w => { st.gold -= wd.cost; w.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit');
         }
       }
@@ -6194,12 +6272,12 @@
       if (b.gate) stats += ' · rytieri cez ňu prejdú';
       if ((UNIT_HOME[b.kind] || b.kind === 'range') && knightsBlocked(b)) stats = '<span class="warn">⚠ vojaci sa nedostanú von</span> · ' + stats;
       selRow(after(b, {}), (b.gate ? 'Brána' : iceMage(b) ? BUILD.icetower.name : d.name) + (fixedKind(b.kind) ? '' : ' · úr. ' + b.lvl), stats);
-      if (!fixedKind(b.kind)) upAct(b.lvl, bCap(), bUpCost(b), () => {
+      if (!fixedKind(b.kind)) upAct(b.lvl, kindCap(b.kind), bUpCost(b), () => {
         const ratio = d.hp ? b.hp / bMaxHp(b) : 1, c = bUpCost(b);
         st.gold -= c; b.spent += c; b.lvl++;
         if (d.hp) b.hp = Math.ceil(bMaxHp(b) * ratio);
         rebuildOcc();
-      }, null, after(b, { lvl: b.lvl + 1 }));
+      }, null, after(b, { lvl: b.lvl + 1 }), null, b.kind);
       const fc = bRepairCost(b);
       if (fc) act(I.actRepair, 'Opraviť', coinTxt(fc), st.gold >= fc, () => { st.gold -= fc; b.hp = bMaxHp(b); rebuildOcc(); }, '', true);
       const refund = Math.floor(b.spent * sellShare()) + (b.unit ? Math.floor(b.unit.spent * sellShare()) : 0);
@@ -6207,7 +6285,7 @@
       if (b.kind === 'barracks' && !isOrc()) { // jednotky kasární: všetky možnosti naraz, zvolená je označená; prepnutie zadarmo, medzi vlnami (vojaci odídu a vyjdú noví)
         for (const o of [{ mode: null, u: 'knight', name: 'Rytieri' }, { mode: 'spear', u: 'spear', name: 'Kopijníci', tech: 'armory' }]) {
           const on = (b.mode || null) === o.mode;
-          if (o.tech && !has(o.tech)) { lockAct(ICONS['u_' + o.u], o.name, unlockMissionOf(o.tech), true); continue; }
+          if (o.tech && !open(o.tech)) { lockAct(ICONS['u_' + o.u], o.name, o.tech, true); continue; }
           if (on) { act(ICONS['u_' + o.u], o.name, 'zvolené', true, () => {}, 'sel', true); continue; }
           if (st.phase !== 'build') { act(ICONS['u_' + o.u], o.name, 'medzi vlnami', false, 'Prepnúť sa dá medzi vlnami', 'locked', true); continue; }
           const btn = act(ICONS['u_' + o.u], o.name, 'zvoliť', true, () => {
@@ -6219,7 +6297,7 @@
       }
       if (b.kind === 'mage' && !isOrc()) { // ohnivá veža sa prepína medzi ohňom a ľadom (zadarmo, kedykoľvek)
         const ice = iceMage(b);
-        if (!has('icetower')) lockAct(after(b, { mode: 'ice' }), 'Ľad', unlockMissionOf('icetower'), true);
+        if (!open('icetower')) lockAct(after(b, { mode: 'ice' }), 'Ľad', 'icetower', true);
         else shineTech(act(after(b, { mode: ice ? null : 'ice' }), ice ? 'Oheň' : 'Ľad', 'prepnúť', true, () => { b.mode = ice ? null : 'ice'; b.cd = Math.max(b.cd, 0.5); }, 'up', true), 'icetower');
       }
       if (b.kind === 'tower' && !b.spec) {
@@ -6231,7 +6309,7 @@
         const u = b.unit;
         if (b.gate) act(after(b, { gate: false }), 'Na hradbu', '', true, () => { b.gate = false; });
         else if (!u) {
-          if (!has('gate')) lockAct(after(b, { gate: true }), 'Brána', unlockMissionOf('gate'));
+          if (!has('gate')) lockAct(after(b, { gate: true }), 'Brána', 'gate');
           else { const gc = gateCost(); shineTech(act(after(b, { gate: true }), 'Brána', coinTxt(gc), st.gold >= gc, () => { st.gold -= gc; b.spent += gc; b.gate = true; }), 'gate'); }
         }
         if (u) {
@@ -6240,7 +6318,7 @@
         } else if (!b.gate && has('wallArcher') && wallNoTower(b)) for (const type in WUNIT) { // strelci nie na vežičkách (rohy a konce hradby)
           if (type === 'crossbow') continue; // kušník z ponuky vyradený (na hradby len lukostrelec)
           const wd = WUNIT[type], tid = type === 'archer' ? 'wallArcher' : 'wallCrossbow';
-          if (!has(tid)) { lockAct(ICONS['u_' + type], wd.name, unlockMissionOf(tid)); continue; }
+          if (!open(tid)) { lockAct(ICONS['u_' + type], wd.name, tid); continue; }
           shineTech(act(after(b, { unit: { type, lvl: 1 } }), wd.name, coinTxt(wd.cost), st.gold >= wd.cost, () => { st.gold -= wd.cost; b.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit'), tid);
         }
       }
@@ -6273,11 +6351,11 @@
       for (const kind of order.filter(k => tab.kinds.includes(k) && (!BUILD[k].orc || isOrc()) && (!BUILD[k].human || !isOrc()))) {
         const d = BUILD[kind];
         const b = document.createElement('button');
-        if (!has(kind)) { // zamknutá stavba
-          const um = unlockMissionOf(kind);
+        if (!open(kind)) { // zamknutá stavba: chýba výskum, alebo na ňu nestačí úroveň hradu
+          const why = !has(kind) ? 'výskum' : hallWord() + ' ' + needHall(kind);
           b.className = 'pcard locked';
-          b.innerHTML = '<span class="pin"><span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost">🔒 misia ' + um + '</span></span></span>';
-          b.addEventListener('click', () => { toast(d.name + ' sa odomkne v misii ' + um); AUDIO.play('deny'); });
+          b.innerHTML = '<span class="pin"><span class="face front"><span class="pic"><img src="' + ICONS[kind] + '"></span><b>' + d.short + '</b><span class="cost">🔒 ' + why + '</span></span></span>';
+          b.addEventListener('click', () => { toast(!has(kind) ? d.name + ': najprv treba vyskúmať (záložka Výskum na mape)' : d.name + ': najprv vylepši ' + hallWord() + ' na úroveň ' + needHall(kind)); AUDIO.play('deny'); });
           pal.appendChild(b);
           continue;
         }
@@ -6311,7 +6389,7 @@
       });
       if (tab.id === 'siege') for (const key in BUY) { // obliehacie stroje: vyrazia so začiatkom vlny
         const u = BUY[key], icon = ICONS['u_' + u.siege];
-        if (!st.tech.has(u.siege)) { lockAct(icon, u.name, unlockMissionOf(u.siege), true); continue; }
+        if (!open(u.siege)) { lockAct(icon, u.name, u.siege, true); continue; }
         if (campGone()) { act(icon, u.name, 'tábor zničený', false, 'Tábor hordy je zničený – obliehacie stroje už netreba', 'locked', true); continue; }
         const n = siegeCount(key), full = n >= SIEGE_MAX;
         const picked = !!(st.siegePick && st.siegePick.key === key);
@@ -6705,7 +6783,7 @@
     : { archer: isOrc() ? 'Goblin strelec' : 'Lukostrelec', falcon: isOrc() ? 'Netopier' : 'Sokol', monk: isOrc() ? 'Šaman' : 'Mních' }[k];
   const armyIcon = k => ARMY[k].siege ? ICONS['u_' + BUY[k].siege] : ICONS['u_' + k];
   const armyTech = k => ARMY[k].siege ? BUY[k].siege : isOrc() ? ARMY[k].home : { spear: 'armory' }[k] || ARMY[k].home; // ľudia: kopijníci z kasární
-  const armyOpen = k => ARMY[k].siege ? st.tech.has(BUY[k].siege) : has(armyTech(k));
+  const armyOpen = k => ARMY[k].siege ? has(BUY[k].siege) : has(armyTech(k));
   const armyUnlock = k => unlockMissionOf(armyTech(k));
   const depAt = (c, r) => st.deps.find(d => d.c === c && d.r === r);
   const depSiege = k => st.deps.filter(d => d.key === k).length;
@@ -6715,7 +6793,8 @@
     if (!inZone(c, r) || (occAt(c, r) && occAt(c, r) !== HALL) || depAt(c, r)) { AUDIO.play('deny'); return false; } // radnica tu nie je – aj jej políčka sú voľné
     if (a.siege && depSiege(k) >= SIEGE_MAX) { toast('Najviac ' + SIEGE_MAX + '× ' + armyName(k).toLowerCase()); AUDIO.play('deny'); return false; }
     if (st.gold < a.cost) { toast('V truhlici nie je dosť zlatiek'); AUDIO.play('deny'); return false; }
-    const id = ++st.depN, lvl = lvlCap(), b = { kind: a.home || 'barracks', lvl, c, r, army: true, mode: k === 'spear' ? 'spear' : null }, n0 = st.soldiers.length;
+    const id = ++st.depN, lvl = Math.max(1, resLvl(a.home || 'barracks')), b = { // oddiel má úroveň, akú má hráč vyskúmanú pre jeho budovu
+      kind: a.home || 'barracks', lvl, c, r, army: true, mode: k === 'spear' ? 'spear' : null }, n0 = st.soldiers.length;
     if (a.siege) { const p = siegeCellPos(c, r); spawnSiege(a.siege, p.x, p.y); }
     else for (let i = 0; i < a.n; i++) {
       if (k === 'archer') spawnArcher(b, true);
@@ -6899,7 +6978,7 @@
     if (n) toast('+' + n + ' zlatiek do truhlice');
   }
   const siegeCount = kind => st.soldiers.filter(s => s.siege === kind && !s.dead).length + st.siegeOrder.filter(o => o.key === kind).length;
-  const canSiege = key => st.tech.has(BUY[key].siege) && !campGone(); // v každej misii, keď je stroj raz odomknutý, kým stojí tábor hordy
+  const canSiege = key => open(BUY[key].siege) && !campGone(); // v každej misii, keď je stroj raz odomknutý, kým stojí tábor hordy
   const campGone = () => !!st.camp && !isAssault() && campLive().length === 0; // celý tábor hordy zbúraný
   // kúpa stroja na miesto (x, y); bez miesta postaví stroj vedľa radnice (simulácia)
   function orderSiege(key, x, y) {
@@ -7046,8 +7125,7 @@
     $('mMeta').innerHTML = missionWaves(m) + ' vĺn · obtiažnosť <span class="stars">' + '●'.repeat(diff) + '<i>' + '●'.repeat(5 - diff) + '</i></span>' + (done ? ' · <span class="ok">splnená ✓</span>' : '');
     const foes = [].concat(enemyIntro(m) || []);
     $('mNew').innerHTML = (foes.length ? '<span>' + (foes.length > 1 ? 'Nepriatelia:' : 'Nepriateľ:') + '</span>' + foes.map(foe => '<em class="foe"><img src="' + ICONS['e_' + foe.id] + '">' + foe.name + '</em>').join('') : '') +
-      ((unlocksOf()[m - 1] || []).length ? '<span>' + (m === 1 ? 'Výbava:' : 'Novinka:') + '</span>' + unlocksOf()[m - 1].map(u => '<em><img src="' + ICONS[u.icon] + '">' + unlockName(u) + '</em>').join('')
-        : m === landLast(landOfMission(m)) && landOfMission(m).reward ? '<span>Odmena za územie:</span><em>' + landOfMission(m).reward.txt + '</em>' : ''); // mimo domovského ostrova nové stavby nie sú, posledná misia územia dá odmenu
+      (m === landLast(landOfMission(m)) && landOfMission(m).reward ? '<span>Odmena za územie:</span><em>' + landOfMission(m).reward.txt + '</em>' : ''); // stavby a vylepšenia sa odomykajú výskumom, posledná misia územia dá odmenu
     // úroveň misie: predvolene prvá otvorená bez plných 3 hviezd
     if (st.mapTierFor !== m) {
       st.mapTierFor = m; st.mapTier = 0;
@@ -7086,7 +7164,7 @@
     renderMapHead();
   }
   $('heroHome').querySelector('img').src = UI_ICONS.homeTab;
-  $('icoHome').src = FINE_ICONS.home; $('icoTrophy').src = FINE_ICONS.trophy; $('icoSwords').src = FINE_ICONS.swords; $('icoShop').src = FINE_ICONS.chest; $('icoWorld').src = FINE_ICONS.globe; // ikonky menu v jemnej kresbe (icons-fine.js)
+  $('icoHome').src = FINE_ICONS.home; $('icoTrophy').src = FINE_ICONS.trophySmall; $('icoResearch').src = FINE_ICONS.research; $('icoSwords').src = FINE_ICONS.swords; $('icoShop').src = FINE_ICONS.chest; $('icoWorld').src = FINE_ICONS.globe; // ikonky menu v jemnej kresbe (icons-fine.js)
   let boxDown = false; // položil sa prst/myš do okna misie od jeho otvorenia?
   const openMission = () => { renderMapPanel(); boxDown = false; $('missionBox').hidden = false; };
   const closeMission = () => { $('missionBox').hidden = true; };
@@ -7244,6 +7322,9 @@
     mapTab = t;
     document.querySelectorAll('.tabCard').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
     $('heroBtn').classList.toggle('on', t === 'heroes'); // Hrdinovia sa otvárajú okienkom hrdinu vľavo hore
+    $('trophyBtn').classList.toggle('on', t === 'trophies'); // Trofeje tlačidlom vpravo hore pod hlavným menu
+    $('research').hidden = t !== 'research';
+    if (t === 'research') renderResearch(true);
     if (t === 'world' && !st.world) openWorld(); // karta Mapa = mapa sveta, karta Boj = mapa územia
     if (t === 'map' && st.world && !st.sail && st.phase === 'map') enterLand(st.land);
     $('perks').hidden = t !== 'hall'; $('heroes').hidden = t !== 'heroes'; $('trophies').hidden = t !== 'trophies'; $('shop').hidden = t !== 'shop';
@@ -7256,6 +7337,67 @@
     }
     closeMission(); renderMapBar();
     if (!quiet) AUDIO.play('click');
+  }
+  // ---- Výskum: 5 veľkých kariet nad sebou (I dole, V hore), posúvajú sa prstom; ťuk na výskum ho označí, druhý ťuk kúpi za zlatky z truhlice ----
+  let resPick = null; // označený výskum (čaká na potvrdenie druhým ťukom)
+  const RES_NAME = { hall: () => isOrc() ? 'Pevnosť' : 'Hrad', wallArcher: () => isOrc() ? 'Strelec na palisáde' : 'Lukostrelci na hradbách', spear: () => isOrc() ? 'Zbrojnica' : 'Kopijníci',
+    ice: () => 'Ľadový plameň', siegeRam: () => BUY.ram.name, siegeCat: () => 'Katapult', hedge: () => BUILD[isOrc() ? 'mud' : 'hedge'].name };
+  const resBuild = r => r.kind === 'pitch' && isOrc() ? 'icetower' : r.kind; // za orkov je na mieste smolnej veže jedový kotol
+  const resName = r => (RES_NAME[r.kind] ? RES_NAME[r.kind]() : BUILD[resBuild(r)].short) + (r.lvl ? ' ' + r.lvl : '');
+  function resIcon(r) {
+    try {
+      const k = resBuild(r);
+      if (r.kind === 'hall') return spriteURL(bsprOf('hall', r.lvl), 2);
+      if (r.kind === 'wall') return spriteURL(wallsOf()[r.lvl - 1][10], 3);
+      if (r.kind === 'wallArcher') return ICONS.u_archer;
+      if (r.kind === 'spear') return isOrc() ? ICONS.armory : ICONS.u_spear;
+      if (r.kind === 'ice') return ICONS.mageIce;
+      if (r.kind === 'paving') return ICONS.paving || spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3);
+      if (r.kind === 'siegeRam' || r.kind === 'siegeCat') return ICONS['u_' + r.kind];
+      if (r.kind === 'hedge') return ICONS[isOrc() ? 'mud' : 'hedge'] || sprIcon(BSPR.hedge);
+      if (TRAPS[k]) return ICONS[k] || sprIcon(BSPR[k]);
+      return sprIcon(bsprOf(k, r.lvl));
+    } catch (e) { return ICONS[resBuild(r)] || ICONS.hall; }
+  }
+  function buyResearch(r) {
+    if (resHas(r.id) || resBlock(r) || (st.chest || 0) < r.cost) return;
+    st.chest -= r.cost; saveJSON(sk('chest'), st.chest);
+    st.res.add(r.id); saveRes();
+    resPick = null;
+    AUDIO.play('upgrade'); toast('Vyskúmané: ' + resName(r));
+    renderResearch(); renderMapHead();
+  }
+  function renderResearch(scroll) {
+    const list = $('resList'), keep = $('research').scrollTop;
+    list.innerHTML = '';
+    let cur = 1; while (cur < 5 && resCardOpen(cur + 1)) cur++; // najvyššia otvorená karta
+    for (let c = 5; c >= 1; c--) {
+      const items = RES.filter(r => r.c === c), need = items.filter(r => !r.opt), got = need.filter(r => resHas(r.id)).length, opn = resCardOpen(c);
+      const card = document.createElement('section');
+      card.className = 'resCard' + (opn ? '' : ' locked') + (got === need.length ? ' done' : '') + (c === cur ? ' cur' : '');
+      card.innerHTML = '<header><span class="roman">' + ROMAN[c] + '</span><div><b>' + RES_NAME.hall() + ' úrovne ' + c + '</b><small>' +
+        (!opn ? '🔒 najprv dokonči kartu ' + ROMAN[c - 1] : got === need.length ? 'povinné výskumy hotové ✓' : 'povinné výskumy ' + got + ' / ' + need.length) + '</small></div></header>';
+      const grid = document.createElement('div'); grid.className = 'resGrid';
+      for (const r of items) {
+        const done = resHas(r.id), why = done ? null : resBlock(r), poor = !done && !why && (st.chest || 0) < r.cost, pick = resPick === r.id && !done && !why && !poor;
+        const b = document.createElement('button');
+        b.className = 'resItem' + (done ? ' done' : why ? ' locked' : poor ? ' poor' : ' buy') + (r.kind === 'hall' ? ' hall' : '') + (pick ? ' sel' : '');
+        b.innerHTML = (r.opt ? '<em class="opt">nepovinné</em>' : '') + '<span class="pic"><img src="' + resIcon(r) + '" alt=""></span><b>' + resName(r) + '</b>' +
+          '<span class="cost">' + (done ? (r.cost ? '✓ vyskúmané' : '✓ od začiatku') : pick ? 'Vyskúmať?' : '<img src="' + UI_ICONS.coinsFine + '" alt="">' + r.cost) + '</span>';
+        b.addEventListener('click', () => {
+          if (done) return;
+          if (why) { toast(why); AUDIO.play('deny'); return; }
+          if (poor) { toast('Chýba ' + (r.cost - (st.chest || 0)) + ' zlatiek – zlatky získaš v misiách'); AUDIO.play('deny'); return; }
+          if (resPick === r.id) { buyResearch(r); return; }
+          resPick = r.id; AUDIO.play('click'); renderResearch();
+        });
+        grid.appendChild(b);
+      }
+      card.appendChild(grid); list.appendChild(card);
+    }
+    const scr = $('research');
+    if (scroll) { const el = list.querySelector('.resCard.cur'); scr.scrollTop = el ? Math.max(0, el.offsetTop + el.offsetHeight - scr.clientHeight + 16) : scr.scrollHeight; } // otvorí sa pri aktuálnej karte (I je dole)
+    else scr.scrollTop = keep;
   }
   // ---- Nákupy: odomknutie rás, hrdinov alebo všetkého naraz (platby cez obchod aplikácií prídu neskôr) ----
   function renderShop() {
@@ -7284,6 +7426,7 @@
   }
   document.querySelectorAll('.tabCard').forEach(b => b.addEventListener('click', () => { if (b.dataset.tab !== mapTab) setTab(b.dataset.tab); }));
   $('heroBtn').addEventListener('click', () => setTab(mapTab === 'heroes' ? (st.world ? 'world' : 'map') : 'heroes')); // druhé ťuknutie Hrdinov zavrie
+  $('trophyBtn').addEventListener('click', () => setTab(mapTab === 'trophies' ? (st.world ? 'world' : 'map') : 'trophies')); // druhé ťuknutie Trofeje zavrie
   $('icoStar').src = UI_ICONS.starFine; $('icoCoins').src = UI_ICONS.coinsFine;
   $('starBox').addEventListener('click', () => toast('Hviezdy získané v misiách – míňajú sa v Kráľovskej sieni'));
   $('pctBox').addEventListener('click', () => toast('Dobyté územia v celom svete'));
@@ -7324,11 +7467,7 @@
 
   // ---- kartičky s novinkami: po rozsvietení ďalšieho hradu, hráč ich odťuká jednu po druhej ----
   function unlockItems(m) {
-    const items = (unlocksOf()[m - 1] || []).map(u => ({
-      icon: ICONS[u.icon], name: unlockName(u),
-      tag: (u.id === 'icetower' || u.id === 'armory') && !isOrc() ? 'Nové vylepšenie' : BUILD[u.id] ? 'Nová stavba' : ABIL[u.id] ? 'Kráľova schopnosť' : /^(volley|fireball|freeze|lightning)$/.test(u.id) ? 'Kúzlo' : 'Nové vylepšenie',
-      desc: u.desc || (BUILD[u.id] ? BUILD[u.id].desc + '.' : ''),
-    }));
+    const items = []; // stavby a vylepšenia sa odomykajú výskumom – kartičky po misii oznamujú už len nových nepriateľov
     for (const foe of [].concat(enemyIntro(m) || [])) items.push({ icon: ICONS['e_' + foe.id], name: foe.name, tag: ENEMY[foe.id].giant ? (isOrc() ? 'Pozor – obor ľudí' : 'Pozor – obor hordy') : 'Pozor – nový nepriateľ', desc: foe.desc.charAt(0).toUpperCase() + foe.desc.slice(1) + '.', foe: true });
     return items;
   }
@@ -7765,5 +7904,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, HEROES, switchHero, setActiveHero, ownedHeroes, heroDef, heroWalkHome, siegeWalkHome,
-    enterBuild, enterLand, openWorld, worldLandAt, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, openHeroUp, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, orderSiege, SIEGE_BUY: BUY, knightsBlocked, applyRace, placeAt, bldLimit, deployArmy, ARMY, depAt, get island() { return island; }, mapOX, get mapView() { return { cam: mapCam, camX: mapCamX, W, H, low: mapBarH() * DPR / S, head: MAP_HEAD }; } };
+    enterBuild, enterLand, openWorld, worldLandAt, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, openHeroUp, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, orderSiege, SIEGE_BUY: BUY, knightsBlocked, applyRace, placeAt, bldLimit, deployArmy, ARMY, depAt, get island() { return island; }, mapOX, RES, resHas, kindCap, renderResearch, get res() { return st.res; }, get mapView() { return { cam: mapCam, camX: mapCamX, W, H, low: mapBarH() * DPR / S, head: MAP_HEAD }; } };
 })();
