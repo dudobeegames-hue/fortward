@@ -239,6 +239,23 @@
     max-height: 62%; overflow-y: auto; touch-action: pan-y;
   }
   @keyframes up { from { transform: translateY(100%); } }
+  /* tlačidlá stavania na hracej ploche (polohu nastavuje hra podľa zóny a panela) */
+  #buildBtns { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
+  #buildBtns[hidden] { display: none; }
+  #buildBtns button { pointer-events: auto; }
+  #nextWave { position: absolute; left: 50%; transform: translateX(-50%); width: auto; min-width: 150px; height: 48px; padding: 0 22px; font-size: 18px;
+    box-shadow: inset 0 -4px 0 var(--blue2), inset 0 2px 0 rgba(255,255,255,.3), 0 4px 12px rgba(0,0,0,.55); }
+  #nextWave:active { transform: translateX(-50%) translateY(2px); }
+  #sideBtns { position: absolute; right: 10px; display: flex; flex-direction: column; gap: 12px; }
+  .roundBtn { position: relative; width: 52px; height: 52px; padding: 0; border-radius: 50%; display: grid; place-items: center;
+    border: 3px solid var(--ink); background: radial-gradient(circle at 35% 30%, #6a5440, #3a2c22 70%);
+    box-shadow: inset 0 -4px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.18), 0 4px 10px rgba(0,0,0,.5); }
+  .roundBtn[hidden] { display: none; }
+  .roundBtn img { width: 28px; height: 28px; image-rendering: pixelated; }
+  .roundBtn:active { transform: translateY(2px); }
+  .roundBtn:disabled { filter: grayscale(.7) brightness(.75); }
+  .roundBtn .rcost { position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%); padding: 0 5px; border-radius: 8px; border: 2px solid var(--ink);
+    background: #1a120d; color: var(--gold); font-style: normal; font-size: 11px; font-weight: 700; line-height: 15px; white-space: nowrap; }
   #palette { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; padding-bottom: 2px; scroll-snap-type: x mandatory; }
   #palette::-webkit-scrollbar { display: none; }
   /* posuvníky sa nikde nezobrazujú – okná sa posúvajú ťahom prsta (alebo kolieskom myši) */
@@ -677,7 +694,7 @@
   }
   /* za orkov oranžový neón namiesto modrého */
   .orcs .pcard.newFlash .face { animation-name: neonFlashOrc; }
-  #repairBtn.neon { animation: neonFlash 2.8s ease-in-out infinite; }
+  #repairBtn.neon { animation: neonFlash 2.8s ease-in-out 1; } /* raz preblikne na začiatku stavby po vlne */
   .orcs #repairBtn.neon { animation-name: neonFlashOrc; }
   @keyframes neonFlashOrc {
     0%, 10% { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
@@ -982,10 +999,13 @@
   <div id="build" hidden>
     <div id="selRow"></div>
     <div id="palette"></div>
-    <div class="brow undoRow">
-      <button id="repairBtn" class="btn"></button>
-      <button id="undoBtn" class="btn undo" disabled>Späť</button>
-      <button id="nextWave" class="primary">Do boja</button>
+  </div>
+  <!-- tlačidlá stavania na hracej ploche: Do boja v strede (nad zónou), vpravo v strede okrúhle Späť a Opraviť všetko -->
+  <div id="buildBtns" hidden>
+    <button id="nextWave" class="primary">Do boja</button>
+    <div id="sideBtns">
+      <button id="undoBtn" class="roundBtn" title="Späť" aria-label="Späť" hidden><img id="icoUndo" alt=""></button>
+      <button id="repairBtn" class="roundBtn" title="Opraviť všetko" aria-label="Opraviť všetko" hidden><img id="icoRepair" alt=""><em class="rcost"></em></button>
     </div>
   </div>
 

@@ -561,6 +561,10 @@
   }
   const isNew = id => (!!BUILD[id] || !!SHINE_TECH[id] || !!RES_BY[id]) && has(id) && !seenNew.includes(id);
   function markSeen(id) { if (seenNew.includes(id)) return; seenNew.push(id); saveJSON(sk('seenNew'), seenNew); }
+  // čo hráč už videl zamknuté (zámok v stavebnom paneli) – len pri tom sa po odomknutí zámok otvorí; vec dostupná od začiatku len zabliká
+  let lockSeen = null;
+  const lockSeenSet = () => lockSeen || (lockSeen = new Set(loadJSON(sk('lockSeen'), [])));
+  function markLocked(id) { if (!id) return; const L = lockSeenSet(); if (L.has(id)) return; L.add(id); saveJSON(sk('lockSeen'), [...L]); }
   // novo odomknutý hrdina (pre celý účet)
   const HEROES_SEEN_KEY = 'fortward.heroesSeen';
   function heroesSeen() {
@@ -585,7 +589,7 @@
     if (age < FLASH_MS) {
       el.classList.add('newFlash'); el.querySelector('.face').style.animationDelay = (-age) + 'ms';
       const pic = el.querySelector('.pic');
-      if (pic && age < 1100) { // zámok, ktorý tu doteraz bol, sa otvorí a odletí – hráč vidí, čo sa práve odomklo
+      if (pic && age < 1100 && lockSeenSet().has(id)) { // zámok, ktorý tu doteraz bol, sa otvorí a odletí – hráč vidí, čo sa práve odomklo
         const fx = document.createElement('img'); fx.className = 'unlockFx'; fx.src = FINE_ICONS.lockOpen; fx.alt = '';
         fx.style.animationDelay = (-age) + 'ms'; pic.appendChild(fx);
       }
@@ -645,6 +649,7 @@
     Object.assign(ach, loadJSON(sk('ach'), {}));
     achSeen = loadJSON(sk('achSeen'), 0);
     st.unlocked = Math.max(1, Math.min(MAX_MISSION + 1, parseInt(localStorage.getItem(sk('unlocked')) || '1', 10) || 1));
+    lockSeen = null; // zoznam vecí videných zamknuté patrí pozícii
     loadRes(); // výskum pozície (pred novinkami – tie sa rátajú z vyskúmaného)
     loadSeen();
     // prejdené misie bez záznamu hviezd (vyhrané pred zavedením hviezd) dostanú 1 bronzovú – víťazstvo dáva vždy aspoň 1
@@ -1311,6 +1316,7 @@
   }
   function enterBuild() {
     st.phase = 'build';
+    st.repairFlash = st.wave > 0; // po vlne kladivo (Opraviť všetko) raz preblikne
     st.moving = null;
     AUDIO.music('build');
     st.tool = null; st.sel = null;
@@ -5880,7 +5886,22 @@
     $('xpFill').style.width = (kingMeta.lvl >= KING_MAX_LVL ? 100 : Math.min(100, kingMeta.xp / kingXpNeed(kingMeta.lvl) * 100)) + '%';
   }
 
+  // tlačidlá stavania na hracej ploche: viditeľné spolu so stavebným panelom; Do boja v strede viditeľného bojiska
+  // (ak by zasahovalo do stavebnej zóny, posunie sa nad ňu), Späť a Opraviť všetko vpravo v strede
+  function placeBuildBtns() {
+    const bb = $('buildBtns'), on = !$('build').hidden && st.phase === 'build';
+    if (bb.hidden === on) bb.hidden = !on;
+    if (!on) return;
+    const hud = $('hud'), top = hud && !hud.hidden ? hud.getBoundingClientRect().bottom - $('game').getBoundingClientRect().top + 8 : 60;
+    const bot = $('game').clientHeight - $('build').offsetHeight - 10, mid = (top + bot) / 2;
+    const zone = (tileY(zoneTopRow()) - camY) * S / DPR; // horná hrana stavebnej zóny na obrazovke
+    let y = mid - 74;
+    if (zone < y + 110) y = Math.max(top, zone - 110);         // vysoko nad zónou, aby nezavadzalo pri stavaní
+    $('nextWave').style.top = Math.round(y) + 'px';
+    $('sideBtns').style.top = Math.round(mid - 58) + 'px';
+  }
   function hudTick() {
+    placeBuildBtns();
     const k = st.king, kp = $('hud-king');
     if (k) {
       const r = k.dead ? 0 : Math.max(0, k.hp / kingMax());
@@ -6160,18 +6181,18 @@
     const shineTech = (el, id) => flashIf(el, isNew(id), id, () => markSeen(id));
     const I = UI_ICONS;
     // zamknutá karta: m = číslo misie (staré odomykanie), alebo meno veci vo výskume – tá chýba vo výskume, alebo na ňu nestačí úroveň hradu
-    const lockCard = (hint, msg) => act(FINE_ICONS.lock, '', hint, false, msg, 'locked lockCard');
+    const lockCard = (hint, msg, id) => { markLocked(id); return act(FINE_ICONS.lock, '', hint, false, msg, 'locked lockCard'); };
     const lockAct = (icon, label, m) => typeof m === 'number' ? lockCard('misia ' + m, label + ' sa odomkne v misii ' + m)
-      : !has(m) ? lockCard('výskum', 'Najprv treba vyskúmať (záložka Výskum na mape)')
-      : lockCard(hallWord() + ' ' + needHall(m), 'Najprv vylepši ' + hallWord() + ' na úroveň ' + needHall(m));
+      : !has(m) ? lockCard('výskum', 'Najprv treba vyskúmať (záložka Výskum na mape)', m)
+      : lockCard(hallWord() + ' ' + needHall(m), 'Najprv vylepši ' + hallWord() + ' na úroveň ' + needHall(m), m);
     // ďalšia úroveň: kúpiť / najprv radnica / zamknutá do misie / maximum
     // icon = náhľad stavby na ďalšej úrovni
     const upAct = (lvl, cap, cost, apply, label, icon, newId, kind) => {
       const nx = RES.find(r => r.kind === resKindOf(kind) && r.lvl === lvl + 1); // výskum ďalšej úrovne
       if (lvl < cap) shineTech(act(icon, label || 'Vylepšiť', coinTxt(cost), st.gold >= cost, apply, 'up'), newId || (nx && nx.id));
       else if (lvl >= resMax(kind)) act(I.star, 'Max. úr.', '', false, null, 'max', true);
-      else if (nx && resHas(nx.id) && kind !== 'hall') lockCard(hallWord() + ' ' + nx.c, 'Najprv vylepši ' + hallWord() + ' na úroveň ' + nx.c);
-      else lockCard('výskum', 'Úroveň ' + (lvl + 1) + ' treba najprv vyskúmať (záložka Výskum na mape)');
+      else if (nx && resHas(nx.id) && kind !== 'hall') lockCard(hallWord() + ' ' + nx.c, 'Najprv vylepši ' + hallWord() + ' na úroveň ' + nx.c, nx.id);
+      else lockCard('výskum', 'Úroveň ' + (lvl + 1) + ' treba najprv vyskúmať (záložka Výskum na mape)', nx ? nx.id : newId);
     };
     const selRow = (icon, title, stats) => {
       const d = document.createElement('div'); d.className = 'selLine';
@@ -6185,7 +6206,6 @@
       st.soldiers = st.soldiers.filter(s => !s.dead);
       rebuildOcc();
     };
-    $('undoBtn').hidden = $('repairBtn').hidden = isAssault();
     if (isAssault()) { // útok na hrad: namiesto stavieb oddiely vojska za zlatky z truhlice
       const n = st.soldiers.filter(u => !u.dead).length;
       selRow(ICONS.chest, 'Vojsko · ' + n + (n === 1 ? ' jednotka' : n && n < 5 ? ' jednotky' : ' jednotiek'),
@@ -6199,6 +6219,7 @@
       }
       $('nextWave').textContent = 'Do útoku!';
       $('nextWave').disabled = !st.deps.length;
+      $('undoBtn').hidden = $('repairBtn').hidden = true; // pri útoku na hrad sa nestavia budovy
       updateHud();
       return;
     }
@@ -6208,7 +6229,7 @@
     // karta oživenia padnutého hrdinu raz preblikne v každom stavebnom kole
     const reviveAct = () => { const k = st.king; if (k && k.dead) { const c = reviveCost(); flashIf(act(heroIcon(st.hero), 'Oživiť', coinTxt(c), st.gold >= c, reviveKing, 'up'), true, 'revive' + st.mission + '.' + st.wave, () => saveJSON(sk('reviveSeen'), true)); } };
     const hallActs = () => {
-      upAct(st.hallLvl, hallCap(), hallUpCost(), () => { const c = hallUpCost(), lost = hallMax() - st.hallHp; st.gold -= c; st.hallLvl++; st.hallHp = Math.max(1, hallMax() - lost); st.king.hp = kingMax(); siegeGoHome(); }, null, bPreview({ kind: 'hall', lvl: st.hallLvl + 1 }), 'lvl' + (st.hallLvl + 1), 'hall');
+      upAct(st.hallLvl, hallCap(), hallUpCost(), () => { const c = hallUpCost(), lost = hallMax() - st.hallHp; st.gold -= c; st.hallLvl++; st.hallHp = Math.max(1, hallMax() - lost); st.king.hp = kingMax(); siegeGoHome(); }, null, bPreview({ kind: 'hall', lvl: st.hallLvl + 1 }), 'hall' + (st.hallLvl + 1), 'hall');
       reviveAct();
     };
     // informačná karta (nedá sa na ňu ťuknúť): obrázok, názov a údaj namiesto ceny
@@ -6361,7 +6382,7 @@
         const b = document.createElement('button');
         if (!open(kind)) { // zamknutá stavba: chýba výskum, alebo na ňu nestačí úroveň hradu
           const why = !has(kind) ? 'výskum' : hallWord() + ' ' + needHall(kind);
-          b.className = 'pcard locked lockCard';
+          b.className = 'pcard locked lockCard'; markLocked(kind);
           b.innerHTML = '<span class="pin"><span class="face front"><span class="pic"><img src="' + FINE_ICONS.lock + '" alt=""></span><b></b><span class="cost">' + why + '</span></span></span>';
           b.addEventListener('click', () => { toast(!has(kind) ? 'Najprv treba vyskúmať (záložka Výskum na mape)' : 'Najprv vylepši ' + hallWord() + ' na úroveň ' + needHall(kind)); AUDIO.play('deny'); });
           pal.appendChild(b);
@@ -6408,11 +6429,16 @@
     }
     $('nextWave').textContent = 'Do boja';
     const rc = repairCost();
-    $('undoBtn').disabled = !undoStack.length;
+    $('undoBtn').hidden = !undoStack.length; // Späť sa ukáže až po prvej akcii (napr. postavení budovy)
     const rb = $('repairBtn');
-    rb.innerHTML = '<span>Opraviť všetko</span>' + (rc ? '<span class="cost"><img class="coin" src="' + ICONS.coin + '">' + rc + '</span>' : '');
+    rb.hidden = !rc; // Opraviť všetko len keď je niečo poškodené
+    rb.querySelector('.rcost').textContent = rc || '';
     rb.disabled = !rc || st.gold < rc;
-    rb.classList.toggle('neon', !!rc && st.gold >= rc); // poškodené budovy: tlačidlo bliká neónom ako karta Oživiť (ľudia modrý, orkovia oranžový)
+    if (rc && st.repairFlash) { // na začiatku stavby po vlne kladivo raz preblikne neónom (ľudia modrý, orkovia oranžový)
+      st.repairFlash = false;
+      rb.classList.remove('neon'); void rb.offsetWidth; rb.classList.add('neon');
+      setTimeout(() => rb.classList.remove('neon'), 3000);
+    }
     updateHud();
   }
 
@@ -6749,12 +6775,13 @@
     AUDIO.play('click'); syncStance();
   });
   $('undoBtn').addEventListener('click', doUndo);
+  $('icoUndo').src = FINE_ICONS.undo; $('icoRepair').src = FINE_ICONS.hammer;
   $('warcryBtn').addEventListener('click', () => ability('warcry'));
   document.querySelectorAll('.spell').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); selectSpell(b.dataset.spell); }));
   $('repairBtn').addEventListener('click', () => {
     const rc = repairCost();
     if (!rc || st.gold < rc) return;
-    snapshot();
+    undoStack = []; // opravu nemožno vrátiť (ani skoršie kroky – vrátili by poškodenie aj zlato)
     st.gold -= rc;
     for (const b of st.blds) if (BUILD[b.kind].hp) b.hp = bMaxHp(b);
     rebuildOcc(); renderBuild();

@@ -230,5 +230,40 @@ const FINE_ICONS = (() => {
     });
   });
 
-  return { swords, hall, globe, trophy, trophySmall, research, chest, home, map: mapIcon(false), mapOn: mapIcon(true), lock: lockIcon(false), lockOpen: lockIcon(true) };
+  // ---- Späť: zatočená šípka dozadu – hrubý oblúk (polkruh vpravo, otvorený vľavo), dole ide rovno doľava a hore končí hrotom smerujúcim doľava ----
+  const undo = icon(28, 28, each => {
+    const cx = 15, cy = 14, ro = 8.5, ri = 4.8;
+    each((px, py) => {
+      const dx = px - cx, dy = py - cy, d = Math.hypot(dx, dy);
+      if (dx >= 0 && d >= ri && d <= ro) { // pravý polkruh
+        const lit = d > ro - 1.3 ? (dy < 0 ? 5 : 2.4) : d < ri + 1.1 ? 1.4 : 3.4;
+        return pick(STEEL, lit - (dy > 3 ? 0.6 : 0));
+      }
+      if (dx < 0 && dx > -9 && py >= cy + ri && py <= cy + ro) return pick(STEEL, py > cy + ro - 1.3 ? 1.6 : py < cy + ri + 1.1 ? 4 : 3.2); // spodné rameno doľava
+      if (dx < 0 && dx > -3 && py <= cy - ri && py >= cy - ro) return pick(STEEL, py < cy - ro + 1.3 ? 5 : 3.6);                        // horné rameno k hrotu
+      // hrot smerujúci doľava na hornom ramene
+      const tx = px - (cx - 3), ty = py - (cy - (ri + ro) / 2);
+      if (tx <= 0 && tx > -7.5 && Math.abs(ty) <= 6.2 + tx * 0.83) return pick(STEEL, ty < -1 ? 5 : ty > 1.5 ? 2 : 3.8);
+      return null;
+    });
+  });
+
+  // ---- Opraviť všetko: kladivo (drevená rúčka šikmo, oceľová hlava) ----
+  const hammer = icon(28, 28, each => {
+    each((px, py) => {
+      // rúčka: z ľavého dolného rohu k stredu hlavy
+      const ux = 0.7071, uy = -0.7071, ox = 6, oy = 23; // smer rúčky (vpravo hore)
+      const dx = px - ox, dy = py - oy, u = dx * ux + dy * uy, v = -dx * uy + dy * ux;
+      // hlava: obdĺžnik kolmo na rúčku pri jej konci
+      if (u > 12.5 && u < 19.5 && Math.abs(v) < 7.5) {
+        const face = v > 5.5 ? 'K' : null;
+        const lit = (u < 13.8 ? 5 : u > 18.2 ? 1 : 3.4) + (v < -5.5 ? 0.6 : v > 4.5 ? -1.4 : 0);
+        return v > 6.2 ? STEEL[0] : pick(STEEL, lit);
+      }
+      if (u > -1 && u <= 13 && Math.abs(v) < 1.8) return pick(WOOD, (v < -0.4 ? 5 : v > 0.7 ? 2 : 4) - (u < 2 ? 1 : 0)); // rúčka
+      return null;
+    });
+  });
+
+  return { swords, hall, globe, trophy, trophySmall, research, chest, home, map: mapIcon(false), mapOn: mapIcon(true), lock: lockIcon(false), lockOpen: lockIcon(true), undo, hammer };
 })();
