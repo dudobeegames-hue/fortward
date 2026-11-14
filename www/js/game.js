@@ -3384,11 +3384,13 @@
 
   // ---------------- Render ----------------
   // kde snímka (jemná kresba) skutočne stojí: najspodnejší riadok kresby a šírka postavy pri zemi (v bodoch hry), raz za snímku
-  function footOf(fr) {
+  // minW = najmenšia šírka riadku zeme v bodoch hry: mág má palicu, ktorej hrot šikmo nahor siaha pod rúcho –
+  // tieň sa zarovnal na hrot a mág vyzeral, že letí (kopytá jazdca sú rovnako úzke, preto len pre mága)
+  function footOf(fr, minW) {
     if (fr._foot) return fr._foot;
     const c = fr.c, k = c.width / fr.w, d = (fr.px || c.getContext('2d').getImageData(0, 0, c.width, c.height)).data; // pixely kresby, ak ich snímka má (bez čítania z grafickej karty)
     let by = -1;
-    for (let y = c.height - 1; y >= 0 && by < 0; y--) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 128) { by = y; break; }
+    for (let y = c.height - 1; y >= 0 && by < 0; y--) { let n = 0; for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 128 && ++n >= (minW || 0.5) * k) { by = y; break; } }
     let x0 = c.width, x1 = -1;
     for (let y = Math.max(0, by - 3 * k); y <= by; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 128) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); }
     return (fr._foot = by < 0 ? { y: fr.h - U8_PB, x0: fr.w / 2 - 2, x1: fr.w / 2 + 2 } : { y: (by + 1) / k, x0: x0 / k, x1: (x1 + 1) / k });
@@ -3623,8 +3625,8 @@
     if (moving) u._wd = (u._wd || 0) + d;
     const sd = smoothDir(u, mvx, mvy);
     if (near) turn8(u, dir8(t.x - u.x, t.y - u.y), u.archer ? 8 : 3); // lukostrelec sa otáča pomalšie (cieľ prechádza medzi smermi)
-    else if (moving) turn8(u, sd, 5);
-    else if (!t) turn8(u, u.helper ? 2 : 6, 5); // bez cieľa: vojaci k horde, remeselník a liečiteľ k hráčovi (na juh)
+    else if (moving && !(st.phase === 'battle' && u.fslot && Math.hypot(u.fslot.x - u.x, u.fslot.y - u.y) < 5)) turn8(u, sd, 5); // drobné dorovnanie na miesto v šíku (po odtlačení) ho neotočí
+    else if (!t) turn8(u, u.helper && !(u.helper === 'chapel' && st.phase === 'battle') ? 2 : 6, 5); // bez cieľa: vojaci aj liečiteľ v boji (v šíku) k horde, remeselník a liečiteľ mimo boja k hráčovi (na juh)
     if (u.face8 == null) u.face8 = u.helper ? 2 : 6;
     const v = set[u.face8];
     if (u.archer) { // lukostrelec: po výstrele chvíľu povolená tetiva, potom znova napne; s cieľom mieri aj pri presune v rade (striedanie s chôdzou blikalo)
@@ -3670,7 +3672,7 @@
       const cast = (heal || (hammer && u.working)) && set[u.face8].atk; // kúzlo liečiteľa / búchanie kladivom: snímky útoku dokola
       const fr = cast ? cast[Math.floor(performance.now() / 120) % cast.length] : repair && u.working ? set[6].idle : unit8Frame(u, set), y = Math.round(u.y - fr.h) + U8_PB;
       if (fr.hd) { // tieň pod kopytami / nohami: výška zeme zo státia v tomto smere (v kluse neposkakuje), šírka podľa snímky
-        const ft = footOf(fr), gr = footOf(set[u.face8 == null ? 6 : u.face8].idle), left = Math.round(u.x - fr.w / 2);
+        const fw = u.helper === 'chapel' ? 2 : 0, ft = footOf(fr, fw), gr = footOf(set[u.face8 == null ? 6 : u.face8].idle, fw), left = Math.round(u.x - fr.w / 2);
         shadow(left + (ft.x0 + ft.x1) / 2, y + gr.y, Math.max(3, Math.round((ft.x1 - ft.x0) / 2)));
       }
       else shadow(u.x, u.y, 4);
