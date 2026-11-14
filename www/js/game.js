@@ -1265,8 +1265,10 @@
     st.viewUp = Math.max(0, (st.viewUp || 0) - panelLow()); // rovnaký pohľad aj bez panela
     $('build').hidden = true; $('bottom').hidden = false;
     for (const b of st.blds) if (UNIT_HOME[b.kind] || b.kind === 'range' || b.kind === 'falconry' || HELPERS[b.kind]) { b.spawnT = helperKey(b) ? 0.6 : 0.3; b.squadUp = true; }
-    if (st.form) st.form.arcSlots = null;
-    st.arcPlan = st.blds.reduce((n, b) => n + (b.kind === 'range' ? archerCap(b) : 0), 0); // toľko miest bude mať rad lukostrelcov // rad lukostrelcov sa v novej vlne postaví nanovo
+    st.arcPlan = st.blds.reduce((n, b) => n + (b.kind === 'range' ? archerCap(b) : 0), 0); // toľko miest bude mať rad lukostrelcov
+    st.formPlan = { knight: 0, spear: 0, rider: 0, monk: 0 }; // a toľko miest šík pešiakov, jazdy a liečiteľov
+    for (const b of st.blds) { const k = UNIT_HOME[b.kind] && unitOf(b); if (k) st.formPlan[k] += knightCap(b); else if (b.kind === 'chapel') st.formPlan.monk++; }
+    if (st.form) st.form.hold = {}; // rad lukostrelcov sa v novej vlne postaví nanovo
     banner(isAssault() ? 'Do útoku!' : st.endless ? 'Vlna ' + st.wave : st.wave === missionWaves(st.mission) ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + missionWaves(st.mission));
     syncStance();
     updateHud();
@@ -1879,8 +1881,10 @@
       const dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy, min = a.siege || b.siege ? 11 : 7;
       if (d2 > min * min || d2 < 0.01) continue;
       const d = Math.sqrt(d2), push = (min - d) * 0.2 * holdK(hold[i], hold[j]);
-      a.x -= dx / d * push * hold[i]; a.y -= dy / d * push * hold[i] * 0.6;
-      b.x += dx / d * push * hold[j]; b.y += dy / d * push * hold[j] * 0.6;
+      // obliehací stroj má prednosť: ťažký voz sa neodtláča, uhne mu pešiak (inak sa stroj pri obchádzaní otáčal a preblikával)
+      const ka = a.siege && !b.siege ? 0 : b.siege && !a.siege ? 2 : 1, kb = 2 - ka;
+      a.x -= dx / d * push * hold[i] * ka; a.y -= dy / d * push * hold[i] * 0.6 * ka;
+      b.x += dx / d * push * hold[j] * kb; b.y += dy / d * push * hold[j] * 0.6 * kb;
     }
   }
 
@@ -2404,7 +2408,7 @@
   const FORM_GAP = 10, FORM_ROW = 9, FORM_MAX = 8, FORM_SPD = 20, ENGAGE = 36, CLASH = 70;
   // prepínač armády: útok = šík ide oproti horde a voľní vojaci búrajú tábor; obrana = šík drží miesto pred zónou
   const armyAttacks = () => st.stance !== 'defend';
-  const RIDER_GUARD = 90; // v obrane jazdec vyráža len do tejto vzdialenosti od svojho miesta
+  const HOLD_REACH = 22; // v obrane vojak (aj jazdec) vyrazí zo šíku len na nepriateľa takto blízko svojho miesta
   const formLeft = () => G.gx0 + 6, formRight = () => G.gx0 + G.cols * T - 6;
   const formPer = () => Math.max(1, Math.min(FORM_MAX, Math.floor((formRight() - formLeft()) / FORM_GAP) + 1));
   // n miest v radoch so stredom cx: predný rad na y, ďalšie rady za ním (k radnici), každý druhý posunutý o pol medzery
@@ -2469,36 +2473,48 @@
       // šík ide oproti najbližšej pozemnej horde, no nie hlbšie než k zhromaždisku pred zónou
       const th = nearestFoe(F.inf.x, F.inf.y, false);
       const atk = armyAttacks(), cp = th || !atk ? null : nearestCampPart(F.inf.x, F.inf.y);
-      if (!atk) { // obrana: celý šík sa poskladá dopredu od posledného radu, ktorý stojí 2 políčka nad najvyššou stavbou; len sa natočí k horde
-        const back = defLineY(), iRows = formRows(knights.length) + formRows(spears.length);
-        const aN = archers.length ? Math.max(archers.length, F.arcSlots ? F.arcSlots.length : 0, st.arcPlan || 0) : 0; F.arcN = aN; // podľa miest v rade – padlý lukostrelec rad neposunie
+      const pl = st.formPlan || {}, kN = Math.max(knights.length, pl.knight || 0), sN = Math.max(spears.length, pl.spear || 0);
+      if (!atk) { // obrana: celý šík sa poskladá dopredu od posledného radu, ktorý stojí 2 políčka nad najvyššou stavbou; stojí pevne
+        const back = defLineY(), iRows = formRows(kN) + formRows(sN);
+        const aN = archers.length ? Math.max(archers.length, st.arcPlan || 0) : 0; F.arcN = aN; // podľa miest v rade – padlý lukostrelec rad neposunie
         F.arcY = back - Math.max(0, formRows(aN) - 1) * FORM_ROW;
-        stepAnchor(F.inf, th ? th.x : cx, aN ? F.arcY - 10 - iRows * FORM_ROW : back - Math.max(0, iRows - 1) * FORM_ROW, dt);
+        stepAnchor(F.inf, cx, aN ? F.arcY - 10 - iRows * FORM_ROW : back - Math.max(0, iRows - 1) * FORM_ROW, dt);
       }
       else if (th) stepAnchor(F.inf, th.x, Math.max(G.gy0 + 24, Math.min(musterY, th.y + 18)), dt);
       else if (cp) stepAnchor(F.inf, cp.x, cp.y + 16, dt); // horda nikde – šík sa presunie k táboru
       else stepAnchor(F.inf, cx, musterY, dt);
-      const front = formSlots(knights.length, F.inf.x, F.inf.y);
-      assignSlots(knights, front);
-      const kRows = formRows(knights.length);
-      assignSlots(spears, formSlots(spears.length, F.inf.x, F.inf.y + kRows * FORM_ROW));
+      let front;
+      if (atk) F.hold = {}; // v útoku pevné miesta neplatia
+      const kRows = formRows(atk ? knights.length : kN);
+      if (atk) {
+        front = formSlots(knights.length, F.inf.x, F.inf.y);
+        assignSlots(knights, front);
+        assignSlots(spears, formSlots(spears.length, F.inf.x, F.inf.y + kRows * FORM_ROW));
+      } else { // obrana: každý drží svoje miesto, rady majú od začiatku vlny plnú veľkosť
+        front = holdGroup('knight', knights, kN, F.inf.x, F.inf.y);
+        holdGroup('spear', spears, sN, F.inf.x, F.inf.y + kRows * FORM_ROW);
+      }
       // jazdci na krídlach predného radu
       const xs = front.length ? front.map(p => p.x) : [F.inf.x];
       const l = Math.min(...xs), r = Math.max(...xs), rs = riders.slice().sort((p, q) => p.x - q.x), nl = Math.ceil(rs.length / 2);
-      rs.forEach((u, i) => {
+      if (!atk) { // obrana: jazdci majú pevné miesta na krídlach (podľa plánu) a držia si ich
+        const rN = Math.max(rs.length, pl.rider || 0), hl = Math.ceil(rN / 2), wing = [];
+        for (let i = 0; i < rN; i++) { const left = i < hl, k = left ? hl - 1 - i : i - hl; wing.push({ x: Math.max(formLeft(), Math.min(formRight(), left ? l - FORM_GAP * (k + 1) : r + FORM_GAP * (k + 1))), y: F.inf.y + (k % 2) * 4 }); }
+        holdGroup('rider', riders, rN, 0, 0, wing);
+      } else rs.forEach((u, i) => {
         const left = i < nl, k = left ? nl - 1 - i : i - nl;
         const x = left ? l - FORM_GAP * (k + 1) : r + FORM_GAP * (k + 1);
         u.fslot = { x: Math.max(formLeft(), Math.min(formRight(), x)), y: F.inf.y + (k % 2) * 4 };
       });
-      infBack = F.inf.y + (kRows + formRows(spears.length)) * FORM_ROW;
-      for (const u of knights.concat(spears, riders)) u.fslot = passSlot(u.fslot);
+      infBack = F.inf.y + (kRows + formRows(atk ? spears.length : sN)) * FORM_ROW;
+      if (atk) for (const u of knights.concat(spears, riders)) u.fslot = passSlot(u.fslot);
       // zrazil sa šík s hordou? potom sa pešiaci pustia aj do nepriateľov o kus ďalej
       F.contact = live.some(s => s.ktype && s.tgt && !s.tgt.dead && Math.hypot(s.tgt.x - s.x, s.tgt.y - s.y) < 14);
     }
     // lukostrelci: v útoku rad na dostrel od najbližšieho nepriateľa (aj letca), vždy za pešiakmi
     if (archers.length && !armyAttacks()) holdArchers(archers, cx, F.arcY, dt); // posledný rad, hneď za šíkom
     else if (archers.length) {
-      F.arcSlots = null; for (const u of archers) u.dslot = null;
+      for (const u of archers) u.hs = null;
       let tx = cx, ty = Math.max(musterY + 16, infBack + 10);
       const th = nearestFoe(F.arc.x, F.arc.y, true), cp = th ? null : nearestCampPart(F.arc.x, F.arc.y);
       if (th) { tx = th.x; ty = Math.max(G.gy0 + 30, Math.min(ty, Math.max(th.y + ARCHER_RANGE - 14, infBack + 10))); }
@@ -2508,33 +2524,38 @@
       for (const u of archers) u.fslot = passSlot(u.fslot);
     }
     F.rearY = Math.max(infBack, ...archers.map(u => u.fslot ? u.fslot.y : u.y)); // zadný okraj armády – za ním sa držia liečitelia
+    if (!armyAttacks()) { // obrana: liečitelia majú pevné miesta v rade za lukostrelcami
+      const ms = st.soldiers.filter(s => s.helper === 'chapel' && !s.dead);
+      if (ms.length) holdGroup('monk', ms, Math.max(ms.length, (st.formPlan || {}).monk || 0), cx, F.rearY + 12);
+    }
+  }
+  // obrana: skupina (rytieri, kopijníci, jazdci, lukostrelci, liečitelia) má n pevných miest; každý drží svoje (u.hs) –
+  // po padlom ostane medzera, ktorú zaplní nový; preskupí sa len, keď sa zmení počet miest. pre = hotové miesta (jazda na krídlach)
+  function holdGroup(name, units, n, x, y, pre) {
+    const F = st.form, H = (F.hold = F.hold || {})[name] || (F.hold[name] = {});
+    n = Math.max(n, units.length);
+    const key = pre ? pre.map(p => Math.round(p.x) + ',' + Math.round(p.y)).join(';') : Math.round(x) + ',' + Math.round(y) + ',' + n;
+    if (H.key !== key) {
+      const same = H.slots && H.slots.length === n; // posun celého radu: každý si drží svoje miesto
+      H.key = key; H.slots = (pre || formSlots(n, x, y)).map(passSlot);
+      if (!same) for (const u of units) u.hs = null;
+    }
+    const used = new Set();
+    for (const u of units) { if (u.hs != null && u.hs < H.slots.length && !used.has(u.hs)) used.add(u.hs); else u.hs = null; }
+    for (const u of units) if (u.hs == null) { // nový: najbližšie voľné miesto
+      let bi = 0, bd = 1e9;
+      H.slots.forEach((p, i) => { const d = Math.hypot(p.x - u.x, p.y - u.y); if (!used.has(i) && d < bd) { bd = d; bi = i; } });
+      u.hs = bi; used.add(bi);
+    }
+    for (const u of units) u.fslot = H.slots[u.hs];
+    return H.slots;
   }
   // obrana: rad lukostrelcov stojí pevne za šíkom (nejde za hordou) a každý drží svoje miesto – po padlom ostane medzera,
   // ktorú zaplní až nový lukostrelec; rad sa celý preskupí, len keď lukostrelcov pribudne viac, než je miest.
   // Strieľa len ten, kto má niekoho na dostrel (updateArcher).
   function holdArchers(archers, cx, ty, dt) {
-    const F = st.form;
-    stepAnchor(F.arc, cx, ty, dt);
-    const key = Math.round(F.arc.x) + ',' + Math.round(F.arc.y);
-    if (!F.arcSlots || F.arcKey !== key || archers.length > F.arcSlots.length) { // rad je od začiatku vlny v plnej veľkosti (st.arcPlan)
-      const n = Math.max(archers.length, F.arcN || 0), same = F.arcSlots && F.arcSlots.length === n; // pri posune radu si každý drží svoje miesto
-      F.arcKey = key;
-      F.arcSlots = formSlots(n, F.arc.x, F.arc.y).map(passSlot);
-      if (!same) for (const u of archers) u.dslot = null;
-    }
-    {
-      const used = new Set();
-      for (const u of archers) {
-        if (u.dslot != null && u.dslot < F.arcSlots.length && !used.has(u.dslot)) used.add(u.dslot);
-        else u.dslot = null;
-      }
-      for (const u of archers) if (u.dslot == null) { // nový lukostrelec: najbližšia voľná medzera
-        let bi = 0, bd = 1e9;
-        F.arcSlots.forEach((p, i) => { const d = Math.hypot(p.x - u.x, p.y - u.y); if (!used.has(i) && d < bd) { bd = d; bi = i; } });
-        u.dslot = bi; used.add(bi);
-      }
-    }
-    for (const u of archers) u.fslot = F.arcSlots[u.dslot];
+    stepAnchor(st.form.arc, cx, ty, dt);
+    holdGroup('arc', archers, st.form.arcN || 0, st.form.arc.x, st.form.arc.y);
   }
 
   // lukostrelci a obliehacie stroje cúvajú (smerom k radnici) o polovicu pomalšie, než idú dopredu
@@ -2617,12 +2638,16 @@
       : st.blds.includes(t) && t.hp < bMaxHp(t));
     if (u.skip) for (const [k, v] of u.skip) { if (v <= dt) u.skip.delete(k); else u.skip.set(k, v - dt); } // odpočet vynechaných budov (6 s)
     if (u.stuckT > 2) { (u.skip = u.skip || new Map()).set(u.tgt, 6); u.tgt = null; u.stuckT = 0; } // nedostal sa k nej – chvíľu ju vynechá
+    // obrana: liečiteľ drží svoje miesto v šíku (u.fslot) – lieči len toho, na koho dosiahne, keď od miesta podíde najviac o HOLD_REACH
+    const hold = u.helper === 'chapel' && st.phase === 'battle' && !armyAttacks() && u.fslot ? u.fslot : null;
+    const reach = o => !hold || Math.hypot(o.x - hold.x, o.y - hold.y) <= HEAL_RANGE + HOLD_REACH;
+    if (u.tgt && !reach(u.tgt)) u.tgt = null;
     if (!valid(u.tgt)) {
       u.tgt = null;
       let best = 1;
       if (u.helper === 'chapel') {
         for (const o of st.soldiers.concat(st.king && !st.king.dead ? [st.king] : [])) {
-          if (o === u || o.dead || o.helper || o.siege) continue; // obliehacie stroje liečiteľ nelieči (opravujú sa inak)
+          if (o === u || o.dead || o.helper || o.siege || !reach(o)) continue; // obliehacie stroje liečiteľ nelieči (opravujú sa inak)
           const r = o.hp / healMax(o);
           if (r < best) { best = r; u.tgt = o; }
         }
@@ -2637,7 +2662,11 @@
     const tgt = u.tgt;
     let tx = 0, ty = 0;
     const monk = u.helper === 'chapel';
-    if (tgt && monk) { // liečiteľ lieči kúzlom na diaľku: postaví sa za zraneného (bližšie k radnici), nie pred neho
+    if (tgt && monk && hold) { // obrana: podíde od svojho miesta k zranenému len toľko, aby naňho dosiahol
+      const dx = tgt.x - hold.x, dy = tgt.y - hold.y, d = Math.hypot(dx, dy) || 1, k = Math.max(0, Math.min(HOLD_REACH, d - (HEAL_RANGE - 6))) / d;
+      tx = hold.x + dx * k; ty = hold.y + dy * k;
+    }
+    else if (tgt && monk) { // liečiteľ lieči kúzlom na diaľku: postaví sa za zraneného (bližšie k radnici), nie pred neho
       tx = tgt.x; ty = tgt.y + HEAL_RANGE - 10;
     }
     else if (tgt) { // viacerí remeselníci pri jednej budove: každý má svoje dosiahnuteľné miesto okolo nej a opravy sa sčítajú
@@ -2649,7 +2678,8 @@
     const casting = u.working; // kto už lieči, prestane až o kus ďalej (na hranici dosahu neprepína tam a späť)
     u.working = false;
     const spd = u.spd * waterMul(u);
-    if (!tgt && monk && st.phase === 'battle' && st.form) { // nikto nie je zranený – liečiteľ ide hneď za armádou a drží sa za jej posledným radom
+    if (!tgt && hold) { if (Math.hypot(hold.x - u.x, hold.y - u.y) > 1) moveKnight(u, hold.x, hold.y, spd, dt); return; } // obrana: stojí na svojom mieste
+    if (!tgt && monk && st.phase === 'battle' && st.form) { // útok: nikto nie je zranený – liečiteľ ide hneď za armádou a drží sa za jej posledným radom
       const ms = st.soldiers.filter(o => o.helper === 'chapel' && !o.dead), i = ms.indexOf(u), n = ms.length;
       const x = Math.max(formLeft(), Math.min(formRight(), st.form.inf.x + (i - (n - 1) / 2) * FORM_GAP * 2)), y = (st.form.rearY || st.form.inf.y) + 14;
       if (Math.hypot(x - u.x, y - u.y) > 2) moveKnight(u, x, y, spd, dt);
@@ -2659,7 +2689,7 @@
       if (u.home && !(monk && st.phase === 'battle')) moveKnight(u, tileX(u.home.c) + T / 2 + 1, tileY(u.home.r) + T + 2, spd * 0.85, dt);
       return;
     }
-    if (monk ? Math.hypot(tgt.x - u.x, tgt.y - u.y) > HEAL_RANGE + (casting ? 6 : 0) || (!casting && u.y < tgt.y + 4 && Math.hypot(tx - u.x, ty - u.y) > 8) /* pred zraneným ani vedľa neho neostane – obíde ho dozadu */ : Math.hypot(tx - u.x, ty - u.y) > 7 && !(casting && Math.hypot(bCenter(tgt).x - u.x, bCenter(tgt).y - u.y) < T + 6)) {
+    if (monk && hold ? Math.hypot(tx - u.x, ty - u.y) > 2 && Math.hypot(tgt.x - u.x, tgt.y - u.y) > HEAL_RANGE + (casting ? 6 : 0) : monk ? Math.hypot(tgt.x - u.x, tgt.y - u.y) > HEAL_RANGE + (casting ? 6 : 0) || (!casting && u.y < tgt.y + 4 && Math.hypot(tx - u.x, ty - u.y) > 8) /* pred zraneným ani vedľa neho neostane – obíde ho dozadu */ : Math.hypot(tx - u.x, ty - u.y) > 7 && !(casting && Math.hypot(bCenter(tgt).x - u.x, bCenter(tgt).y - u.y) < T + 6)) {
       const x0 = u.x, y0 = u.y;
       moveKnight(u, tx, ty, spd, dt);
       if (!monk) u.stuckT = Math.hypot(u.x - x0, u.y - y0) < spd * dt * 0.2 ? (u.stuckT || 0) + dt : 0; // remeselník stojí na mieste, hoci má ísť – zasekol sa
@@ -3144,7 +3174,7 @@
         // jazdec sa pohybuje voľne; kto prerazil za šík, toho prenasleduje ktokoľvek
         const sl = s.fslot || { x: G.gx0 + G.cols * T / 2, y: musterY };
         const atk = armyAttacks();
-        let aggro = s.ktype === 'rider' ? (atk ? 9999 : RIDER_GUARD) : F.contact ? CLASH : ENGAGE;
+        let aggro = !atk ? HOLD_REACH : s.ktype === 'rider' ? 9999 : F.contact ? CLASH : ENGAGE; // obrana: drží šík, bije len toho, kto príde k nemu
         // obrana hradu má prednosť: kto búcha do hradu, po tom ide každý pešiak a jazdec (aj keby mal iný cieľ pri hradbách)
         if (!(s.tgt && !s.tgt.dead && atHall(s.tgt))) { const ht = nearestEnemyWhere(s.x, s.y, atHall, true); if (ht) s.tgt = ht; }
         if (!s.tgt || s.tgt.dead) { const leak = nearestEnemyWhere(s.x, s.y, e => e.y > F.inf.y + 14 && e.y > 4, true); if (leak) s.tgt = leak; }
@@ -3611,10 +3641,15 @@
   function drawSiege8(u, set) {
     const mvx = u.x - (u._lx == null ? u.x : u._lx), mvy = u.y - (u._ly == null ? u.y : u._ly);
     u._lx = u.x; u._ly = u.y;
-    const d = Math.hypot(mvx, mvy), moving = d > 0.03;
+    const d = Math.hypot(mvx, mvy), moving = d > 0.03 && d < 8 && performance.now() - (u._walkT || 0) < 150; // ide sám (nie odtlačenie)
     const busy = set.art && (u.siege === 'cat' ? u.fired > 0.3 : u.siege === 'ram' && u.swing > 0); // pri výstrele či údere sa neotáča, ani keď ho susedia odtlačia
-    if (moving && !busy) { u._wd = (u._wd || 0) + d; u.face8 = dir8(mvx, mvy); }
-    else if (u.aimP && (u.fired > 0 || u.cd > 0)) u.face8 = set.art && u.siege === 'cat' ? (u.aimP.y <= u.y ? 6 : 2) : dir8(u.aimP.x - u.x, u.aimP.y - u.y); // katapult z PixelLabu strieľa len na sever alebo na juh
+    if (moving) { u._svx = (u._svx || 0) * 0.92 + mvx * 0.08; u._svy = (u._svy || 0) * 0.92 + mvy * 0.08; } // ťažký voz mení smer pomaly
+    const sd = dir8(u._svx || 0, u._svy || 0);
+    if (moving && !busy) { u._wd = (u._wd || 0) + d; turn8(u, sd, 14); } // smer len vyhladený a s oneskorením – cik-cak po ceste ani krátke uhnutie ho neotočí
+    else if ((busy || !moving) && u.aimP && (u.fired > 0 || u.cd > 0)) { // katapult z PixelLabu strieľa len na sever alebo na juh
+      const ad = set.art && u.siege === 'cat' ? (u.aimP.y <= u.y ? 6 : 2) : dir8(u.aimP.x - u.x, u.aimP.y - u.y);
+      if (busy) u.face8 = ad; else turn8(u, ad, 10); // pri výstrele hneď, inak s oneskorením
+    }
     if (u.face8 == null) u.face8 = 6;
     const v = set[u.face8], k = u.siege;
     const act = k === 'ram' ? u.swing > 0 && (set.art || u.swing < 0.25) : u.fired > (set.art ? 0.3 : 0.4);
