@@ -5309,11 +5309,11 @@
     else order = snakeOrder(geom.provs.map((p, j) => Object.assign({ j }, p)), [[[0, 0]]], (p, li, zi) => p.land === li && p.zone === zi).map(p => p.j);
     const node = new Array(geom.provs.length); order.forEach((j, k) => { node[j] = k; });
     const prov = new Uint8Array(w * h).fill(255);
-    let landTop = h, landBot = 0;
+    let landTop = h, landBot = 0, landLeft = w, landRight = 0;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const pj = geom.prov[(y + PPY) * geom.W + x + PPX];
       if (geom.land[(y + PPY) * geom.W + x + PPX] < 0 || pj < 0) continue;
-      prov[y * w + x] = node[pj]; if (y < landTop) landTop = y; if (y > landBot) landBot = y;
+      prov[y * w + x] = node[pj]; if (y < landTop) landTop = y; if (y > landBot) landBot = y; if (x < landLeft) landLeft = x; if (x > landRight) landRight = x;
     }
     const nodes = order.map(j => ({ x: geom.provs[j].x - PPX, y: geom.provs[j].y - PPY + 4 }));
     // hrady tesne nad sebou (hrad by zakryl hviezdičky toho nad ním) sa rozostúpia do strán – len ak ostanú na súši
@@ -5327,7 +5327,7 @@
       else if (onLand(a.x - sg * half * 2, a.y)) a.x -= sg * half * 2;
     }
     return { seaMap: true, builtH: H, // námornícke územie (island.paper je obrázok námorníckej mapy domovského ostrova); builtH = výška obrazovky pri výrobe
-      land: l, w, h, geom, order, node, prov, nodes, segs: [], landTop, landBot, foam: [], waves: [], fires: nodes.map(() => []),
+      land: l, w, h, geom, order, node, prov, nodes, segs: [], landTop, landBot, landLeft, landRight, foam: [], waves: [], fires: nodes.map(() => []),
       bg: { height: h }, fort: makeOrcFort(), castle: makeMiniCastle(false) };
   }
   // vyfarbená mapa územia; skip = uzol, ktorý sa ešte kreslí v pôvodnej farbe (počas prefarbenia po dobytí)
@@ -5505,7 +5505,7 @@
   function enterLand(id) {
     st.world = false; setLand(id);
     const l = curLand(); st.mapSel = Math.max(l.first, Math.min(st.unlocked, landLast(l)));
-    renderMapPanel(); focusMapNode(st.mapSel, true); updateMapUi();
+    renderMapPanel(); centerLand(); updateMapUi(); // po prepnutí územia je ostrov v strede obrazovky (nie pri vybranom hrade)
   }
   function openWorld() {
     if (st.mapAnim || st.provAnim) return;
@@ -5598,6 +5598,16 @@
     if (instant) { mapCam = mapCamTarget; mapCamX = mapCamXTarget; }
   }
 
+  // celé územie do stredu viditeľnej časti mapy (medzi horným riadkom a kartami); široká či vysoká mapa sa posunie tak, aby bol stred súše v strede
+  function centerLand() {
+    const I = island;
+    if (!I || !I.nodes.length) return;
+    const low = mapBarH() * DPR / S, mid = MAP_HEAD + (H - low - MAP_HEAD) / 2, xs = I.nodes.map(n => n.x), ys = I.nodes.map(n => n.y);
+    const top = I.landTop != null ? I.landTop : Math.min(...ys), bot = I.landBot != null ? I.landBot : Math.max(...ys);
+    const lx = I.landLeft != null ? I.landLeft : Math.min(...xs), rx = I.landRight != null ? I.landRight : Math.max(...xs);
+    mapCam = mapCamTarget = clampMap((top + bot) / 2 - mid);
+    mapCamX = mapCamXTarget = clampMapX((lx + rx) / 2 - W / 2);
+  }
   const panelLow = () => $('build').offsetHeight * DPR / S;
   const INTRO_PAN = [1.8, 1.6]; // s: pohľad na tábor, zvezenie k radnici
   function camTick(dt) {
@@ -7755,5 +7765,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, HEROES, switchHero, setActiveHero, ownedHeroes, heroDef, heroWalkHome, siegeWalkHome,
-    enterBuild, enterLand, openWorld, worldLandAt, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, openHeroUp, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, orderSiege, SIEGE_BUY: BUY, knightsBlocked, applyRace, placeAt, bldLimit, deployArmy, ARMY, depAt, get island() { return island; }, mapOX };
+    enterBuild, enterLand, openWorld, worldLandAt, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, openHeroUp, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, orderSiege, SIEGE_BUY: BUY, knightsBlocked, applyRace, placeAt, bldLimit, deployArmy, ARMY, depAt, get island() { return island; }, mapOX, get mapView() { return { cam: mapCam, camX: mapCamX, W, H, low: mapBarH() * DPR / S, head: MAP_HEAD }; } };
 })();
