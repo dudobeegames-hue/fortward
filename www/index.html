@@ -559,10 +559,9 @@
   .raceSub { margin-top: 4px; font-size: 13px; color: var(--muted); }
   #raceCar { position: relative; width: 100%; height: 236px; margin-top: 2px; touch-action: pan-y; flex-shrink: 0; }
   .rStand { position: absolute; left: 50%; top: 6px; width: 192px; height: 224px; margin-left: -96px; } /* jeden podstavec stojí na mieste, menia sa len erby */
-  .rStand .rCrest { cursor: pointer; pointer-events: auto !important; transition: transform .35s ease, opacity .35s ease; transform-origin: 50% 50%; } /* erby sa točia v kruhu, susedné visia vedľa podstavca */
-  .rStand .rCrest.lk { filter: grayscale(.75) brightness(.6) !important; } /* zamknutý erb je sivý hneď, nie až keď sa ukáže zámok */
+  .rStand .rCrest { cursor: pointer; pointer-events: auto !important; transition: transform .35s ease, opacity .35s ease, filter .3s ease; transform-origin: 50% 50%; } /* erby sa točia v kruhu, susedné visia vedľa podstavca */
   .rStand .rCrest.side { filter: brightness(.55); }
-  .rStand .rCrest.side.lk { filter: grayscale(.75) brightness(.35) !important; }
+  .rStand.lockd:not(.swap) .rCrest.mid.lk { filter: grayscale(.75) brightness(.6); } /* zamknutý erb príde vo farbe a zošedne až spolu so zámkom */
   .rStand img { position: absolute; image-rendering: pixelated; pointer-events: none; }
   .rStand .rBase { left: 0; top: 0; width: 192px; height: 224px; }
   .rStand .rName { position: absolute; left: 0; right: 0; top: 187px; height: 18px; line-height: 18px; text-align: center; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 15px; color: #2a1a0e; text-shadow: 0 1px 0 rgba(255,230,180,.6); }
@@ -571,7 +570,7 @@
   .rStand.lockd.swap .rChain { opacity: 0; } /* počas presunu erbov zámok zhasne, pri zamknutom erbe sa znova objaví */
   .rStand.chosen .rCrest.mid { animation: raceGlow .7s ease-out 1; }
   @keyframes raceGlow { 0% { filter: brightness(1); } 30% { filter: brightness(1.8) drop-shadow(0 0 10px #fff); } 100% { filter: brightness(1); } }
-  .raceArrow { position: absolute; top: 96px; z-index: 9; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 3px solid var(--ink);
+  .raceArrow { position: absolute; top: 172px; z-index: 9; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 3px solid var(--ink);
     background: radial-gradient(circle at 35% 30%, #6a5440, #3a2c22 70%); color: var(--gold); font-size: 26px; font-weight: 700; line-height: 1; box-shadow: 0 4px 8px rgba(0,0,0,.5); }
   .raceArrow:active { transform: translateY(2px); }
   #racePrev { left: 6px; } #raceNext { right: 6px; }
