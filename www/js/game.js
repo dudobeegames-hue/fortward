@@ -7385,6 +7385,19 @@
   // ---- Výskum: 5 veľkých kariet nad sebou (I dole, V hore), posúvajú sa prstom; ťuk na výskum ho označí, druhý ťuk kúpi za zlatky z truhlice ----
   let resPick = null; // označený výskum (čaká na potvrdenie druhým ťukom)
   let resFlash = null; // hrad práve otvorenej karty – po dokončení predošlej karty zabliká
+  let resFlip = null;  // otočené okno výskumu (vzadu popis)
+  // popis výskumu na zadnej strane okna
+  function resDesc(r) {
+    const k = resBuild(r), lv = r.lvl > 1 ? 'Úroveň ' + r.lvl + ': silnejšia a odolnejšia. ' : '';
+    if (r.kind === 'hall') return 'Dovolí vylepšiť ' + (isOrc() ? 'pevnosť' : 'radnicu') + ' na úroveň ' + r.lvl + ' – rozšíri stavebnú zónu a otvorí výskumy karty ' + ROMAN[r.lvl] + '.';
+    if (r.kind === 'wallArcher') return 'Na hradbu postavíš lukostrelca, ktorý strieľa na hordu ponad hradby.';
+    if (r.kind === 'spear') return 'Kasárne prepneš na kopijníkov – útočia spoza rytierov a jazdu zastavia aj s trojnásobnou silou.';
+    if (r.kind === 'ice') return 'Ohnivú vežu prepneš na ľad – ľadové strely spomalia zasiahnutého aj nepriateľov okolo neho.';
+    if (r.kind === 'siegeRam') return 'Obliehací stroj zo záložky Stroje – ide na tábor hordy a rozbíja jeho stavby.';
+    if (r.kind === 'siegeCat') return 'Obliehací stroj zo záložky Stroje – z diaľky ostreľuje balvanmi stavby tábora.';
+    if (r.kind === 'wall') return lv + 'Brána ide spolu s hradbami. ' + BUILD.wall.desc + '.';
+    return lv + (BUILD[k] ? BUILD[k].desc + '.' : '');
+  }
   const RES_NAME = { hall: () => isOrc() ? 'Pevnosť' : 'Hrad', wallArcher: () => isOrc() ? 'Strelec na palisáde' : 'Lukostrelci na hradbách', spear: () => isOrc() ? 'Zbrojnica' : 'Kopijníci',
     ice: () => 'Ľadový plameň', siegeRam: () => BUY.ram.name, siegeCat: () => 'Katapult', hedge: () => BUILD[isOrc() ? 'mud' : 'hedge'].name };
   const resBuild = r => r.kind === 'pitch' && isOrc() ? 'icetower' : r.kind; // za orkov je na mieste smolnej veže jedový kotol
@@ -7440,17 +7453,21 @@
         const b = document.createElement('div');
         b.className = 'resItem' + (done ? ' rDone' : why ? ' rLock' : poor ? ' rPoor' : ' rBuy') + (r.kind === 'hall' ? ' hall' : '') + (pick ? ' rSel' : '') + (resFlash === r.id ? ' resNew' : '');
         // okno výskumu (rám vo farbe rasy, tieň, podstavec pod obrázkom) a pod ním zelené tlačidlo s cenou
-        b.innerHTML = '<div class="win">' + (r.opt ? '<em class="opt">nepovinné</em>' : '') + '<span class="pic"><img src="' + resIcon(r) + '" alt=""></span><b>' + resName(r) + '</b></div>' +
+        // okno sa dá otočiť ťukom – vzadu je popis (ako karty stavieb v hre); tlačidlo s cenou výskum hneď kúpi
+        b.innerHTML = '<div class="win' + (resFlip === r.id ? ' flipped' : '') + '"><div class="side front">' + (r.opt ? '<em class="opt">nepovinné</em>' : '') +
+          '<span class="pic"><img src="' + resIcon(r) + '" alt=""></span><b>' + resName(r) + '</b></div>' +
+          '<div class="side back"><b>' + resName(r) + '</b><small>' + resDesc(r) + '</small></div></div>' +
           (done ? '<span class="got">' + (r.cost ? '✓ vyskúmané' : '✓ od začiatku') + '</span>'
-            : '<button class="buyBtn">' + (pick ? 'Vyskúmať?' : '<img src="' + UI_ICONS.coinsFine + '" alt="">' + r.cost) + '</button>');
-        const tap = () => {
-          if (done) return;
+            : '<button class="buyBtn"><img src="' + UI_ICONS.coinsFine + '" alt="">' + r.cost + '</button>');
+        b.querySelector('.win').addEventListener('click', ev => {
+          const w = ev.currentTarget; w.classList.toggle('flipped'); resFlip = w.classList.contains('flipped') ? r.id : null; AUDIO.play('click');
+        });
+        const btn = b.querySelector('.buyBtn');
+        if (btn) btn.addEventListener('click', () => {
           if (why) { toast(why); AUDIO.play('deny'); return; }
           if (poor) { toast('Chýba ' + (r.cost - (st.chest || 0)) + ' zlatiek – zlatky získaš v misiách'); AUDIO.play('deny'); return; }
-          if (resPick === r.id) { buyResearch(r); return; }
-          resPick = r.id; AUDIO.play('click'); renderResearch(); // prvý ťuk označí, druhý vyskúma
-        };
-        b.addEventListener('click', tap);
+          buyResearch(r);
+        });
         grid.appendChild(b);
       }
       card.appendChild(grid); list.appendChild(card);
