@@ -7870,58 +7870,55 @@
     AUDIO.music('map');
     renderRaceCar(Math.max(0, RACES.findIndex(r => r.name === (st.race || 'Ľudia'))));
   }
-  // kolotoč erbov: stredný podstavec veľký, susedné menšie a stmavené, ostatné skryté; zamknuté erby sú prekrížené reťazou so zámkom
-  let raceCur = 0, raceEls = null;
+  // výber národa: jeden drevený podstavec stojí na mieste, šípkami či ťahom sa na ňom vymieňajú erby; ťuk na erb spustí hru za ten národ
+  let raceCur = 0, raceStand = null;
   function renderRaceCar(start) {
-    const car = $('raceCar');
-    if (!raceEls) {
-      raceEls = RACES.map((r, i) => {
-        const d = document.createElement('div'); d.className = 'rStand' + (r.state === 'open' ? '' : ' lockd');
-        const [cx, cy] = CREST_AT[r.key];
-        d.innerHTML = '<img class="rBase" src="img/erby/stand.png" alt=""><img class="rCrest" src="' + crestURL(r) + '" alt="" style="left:' + cx * 2 + 'px;top:' + cy * 2 + 'px">' +
-          '<img class="rChain" src="' + FINE_ICONS.lock + '" alt="" style="left:80px;top:96px;width:32px;height:32px"><div class="rName">' + r.name + '</div>';
-        const crest = d.querySelector('.rCrest'); crest.onload = () => { crest.style.width = crest.naturalWidth * 2 + 'px'; crest.style.height = crest.naturalHeight * 2 + 'px'; };
-        d.addEventListener('click', () => { if (i !== raceCur) { AUDIO.play('click'); raceGo(i); } });
-        car.appendChild(d);
-        return d;
-      });
+    if (!raceStand) {
+      raceStand = document.createElement('div'); raceStand.className = 'rStand';
+      raceStand.innerHTML = '<img class="rBase" src="img/erby/stand.png" alt=""><img class="rCrest" alt="">' +
+        '<img class="rChain" src="' + FINE_ICONS.lock + '" alt="" style="left:80px;top:96px;width:32px;height:32px"><div class="rName"></div>';
+      const crest = raceStand.querySelector('.rCrest');
+      crest.onload = () => { crest.style.width = crest.naturalWidth * 2 + 'px'; crest.style.height = crest.naturalHeight * 2 + 'px'; };
+      crest.addEventListener('click', ev => { ev.stopPropagation(); pickRace(); });
+      $('raceCar').appendChild(raceStand);
       $('raceDots').innerHTML = RACES.map(() => '<i></i>').join('');
+      for (const r of RACES) { const im = new Image(); im.src = crestURL(r); } // erby vopred, aby výmena neblikla
     }
-    raceGo(start);
+    raceGo(start, 0);
   }
-  function raceGo(i) {
+  function raceGo(i, dir) {
     raceCur = (i + RACES.length) % RACES.length;
-    raceEls.forEach((e, j) => {
-      let o = j - raceCur; if (o > 3) o -= RACES.length; if (o < -3) o += RACES.length;
-      const far = Math.abs(o) > 1;
-      e.style.transform = 'translateX(' + (o * 150) + 'px) scale(' + (o ? 0.62 : 1) + ')';
-      e.style.opacity = far ? 0 : o ? 0.55 : 1;
-      e.style.filter = o ? 'brightness(.55)' : '';
-      e.style.zIndex = o ? 1 : 5;
-      e.style.pointerEvents = far ? 'none' : '';
-    });
+    const r = RACES[raceCur], crest = raceStand.querySelector('.rCrest');
+    const show = () => {
+      const [cx, cy] = CREST_AT[r.key];
+      crest.src = crestURL(r); crest.style.left = cx * 2 + 'px'; crest.style.top = cy * 2 + 'px';
+      raceStand.classList.toggle('lockd', r.state !== 'open');
+      raceStand.querySelector('.rName').textContent = r.name;
+      crest.style.setProperty('--sw', (dir < 0 ? 8 : -8) + 'deg'); // nový erb prichádza z opačnej strany
+      requestAnimationFrame(() => crest.classList.remove('out'));
+    };
+    if (dir) { crest.style.setProperty('--sw', (dir > 0 ? 8 : -8) + 'deg'); crest.classList.add('out'); clearTimeout(raceGo.t); raceGo.t = setTimeout(show, 160); }
+    else show();
     [...$('raceDots').children].forEach((d, j) => d.classList.toggle('on', j === raceCur));
-    const r = RACES[raceCur];
-    $('raceDesc').textContent = r.desc;
-    $('racePerks').innerHTML = r.perks.map(p => '<span>' + p + '</span>').join('');
     const pk = $('racePick');
     pk.className = r.state === 'open' ? '' : r.state;
     pk.innerHTML = r.state === 'open' ? 'Vybrať' : r.state === 'soon' ? 'Čoskoro' : '<img src="' + ICONS.gem + '" alt="">' + r.price;
   }
-  $('racePrev').addEventListener('click', () => { AUDIO.play('click'); raceGo(raceCur - 1); });
-  $('raceNext').addEventListener('click', () => { AUDIO.play('click'); raceGo(raceCur + 1); });
-  { let sx = null; // potiahnutie prstom do strany prepne národ
-    $('raceCar').addEventListener('pointerdown', e => { sx = e.clientX; });
-    $('raceCar').addEventListener('pointerup', e => { if (sx != null && Math.abs(e.clientX - sx) > 30) { AUDIO.play('click'); raceGo(raceCur + (e.clientX < sx ? 1 : -1)); } sx = null; });
-  }
-  $('racePick').addEventListener('click', () => {
+  function pickRace() {
     const r = RACES[raceCur];
     if (r.state === 'soon') { toast(r.name + ' prídu v ďalšej verzii'); AUDIO.play('deny'); return; }
     if (r.state === 'gem') { toast('Odomykanie za gemy pripravujeme'); AUDIO.play('deny'); return; }
     AUDIO.play('click');
-    raceEls[raceCur].classList.add('chosen'); // erb sa rozžiari
-    afterPress($('racePick'), () => { raceEls[raceCur].classList.remove('chosen'); saveJSON(sk('race'), r.name); st.race = r.name; applyRace(); saveProgress(); showMap(); });
-  });
+    raceStand.classList.add('chosen'); // erb sa rozžiari
+    afterPress($('racePick'), () => { raceStand.classList.remove('chosen'); saveJSON(sk('race'), r.name); st.race = r.name; applyRace(); saveProgress(); showMap(); });
+  }
+  $('racePrev').addEventListener('click', () => { AUDIO.play('click'); raceGo(raceCur - 1, -1); });
+  $('raceNext').addEventListener('click', () => { AUDIO.play('click'); raceGo(raceCur + 1, 1); });
+  { let sx = null; // potiahnutie prstom do strany prepne národ
+    $('raceCar').addEventListener('pointerdown', e => { sx = e.clientX; });
+    $('raceCar').addEventListener('pointerup', e => { if (sx != null && Math.abs(e.clientX - sx) > 30) { const d = e.clientX < sx ? 1 : -1; AUDIO.play('click'); raceGo(raceCur + d, d); } sx = null; });
+  }
+  $('racePick').addEventListener('click', pickRace);
 
   // odpočet budovania počas obliehania (stojí, kým kráľ vyberá talent)
 
@@ -8028,5 +8025,5 @@
     return postPNG(c, name);
   }
   window.FW = { DIFF, meta, perk, st, G, costOf, moveBuilding, renderBuild, get camY() { return camY; }, get slowmoT() { return slowmoT; }, hudTick, ability, SPECS, KTYPES, BUILD, ENEMY, WUNIT, snap, sheet, update, spawnEnemy, render, addBuilding, startWave, rebuildOcc, showMap, startMission, missionWon, castSpell, selectSpell, SPELLS, KING_SLOT_LVL, HEROES, switchHero, setActiveHero, ownedHeroes, heroDef, heroWalkHome, siegeWalkHome,
-    enterBuild, enterLand, openWorld, worldLandAt, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, openHeroUp, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, orderSiege, SIEGE_BUY: BUY, knightsBlocked, applyRace, placeAt, bldLimit, deployArmy, ARMY, depAt, get island() { return island; }, mapOX, RES, resHas, kindCap, renderResearch, get res() { return st.res; }, get mapView() { return { cam: mapCam, camX: mapCamX, W, H, low: mapBarH() * DPR / S, head: MAP_HEAD }; } };
+    enterBuild, enterLand, openWorld, worldLandAt, reviveKing, reviveCost, TIERS, starsOf, tierOpen, showUnlockDeck, openHeroUp, kingMeta, gainKingXp, volley, has, lvlCap, hallCap, bCap, bUpCost, hallUpCost, repairCost, bRepairCost, bMaxHp, hallMax, zoneTopRow, inZone, inHall, occAt, kingMax, orderSiege, SIEGE_BUY: BUY, knightsBlocked, applyRace, placeAt, bldLimit, deployArmy, ARMY, depAt, get island() { return island; }, mapOX, RES, resHas, kindCap, renderResearch, showTitle, get res() { return st.res; }, get mapView() { return { cam: mapCam, camX: mapCamX, W, H, low: mapBarH() * DPR / S, head: MAP_HEAD }; } };
 })();

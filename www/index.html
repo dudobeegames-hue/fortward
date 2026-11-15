@@ -557,12 +557,14 @@
   .raceHead { margin: 0; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 26px; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
   .raceSub { margin-top: 4px; font-size: 13px; color: var(--muted); }
   #raceCar { position: relative; width: 100%; height: 236px; margin-top: 2px; touch-action: pan-y; flex-shrink: 0; }
-  .rStand { position: absolute; left: 50%; top: 6px; width: 192px; height: 224px; margin-left: -96px; transition: transform .35s ease, opacity .35s ease, filter .35s ease; cursor: pointer; }
+  .rStand { position: absolute; left: 50%; top: 6px; width: 192px; height: 224px; margin-left: -96px; } /* jeden podstavec stojí na mieste, menia sa len erby */
+  .rStand .rCrest { cursor: pointer; pointer-events: auto !important; transition: opacity .16s ease, transform .16s ease; transform-origin: 50% 0; }
+  .rStand .rCrest.out { opacity: 0; transform: rotate(var(--sw, 8deg)) translateY(-6px); } /* erb sa pri výmene zhupne preč a nový sa zhupne dnu */
   .rStand img { position: absolute; image-rendering: pixelated; pointer-events: none; }
   .rStand .rBase { left: 0; top: 0; width: 192px; height: 224px; }
   .rStand .rName { position: absolute; left: 0; right: 0; top: 187px; height: 18px; line-height: 18px; text-align: center; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 15px; color: #2a1a0e; text-shadow: 0 1px 0 rgba(255,230,180,.6); }
   .rStand.lockd .rCrest { filter: grayscale(.75) brightness(.6); }
-  .rStand .rChain { display: none; }
+  .rStand .rChain { display: none; pointer-events: none; }
   .rStand.lockd .rChain { display: block; }
   .rStand.chosen .rCrest { animation: raceGlow .7s ease-out 1; }
   @keyframes raceGlow { 0% { filter: brightness(1); } 30% { filter: brightness(1.8) drop-shadow(0 0 10px #fff); } 100% { filter: brightness(1); } }
@@ -1110,7 +1112,6 @@
     <h2 class="raceHead">Vyber svoj národ</h2>
     <div id="raceCar"><button id="racePrev" class="raceArrow" aria-label="Predošlý">‹</button><button id="raceNext" class="raceArrow" aria-label="Ďalší">›</button></div>
     <div id="raceDots"></div>
-    <div id="raceInfo"><div id="raceDesc"></div><div id="racePerks"></div></div>
     <button id="racePick">Vybrať</button>
     <button id="raceBack" class="btn backBtn">Späť</button>
   </div>
