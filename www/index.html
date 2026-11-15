@@ -750,7 +750,25 @@
     color: #fff; font: inherit; font-size: 14px; font-weight: 700; text-shadow: 1px 1px 0 #1f4a18; white-space: nowrap; }
   .resItem .buyBtn img { width: 26px; height: 24px; margin: -6px 0 0 -2px; image-rendering: pixelated; filter: drop-shadow(1px 1px 0 rgba(0,0,0,.4)); } /* kôpka má v kresbe hore voľné riadky – posun do stredu */
   .resItem .buyBtn:active { transform: translateY(2px); box-shadow: inset 0 -1px 0 #1f6420; }
-  .resItem .got { display: flex; align-items: center; justify-content: center; height: 30px; font-size: 13px; font-weight: 700; color: #9cd45a; text-shadow: 1px 1px 0 var(--ink); }
+  .resItem .got { display: block; height: 30px; } /* vyskúmané: pod oknom nič (miesto ostane, aby okná sedeli v riadku) */
+  /* efekt odomknutia (strieborný): okno sa nehýbe – prebleskne bielym svetlom, od neho sa rozbehnú dva strieborné prstence
+     a okolo zatrblietajú biele hviezdičky */
+  .resItem.rJust .front::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    background: radial-gradient(ellipse at 50% 45%, rgba(255,255,255,.95), rgba(220,232,255,.55) 45%, rgba(200,214,240,0) 75%); animation: resFlash .9s ease-out 1 both; }
+  @keyframes resFlash { 0% { opacity: 0; } 18% { opacity: 1; } 100% { opacity: 0; } }
+  .resItem .burst { position: absolute; left: 0; right: 0; top: 0; height: 108px; pointer-events: none; z-index: 5; }
+  .resItem .burst i { position: absolute; inset: 0; border-radius: 12px; border: 2px solid #e8eef8; box-shadow: 0 0 8px 2px rgba(220,232,255,.8), inset 0 0 6px rgba(255,255,255,.6);
+    animation: resRing .9s ease-out 1 both; }
+  .resItem .burst i + i { animation-delay: .18s; border-color: #b8c4d8; }
+  @keyframes resRing { from { transform: scale(1); opacity: .95; } to { transform: scale(1.32, 1.22); opacity: 0; } }
+  .resItem .burst b { position: absolute; width: 9px; height: 9px; opacity: 0; animation: resTwinkle 1s ease-in-out 1 both;
+    background: radial-gradient(circle, #fff 0 1.5px, transparent 2px), linear-gradient(#fff, #fff) center / 1px 100% no-repeat, linear-gradient(#fff, #fff) center / 100% 1px no-repeat;
+    filter: drop-shadow(0 0 3px rgba(220,232,255,.95)); }
+  @keyframes resTwinkle { 0% { opacity: 0; transform: scale(.3); } 35% { opacity: 1; transform: scale(1.25); } 100% { opacity: 0; transform: scale(.5); } }
+  .resItem .burst b:nth-child(3) { left: 6%; top: 10%; animation-delay: .05s; } .resItem .burst b:nth-child(4) { left: 82%; top: 6%; animation-delay: .2s; }
+  .resItem .burst b:nth-child(5) { left: 90%; top: 52%; animation-delay: .1s; } .resItem .burst b:nth-child(6) { left: 70%; top: 86%; animation-delay: .32s; }
+  .resItem .burst b:nth-child(7) { left: 14%; top: 78%; animation-delay: .25s; } .resItem .burst b:nth-child(8) { left: -4%; top: 44%; animation-delay: .4s; }
+  .resItem .burst b:nth-child(9) { left: 44%; top: -6%; animation-delay: .15s; } .resItem .burst b:nth-child(10) { left: 46%; top: 96%; animation-delay: .45s; }
   .resItem.rPoor .buyBtn { background: linear-gradient(#5a6a52, #3e4a38); box-shadow: inset 0 -3px 0 #263020; color: #e8a090; }
   .resItem.rLock .win { filter: grayscale(.85) brightness(.7); }
   .resItem.rLock .buyBtn { background: linear-gradient(#4a4a44, #33332e); box-shadow: inset 0 -3px 0 #1e1e1a; color: #9a9488; }

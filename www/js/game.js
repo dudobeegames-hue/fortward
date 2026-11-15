@@ -7386,6 +7386,7 @@
   let resPick = null; // označený výskum (čaká na potvrdenie druhým ťukom)
   let resFlash = null; // hrad práve otvorenej karty – po dokončení predošlej karty zabliká
   let resFlip = null;  // otočené okno výskumu (vzadu popis)
+  let resJust = null;  // práve vyskúmané okno – prehrá efekt odomknutia
   // popis výskumu na zadnej strane okna
   function resDesc(r) {
     const k = resBuild(r), lv = r.lvl > 1 ? 'Úroveň ' + r.lvl + ': silnejšia a odolnejšia. ' : '';
@@ -7422,7 +7423,8 @@
     const wasOpen = r.c < 5 && resCardOpen(r.c + 1);
     st.chest -= r.cost; saveJSON(sk('chest'), st.chest);
     st.res.add(r.id); saveRes();
-    resPick = null;
+    resPick = null; resJust = r.id; resFlip = null;
+    setTimeout(() => { if (resJust === r.id) resJust = null; }, 1400);
     AUDIO.play('upgrade'); toast('Vyskúmané: ' + resName(r));
     const next = r.c < 5 && !wasOpen && resCardOpen(r.c + 1) ? r.c + 1 : 0; // karta je hotová – otvorí sa ďalšia
     if (next) { resFlash = 'hall' + next; setTimeout(() => { if (resFlash === 'hall' + next) { resFlash = null; if (mapTab === 'research') renderResearch(); } }, 5600); }
@@ -7451,16 +7453,19 @@
       for (const r of items) {
         const done = resHas(r.id), why = done ? null : resBlock(r), poor = !done && !why && (st.chest || 0) < r.cost, pick = resPick === r.id && !done && !why && !poor;
         const b = document.createElement('div');
-        b.className = 'resItem' + (done ? ' rDone' : why ? ' rLock' : poor ? ' rPoor' : ' rBuy') + (r.kind === 'hall' ? ' hall' : '') + (pick ? ' rSel' : '') + (resFlash === r.id ? ' resNew' : '');
+        b.className = 'resItem' + (done ? ' rDone' : why ? ' rLock' : poor ? ' rPoor' : ' rBuy') + (r.kind === 'hall' ? ' hall' : '') + (pick ? ' rSel' : '') + (resFlash === r.id ? ' resNew' : '') + (resJust === r.id ? ' rJust' : '');
         // okno výskumu (rám vo farbe rasy, tieň, podstavec pod obrázkom) a pod ním zelené tlačidlo s cenou
         // okno sa dá otočiť ťukom – vzadu je popis (ako karty stavieb v hre); tlačidlo s cenou výskum hneď kúpi
         b.innerHTML = '<div class="win' + (resFlip === r.id ? ' flipped' : '') + '"><div class="side front">' + (r.opt ? '<em class="opt">nepovinné</em>' : '') +
           '<span class="pic"><img src="' + resIcon(r) + '" alt=""></span><b>' + resName(r) + '</b></div>' +
           '<div class="side back"><b>' + resName(r) + '</b><small>' + resDesc(r) + '</small></div></div>' +
-          (done ? '<span class="got">' + (r.cost ? '✓ vyskúmané' : '✓ od začiatku') + '</span>'
+          (resJust === r.id ? '<span class="burst"><i></i><i></i>' + '<b></b>'.repeat(8) + '</span>' : '') + // iskry efektu odomknutia
+          (done ? '<span class="got"></span>'
             : '<button class="buyBtn"><img src="' + UI_ICONS.coinsFine + '" alt="">' + r.cost + '</button>');
         b.querySelector('.win').addEventListener('click', ev => {
           const w = ev.currentTarget; w.classList.toggle('flipped'); resFlip = w.classList.contains('flipped') ? r.id : null; AUDIO.play('click');
+          clearTimeout(w._back);
+          if (resFlip) w._back = setTimeout(() => { w.classList.remove('flipped'); if (resFlip === r.id) resFlip = null; }, 4000); // po chvíli sa otočí späť
         });
         const btn = b.querySelector('.buyBtn');
         if (btn) btn.addEventListener('click', () => {
@@ -7473,7 +7478,7 @@
       card.appendChild(grid); list.appendChild(card);
     }
     const scr = $('research');
-    if (scroll) { const el = list.querySelector('.resCard.cur'); scr.scrollTop = el ? Math.max(0, el.offsetTop + el.offsetHeight - scr.clientHeight + 16) : scr.scrollHeight; } // otvorí sa pri aktuálnej karte (I je dole)
+    if (scroll) { const el = list.querySelector('.resCard.cur'); scr.scrollTop = el ? Math.max(0, el.offsetTop + el.offsetHeight - scr.clientHeight + 72) : scr.scrollHeight; } // spodok karty nad kartami záložiek // otvorí sa pri aktuálnej karte (I je dole)
     else scr.scrollTop = keep;
   }
   // ---- Nákupy: odomknutie rás, hrdinov alebo všetkého naraz (platby cez obchod aplikácií prídu neskôr) ----
