@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Výber národa – náhľad</title>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #1c140e; --gold: #f8d048; --muted: #b8a890; }
+  html, body { margin: 0; height: 100%; background: #07061a; color: #fff; font-family: Rubik, sans-serif; }
+  /* telefón: obrazovka hry na výšku */
+  #phone { position: relative; width: min(100vw, 420px); height: min(100vh, 860px); margin: 0 auto; overflow: hidden;
+    background: linear-gradient(rgba(8,6,12,.25), rgba(14,10,8,.82) 40%, rgba(14,10,8,.94)), #07061a url(../img/splash.jpg) center top / cover no-repeat; }
+  h1 { margin: 0; padding: 22px 16px 0; text-align: center; font-family: 'Pixelify Sans', sans-serif; font-size: 26px; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
+  .sub { text-align: center; color: var(--muted); font-size: 13px; margin-top: 4px; }
+  /* kolotoč: veľký podstavec v strede, menšie stmavené po stranách */
+  #carousel { position: relative; height: 300px; margin-top: 18px; }
+  .stand { position: absolute; left: 50%; top: 20px; width: 192px; height: 224px; margin-left: -96px; transition: transform .35s ease, opacity .35s ease, filter .35s ease; cursor: pointer; }
+  .stand canvas { position: absolute; image-rendering: pixelated; }
+  .stand .base { left: 0; top: 0; width: 192px; height: 224px; }
+  .stand .crest { left: 32px; top: 32px; width: 128px; height: 144px; } /* erb 64×72 v ráme 72×80 (rám začína na 12,12), visí na reťaziach */
+  .stand .plate { position: absolute; left: 0; right: 0; top: 190px; text-align: center; font-family: 'Pixelify Sans', sans-serif; font-size: 16px; color: #2a1a0e; text-shadow: 0 1px 0 rgba(255,230,180,.6); }
+  .stand.lockd .crest { filter: grayscale(.8) brightness(.55); }
+  .stand .chain { position: absolute; left: 50%; top: 70px; width: 120px; margin-left: -60px; image-rendering: pixelated; display: none; }
+  .stand.lockd .chain { display: block; }
+  .arrow { position: absolute; top: 120px; width: 42px; height: 42px; border-radius: 50%; border: 3px solid var(--ink); background: radial-gradient(circle at 35% 30%, #6a5440, #3a2c22 70%);
+    color: var(--gold); font-size: 22px; font-weight: 700; display: grid; place-items: center; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,.5); z-index: 9; user-select: none; }
+  #prev { left: 8px; } #next { right: 8px; }
+  #dots { display: flex; justify-content: center; gap: 8px; margin-top: -6px; }
+  #dots i { width: 9px; height: 9px; border-radius: 50%; background: #5a4836; border: 2px solid var(--ink); }
+  #dots i.on { background: var(--gold); }
+  #info { margin: 14px 18px 0; padding: 12px 14px; border-radius: 12px; border: 3px solid var(--ink); background: linear-gradient(#3a2c22, #241a12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); }
+  #desc { font-size: 14px; line-height: 1.4; text-align: center; }
+  #perks { display: flex; justify-content: center; gap: 10px; margin-top: 10px; }
+  #perks span { padding: 4px 9px; border-radius: 8px; background: rgba(0,0,0,.3); border: 2px solid var(--ink); font-size: 12px; color: var(--gold); }
+  #pick { display: block; width: 220px; height: 52px; margin: 16px auto 0; border-radius: 12px; border: 3px solid var(--ink); font: 700 19px Rubik, sans-serif; color: #fff; text-shadow: 1px 1px 0 #1f4a18;
+    background: linear-gradient(#7ee05e, #3fae3a 55%, #2c8a2c); box-shadow: inset 0 -4px 0 #1f6420, inset 0 2px 0 rgba(255,255,255,.35), 0 4px 10px rgba(0,0,0,.5); cursor: pointer; }
+  #pick.locked { background: linear-gradient(#5c8ce0, #3c64c8 55%, #22408c); box-shadow: inset 0 -4px 0 #16285a, inset 0 2px 0 rgba(255,255,255,.3); text-shadow: 1px 1px 0 #16285a; }
+  #pick.soon { background: linear-gradient(#5a5650, #3a3632); box-shadow: inset 0 -4px 0 #1e1c18; color: #b8b0a0; }
+  #guide { position: absolute; left: 10px; bottom: 10px; font-size: 12px; color: var(--muted); }
+  #guide input { vertical-align: -2px; }
+  .stand .box { position: absolute; border: 1px dashed; pointer-events: none; display: none; }
+  body.showBox .stand .box { display: block; }
+  .stand .box.b1 { left: 0; top: 0; width: 190px; height: 222px; border-color: #ff5a5a; }
+  .stand .box.b2 { left: 24px; top: 24px; width: 142px; height: 158px; border-color: #5aff8a; }
+  .stand .box.b3 { left: 32px; top: 32px; width: 126px; height: 142px; border-color: #5ac8ff; }
+</style>
+</head>
+<body>
+<div id="phone">
+  <h1>Vyber svoj národ</h1>
+  <div class="sub">Posúvaj prstom alebo šípkami</div>
+  <div id="carousel"><div id="prev" class="arrow">‹</div><div id="next" class="arrow">›</div></div>
+  <div id="dots"></div>
+  <div id="info"><div id="desc"></div><div id="perks"></div></div>
+  <button id="pick">Vybrať</button>
+  <label id="guide"><input type="checkbox" id="boxes"> ukázať rozmery (červená: podstavec 96×112, zelená: voľný rám 72×80, modrá: erb 64×72)</label>
+</div>
+<script>
+'use strict';
+// ---- provizórna kresba: drevený podstavec 96×112 a erby 64×72 (len na posúdenie veľkostí a rozloženia) ----
+const K = '#1c140e';
+const WOOD = ['#2a1a0e', '#3e2614', '#6a4220', '#9a6430', '#c08848', '#dca866'];
+const IRON = ['#2c3040', '#4a4e60', '#80869a', '#bcc0cc'];
+function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function outline(c) { // tmavý obrys okolo nakreslenej siluety
+  const x = c.getContext('2d'), d = x.getImageData(0, 0, c.width, c.height), a = d.data, W = c.width, H = c.height, src = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) src[i] = a[i * 4 + 3] > 0;
+  for (let y = 0; y < H; y++) for (let X = 0; X < W; X++) {
+    if (src[y * W + X]) continue;
+    const n = (X > 0 && src[y * W + X - 1]) || (X < W - 1 && src[y * W + X + 1]) || (y > 0 && src[(y - 1) * W + X]) || (y < H - 1 && src[(y + 1) * W + X]);
+    if (n) { const i = (y * W + X) * 4; a[i] = 0x1c; a[i + 1] = 0x14; a[i + 2] = 0x0e; a[i + 3] = 255; }
+  }
+  x.putImageData(d, 0, 0);
+}
+function drawStand() {
+  const c = canvas(96, 112), x = c.getContext('2d'), px = (X, Y, col) => { x.fillStyle = col; x.fillRect(X, Y, 1, 1); };
+  const plank = (x0, y0, w, h, horiz) => { // doska s letokruhmi, svetlo zľava zhora
+    for (let y = y0; y < y0 + h; y++) for (let X = x0; X < x0 + w; X++) {
+      const t = horiz ? (y - y0) / h : (X - x0) / w;
+      let v = 4 - t * 2.4 + (((horiz ? X * 3 + y * 17 : y * 3 + X * 17) % 23) === 0 ? -1 : 0) + (((horiz ? X : y) % 9) === 0 ? -0.6 : 0);
+      px(X, y, WOOD[Math.max(1, Math.min(5, Math.round(v)))]);
+    }
+  };
+  plank(3, 4, 9, 94, false); plank(84, 4, 9, 94, false);          // stĺpiky
+  plank(1, 2, 94, 10, true);                                       // horná priečka
+  for (const X of [0, 95]) for (let y = 3; y < 11; y++) px(X, y, WOOD[2]);
+  for (const X of [2, 3, 92, 93]) { px(X, 1, WOOD[5]); }           // zaoblené konce priečky
+  for (const [X, Y] of [[6, 6], [89, 6], [6, 90], [89, 90]]) { px(X, Y, IRON[3]); px(X + 1, Y, IRON[2]); px(X, Y + 1, IRON[2]); px(X + 1, Y + 1, IRON[1]); } // klince
+  plank(0, 92, 96, 12, true);                                      // spodná doska
+  plank(0, 104, 96, 6, true);
+  for (let X = 0; X < 96; X++) px(X, 103, WOOD[1]);
+  // tabuľka na meno (svetlejšia doska v strede)
+  for (let y = 93; y < 103; y++) for (let X = 24; X < 72; X++) px(X, y, y === 93 ? '#f0d8a8' : y === 102 ? '#a87c48' : X === 24 ? '#e8cc98' : X === 71 ? '#b08850' : '#dcbc84');
+  // reťaze z priečky (erb na nich visí)
+  for (const cx of [27, 68]) for (let y = 12; y < 22; y++) { const l = y % 3; if (l === 0) { px(cx - 1, y, IRON[2]); px(cx + 1, y, IRON[1]); } else px(cx, y, l === 1 ? IRON[3] : IRON[2]); }
+  outline(c);
+  return c;
+}
+// tvar erbu: rovný vrch, rovné boky do polovice, potom oblúk do hrotu
+const inShield = (X, Y, w, h, inset) => {
+  const x0 = inset, x1 = w - 1 - inset, y0 = inset, mid = h * 0.48, cx = (w - 1) / 2;
+  if (X < x0 || X > x1 || Y < y0 || Y > h - 1 - inset) return false;
+  if (Y <= mid) return true;
+  const t = (Y - mid) / (h - 1 - inset - mid), half = (x1 - x0) / 2 * Math.cos(t * Math.PI / 2) ** 0.85;
+  return Math.abs(X - cx) <= half;
+};
+const RACES = [
+  { name: 'Ľudia', field: ['#16285a', '#22408c', '#3c64c8', '#5c8ce0'], rim: ['#8a5c14', '#b88420', '#f8d048', '#fff070'], sym: 'tower',
+    desc: 'Rytieri, kamenné hradby a odvážni hrdinovia.', perks: ['hradby', 'rytieri', 'hrdinovia'], state: 'open' },
+  { name: 'Orkovia', field: ['#4a1008', '#7a2010', '#a83c24', '#cc5a34'], rim: ['#3a2c22', '#5a4434', '#7a6048', '#9a8060'], sym: 'axes',
+    desc: 'Surová sila a nekonečné hordy.', perks: ['sila', 'hordy', 'besnenie'], state: 'open' },
+  { name: 'Nemŕtvi', field: ['#1a1024', '#2a1838', '#3e2650', '#56366a'], rim: ['#8a8070', '#b0a690', '#d8d0bc', '#f0ead8'], sym: 'skull',
+    desc: 'Padlí kostlivci vstávajú znova do boja.', perks: ['oživovanie', 'kliatby', 'strach'], state: 'soon' },
+  { name: 'Elfovia', field: ['#143a1a', '#1e5226', '#2e6e34', '#4a8c42'], rim: ['#6a7080', '#9aa0b0', '#c8ccd8', '#f0f2f8'], sym: 'tree',
+    desc: 'Presní lukostrelci a lesná mágia.', perks: ['lukostrelci', 'mágia', 'lesy'], state: 'gem', price: 500 },
+  { name: 'Púštny ľud', field: ['#7a5014', '#a8781e', '#d0a038', '#ecc860'], rim: ['#6a3a10', '#9a5a1c', '#c07a2c', '#e0a050'], sym: 'sun',
+    desc: 'Jazdci na ťavách, šable a horúce slnko púšte.', perks: ['jazda', 'šable', 'oázy'], state: 'gem', price: 500 },
+  { name: 'Severania', field: ['#2a4a6a', '#4a7298', '#7aa4c8', '#b4d4ec'], rim: ['#5a6474', '#8a96a8', '#c0cad8', '#ffffff'], sym: 'wolf',
+    desc: 'Ľadové fjordy, runy a vlčie svorky.', perks: ['runy', 'vlci', 'mráz'], state: 'gem', price: 500 },
+];
+function drawCrest(r) {
+  const w = 64, h = 72, c = canvas(w, h), x = c.getContext('2d'), px = (X, Y, col) => { x.fillStyle = col; x.fillRect(X, Y, 1, 1); };
+  for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) {
+    if (!inShield(X, Y, w, h, 0)) continue;
+    const lit = 1 - (X + Y * 0.6) / (w + h * 0.6);
+    if (!inShield(X, Y, w, h, 4)) { px(X, Y, r.rim[Math.max(0, Math.min(3, Math.round(lit * 3.4 + (inShield(X, Y, w, h, 2) ? 0 : -0.6))))]); continue; } // kovový lem
+    px(X, Y, r.field[Math.max(0, Math.min(3, Math.round(lit * 2.6 + 0.6 + (((X + Y) & 3) === 0 ? 0.3 : 0))))]);
+  }
+  // úchyty na reťaze v horných rohoch
+  for (const cx of [11, 52]) { for (const [dx, dy] of [[-1, -2], [0, -3], [1, -2], [-2, -1], [2, -1]]) px(cx + dx, 2 + dy + 1, r.rim[3]); }
+  const g = r.rim[3], gd = r.rim[1], sh = 'rgba(0,0,0,.35)';
+  const rect = (X, Y, W, H, col) => { x.fillStyle = col; x.fillRect(X, Y, W, H); };
+  const S = r.sym, cx = 32;
+  x.save();
+  if (S === 'tower') { rect(24, 22, 16, 26, '#e6e9f2'); rect(36, 22, 4, 26, '#9aa4b8'); for (let i = 0; i < 4; i++) rect(23 + i * 5, 18, 3, 4, '#e6e9f2'); rect(29, 38, 6, 10, '#22337a'); rect(27, 11, 10, 4, g); rect(27, 9, 2, 2, g); rect(31, 8, 2, 3, g); rect(35, 9, 2, 2, g); }
+  if (S === 'axes') { x.strokeStyle = '#3e2614'; x.lineWidth = 3; x.beginPath(); x.moveTo(16, 52); x.lineTo(46, 16); x.moveTo(48, 52); x.lineTo(18, 16); x.stroke();
+    for (const [X, s] of [[14, 1], [42, -1]]) { rect(X, 12, 8, 10, '#bcc0cc'); } rect(25, 24, 14, 13, '#ece4cc'); rect(27, 28, 3, 3, K); rect(34, 28, 3, 3, K); rect(28, 35, 2, 4, '#fff'); rect(34, 35, 2, 4, '#fff'); }
+  if (S === 'skull') { rect(22, 16, 20, 18, '#ece4cc'); rect(24, 34, 16, 8, '#d8d0bc'); rect(25, 22, 5, 6, K); rect(34, 22, 5, 6, K); rect(26, 23, 2, 2, '#7cff6a'); rect(35, 23, 2, 2, '#7cff6a'); rect(30, 29, 4, 3, K);
+    for (let i = 0; i < 4; i++) rect(26 + i * 3, 38, 2, 4, K); for (let i = 0; i < 6; i++) rect(20 + i * 5, 48 + (i % 2) * 2, 2, 5, 'rgba(124,255,106,.55)'); }
+  if (S === 'tree') { x.fillStyle = '#e6e9f2'; x.beginPath(); x.arc(cx, 26, 12, 0, 7); x.fill(); rect(30, 34, 5, 16, '#c8ccd8'); rect(24, 48, 17, 3, '#c8ccd8'); x.fillStyle = '#f8f8ff'; x.beginPath(); x.arc(46, 13, 5, 0, 7); x.fill(); x.fillStyle = r.field[2]; x.beginPath(); x.arc(48, 12, 4.5, 0, 7); x.fill(); }
+  if (S === 'sun') { x.fillStyle = '#fff070'; x.beginPath(); x.arc(cx, 24, 8, 0, 7); x.fill(); for (let i = 0; i < 12; i++) { const a = i / 12 * 6.283; rect(Math.round(cx + Math.cos(a) * 12) - 1, Math.round(24 + Math.sin(a) * 12) - 1, 2, 2, '#fff070'); }
+    x.strokeStyle = '#e6e9f2'; x.lineWidth = 2; x.beginPath(); x.moveTo(18, 52); x.quadraticCurveTo(30, 44, 44, 34); x.moveTo(46, 52); x.quadraticCurveTo(34, 44, 20, 34); x.stroke(); rect(29, 56, 6, 3, '#40c0b0'); }
+  if (S === 'wolf') { x.fillStyle = '#f0f2f8'; x.beginPath(); x.moveTo(20, 16); x.lineTo(26, 24); x.lineTo(38, 24); x.lineTo(44, 16); x.lineTo(42, 34); x.lineTo(32, 46); x.lineTo(22, 34); x.closePath(); x.fill();
+    rect(26, 28, 3, 2, K); rect(35, 28, 3, 2, K); rect(30, 40, 4, 3, K); for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283; x.strokeStyle = '#ffffff'; x.lineWidth = 1; x.beginPath(); x.moveTo(cx, 56); x.lineTo(cx + Math.cos(a) * 6, 56 + Math.sin(a) * 6); x.stroke(); } }
+  x.restore();
+  // tieň symbolu dole vpravo (zjednodušene) a obrys
+  outline(c);
+  return c;
+}
+function drawChains() { // reťaze cez zamknutý erb
+  const c = canvas(60, 40), x = c.getContext('2d');
+  for (let i = 0; i < 60; i += 4) { x.fillStyle = IRON[i % 8 ? 2 : 3]; x.fillRect(i, Math.round(i * 0.55), 3, 2); x.fillRect(59 - i, Math.round(i * 0.55), 3, 2); }
+  x.fillStyle = '#b88420'; x.fillRect(24, 14, 12, 10); x.fillStyle = '#f8d048'; x.fillRect(25, 15, 10, 4); x.fillStyle = K; x.fillRect(29, 18, 2, 4);
+  x.strokeStyle = IRON[3]; x.lineWidth = 2; x.beginPath(); x.arc(30, 14, 4, Math.PI, 0); x.stroke();
+  return c;
+}
+const base = drawStand(), chains = drawChains();
+const car = document.getElementById('carousel'), dots = document.getElementById('dots');
+const els = RACES.map((r, i) => {
+  const d = document.createElement('div'); d.className = 'stand' + (r.state === 'open' ? '' : ' lockd');
+  const b = canvas(96, 112); b.getContext('2d').drawImage(base, 0, 0); b.className = 'base';
+  const cr = drawCrest(r); cr.className = 'crest';
+  const ch = canvas(60, 40); ch.getContext('2d').drawImage(chains, 0, 0); ch.className = 'chain';
+  const p = document.createElement('div'); p.className = 'plate'; p.textContent = r.name;
+  d.append(b, cr, ch, p);
+  for (const k of ['b1', 'b2', 'b3']) { const bx = document.createElement('i'); bx.className = 'box ' + k; d.appendChild(bx); }
+  d.addEventListener('click', () => go(i));
+  car.appendChild(d);
+  const dot = document.createElement('i'); dots.appendChild(dot);
+  return d;
+});
+let cur = 0;
+function go(i) {
+  cur = (i + RACES.length) % RACES.length;
+  els.forEach((e, j) => {
+    let o = j - cur; if (o > 3) o -= 6; if (o < -3) o += 6;
+    const far = Math.abs(o) > 1;
+    e.style.transform = 'translateX(' + (o * 150) + 'px) scale(' + (o ? 0.62 : 1) + ')';
+    e.style.opacity = far ? 0 : o ? 0.55 : 1;
+    e.style.filter = o ? 'brightness(.55)' : '';
+    e.style.zIndex = o ? 1 : 5;
+    e.style.pointerEvents = far ? 'none' : '';
+  });
+  [...dots.children].forEach((d, j) => d.classList.toggle('on', j === cur));
+  const r = RACES[cur];
+  document.getElementById('desc').textContent = r.desc;
+  document.getElementById('perks').innerHTML = r.perks.map(p => '<span>' + p + '</span>').join('');
+  const pk = document.getElementById('pick');
+  pk.className = r.state === 'open' ? '' : r.state === 'soon' ? 'soon' : 'locked';
+  pk.textContent = r.state === 'open' ? 'Vybrať' : r.state === 'soon' ? 'Čoskoro' : '💎 ' + r.price;
+}
+document.getElementById('prev').onclick = () => go(cur - 1);
+document.getElementById('next').onclick = () => go(cur + 1);
+let sx = null;
+car.addEventListener('pointerdown', e => { sx = e.clientX; });
+car.addEventListener('pointerup', e => { if (sx != null && Math.abs(e.clientX - sx) > 30) go(cur + (e.clientX < sx ? 1 : -1)); sx = null; });
+document.getElementById('boxes').onchange = e => document.body.classList.toggle('showBox', e.target.checked);
+go(0);
+</script>
+</body>
+</html>

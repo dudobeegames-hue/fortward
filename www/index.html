@@ -552,6 +552,40 @@
   }
   #gemBox { position: absolute; top: calc(env(safe-area-inset-top) + 10px); right: 12px; pointer-events: auto; }
   #races { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
+  /* výber národa: erb visí na drevenom podstavci (96×112 bodov kresby, na obrazovke 2×) */
+  #title.menuBg { justify-content: flex-start; gap: 0; overflow-y: auto; }
+  .raceHead { margin: 0; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 26px; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
+  .raceSub { margin-top: 4px; font-size: 13px; color: var(--muted); }
+  #raceCar { position: relative; width: 100%; height: 236px; margin-top: 2px; touch-action: pan-y; flex-shrink: 0; }
+  .rStand { position: absolute; left: 50%; top: 6px; width: 192px; height: 224px; margin-left: -96px; transition: transform .35s ease, opacity .35s ease, filter .35s ease; cursor: pointer; }
+  .rStand img { position: absolute; image-rendering: pixelated; pointer-events: none; }
+  .rStand .rBase { left: 0; top: 0; width: 192px; height: 224px; }
+  .rStand .rName { position: absolute; left: 0; right: 0; top: 187px; height: 18px; line-height: 18px; text-align: center; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 15px; color: #2a1a0e; text-shadow: 0 1px 0 rgba(255,230,180,.6); }
+  .rStand.lockd .rCrest { filter: grayscale(.75) brightness(.6); }
+  .rStand .rChain { display: none; }
+  .rStand.lockd .rChain { display: block; }
+  .rStand.chosen .rCrest { animation: raceGlow .7s ease-out 1; }
+  @keyframes raceGlow { 0% { filter: brightness(1); } 30% { filter: brightness(1.8) drop-shadow(0 0 10px #fff); } 100% { filter: brightness(1); } }
+  .raceArrow { position: absolute; top: 96px; z-index: 9; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 3px solid var(--ink);
+    background: radial-gradient(circle at 35% 30%, #6a5440, #3a2c22 70%); color: var(--gold); font-size: 26px; font-weight: 700; line-height: 1; box-shadow: 0 4px 8px rgba(0,0,0,.5); }
+  .raceArrow:active { transform: translateY(2px); }
+  #racePrev { left: 6px; } #raceNext { right: 6px; }
+  #raceDots { display: flex; justify-content: center; gap: 8px; margin-top: 2px; }
+  #raceDots i { width: 9px; height: 9px; border-radius: 50%; background: #5a4836; border: 2px solid var(--ink); }
+  #raceDots i.on { background: var(--gold); }
+  #raceInfo { width: 100%; max-width: 360px; box-sizing: border-box; margin-top: 8px; flex-shrink: 0; padding: 11px 12px; border-radius: 12px; border: 3px solid var(--ink);
+    background: linear-gradient(#3a2c22, #241a12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); }
+  #raceDesc { font-size: 14px; line-height: 1.4; text-align: center; min-height: 40px; }
+  #racePerks { display: flex; justify-content: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  #racePerks span { padding: 3px 9px; border-radius: 8px; background: rgba(0,0,0,.3); border: 2px solid var(--ink); font-size: 12px; color: var(--gold); }
+  #racePick { flex-shrink: 0; width: 220px; height: 50px; margin-top: 10px; border-radius: 12px; border: 3px solid var(--ink); font: 700 19px 'Rubik', sans-serif; color: #fff; text-shadow: 1px 1px 0 #1f4a18;
+    background: linear-gradient(#7ee05e, #3fae3a 55%, #2c8a2c); box-shadow: inset 0 -4px 0 #1f6420, inset 0 2px 0 rgba(255,255,255,.35), 0 4px 10px rgba(0,0,0,.5);
+    display: flex; align-items: center; justify-content: center; gap: 6px; }
+  #racePick:active { transform: translateY(2px); }
+  #racePick img { width: 20px; height: 20px; }
+  #racePick.gem { background: linear-gradient(#5c8ce0, #3c64c8 55%, #22408c); box-shadow: inset 0 -4px 0 #16285a, inset 0 2px 0 rgba(255,255,255,.3); text-shadow: 1px 1px 0 #16285a; }
+  #racePick.soon { background: linear-gradient(#5a5650, #3a3632); box-shadow: inset 0 -4px 0 #1e1c18; color: #b8b0a0; text-shadow: none; }
+  #raceBack { margin-top: 10px; flex-shrink: 0; }
   .race {
     background: rgba(28,20,14,.9); border: 2px solid var(--ink); border-radius: 10px;
     padding: 8px 4px 6px; display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -727,7 +761,7 @@
   .resItem { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 0; }
   .resItem.hall { grid-column: 2 / 3; } /* hrad v strede riadku, rovnako veľký ako ostatné */
   .resItem.hall + .resItem { grid-column-start: 1; } /* hrad má riadok sám pre seba */
-  .resItem .win { position: relative; height: 108px; perspective: 500px; cursor: pointer; }
+  .resItem .win { position: relative; height: 138px; perspective: 500px; cursor: pointer; }
   .resItem .side { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 4px 6px; box-sizing: border-box;
     backface-visibility: hidden; -webkit-backface-visibility: hidden; transition: transform .35s ease;
     border-radius: 10px; border: 2px solid var(--ink);
@@ -745,18 +779,19 @@
   .resItem b { font-size: 12px; line-height: 1.15; text-align: center; color: #fff; text-shadow: 1px 1px 0 var(--ink); }
   .resItem .opt { position: absolute; top: -8px; right: -4px; z-index: 2; padding: 1px 5px; border-radius: 7px; border: 2px solid var(--ink); background: var(--rc2); color: #fff; font-style: normal; font-size: 9px; font-weight: 700; }
   /* zelené tlačidlo s mincami a cenou */
-  .resItem .buyBtn { display: flex; align-items: center; justify-content: center; gap: 4px; height: 30px; padding: 0 8px; border-radius: 9px; border: 2px solid var(--ink);
+  .resItem .buyBtn { margin-top: auto; width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 4px; height: 30px; padding: 0 8px; border-radius: 9px; border: 2px solid var(--ink);
     background: linear-gradient(#7ee05e, #3fae3a 55%, #2c8a2c); box-shadow: inset 0 -3px 0 #1f6420, inset 0 2px 0 rgba(255,255,255,.35), 0 3px 6px rgba(0,0,0,.45);
     color: #fff; font: inherit; font-size: 14px; font-weight: 700; text-shadow: 1px 1px 0 #1f4a18; white-space: nowrap; }
   .resItem .buyBtn img { width: 26px; height: 24px; margin: -6px 0 0 -2px; image-rendering: pixelated; filter: drop-shadow(1px 1px 0 rgba(0,0,0,.4)); } /* kôpka má v kresbe hore voľné riadky – posun do stredu */
   .resItem .buyBtn:active { transform: translateY(2px); box-shadow: inset 0 -1px 0 #1f6420; }
-  .resItem .got { display: block; height: 30px; } /* vyskúmané: pod oknom nič (miesto ostane, aby okná sedeli v riadku) */
+  .resItem .got { display: none; }
+  .resItem.rDone .front { justify-content: center; } /* vyskúmané okno bez tlačidla: obrázok a názov v strede */ /* vyskúmané: pod oknom nič (miesto ostane, aby okná sedeli v riadku) */
   /* efekt odomknutia (strieborný): okno sa nehýbe – prebleskne bielym svetlom, od neho sa rozbehnú dva strieborné prstence
      a okolo zatrblietajú biele hviezdičky */
   .resItem.rJust .front::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
     background: radial-gradient(ellipse at 50% 45%, rgba(255,255,255,.95), rgba(220,232,255,.55) 45%, rgba(200,214,240,0) 75%); animation: resFlash .9s ease-out 1 both; }
   @keyframes resFlash { 0% { opacity: 0; } 18% { opacity: 1; } 100% { opacity: 0; } }
-  .resItem .burst { position: absolute; left: 0; right: 0; top: 0; height: 108px; pointer-events: none; z-index: 5; }
+  .resItem .burst { position: absolute; left: 0; right: 0; top: 0; height: 138px; pointer-events: none; z-index: 5; }
   .resItem .burst i { position: absolute; inset: 0; border-radius: 12px; border: 2px solid #e8eef8; box-shadow: 0 0 8px 2px rgba(220,232,255,.8), inset 0 0 6px rgba(255,255,255,.6);
     animation: resRing .9s ease-out 1 both; }
   .resItem .burst i + i { animation-delay: .18s; border-color: #b8c4d8; }
@@ -1070,16 +1105,14 @@
 
   <div id="title" class="screenOverlay menuBg" hidden>
     <div id="gemBox" class="pill"><img class="gem" alt=""><span>0</span></div>
-    <div class="menuSpace"></div>
-    <div class="scroll">
-      <div class="rod"></div>
-      <div class="paper"><div class="paperIn">
-        <h2 class="menuHead">Vyber si rasu</h2>
-        <div id="races"></div>
-      </div></div>
-      <div class="rod"></div>
-      <button id="raceTag" class="scrollTag" title="Späť" aria-label="Späť"><img alt=""></button>
-    </div>
+    <!-- výber národa: erby na drevených podstavcoch v kolotoči (stred veľký, po stranách menšie) -->
+    <div class="menuSpace"></div> <!-- miesto pre názov hry na pozadí – výber národa je celý pod ním -->
+    <h2 class="raceHead">Vyber svoj národ</h2>
+    <div id="raceCar"><button id="racePrev" class="raceArrow" aria-label="Predošlý">‹</button><button id="raceNext" class="raceArrow" aria-label="Ďalší">›</button></div>
+    <div id="raceDots"></div>
+    <div id="raceInfo"><div id="raceDesc"></div><div id="racePerks"></div></div>
+    <button id="racePick">Vybrať</button>
+    <button id="raceBack" class="btn backBtn">Späť</button>
   </div>
 
   <div id="map" hidden>

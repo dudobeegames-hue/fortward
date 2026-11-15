@@ -5349,7 +5349,7 @@
     const seen = landsSeen(), key = st.unlocked + ':' + st.race + ':' + seen.join(',');
     if (worldImg && worldImgKey === key) return worldImg;
     const G0 = worldG(), mis = worldMissions(), li = id => LANDS.findIndex(l => l.id === id);
-    worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), rose: [PPX + 62, PPY + 49], roseImg: true, noEdge: true });
+    worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), rose: [PPX + 51, PPY + 38], roseImg: true, noEdge: true });
     // územia, ktoré sú ešte zamknuté, sú vyšedené (súš aj pobrežie)
     const locked = new Set(LANDS.filter(l => !landReached(l)).flatMap(l => l.wl));
     if (locked.size) {
@@ -5518,7 +5518,7 @@
     const G0 = worldG(), mis = worldMissions(), anim = new Set();
     G0.provs.forEach((p, i) => { if (mis[i] >= seenU && mis[i] < st.unlocked) anim.add(i); });
     if (!anim.size) return null;
-    const img = worldPaint(), old = PAPER.paint(G0, { raceOf: i => anim.has(i) ? G0.provs[i].race : provRaceW(G0.provs[i], mis[i]), rose: [PPX + 62, PPY + 49], roseImg: true, noEdge: true });
+    const img = worldPaint(), old = PAPER.paint(G0, { raceOf: i => anim.has(i) ? G0.provs[i].race : provRaceW(G0.provs[i], mis[i]), rose: [PPX + 51, PPY + 38], roseImg: true, noEdge: true });
     const { W: GW, H: GH, prov } = G0, nd = img.canvas.getContext('2d').getImageData(0, 0, GW, GH).data, od = old.canvas.getContext('2d').getImageData(0, 0, GW, GH).data;
     let x0 = GW, y0 = GH, x1 = 0, y1 = 0;
     for (let k = 0; k < GW * GH; k++) if (anim.has(prov[k])) { const x = k % GW, y = (k / GW) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
@@ -7458,18 +7458,18 @@
         // okno výskumu (rám vo farbe rasy, tieň, podstavec pod obrázkom) a pod ním zelené tlačidlo s cenou
         // okno sa dá otočiť ťukom – vzadu je popis (ako karty stavieb v hre); tlačidlo s cenou výskum hneď kúpi
         b.innerHTML = '<div class="win' + (resFlip === r.id ? ' flipped' : '') + '"><div class="side front">' + (r.opt ? '<em class="opt">nepovinné</em>' : '') +
-          '<span class="pic"><img src="' + resIcon(r) + '" alt=""></span><b>' + resName(r) + '</b></div>' +
+          '<span class="pic"><img src="' + resIcon(r) + '" alt=""></span><b>' + resName(r) + '</b>' +
+          (done ? '' : '<button class="buyBtn"><img src="' + UI_ICONS.coinsFine + '" alt="">' + r.cost + '</button>') + '</div>' + // tlačidlo s cenou je dole v okne
           '<div class="side back"><b>' + resName(r) + '</b><small>' + resDesc(r) + '</small></div></div>' +
-          (resJust === r.id ? '<span class="burst"><i></i><i></i>' + '<b></b>'.repeat(8) + '</span>' : '') + // iskry efektu odomknutia
-          (done ? '<span class="got"></span>'
-            : '<button class="buyBtn"><img src="' + UI_ICONS.coinsFine + '" alt="">' + r.cost + '</button>');
+          (resJust === r.id ? '<span class="burst"><i></i><i></i>' + '<b></b>'.repeat(8) + '</span>' : ''); // iskry efektu odomknutia
         b.querySelector('.win').addEventListener('click', ev => {
           const w = ev.currentTarget; w.classList.toggle('flipped'); resFlip = w.classList.contains('flipped') ? r.id : null; AUDIO.play('click');
           clearTimeout(w._back);
           if (resFlip) w._back = setTimeout(() => { w.classList.remove('flipped'); if (resFlip === r.id) resFlip = null; }, 4000); // po chvíli sa otočí späť
         });
         const btn = b.querySelector('.buyBtn');
-        if (btn) btn.addEventListener('click', () => {
+        if (btn) btn.addEventListener('click', ev => {
+          ev.stopPropagation(); // ťuk na tlačidlo okno neotočí
           if (why) { toast(why); AUDIO.play('deny'); return; }
           if (poor) { toast('Chýba ' + (r.cost - (st.chest || 0)) + ' zlatiek – zlatky získaš v misiách'); AUDIO.play('deny'); return; }
           buyResearch(r);
@@ -7500,7 +7500,7 @@
       lockedHeroes.length ? 'Odomknúť' : 'Odomknuté', lockedHeroes.length ? () => lockedHeroes.forEach(buyHero) : null);
     sec('Rasy');
     for (const r of RACES.filter(x => x.state !== 'open'))
-      item('', '<img src="' + spriteURL(SPR[r.spr][0], 4) + '" alt="">', r.name, r.desc + ' Pripravujeme.', 'Čoskoro', null);
+      item('', '<img src="' + crestURL(r) + '" alt="">', r.name, r.desc + ' Pripravujeme.', 'Čoskoro', null); // erb národa
     sec('Hrdinovia');
     for (const id of heroIds().filter(x => HEROES[x].price)) {
       const h = HEROES[id], own = ownsHero(id);
@@ -7717,7 +7717,7 @@
     setTimeout(() => { delete p.dataset.rolling; done(); stopScrollAnims(p); }, 650);
   }
   $('slotsTag').addEventListener('click', () => rollUp('slots', showMenu));
-  $('raceTag').addEventListener('click', () => rollUp('title', () => showSlots()));
+  $('raceBack').addEventListener('click', () => { AUDIO.play('click'); showSlots(); });
   // Nastavenia na úvodnom obrázku: jediné miesto pre hudbu, zvuky a jazyk
   function syncSound() {
     document.querySelectorAll('.setIc.snd').forEach(b => {
@@ -7754,14 +7754,17 @@
   $('gemBox').addEventListener('click', () => toast('Obchod s gemami pripravujeme'));
   $('chestBox').addEventListener('click', () => toast('Truhlica: zlatky na útok na hrad v poslednej misii'));
 
+  // 6 hrateľných národov (Roj je len príbehový nepriateľ); erb = img/erby/<key>.png, zavesí sa na podstavec na miesto CREST_AT (tools/menu_crests.py)
   const RACES = [
-    { name: 'Ľudia',   spr: 'race_humans', state: 'open',                desc: 'Rytieri, kamenné hradby a odvážni hrdinovia.' },
-    { name: 'Orkovia', spr: 'race_orcs',   state: 'open',                desc: 'Surová sila a nekonečné hordy.', icon: () => trimmed(SPR.brute8[2].idle) }, // surovec s rohatou prilbou spredu
-    { name: 'Nemŕtvi', spr: 'race_undead', state: 'soon',                desc: 'Padlí kostlivci vstávajú znova do boja.' },
-    { name: 'Elfovia', spr: 'race_elves',  state: 'gem', price: 500,     desc: 'Presní lukostrelci a lesná mágia.' },
-    { name: 'Démoni',  spr: 'race_demons', state: 'gem', price: 500,     desc: 'Oheň, besnenie a temné obete.' },
-    { name: 'Roj',     spr: 'race_swarm',  state: 'gem', price: 800,     desc: 'Hmyzia ríša, ktorá sa rýchlo množí a zaplaví bojisko.' },
+    { name: 'Ľudia',      key: 'ludia',     state: 'open',            desc: 'Rytieri, kamenné hradby a odvážni hrdinovia.',  perks: ['hradby', 'rytieri', 'hrdinovia'] },
+    { name: 'Orkovia',    key: 'orkovia',   state: 'open',            desc: 'Surová sila a nekonečné hordy.',                 perks: ['sila', 'hordy', 'besnenie'] },
+    { name: 'Nemŕtvi',    key: 'nemrtvi',   state: 'soon',            desc: 'Padlí kostlivci vstávajú znova do boja.',        perks: ['oživovanie', 'kliatby', 'strach'] },
+    { name: 'Elfovia',    key: 'elfovia',   state: 'gem', price: 500, desc: 'Presní lukostrelci a lesná mágia.',              perks: ['lukostrelci', 'mágia', 'lesy'] },
+    { name: 'Púštny ľud', key: 'pustny',    state: 'gem', price: 500, desc: 'Jazdci púšte, šable a spaľujúce slnko.',         perks: ['jazda', 'šable', 'oázy'] },
+    { name: 'Severania',  key: 'severania', state: 'gem', price: 500, desc: 'Ľadové fjordy, runy a vlčie svorky.',            perks: ['runy', 'vlci', 'mráz'] },
   ];
+  const CREST_AT = {"ludia": [29, 26], "orkovia": [26, 26], "nemrtvi": [26, 26], "elfovia": [29, 26], "pustny": [29, 26], "severania": [30, 26]}; // ľavý horný roh erbu na podstavci 96×112
+  const crestURL = r => 'img/erby/' + r.key + '.png';
   // ---- menu: 4 pozície na uloženie ----
   // červený pixelový kôš na vymazanie pozície (14×16 bodov)
   const TRASH = (() => {
@@ -7818,7 +7821,7 @@
       if (had && w && sc && !sc.hidden && !p.dataset.rolling && !scrollAnims(p).some(a => a.playState === 'running')) unrollScroll(false, sc.id); // počas rozvíjania nie (zrušilo by ho)
     }
   });
-  for (const sc of ['slots', 'title']) scrollRO.observe($(sc).querySelector('.paper'));
+  scrollRO.observe($('slots').querySelector('.paper')); // výber národa už zvitok nemá (erby na podstavcoch)
   // ťuk na tlačidlo menu: tlačidlo sa hneď zatlačí a zaznie zvuk; ťažšia práca (načítanie pozície, mapa, terén misie)
   // sa spustí až po vykreslení tejto odozvy, takže aj na pomalom zariadení je hneď vidieť, že ťuk zabral
   let pressBusy = false;
@@ -7865,22 +7868,60 @@
     $('slots').hidden = true;
     $('title').hidden = false;
     AUDIO.music('map');
-    const box = $('races'); box.innerHTML = '';
-    for (const r of RACES) {
-      const c = document.createElement('button');
-      c.className = 'race ' + r.state + (r.name === (st.race || 'Ľudia') ? ' sel' : '');
-      const img = spriteURL(r.icon ? r.icon() : SPR[r.spr][0], 4, r.state !== 'open');
-      const tag = r.state === 'open' ? 'Hrať' : r.state === 'soon' ? 'Čoskoro' : '<img class="gem" src="' + ICONS.gem + '">' + r.price;
-      c.innerHTML = '<img' + (r.icon ? ' class="wide"' : '') + ' src="' + img + '"><b>' + r.name + '</b><span class="tag">' + tag + '</span>';
-      c.addEventListener('click', () => {
-        if (r.state === 'soon') toast(r.name + ' prídu v ďalšej verzii');
-        else if (r.state === 'gem') toast('Odomykanie za gemy pripravujeme');
-        else { AUDIO.play('click'); afterPress(c, () => { saveJSON(sk('race'), r.name); st.race = r.name; applyRace(); saveProgress(); showMap(); }); }
-      });
-      box.appendChild(c);
-    }
-    unrollScroll(true, 'title');
+    renderRaceCar(Math.max(0, RACES.findIndex(r => r.name === (st.race || 'Ľudia'))));
   }
+  // kolotoč erbov: stredný podstavec veľký, susedné menšie a stmavené, ostatné skryté; zamknuté erby sú prekrížené reťazou so zámkom
+  let raceCur = 0, raceEls = null;
+  function renderRaceCar(start) {
+    const car = $('raceCar');
+    if (!raceEls) {
+      raceEls = RACES.map((r, i) => {
+        const d = document.createElement('div'); d.className = 'rStand' + (r.state === 'open' ? '' : ' lockd');
+        const [cx, cy] = CREST_AT[r.key];
+        d.innerHTML = '<img class="rBase" src="img/erby/stand.png" alt=""><img class="rCrest" src="' + crestURL(r) + '" alt="" style="left:' + cx * 2 + 'px;top:' + cy * 2 + 'px">' +
+          '<img class="rChain" src="' + FINE_ICONS.lock + '" alt="" style="left:80px;top:96px;width:32px;height:32px"><div class="rName">' + r.name + '</div>';
+        const crest = d.querySelector('.rCrest'); crest.onload = () => { crest.style.width = crest.naturalWidth * 2 + 'px'; crest.style.height = crest.naturalHeight * 2 + 'px'; };
+        d.addEventListener('click', () => { if (i !== raceCur) { AUDIO.play('click'); raceGo(i); } });
+        car.appendChild(d);
+        return d;
+      });
+      $('raceDots').innerHTML = RACES.map(() => '<i></i>').join('');
+    }
+    raceGo(start);
+  }
+  function raceGo(i) {
+    raceCur = (i + RACES.length) % RACES.length;
+    raceEls.forEach((e, j) => {
+      let o = j - raceCur; if (o > 3) o -= RACES.length; if (o < -3) o += RACES.length;
+      const far = Math.abs(o) > 1;
+      e.style.transform = 'translateX(' + (o * 150) + 'px) scale(' + (o ? 0.62 : 1) + ')';
+      e.style.opacity = far ? 0 : o ? 0.55 : 1;
+      e.style.filter = o ? 'brightness(.55)' : '';
+      e.style.zIndex = o ? 1 : 5;
+      e.style.pointerEvents = far ? 'none' : '';
+    });
+    [...$('raceDots').children].forEach((d, j) => d.classList.toggle('on', j === raceCur));
+    const r = RACES[raceCur];
+    $('raceDesc').textContent = r.desc;
+    $('racePerks').innerHTML = r.perks.map(p => '<span>' + p + '</span>').join('');
+    const pk = $('racePick');
+    pk.className = r.state === 'open' ? '' : r.state;
+    pk.innerHTML = r.state === 'open' ? 'Vybrať' : r.state === 'soon' ? 'Čoskoro' : '<img src="' + ICONS.gem + '" alt="">' + r.price;
+  }
+  $('racePrev').addEventListener('click', () => { AUDIO.play('click'); raceGo(raceCur - 1); });
+  $('raceNext').addEventListener('click', () => { AUDIO.play('click'); raceGo(raceCur + 1); });
+  { let sx = null; // potiahnutie prstom do strany prepne národ
+    $('raceCar').addEventListener('pointerdown', e => { sx = e.clientX; });
+    $('raceCar').addEventListener('pointerup', e => { if (sx != null && Math.abs(e.clientX - sx) > 30) { AUDIO.play('click'); raceGo(raceCur + (e.clientX < sx ? 1 : -1)); } sx = null; });
+  }
+  $('racePick').addEventListener('click', () => {
+    const r = RACES[raceCur];
+    if (r.state === 'soon') { toast(r.name + ' prídu v ďalšej verzii'); AUDIO.play('deny'); return; }
+    if (r.state === 'gem') { toast('Odomykanie za gemy pripravujeme'); AUDIO.play('deny'); return; }
+    AUDIO.play('click');
+    raceEls[raceCur].classList.add('chosen'); // erb sa rozžiari
+    afterPress($('racePick'), () => { raceEls[raceCur].classList.remove('chosen'); saveJSON(sk('race'), r.name); st.race = r.name; applyRace(); saveProgress(); showMap(); });
+  });
 
   // odpočet budovania počas obliehania (stojí, kým kráľ vyberá talent)
 
