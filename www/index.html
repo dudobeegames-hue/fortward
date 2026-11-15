@@ -802,6 +802,10 @@
   .setIc .badge, .tabCard .badge, .mapIc .badge { position: absolute; top: -9px; right: -11px; min-width: 22px; height: 22px; padding: 0 5px; box-sizing: border-box; border-radius: 11px; border: 2px solid var(--ink);
     background: var(--gold); color: var(--ink); font-style: normal; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 13px; line-height: 18px; text-align: center; text-shadow: none; }
   .setIc .badge[hidden], .tabCard .badge[hidden], .mapIc .badge[hidden] { display: none; }
+  /* pripomienka čakajúcej akcie na mape: malý biely výkričník v červenom krúžku (Sieň, hrdina, Trofeje) */
+  .tabCard .badge, .mapIc .badge, #heroBtn .badge { top: -7px; right: -7px; min-width: 0; width: 20px; height: 20px; padding: 0; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ff7a5a, #d02818 70%); color: #fff; font-family: 'Rubik', sans-serif; font-size: 13px; font-weight: 800; line-height: 16px;
+    box-shadow: 0 2px 3px rgba(0,0,0,.5); text-shadow: 0 1px 0 #6a1008; }
   /* hrdinovia */
   #heroList { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
   .hero { width: 220px; height: 220px; box-sizing: border-box; flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;

@@ -5349,7 +5349,7 @@
     const seen = landsSeen(), key = st.unlocked + ':' + st.race + ':' + seen.join(',');
     if (worldImg && worldImgKey === key) return worldImg;
     const G0 = worldG(), mis = worldMissions(), li = id => LANDS.findIndex(l => l.id === id);
-    worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), rose: [PPX + 70, PPY + 54], roseImg: true, noEdge: true });
+    worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), rose: [PPX + 62, PPY + 49], roseImg: true, noEdge: true });
     // územia, ktoré sú ešte zamknuté, sú vyšedené (súš aj pobrežie)
     const locked = new Set(LANDS.filter(l => !landReached(l)).flatMap(l => l.wl));
     if (locked.size) {
@@ -5518,7 +5518,7 @@
     const G0 = worldG(), mis = worldMissions(), anim = new Set();
     G0.provs.forEach((p, i) => { if (mis[i] >= seenU && mis[i] < st.unlocked) anim.add(i); });
     if (!anim.size) return null;
-    const img = worldPaint(), old = PAPER.paint(G0, { raceOf: i => anim.has(i) ? G0.provs[i].race : provRaceW(G0.provs[i], mis[i]), rose: [PPX + 70, PPY + 54], roseImg: true, noEdge: true });
+    const img = worldPaint(), old = PAPER.paint(G0, { raceOf: i => anim.has(i) ? G0.provs[i].race : provRaceW(G0.provs[i], mis[i]), rose: [PPX + 62, PPY + 49], roseImg: true, noEdge: true });
     const { W: GW, H: GH, prov } = G0, nd = img.canvas.getContext('2d').getImageData(0, 0, GW, GH).data, od = old.canvas.getContext('2d').getImageData(0, 0, GW, GH).data;
     let x0 = GW, y0 = GH, x1 = 0, y1 = 0;
     for (let k = 0; k < GW * GH; k++) if (anim.has(prov[k])) { const x = k % GW, y = (k / GW) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
@@ -5557,7 +5557,7 @@
     for (const l of LANDS) {
       const b = landBox(l), known = seen.includes(l.id) || st.unlocked >= l.first;
       const won = Math.max(0, Math.min(l.count, st.unlocked - l.first));
-      lbl.push({ s: l.name, sub: known ? (won >= l.count ? 'dobyté ✓' : won + ' / ' + l.count) : '', x: ox + b.x + b.w / 2 + (l.lblDx || 0), y: b.y - 3 }); // názvy jednou farbou (zamknuté územia sú vyšedené na mape)
+      lbl.push({ s: l.name, sub: known ? (won >= l.count ? 'dobyté ✓' : won + ' / ' + l.count) : '', x: ox + b.x + b.w / 2 + (l.lblDx || 0), y: b.y - 9 }); // názov kúsok nad ostrovom, nie na ňom // názvy jednou farbou (zamknuté územia sú vyšedené na mape)
     }
     const ringL = st.sail ? landById(st.sail.to) : landById(st.land); // zvolené územie (počas plavby to, kam sa pláva)
     if (ringL) drawWorldRing(ringL, time);
@@ -7201,9 +7201,10 @@
   // spodné ikonky mapy: na Sieni počet voľných hviezd, na Trofejach počet získaných
   function renderMapBar() {
     const free = starsFree(), fresh = ACH.filter(a => ach[a.id] > achSeen).length;
-    $('hallBtnTxt').textContent = '★' + free; $('hallBtnTxt').hidden = !free;
-    $('trophyTxt').textContent = fresh; $('trophyTxt').hidden = !fresh;
-    const es = emptySlots(); $('heroTxt').textContent = es; $('heroTxt').hidden = !es; // voľný slot na schopnosť
+    // čakajúca akcia (voľné hviezdy, nová trofej, voľný slot schopnosti): všade len malý výkričník v červenom krúžku
+    $('hallBtnTxt').textContent = '!'; $('hallBtnTxt').hidden = !free;
+    $('trophyTxt').textContent = '!'; $('trophyTxt').hidden = !fresh;
+    const es = emptySlots(); $('heroTxt').textContent = '!'; $('heroTxt').hidden = !es;
     $('heroBtn').classList.toggle('shine', heroIds().some(heroIsNew));
     renderMapHead();
   }
