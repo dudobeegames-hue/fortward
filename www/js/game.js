@@ -7870,35 +7870,45 @@
     AUDIO.music('map');
     renderRaceCar(Math.max(0, RACES.findIndex(r => r.name === (st.race || 'Ľudia'))));
   }
-  // výber národa: jeden drevený podstavec stojí na mieste, šípkami či ťahom sa na ňom vymieňajú erby; ťuk na erb spustí hru za ten národ
-  let raceCur = 0, raceStand = null;
+  // výber národa: jeden drevený podstavec stojí na mieste, erby sa okolo neho točia v kruhu (susedné visia vedľa, menšie a stmavené); ťuk na stredný erb spustí hru
+  let raceCur = 0, raceStand = null, raceCrests = null;
   function renderRaceCar(start) {
     if (!raceStand) {
       raceStand = document.createElement('div'); raceStand.className = 'rStand';
-      raceStand.innerHTML = '<img class="rBase" src="img/erby/stand.png" alt=""><img class="rCrest" alt="">' +
+      raceStand.innerHTML = '<img class="rBase" src="img/erby/stand.png" alt="">' +
         '<img class="rChain" src="' + FINE_ICONS.lock + '" alt="" style="left:80px;top:96px;width:32px;height:32px"><div class="rName"></div>';
-      const crest = raceStand.querySelector('.rCrest');
-      crest.onload = () => { crest.style.width = crest.naturalWidth * 2 + 'px'; crest.style.height = crest.naturalHeight * 2 + 'px'; };
-      crest.addEventListener('click', ev => { ev.stopPropagation(); pickRace(); });
+      raceCrests = RACES.map((r, i) => {
+        const c = document.createElement('img'); c.className = 'rCrest' + (r.state === 'open' ? '' : ' lk'); c.alt = '';
+        const [cx, cy] = CREST_AT[r.key];
+        c.style.left = cx * 2 + 'px'; c.style.top = cy * 2 + 'px';
+        c.onload = () => { c.style.width = c.naturalWidth * 2 + 'px'; c.style.height = c.naturalHeight * 2 + 'px'; };
+        c.src = crestURL(r);
+        c.addEventListener('click', ev => { ev.stopPropagation(); if (i === raceCur) pickRace(); else { AUDIO.play('click'); raceGo(i); } });
+        raceStand.insertBefore(c, raceStand.querySelector('.rChain'));
+        return c;
+      });
       $('raceCar').appendChild(raceStand);
       $('raceDots').innerHTML = RACES.map(() => '<i></i>').join('');
-      for (const r of RACES) { const im = new Image(); im.src = crestURL(r); } // erby vopred, aby výmena neblikla
     }
-    raceGo(start, 0);
+    raceGo(start);
   }
-  function raceGo(i, dir) {
+  function raceGo(i) {
     raceCur = (i + RACES.length) % RACES.length;
-    const r = RACES[raceCur], crest = raceStand.querySelector('.rCrest');
-    const show = () => {
-      const [cx, cy] = CREST_AT[r.key];
-      crest.src = crestURL(r); crest.style.left = cx * 2 + 'px'; crest.style.top = cy * 2 + 'px';
-      raceStand.classList.toggle('lockd', r.state !== 'open');
-      raceStand.querySelector('.rName').textContent = r.name;
-      crest.style.setProperty('--sw', (dir < 0 ? 8 : -8) + 'deg'); // nový erb prichádza z opačnej strany
-      requestAnimationFrame(() => crest.classList.remove('out'));
-    };
-    if (dir) { crest.style.setProperty('--sw', (dir > 0 ? 8 : -8) + 'deg'); crest.classList.add('out'); clearTimeout(raceGo.t); raceGo.t = setTimeout(show, 160); }
-    else show();
+    const r = RACES[raceCur];
+    raceCrests.forEach((c, j) => {
+      let o = j - raceCur; if (o > 3) o -= RACES.length; if (o < -3) o += RACES.length;
+      const far = Math.abs(o) > 1;
+      c.style.transform = 'translateX(' + (o * 150) + 'px) scale(' + (o ? 0.62 : 1) + ')';
+      c.style.opacity = far ? 0 : 1;
+      c.style.zIndex = o ? 1 : 5;
+      c.style.pointerEvents = far ? 'none' : '';
+      c.classList.toggle('side', !!o); c.classList.toggle('mid', !o); c.classList.toggle('lk', RACES[j].state !== 'open');
+    });
+    if (raceGo.ready) { // pri prepínaní zámok zhasne a znova sa ukáže, až keď erb dorazí na podstavec
+      raceStand.classList.add('swap'); clearTimeout(raceGo.t);
+      raceGo.t = setTimeout(() => { raceStand.classList.toggle('lockd', RACES[raceCur].state !== 'open'); raceStand.classList.remove('swap'); }, 300);
+    } else { raceStand.classList.toggle('lockd', r.state !== 'open'); raceGo.ready = true; }
+    raceStand.querySelector('.rName').textContent = r.name;
     [...$('raceDots').children].forEach((d, j) => d.classList.toggle('on', j === raceCur));
     const pk = $('racePick');
     pk.className = r.state === 'open' ? '' : r.state;
@@ -7912,11 +7922,11 @@
     raceStand.classList.add('chosen'); // erb sa rozžiari
     afterPress($('racePick'), () => { raceStand.classList.remove('chosen'); saveJSON(sk('race'), r.name); st.race = r.name; applyRace(); saveProgress(); showMap(); });
   }
-  $('racePrev').addEventListener('click', () => { AUDIO.play('click'); raceGo(raceCur - 1, -1); });
-  $('raceNext').addEventListener('click', () => { AUDIO.play('click'); raceGo(raceCur + 1, 1); });
+  $('racePrev').addEventListener('click', () => { AUDIO.play('click'); raceGo(raceCur - 1); });
+  $('raceNext').addEventListener('click', () => { AUDIO.play('click'); raceGo(raceCur + 1); });
   { let sx = null; // potiahnutie prstom do strany prepne národ
     $('raceCar').addEventListener('pointerdown', e => { sx = e.clientX; });
-    $('raceCar').addEventListener('pointerup', e => { if (sx != null && Math.abs(e.clientX - sx) > 30) { const d = e.clientX < sx ? 1 : -1; AUDIO.play('click'); raceGo(raceCur + d, d); } sx = null; });
+    $('raceCar').addEventListener('pointerup', e => { if (sx != null && Math.abs(e.clientX - sx) > 30) { const d = e.clientX < sx ? 1 : -1; AUDIO.play('click'); raceGo(raceCur + d); } sx = null; });
   }
   $('racePick').addEventListener('click', pickRace);
 
