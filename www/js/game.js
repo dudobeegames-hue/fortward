@@ -7437,17 +7437,20 @@
       const grid = document.createElement('div'); grid.className = 'resGrid';
       for (const r of items) {
         const done = resHas(r.id), why = done ? null : resBlock(r), poor = !done && !why && (st.chest || 0) < r.cost, pick = resPick === r.id && !done && !why && !poor;
-        const b = document.createElement('button');
-        b.className = 'resItem' + (done ? ' done' : why ? ' locked' : poor ? ' poor' : ' buy') + (r.kind === 'hall' ? ' hall' : '') + (pick ? ' sel' : '') + (resFlash === r.id ? ' resNew' : '');
-        b.innerHTML = (r.opt ? '<em class="opt">nepovinné</em>' : '') + '<span class="pic"><img src="' + resIcon(r) + '" alt=""></span><b>' + resName(r) + '</b>' +
-          '<span class="cost">' + (done ? (r.cost ? '✓ vyskúmané' : '✓ od začiatku') : pick ? 'Vyskúmať?' : '<img src="' + UI_ICONS.coinsFine + '" alt="">' + r.cost) + '</span>';
-        b.addEventListener('click', () => {
+        const b = document.createElement('div');
+        b.className = 'resItem' + (done ? ' rDone' : why ? ' rLock' : poor ? ' rPoor' : ' rBuy') + (r.kind === 'hall' ? ' hall' : '') + (pick ? ' rSel' : '') + (resFlash === r.id ? ' resNew' : '');
+        // okno výskumu (rám vo farbe rasy, tieň, podstavec pod obrázkom) a pod ním zelené tlačidlo s cenou
+        b.innerHTML = '<div class="win">' + (r.opt ? '<em class="opt">nepovinné</em>' : '') + '<span class="pic"><img src="' + resIcon(r) + '" alt=""></span><b>' + resName(r) + '</b></div>' +
+          (done ? '<span class="got">' + (r.cost ? '✓ vyskúmané' : '✓ od začiatku') + '</span>'
+            : '<button class="buyBtn">' + (pick ? 'Vyskúmať?' : '<img src="' + UI_ICONS.coinsFine + '" alt="">' + r.cost) + '</button>');
+        const tap = () => {
           if (done) return;
           if (why) { toast(why); AUDIO.play('deny'); return; }
           if (poor) { toast('Chýba ' + (r.cost - (st.chest || 0)) + ' zlatiek – zlatky získaš v misiách'); AUDIO.play('deny'); return; }
           if (resPick === r.id) { buyResearch(r); return; }
-          resPick = r.id; AUDIO.play('click'); renderResearch();
-        });
+          resPick = r.id; AUDIO.play('click'); renderResearch(); // prvý ťuk označí, druhý vyskúma
+        };
+        b.addEventListener('click', tap);
         grid.appendChild(b);
       }
       card.appendChild(grid); list.appendChild(card);

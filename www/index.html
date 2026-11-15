@@ -710,7 +710,10 @@
   .tabCard.shop.on { background: linear-gradient(#a07a38, #5a4020); }
   /* výskum: 5 veľkých kariet nad sebou (V hore, I dole) */
   #resList { display: flex; flex-direction: column; gap: 14px; width: 100%; }
-  .resCard { box-sizing: border-box; min-height: calc(100vh - 190px); padding: 10px; border-radius: 14px; border: 3px solid var(--ink);
+  /* karta výskumu je vysoká podľa počtu výskumov; farby rámov podľa rasy (ľudia modré, orkovia oranžové) */
+  #resList { --rc0: #16285a; --rc1: #22408c; --rc2: #3c64c8; --rc3: #88b4ff; --rcg: rgba(92,140,224,.35); }
+  .orcs #resList { --rc0: #4a2008; --rc1: #7a3a10; --rc2: #c06a20; --rc3: #ffb050; --rcg: rgba(255,140,30,.3); }
+  .resCard { box-sizing: border-box; padding: 10px 10px 14px; border-radius: 14px; border: 3px solid var(--ink);
     background: linear-gradient(#3a2c22, #241a12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 6px 14px rgba(0,0,0,.45); }
   .resCard.cur { border-color: #b88420; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px #f8d048, 0 6px 14px rgba(0,0,0,.45); }
   .resCard.locked { filter: saturate(.35) brightness(.8); }
@@ -719,27 +722,39 @@
   .resCard header b { display: block; font-family: 'Pixelify Sans', 'Rubik', sans-serif; font-size: 20px; color: var(--gold); text-shadow: 2px 2px 0 var(--ink); }
   .resCard header small { color: var(--muted); font-size: 12px; }
   .resCard.done header small { color: #9cd45a; }
-  .resGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .resItem { position: relative; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px 6px; min-height: 104px; border-radius: 10px; border: 2px solid var(--ink);
-    background: rgba(0,0,0,.3); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); color: inherit; font: inherit; }
-  .resItem.hall { grid-column: 1 / -1; flex-direction: row; justify-content: center; gap: 12px; min-height: 76px; }
-  .resItem .pic { display: grid; place-items: center; width: 52px; height: 52px; }
-  .resItem .pic img { max-width: 52px; max-height: 52px; image-rendering: pixelated; }
-  .resItem b { font-size: 12px; line-height: 1.15; text-align: center; }
-  .resItem.hall b { font-size: 16px; }
-  .resItem .cost { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 700; color: var(--gold); white-space: nowrap; }
-  .resItem .cost img { width: 20px; height: 18px; image-rendering: pixelated; }
-  .resItem.buy { border-color: #6a5030; background: linear-gradient(rgba(248,208,72,.14), rgba(248,208,72,.04)); }
-  .resItem.sel { border-color: #f8d048; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px #f8d048; }
-  .resItem.poor .cost { color: #e07060; }
-  .resItem.done { background: rgba(98,160,58,.16); border-color: #3e6a2a; }
-  .resItem.done .cost { color: #9cd45a; }
-  .resItem.locked { opacity: .5; }
-  .resItem.locked .pic img { filter: grayscale(1); }
-  .resItem .opt { position: absolute; top: -7px; right: -3px; padding: 1px 5px; border-radius: 7px; border: 2px solid var(--ink); background: #5c8ce0; color: #fff; font-style: normal; font-size: 9px; font-weight: 700; }
-  .resItem:active { transform: translateY(1px); }
-  .resItem.resNew { animation: neonFlash 2.8s ease-in-out 2.4s 1; } /* zabliká, keď posun obrazovky dobehne */ /* hrad novej karty: neónové zablikanie (za ľudí modré) */
-  .orcs .resItem.resNew { animation-name: neonFlashOrc; }
+  .resGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 8px; }
+  /* výskum: okno (rám vo farbe rasy s tieňom a svetlým lemom, obrázok na podstavci) a pod ním tlačidlo s cenou */
+  .resItem { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 0; }
+  .resItem.hall { grid-column: 1 / -1; align-items: center; }
+  .resItem .win { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 4px 6px; min-height: 92px; box-sizing: border-box;
+    border-radius: 10px; border: 2px solid var(--ink);
+    background: radial-gradient(ellipse at 50% 38%, var(--rcg), transparent 62%), linear-gradient(var(--rc1), var(--rc0));
+    box-shadow: inset 0 0 0 2px var(--rc2), inset 0 3px 0 1px rgba(255,255,255,.18), inset 0 -4px 0 1px rgba(0,0,0,.35), 0 4px 8px rgba(0,0,0,.5); }
+  .resItem.hall .win { flex-direction: row; justify-content: center; gap: 14px; width: 100%; min-height: 76px; }
+  .resItem .pic { position: relative; display: grid; place-items: center; width: 54px; height: 54px; }
+  .resItem .pic::before { content: ''; position: absolute; left: 6px; right: 6px; bottom: 2px; height: 9px; border-radius: 50%; background: rgba(0,0,0,.35); } /* tieň pod obrázkom */
+  .resItem .pic img { position: relative; max-width: 52px; max-height: 52px; image-rendering: pixelated; filter: drop-shadow(1px 2px 0 rgba(0,0,0,.45)); }
+  .resItem b { font-size: 12px; line-height: 1.15; text-align: center; color: #fff; text-shadow: 1px 1px 0 var(--ink); }
+  .resItem.hall b { font-size: 17px; }
+  .resItem .opt { position: absolute; top: -8px; right: -4px; z-index: 2; padding: 1px 5px; border-radius: 7px; border: 2px solid var(--ink); background: var(--rc2); color: #fff; font-style: normal; font-size: 9px; font-weight: 700; }
+  /* zelené tlačidlo s mincami a cenou */
+  .resItem .buyBtn { display: flex; align-items: center; justify-content: center; gap: 4px; height: 30px; padding: 0 8px; border-radius: 9px; border: 2px solid var(--ink);
+    background: linear-gradient(#7ee05e, #3fae3a 55%, #2c8a2c); box-shadow: inset 0 -3px 0 #1f6420, inset 0 2px 0 rgba(255,255,255,.35), 0 3px 6px rgba(0,0,0,.45);
+    color: #fff; font: inherit; font-size: 14px; font-weight: 700; text-shadow: 1px 1px 0 #1f4a18; white-space: nowrap; }
+  .resItem.hall .buyBtn { min-width: 140px; }
+  .resItem .buyBtn img { width: 22px; height: 20px; image-rendering: pixelated; filter: drop-shadow(1px 1px 0 rgba(0,0,0,.4)); }
+  .resItem .buyBtn:active { transform: translateY(2px); box-shadow: inset 0 -1px 0 #1f6420; }
+  .resItem .got { display: flex; align-items: center; justify-content: center; height: 30px; font-size: 13px; font-weight: 700; color: #9cd45a; text-shadow: 1px 1px 0 var(--ink); }
+  .resItem.rSel .win { box-shadow: 0 0 0 2px #f8d048, inset 0 0 0 2px var(--rc3), 0 4px 8px rgba(0,0,0,.5); }
+  .resItem.rSel .buyBtn { background: linear-gradient(#a8f080, #5cc84a 55%, #3a9a30); }
+  .resItem.rPoor .buyBtn { background: linear-gradient(#5a6a52, #3e4a38); box-shadow: inset 0 -3px 0 #263020; color: #e8a090; }
+  .resItem.rLock .win { filter: grayscale(.85) brightness(.7); }
+  .resItem.rLock .buyBtn { background: linear-gradient(#4a4a44, #33332e); box-shadow: inset 0 -3px 0 #1e1e1a; color: #9a9488; }
+  .resItem.rLock .buyBtn img { filter: grayscale(1); opacity: .6; }
+  .resItem.rDone .win { background: radial-gradient(ellipse at 50% 38%, rgba(156,212,90,.25), transparent 62%), linear-gradient(#2e5a24, #1a3614);
+    box-shadow: inset 0 0 0 2px #4a8c32, inset 0 3px 0 1px rgba(255,255,255,.15), inset 0 -4px 0 1px rgba(0,0,0,.35), 0 4px 8px rgba(0,0,0,.5); }
+  .resItem.resNew .win { animation: neonFlash 2.8s ease-in-out 2.4s 1; } /* zabliká, keď posun obrazovky dobehne */ /* hrad novej karty: neónové zablikanie (za ľudí modré) */
+  .orcs .resItem.resNew .win { animation-name: neonFlashOrc; }
   /* obchod */
   #shopList { display: flex; flex-direction: column; gap: 8px; width: 100%; }
   .shopSec { margin: 6px 0 -2px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
