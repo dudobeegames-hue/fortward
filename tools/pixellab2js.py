@@ -72,7 +72,12 @@ def main():
     own = {d: [int(i) for i in v.split(',')] for d, v in (a.split('=') for a in args[4:])}
     pb = PB * (2 if hd else 1)
     base = os.path.join(ROOT, 'postavy', folder)  # folder môže byť aj cesta, napr. ../Grafika/Ludia/postavy/lucisnik
-    rot = [load(os.path.join(base, 'rotations', d + '.png')) for d in DIRS]
+    rdir = os.path.join(base, 'rotations')
+    if os.path.isdir(rdir):
+        rot = [load(os.path.join(rdir, d + '.png')) for d in DIRS]
+    else:  # bez rotations: státie = prvá snímka chôdze v danom smere
+        first = sorted(n for n in os.listdir(os.path.join(base, 'animations')) if 'attack' not in n.lower())[0]
+        rot = [load(os.path.join(base, 'animations', first, d, 'frame_000.png')) for d in DIRS]
     rw, rh = len(rot[0][0]), len(rot[0])
     if wide:
         sizes = [Image.open(f).size for f in glob.glob(os.path.join(base, 'animations', '*', '*', 'frame_000.png'))]

@@ -475,7 +475,7 @@
   .setIc .ico { position: relative; width: 64px; height: 64px; display: grid; place-items: center; border-radius: 12px; border: 3px solid var(--ink);
     background: linear-gradient(#5a4836, #3a2c22); box-shadow: inset 0 -4px 0 rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.15); }
   .setIc .ico img { width: 42px; height: 42px; image-rendering: pixelated; }
-  .setIc .ico img.flag { width: 40px; height: auto; outline: 2px solid var(--ink); }
+  .setIc .ico img.flag { width: 40px; height: auto; image-rendering: pixelated; }
   .setIc:active .ico { transform: translateY(2px); }
   .setIc.off .ico img { opacity: .35; }
   .setIc.off .ico::after { content: ''; position: absolute; left: 2px; right: 2px; top: 50%; height: 5px; margin-top: -2px; background: var(--red); border: 2px solid var(--ink); border-radius: 3px; transform: rotate(-40deg); }
@@ -486,7 +486,7 @@
   #langList[hidden], #setMain[hidden] { display: none; }
   .lang { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 8px; border-radius: 9px; border: 2px solid var(--ink); background: var(--panel2); color: #fff; text-align: left;
     box-shadow: inset 0 -4px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.12); font-size: 14px; font-weight: 600; line-height: 1.1; }
-  .lang img { width: 27px; height: 18px; flex: 0 0 auto; image-rendering: pixelated; outline: 2px solid var(--ink); }
+  .lang img { width: 36px; height: 26px; flex: 0 0 auto; image-rendering: pixelated; }
   .lang span { display: flex; flex-direction: column; min-width: 0; white-space: nowrap; }
   .lang small { color: var(--muted); font-size: 10.5px; font-weight: 500; }
   .lang.cur { border-color: var(--gold); box-shadow: inset 0 -4px 0 rgba(0,0,0,.35), 0 0 0 1px var(--gold); }
@@ -1241,7 +1241,7 @@
 <script>
   // hra sa načíta až po vykreslení úvodnej obrazovky (inak by ťažké skripty zdržali jej prvé zobrazenie)
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    const list = ['audio', 'knight-art', 'archer-art', 'spear-art', 'rider-art', 'tower-art', 'fire-tower-art', 'castle-art', 'pitch-tower-art', 'ballista-tower-art', 'ballista-turret-art', 'wall-art', 'pit-art', 'firetrap-art', 'barracks-art', 'stables-art', 'range-art', 'falconry-art', 'armory-art', 'mine-art', 'workshop-art', 'chapel-art', 'healer-art', 'carpenter-art', 'falcon-art', 'paladin-art', 'sorc-art', 'king-art', 'ram-art', 'catapult-art', 'sprites', 'orcs8', 'scene', 'buildings', 'siege', 'map', 'camp', 'castles', 'paper', 'world', 'icons', 'icons-fine', 'game'];
+    const list = ['audio', 'knight-art', 'orc-art', 'archer-art', 'spear-art', 'rider-art', 'tower-art', 'fire-tower-art', 'castle-art', 'pitch-tower-art', 'ballista-tower-art', 'ballista-turret-art', 'wall-art', 'pit-art', 'firetrap-art', 'barracks-art', 'stables-art', 'range-art', 'falconry-art', 'armory-art', 'mine-art', 'workshop-art', 'chapel-art', 'healer-art', 'carpenter-art', 'falcon-art', 'paladin-art', 'sorc-art', 'king-art', 'ram-art', 'catapult-art', 'sprites', 'orcs8', 'scene', 'buildings', 'siege', 'map', 'camp', 'castles', 'paper', 'world', 'icons', 'icons-fine', 'game'];
     list.forEach((n, i) => {
       const s = document.createElement('script'); s.src = 'js/' + n + '.js?v=__BUILD__'; s.async = false; // verziu doplní nasadenie, mobil tak nevezme starý skript z pamäte
       document.body.appendChild(s);

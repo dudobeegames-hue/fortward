@@ -508,71 +508,123 @@ const UI_ICONS = (() => {
     'KK.......KK',
   ], { K: '#1c140e', L: '#8ab4ff', B: '#3c64c8', D: '#22337a', W: '#fff7e0' });
 
-  // ---- vlajky 18×12 bodov ----
-  const FW = 18, FH = 12;
-  const stripesH = cols => (x, y) => cols[Math.floor(y * cols.length / FH)];
+  // ---- vlajky: jemná pixel grafika 36×26 bodov ----
+  // látka 36×24 so zvlnenými hornými a dolnými okrajmi, tmavý obrys, svetlo a tieň záhybov (rozptýlené cez bayer)
+  const FW = 36, FH = 24, IW = FW - 2, IH = FH - 2;               // vnútro bez obrysu: 34×22
+  const FINK = '#1c140e';
+  const mixHex = (c, t, k) => { const a = hex(c), b = hex(t); return a.map((v, i) => Math.round(v + (b[i] - v) * k)); };
+  const waveY = x => Math.round(Math.sin(x / FW * Math.PI * 2 + 0.6) * 1.1);   // posun stĺpca hore/dole
+  function flagArt(fn) {
+    const cache = {};
+    const tone = (c, lv) => { const k = c + lv; if (!cache[k]) cache[k] = lv > 0 ? mixHex(c, '#ffffff', 0.2) : lv < 0 ? mixHex(c, '#000000', 0.17) : hex(c); return cache[k]; };
+    return canvasArt(FW, FH + 2, (x, y) => {
+      const fy = y - 1 - waveY(x);
+      if (fy < 0 || fy >= FH) return null;
+      if (x === 0 || x === FW - 1 || fy === 0 || fy === FH - 1) return hex(FINK);
+      const c = fn(x - 1, fy - 1);
+      if (c === FINK) return hex(FINK);
+      // záhyby: svah vlny k svetlu (zľava hore) je svetlejší, odvrátený tmavší; ľavý okraj pri žrdi mierne v tieni
+      let s = Math.cos(x / FW * Math.PI * 2 + 0.6) * 0.55 - (fy / FH) * 0.18 + 0.06;
+      if (x === 1) s -= 0.4;
+      s += (bayer(x, y) - 0.5) * 0.22;                           // rozptyl len v úzkom prechode medzi tónmi
+      return tone(c, s > 0.36 ? 1 : s < -0.36 ? -1 : 0);
+    });
+  }
+  const bandsV = cols => (x, y) => cols[Math.min(cols.length - 1, Math.floor((y + 0.5) * cols.length / IH))];
+  const bandsU = cols => (x, y) => cols[Math.min(cols.length - 1, Math.floor((x + 0.5) * cols.length / IW))];
+  const mapAt = (rows, ox, oy, P) => (x, y) => { const r = rows[y - oy]; const ch = r && x >= ox ? r[x - ox] : undefined; return ch && ch !== '.' ? P[ch] : null; };
+  // päťcípa hviezda: bod v mnohouholníku (stred, polomer, natočenie)
+  const inStar = (px, py, cx, cy, R, rot) => {
+    const pts = [];
+    for (let i = 0; i < 10; i++) { const a = rot - Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? R * 0.42 : R; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
+    let ins = false;
+    for (let i = 0, j = 9; i < 10; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j]; if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) ins = !ins; }
+    return ins;
+  };
   const flags = {
-    sk: (() => { // biela-modrá-červená a štít s dvojkrížom na troch vrškoch
-      const base = stripesH(['#ffffff', '#0b4ea2', '#ee1c25']);
-      const shield = [
-        'WWWWWWW',
-        'WRRRRRW',
-        'WRRWRRW',
-        'WRWWWRW',
-        'WRRWRRW',
-        'WWWWWWW',
-        'WRRWRRW',
-        'WBBBBBW',
-        '.WBBBW.',
-        '..WWW..',
-      ];
-      const P = { W: '#ffffff', R: '#ee1c25', B: '#0b4ea2' };
-      return pix(FW, FH, (x, y) => {
-        const sx = x - 3, sy = y - 1;
-        if (sx >= 0 && sx < 7 && sy >= 0 && sy < 10 && shield[sy][sx] !== '.') return P[shield[sy][sx]];
-        return base(x, y);
-      });
+    sk: (() => { // biela-modrá-červená, štít s bielym dvojkrížom na modrom trojvrší
+      const base = bandsV(['#ffffff', '#0b4ea2', '#ee1c25']);
+      const shield = mapAt([
+        'WWWWWWWWWWW',
+        'WRRRRWRRRRW',
+        'WRRRRWRRRRW',
+        'WRRWWWWWRRW',
+        'WRRRRWRRRRW',
+        'WRRRRWRRRRW',
+        'WRWWWWWWWRW',
+        'WRRRRWRRRRW',
+        'WRRRRWRRRRW',
+        'WRRRBBBRRRW',
+        'WRBBBBBBBRW',
+        'WBBBBBBBBBW',
+        '.WBBBBBBBW.',
+        '..WWBBBWW..',
+        '....WWW....',
+      ], 6, 4, { W: '#ffffff', R: '#ee1c25', B: '#0b4ea2' });
+      return flagArt((x, y) => shield(x, y) || base(x, y));
     })(),
-    en: pix(FW, FH, (x, y) => { // Union Jack
-      const cx = x + 0.5, cy = y + 0.5;
-      if (y >= 5 && y <= 6 || x >= 8 && x <= 9) return '#c8102e';
-      if (y >= 4 && y <= 7 || x >= 7 && x <= 10) return '#ffffff';
-      const d1 = Math.abs(12 * cx - 18 * cy) / 21.6, d2 = Math.abs(12 * cx + 18 * cy - 216) / 21.6;
-      if (d1 < 0.7 || d2 < 0.7) return '#c8102e';
-      if (d1 < 1.6 || d2 < 1.6) return '#ffffff';
+    en: flagArt((x, y) => { // Union Jack v pomere 60×30: biely a červený kríž, šikmé kríže s posunutým červeným pásom
+      const X = (x + 0.5) / IW * 60, Y = (y + 0.5) / IH * 30;
+      if (Math.abs(X - 30) < 3 || Math.abs(Y - 15) < 3) return '#c8102e';
+      if (Math.abs(X - 30) < 5.2 || Math.abs(Y - 15) < 5.2) return '#ffffff';
+      const d1 = (X * 30 - Y * 60) / 67.08, d2 = (X * 30 + Y * 60 - 1800) / 67.08; // vzdialenosť od uhlopriečok
+      const left = X < 30, top = Y < 15;
+      if (Math.abs(d1) < 3.4) { const red = left ? d1 < 0 && d1 > -2.2 : d1 > 0 && d1 < 2.2; return red ? '#c8102e' : '#ffffff'; }
+      if (Math.abs(d2) < 3.4) { const red = left ? d2 > 0 && d2 < 2.2 : d2 < 0 && d2 > -2.2; return red ? '#c8102e' : '#ffffff'; }
       return '#012169';
     }),
-    de: pix(FW, FH, stripesH(['#1c1c1c', '#dd0000', '#ffce00'])),
-    es: pix(FW, FH, (x, y) => {
-      if (y < 3 || y >= 9) return '#c60b1e';
-      if (x >= 4 && x <= 6 && y >= 4 && y <= 7) return (x === 5 && y === 4) ? '#c60b1e' : (y === 7 ? '#8a5a10' : '#c60b1e'); // malý erb
-      if ((x === 3 || x === 7) && y >= 4 && y <= 7) return '#d8d8d8';               // stĺpy
-      return '#ffc400';
-    }),
-    ja: pix(FW, FH, (x, y) => (Math.hypot(x + 0.5 - 9, y + 0.5 - 6) < 3.7 ? '#bc002d' : '#ffffff')),
-    it: pix(FW, FH, x => ['#009246', '#ffffff', '#ce2b37'][Math.floor(x / 6)]),
-    ko: pix(FW, FH, (x, y) => {
-      const dx = x + 0.5 - 9, dy = y + 0.5 - 6;
-      if (Math.hypot(dx, dy) < 3.3) {                                                // taeguk: hore červená, dole modrá, so záhybom
-        const top = dy < 0 || (dy < 1 && dx < -0.5);
-        const bump = dy > -1.2 && dy < 0 && dx > 0.5;
-        return (top && !bump) ? '#cd2e3a' : '#0047a0';
-      }
-      // štyri trigramy v rohoch: krátke čierne čiarky šikmo
-      const tri = [[2, 1], [3, 2], [2, 2], [14, 1], [15, 2], [15, 1], [2, 10], [3, 9], [2, 9], [15, 10], [14, 9], [15, 9]];
-      for (const [tx, ty] of tri) if (x === tx && y === ty) return '#1c1c1c';
-      return '#ffffff';
-    }),
-    zh: (() => { // veľká hviezda a štyri malé
-      const star = ['..Y..', '.YYY.', 'YYYYY', '.YYY.', '.Y.Y.'];
-      const small = [[7, 1], [8, 3], [8, 5], [7, 7]];
-      return pix(FW, FH, (x, y) => {
-        const sx = x - 1, sy = y - 1;
-        if (sx >= 0 && sx < 5 && sy >= 0 && sy < 5 && star[sy][sx] === 'Y') return '#ffde00';
-        for (const [tx, ty] of small) if (x === tx && y === ty) return '#ffde00';
-        return '#de2910';
+    de: flagArt(bandsV(['#1c1c1c', '#dd0000', '#ffce00'])),
+    es: (() => { // červená–žltá (dvojitá)–červená, erb s korunou medzi Herkulovými stĺpmi
+      const arms = mapAt([
+        '.....KKK.....',
+        '....KOYOK....',
+        '....KOKOK....',
+        '.GG.KKKKK.GG.',
+        '.gG.KrrwK.gG.',
+        '.gG.KrrwK.gG.',
+        '.gG.KwwrK.gG.',
+        '.gG.KyRrK.gG.',
+        'RgGRKyRrKRgGR',
+        '.gG.KKrKK.gG.',
+        '.gG..KKK..gG.',
+      ], 5, 6, { K: '#5a2a0a', O: '#c8901a', Y: '#f0c030', G: '#e0e0e0', g: '#9a9a9a', r: '#c60b1e', R: '#c60b1e', w: '#f0e8d8', y: '#e8b010' });
+      return flagArt((x, y) => {
+        const v = (y + 0.5) / IH;
+        if (v < 0.25 || v >= 0.75) return '#c60b1e';
+        return arms(x, y) || '#ffc400';
       });
     })(),
+    ja: flagArt((x, y) => (Math.hypot(x + 0.5 - IW / 2, y + 0.5 - IH / 2) < IH * 0.3 ? '#bc002d' : '#ffffff')),
+    it: flagArt(bandsU(['#009246', '#ffffff', '#ce2b37'])),
+    ko: flagArt((x, y) => { // taeguk natočený pozdĺž uhlopriečky a štyri trigramy
+      const U = IW / 3;                                            // jednotka: šírka vlajky = 3
+      const dx = (x + 0.5 - IW / 2) / U, dy = (y + 0.5 - IH / 2) / U;
+      const al = Math.hypot(3, 2), ax = 3 / al, ay = 2 / al;       // os ľavý horný – pravý dolný roh
+      const s = dx * ax + dy * ay, t = dx * ay - dy * ax;          // t > 0 = horná (červená) strana
+      const R = 0.5;
+      if (Math.hypot(s, t) < R) {
+        if (Math.hypot(s - R / 2, t) < R / 2) return '#cd2e3a';
+        if (Math.hypot(s + R / 2, t) < R / 2) return '#0047a0';
+        return t > 0 ? '#cd2e3a' : '#0047a0';
+      }
+      // trigramy ručne po bodoch: tri šikmé pásy kolmo na uhlopriečku, prerušený pás má medzeru v strede
+      for (const [cx, cy, sl, bars] of [[8, 5, 1, [1, 1, 1]], [26, 5, -1, [0, 1, 0]], [8, 17, -1, [1, 0, 1]], [26, 17, 1, [0, 0, 0]]]) {
+        const ox = x - cx, oy = y - cy;
+        const a = sl > 0 ? ox + oy : ox - oy, b = sl > 0 ? ox - oy : ox + oy;  // a = naprieč pásmi, b = pozdĺž pásu
+        if (Math.abs(b) > 2 || Math.abs(a) > 2 || a & 1) continue;
+        if (!bars[(a + 2) / 2] && b === 0) continue;
+        return '#1c1c1c';
+      }
+      return '#ffffff';
+    }),
+    zh: flagArt((x, y) => { // veľká hviezda a štyri malé natočené k nej (mriežka 30×20)
+      const X = (x + 0.5) / IW * 30, Y = (y + 0.5) / IH * 20;
+      if (inStar(X, Y, 5, 5, 3.2, 0)) return '#ffde00';
+      for (const [px, py] of [[12, 2], [15, 5], [15, 9], [12, 12]]) {  // malé hviezdy: krížik 3×3 bodov v oblúku, s medzerami
+        if (Math.abs(x - px) + Math.abs(y - py) <= 1) return '#ffde00';
+      }
+      return '#de2910';
+    }),
   };
 
   // ikonky akcií pri označenej stavbe (karty v paneli): odvolať, opraviť, šíp špecializácie

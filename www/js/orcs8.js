@@ -494,7 +494,8 @@ function initOrcSprites() {
   lazySpr('goblin8', () => buildUnit8({ body: GB8, hand: GB8_HAND, legs: GOB_LEGS, blade: 4, fist: 'o' }));
   lazySpr('garcher8', () => Object.assign(buildUnit8({ body: GA8, bow: GA8_BOW, hand: GB8_HAND, legs: GOB_LEGS, fist: 'o' }), { bow: true }));
   lazySpr('sapper8', () => buildUnit8({ body: SA8, hand: GB8_HAND, legs: GOB_LEGS, noWeapon: true, fist: 'o' }));
-  lazySpr('orc8', () => buildUnit8({ body: OR8, hand: OR8_HAND, legs: orcLegs('o', 'q', 'd'), axe: [6, 2.5], fist: 'o' }));
+  // orkský bojovník z PixelLabu, jemná kresba (orc-art.js): atk = napriahnutie, sek, dokončenie; stará kresba ostáva ako záloha
+  lazySpr('orc8', () => typeof ORC_ART !== 'undefined' ? buildArt8(ORC_ART, null, 4) : buildUnit8({ body: OR8, hand: OR8_HAND, legs: orcLegs('o', 'q', 'd'), axe: [6, 2.5], fist: 'o' }));
   lazySpr('brute8', () => buildUnit8({ body: BR8, hand: BR8_HAND, legs: orcLegs('o', 'q', 'd', 1), axe: [8, 3.25], fist: 'o', H: 28 }));
   lazySpr('warlord8', () => buildUnit8({ body: BR8, hand: BR8_HAND, legs: orcLegs('o', 'q', 'd', 1), axe: [8, 3.25], fist: 'o', H: 28, pal: PAL_WARLORD }));
   lazySpr('shaman8', () => buildUnit8({ body: SH8, hand: SH8_HAND, legs: orcLegs('P', 'p', 'q'), spear: 9, tip: ['w', 'o'], fist: 'o' }));
