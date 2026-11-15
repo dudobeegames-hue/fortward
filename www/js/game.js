@@ -2497,6 +2497,9 @@
   // prepínač armády: útok = šík ide oproti horde a voľní vojaci búrajú tábor; obrana = šík drží miesto pred zónou
   const armyAttacks = () => st.stance !== 'defend';
   const HOLD_REACH = 22; // v obrane vojak (aj jazdec) vyrazí zo šíku len na nepriateľa takto blízko svojho miesta
+  // ...no keď sa horda pri šíku už bije so spolubojovníkom, pridajú sa aj susedia do takejto vzdialenosti od svojho miesta
+  // (po boji sa vrátia na miesto) – inak by väčšina šíku len prizerala, ako bojuje pár vojakov v strede
+  const HOLD_HELP = 52;
   const formLeft = () => G.gx0 + 6, formRight = () => G.gx0 + G.cols * T - 6;
   const formPer = () => Math.max(1, Math.min(FORM_MAX, Math.floor((formRight() - formLeft()) / FORM_GAP) + 1));
   // n miest v radoch so stredom cx: predný rad na y, ďalšie rady za ním (k radnici), každý druhý posunutý o pol medzery
@@ -3263,6 +3266,7 @@
         const sl = s.fslot || { x: G.gx0 + G.cols * T / 2, y: musterY };
         const atk = armyAttacks();
         let aggro = !atk ? HOLD_REACH : s.ktype === 'rider' ? 9999 : F.contact ? CLASH : ENGAGE; // obrana: drží šík, bije len toho, kto príde k nemu
+        if (!atk && st.enemies.some(e => !e.dead && !e.d.fly && enemyFights(e) && Math.hypot(e.x - sl.x, e.y - sl.y) <= HOLD_HELP)) aggro = HOLD_HELP; // obrana: boj pri šíku – pridá sa
         // obrana hradu má prednosť: kto búcha do hradu, po tom ide každý pešiak a jazdec (aj keby mal iný cieľ pri hradbách)
         if (!(s.tgt && !s.tgt.dead && atHall(s.tgt))) { const ht = nearestEnemyWhere(s.x, s.y, atHall, true); if (ht) s.tgt = ht; }
         if (!s.tgt || s.tgt.dead) { const leak = nearestEnemyWhere(s.x, s.y, e => e.y > F.inf.y + 14 && e.y > 4, true); if (leak) s.tgt = leak; }
