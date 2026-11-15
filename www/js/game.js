@@ -1027,7 +1027,7 @@
     AUDIO.play('crumble'); st.shake = Math.max(st.shake, 0.2);
     for (let k = 0; k < 26; k++) part(o.x + (Math.random() - 0.5) * 16, o.y - Math.random() * 18, (Math.random() - 0.5) * 60, -Math.random() * 50, 0.9, ['#3c3846', '#22202a', '#4a2e1a', '#f89838'][k % 4], 110);
     const gold = Math.round(CAMP_ROLES[o.role].gold * (1 + 0.1 * (st.mission - HOME_PROVINCES)));
-    if (!isAssault()) { st.gold += gold; st.texts.push({ x: o.x, y: o.y - 22, s: '+' + gold, life: 1.4, max: 1.4 }); }
+    if (!isAssault()) { st.gold += gold; st.chestRun += gold; st.texts.push({ x: o.x, y: o.y - 22, s: '+' + gold, life: 1.4, max: 1.4 }); }
     if (o.role === 'wall') { st.campV++; computeFlow(); } // zbúraná hradba či brána otvorí cestu
     if (o.role === 'keep') { st.shake = 0.6; for (const q of campLive()) hitCamp(q, q.hp + 1); } // srdce padlo – zrúti sa celý tábor
     updateHud();
@@ -1255,7 +1255,6 @@
   const goldMul = () => (1 + DIFF.goldMission * (diffM(st.mission) - 1)) * (landDone('isles') ? 1.05 : 1); // Neutrálne zeme: +5 % zlata
   const ENDLESS_HP = 1.09, ENDLESS_BASE = 0.55; // nekonečná obrana: horda začne na 55 % sily 10. misie a každá vlna pridá 9 % zdravia
   // ---- truhlica: zlatky na útok na hrad; plní sa v obranných misiách (podiel zo zabitých + neminuté zlato pri výhre) ----
-  const CHEST_KILL = 0.05; // 5 % odmeny za zabitého navyše do truhlice (neminuté zlato ide celé)
   function addChest(n) { n = Math.max(0, Math.round(n)); st.chest = (st.chest || 0) + n; saveJSON(sk('chest'), st.chest); updateChest(); return n; }
   const chestTxt = n => '<img class="chest" src="' + ICONS.chest + '">' + n;
   const updateChest = () => { const c = document.querySelector('#chestBox span'); if (c) c.textContent = st.chest || 0; };
@@ -1395,7 +1394,7 @@
   function endWave() {
     stats.maxGold = Math.max(stats.maxGold, st.gold); saveStats();
     const bonus = Math.round((10 + st.wave * 4) * goldMul()) + 6 * tal('tax');
-    st.gold += bonus;
+    st.gold += bonus; st.chestRun += bonus;
     const lvl0 = kingMeta.lvl;
     st.lastXp = gainKingXp(Math.round((8 + 2 * st.wave + ((st.endless ? st.wave % 10 === 0 : st.wave >= missionWaves(st.mission)) ? 40 : 0)) * TIERS[st.tier || 0].xp));
     if (kingMeta.lvl > lvl0) heroLevelUp();
@@ -1404,7 +1403,7 @@
       const gm = Math.round(mineGold(b) * goldMul()); mined += gm;
       st.texts.push({ x: bCenter(b).x, y: tileY(b.r) - 4, s: '+' + gm, life: 1.4, max: 1.4 });
     }
-    st.gold += mined;
+    st.gold += mined; st.chestRun += mined;
     st.phase = 'pause';
     st.proj = []; st.eproj = []; st.drops = [];
     if (st.camp) st.camp.rocks = [];
@@ -1455,9 +1454,9 @@
     banner('Misia splnená!');
     AUDIO.music(null); AUDIO.play('win');
     for (let k = 0; k < 80; k++) part(Math.random() * W, camY + H * 0.3 + Math.random() * 30, (Math.random() - 0.5) * 60, -30 - Math.random() * 60, 1.4, ['#f8d048', '#fff070', '#88b4ff', '#e84838'][k % 4], 60);
-    // výsledok misie: len hviezdy a zlatky, ktoré pribudnú do truhlice (podiel zo zabitých + neminuté zlato)
+    // výsledok misie: len hviezdy a zlatky, ktoré pribudnú do truhlice (len zlato, ktoré ostalo neminuté – za zabitých nepriateľov nič navyše)
     st.assaultDone = true;
-    const chestGain = addChest(isAssault() ? left : st.chestRun + st.gold); // pri útoku sa vrátia zlatky za vojsko, ktoré prežilo
+    const chestGain = addChest(isAssault() ? left : st.gold); // pri útoku sa vrátia zlatky za vojsko, ktoré prežilo
     const starLine = '<span class="bigStars">' + starSpan(stars, t) + '</span>';
     const chestLine = '<span class="chestGain">+' + chestTxt(chestGain) + '</span><br><small class="dim">do truhlice</small>';
     const wl = landOfMission(m), wonLand = first && m === landLast(wl);
@@ -1470,8 +1469,8 @@
   function gameOver() {
     st.phase = 'over';
     saveStats();
-    // podiel zo zabitých ostane v truhlici aj po prehre; pri útoku na hrad sa vráti polovica minutých zlatiek
-    const chestGain = isAssault() ? (st.assaultDone ? 0 : addChest(st.assaultSpent * ASSAULT_BACK)) : addChest(st.chestRun);
+    // po prehre ide do truhlice 10 % zlata zarobeného v misii; pri útoku na hrad sa vráti polovica minutých zlatiek
+    const chestGain = isAssault() ? (st.assaultDone ? 0 : addChest(st.assaultSpent * ASSAULT_BACK)) : addChest(st.chestRun * LOSS_SHARE);
     st.assaultDone = true;
     const fell = !isAssault(); // pri útoku na hrad radnica nie je – prehráva sa pádom celého vojska
     if (fell) st.hallHp = 0;
@@ -1537,8 +1536,7 @@
     AUDIO.play('die'); AUDIO.play('coin');
     const gain = Math.round(e.d.gold * goldMul() * (1 + 0.04 * perk('loot')));
     if (!isAssault()) { // pri útoku na hrad sa za zabitých neplatí
-      st.gold += gain;
-      st.chestRun += gain * CHEST_KILL; // podiel do truhlice navyše (zlato na stavanie sa nemení)
+      st.gold += gain; st.chestRun += gain; // chestRun = zlato zarobené v misii (po prehre ide 10 % do truhlice)
       st.texts.push({ x: e.x, y: e.y - e.h, s: '+' + gain, life: 0.9, max: 0.9 });
     }
     const cols = [blood(e), isOrc() ? '#22337a' : '#305c22', '#6e4422', '#1c140e'];
@@ -5351,7 +5349,7 @@
     const seen = landsSeen(), key = st.unlocked + ':' + st.race + ':' + seen.join(',');
     if (worldImg && worldImgKey === key) return worldImg;
     const G0 = worldG(), mis = worldMissions(), li = id => LANDS.findIndex(l => l.id === id);
-    worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), rose: [PPX + 80, PPY + 36], roseImg: true, noEdge: true });
+    worldImg = PAPER.paint(G0, { raceOf: i => provRaceW(G0.provs[i], mis[i]), rose: [PPX + 70, PPY + 54], roseImg: true, noEdge: true });
     // územia, ktoré sú ešte zamknuté, sú vyšedené (súš aj pobrežie)
     const locked = new Set(LANDS.filter(l => !landReached(l)).flatMap(l => l.wl));
     if (locked.size) {
@@ -5520,7 +5518,7 @@
     const G0 = worldG(), mis = worldMissions(), anim = new Set();
     G0.provs.forEach((p, i) => { if (mis[i] >= seenU && mis[i] < st.unlocked) anim.add(i); });
     if (!anim.size) return null;
-    const img = worldPaint(), old = PAPER.paint(G0, { raceOf: i => anim.has(i) ? G0.provs[i].race : provRaceW(G0.provs[i], mis[i]), rose: [PPX + 80, PPY + 36], roseImg: true, noEdge: true });
+    const img = worldPaint(), old = PAPER.paint(G0, { raceOf: i => anim.has(i) ? G0.provs[i].race : provRaceW(G0.provs[i], mis[i]), rose: [PPX + 70, PPY + 54], roseImg: true, noEdge: true });
     const { W: GW, H: GH, prov } = G0, nd = img.canvas.getContext('2d').getImageData(0, 0, GW, GH).data, od = old.canvas.getContext('2d').getImageData(0, 0, GW, GH).data;
     let x0 = GW, y0 = GH, x1 = 0, y1 = 0;
     for (let k = 0; k < GW * GH; k++) if (anim.has(prov[k])) { const x = k % GW, y = (k / GW) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
@@ -6331,7 +6329,7 @@
         if (!open('icetower')) lockAct(after(b, { mode: 'ice' }), 'Ľad', 'icetower', true);
         else shineTech(act(after(b, { mode: ice ? null : 'ice' }), ice ? 'Oheň' : 'Ľad', 'prepnúť', true, () => { b.mode = ice ? null : 'ice'; b.cd = Math.max(b.cd, 0.5); }, 'up', true), 'icetower');
       }
-      if (b.kind === 'tower' && !b.spec) {
+      if (false && b.kind === 'tower' && !b.spec) { // špecializácia veže je z hry vyradená
         if (!has('spec')) lockAct(I.actSpec.fire, 'Špecializácia', unlockMissionOf('spec'), true);
         else if (b.lvl < 3) act(I.actSpec.fire, 'Špecializácia', 'od úr. 3', false, 'Špecializácia sa dá vybrať od úrovne 3', 'locked', true);
         else for (const k in SPECS) shineTech(act(after(b, { spec: k }), SPEC_SHORT[k], coinTxt(SPEC_COST), st.gold >= SPEC_COST, () => { st.gold -= SPEC_COST; b.spent += SPEC_COST; b.spec = k; }, 'up', true), 'spec');
@@ -7016,10 +7014,11 @@
     if (!isAssault() || st.phase !== 'battle' || st.assaultDone) return;
     st.assaultDone = true; addChest(st.assaultSpent * ASSAULT_BACK);
   }
-  // odchod z nekonečnej obrany (pauza → Ukončiť či Reštart): zlatky zarobené na nepriateľoch idú do truhlice ako pri páde radnice
+  // odchod z nekonečnej obrany (pauza → Ukončiť či Reštart): 10 % zarobeného zlata ide do truhlice ako pri páde radnice
+  const LOSS_SHARE = 0.1;
   function endlessCashOut() {
     if (!st.endless || !(st.chestRun > 0)) return;
-    const n = addChest(st.chestRun); st.chestRun = 0;
+    const n = addChest(st.chestRun * LOSS_SHARE); st.chestRun = 0;
     if (n) toast('+' + n + ' zlatiek do truhlice');
   }
   const siegeCount = kind => st.soldiers.filter(s => s.siege === kind && !s.dead).length + st.siegeOrder.filter(o => o.key === kind).length;
@@ -7395,7 +7394,7 @@
       const k = resBuild(r);
       if (r.kind === 'hall') return spriteURL(bsprOf('hall', r.lvl), 2);
       if (r.kind === 'wall') return spriteURL(wallsOf()[r.lvl - 1][10], 3);
-      if (r.kind === 'wallArcher') return ICONS.u_archer;
+      if (r.kind === 'wallArcher') return bPreview({ kind: 'wall', lvl: 1, unit: { type: 'archer', lvl: 1 } }); // hradba s lukostrelcom
       if (r.kind === 'spear') return isOrc() ? ICONS.armory : ICONS.u_spear;
       if (r.kind === 'ice') return ICONS.mageIce;
       if (r.kind === 'paving') return ICONS.paving || spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3);
@@ -7413,11 +7412,16 @@
     resPick = null;
     AUDIO.play('upgrade'); toast('Vyskúmané: ' + resName(r));
     const next = r.c < 5 && !wasOpen && resCardOpen(r.c + 1) ? r.c + 1 : 0; // karta je hotová – otvorí sa ďalšia
-    if (next) { resFlash = 'hall' + next; setTimeout(() => { if (resFlash === 'hall' + next) { resFlash = null; if (mapTab === 'research') renderResearch(); } }, 4200); }
+    if (next) { resFlash = 'hall' + next; setTimeout(() => { if (resFlash === 'hall' + next) { resFlash = null; if (mapTab === 'research') renderResearch(); } }, 5600); }
     renderResearch(); renderMapHead();
     if (next) { // obrazovka sa plynulo posunie hore na ďalšiu kartu, jej hrad potom zabliká
       const scr = $('research'), card = $('resList').querySelectorAll('.resCard')[5 - next];
-      setTimeout(() => { AUDIO.play('unlock'); scr.scrollTo({ top: Math.max(0, card.offsetTop - 62), behavior: 'smooth' }); }, 350);
+      setTimeout(() => { // pomalý plynulý posun (1,8 s, rozbeh a dobeh), potom hrad zabliká
+        AUDIO.play('unlock');
+        const y0 = scr.scrollTop, y1 = Math.max(0, card.offsetTop - 62), t0 = performance.now(), DUR = 1800;
+        const step = now => { const p = Math.min(1, (now - t0) / DUR), e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; scr.scrollTop = y0 + (y1 - y0) * e; if (p < 1) requestAnimationFrame(step); };
+        requestAnimationFrame(step);
+      }, 600);
     }
   }
   function renderResearch(scroll) {

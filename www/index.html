@@ -738,7 +738,7 @@
   .resItem.locked .pic img { filter: grayscale(1); }
   .resItem .opt { position: absolute; top: -7px; right: -3px; padding: 1px 5px; border-radius: 7px; border: 2px solid var(--ink); background: #5c8ce0; color: #fff; font-style: normal; font-size: 9px; font-weight: 700; }
   .resItem:active { transform: translateY(1px); }
-  .resItem.resNew { animation: neonFlash 2.8s ease-in-out .5s 1; } /* hrad novej karty: neónové zablikanie (za ľudí modré) */
+  .resItem.resNew { animation: neonFlash 2.8s ease-in-out 2.4s 1; } /* zabliká, keď posun obrazovky dobehne */ /* hrad novej karty: neónové zablikanie (za ľudí modré) */
   .orcs .resItem.resNew { animation-name: neonFlashOrc; }
   /* obchod */
   #shopList { display: flex; flex-direction: column; gap: 8px; width: 100%; }
@@ -1061,9 +1061,9 @@
     </div>
     <!-- spodný riadok kariet: Boj (mapa územia), Sieň, Mapa sveta, Trofeje, Nákupy; zvolená karta je povysunutá -->
     <div id="mapBar">
-      <button class="tabCard on" data-tab="map" title="Boj"><img id="icoSwords" alt="Boj"></button>
       <button class="tabCard" data-tab="hall" title="Sieň"><img id="icoHall" alt="Sieň"><em id="hallBtnTxt" class="badge" hidden>0</em></button>
       <button class="tabCard" data-tab="world" title="Mapa sveta" aria-label="Mapa sveta"><img id="icoWorld" alt="Mapa sveta"></button>
+      <button class="tabCard on" data-tab="map" title="Boj"><img id="icoSwords" alt="Boj"></button>
       <button class="tabCard" data-tab="research" title="Výskum"><img id="icoResearch" alt="Výskum"></button>
       <button class="tabCard shop shine" data-tab="shop" title="Nákupy"><img id="icoShop" alt="Nákupy"></button>
     </div>
