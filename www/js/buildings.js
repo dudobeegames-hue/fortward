@@ -1603,11 +1603,12 @@ function initBuildingSprites() {
   // brány z PixelLabu (wall-art.js): vodorovný úsek hradby s bránou v ráme hradby, zástavy ako na vežiach vejú
   BSPR.gateArt = (WALL_ART.gate || []).map(gt => gt ? Object.assign(artBuilding({ chars: WALL_ART.chars, pal: WALL_ART.pal, lv: [gt.rows] }, 0), { flags: gt.flags }) : null);
   // ikona brány: hradba + strážnica (kamenná)
+  const ga1 = BSPR.gateArt[1], tall = ga1 && ga1.w > 16; // vysoká brána (B*.png) je širšia a vyššia – ikonou je ona sama v plnom rozlíšení
   const ic = document.createElement('canvas'); ic.width = 16; ic.height = 33;
   const ix = ic.getContext('2d'); ix.imageSmoothingEnabled = false;
-  if (BSPR.gateArt[1]) ix.drawImage(BSPR.gateArt[1].c, 0, -5, 16, 32);
+  if (ga1 && !tall) ix.drawImage(ga1.c, 0, -5, 16, 32);
   else { ix.drawImage(BSPR.wall[1][10].c, 0, 9); ix.drawImage(BSPR.gatehouse[1].c, 0, 0); }
-  BSPR.gateIcon = spriteFromCanvas(ic);
+  BSPR.gateIcon = tall ? ga1 : spriteFromCanvas(ic);
   // orkské podoby stavieb hráča: budovy hordy, ktoré už poznáme z tábora, plus palisáda, brána a jedový kotol
   Object.assign(OBSPR, {
     hall: [1, 2, 3, 4, 5].map(l => makeOrcKeep(l)), tower: [1, 2, 3, 4, 5].map(l => makeOrcTower(true, l)),
