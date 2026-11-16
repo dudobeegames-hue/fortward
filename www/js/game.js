@@ -2673,7 +2673,7 @@
       // kým sa celý rad presúva, ide stále (inak by striedal chôdzu a mierenie); drobné dorovnanie (pod 3 body) ostane pri mierení
       const sl = u.fslot, d = sl ? Math.hypot(sl.x - u.x, sl.y - u.y) : 0;
       const lineMove = armyAttacks() && st.form && st.form.arcMove;
-      u.retreat = lineMove ? u.retreat || d > 0.5 : d > (u.retreat ? 0.8 : 3);
+      u.retreat = lineMove ? u.retreat || d > 0.5 : d > (u.retreat ? 1.2 : 3); // koniec presunu nad hranicou pohybu (1) – inak by uviazol 0,8–1 bod od miesta v presune a nestrieľal
       // poistka: kto sa k miestu nedostane (hradba, tlačenica), po sekunde bez pokroku chvíľu stojí a strieľa
       if (u.noRepos > 0) { u.noRepos -= dt; u.retreat = false; }
       else if (u.retreat) {
