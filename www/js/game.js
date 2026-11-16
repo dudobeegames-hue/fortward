@@ -150,7 +150,7 @@
     brute:   { spr: 'brute',   hp: 120, speed: 11, atk: 22, atkCd: 1.3, gold: 18, blood: '#62a03a' },
     warlord: { spr: 'warlord', hp: 520, speed: 8,  atk: 45, atkCd: 1.5, gold: 90, blood: '#a8482c', boss: true },
     orcKing: { spr: 'orcKing', hp: 2600, speed: 9, atk: 55, atkCd: 1.4, gold: 300, blood: '#a8482c', boss: true, king: true, name: 'Orkský veľkráľ' },
-    garcher: { spr: 'garcher', hp: 14,  speed: 20, atk: 6,  atkCd: 1.7, gold: 5,  blood: '#62a03a', ranged: 54 },
+    garcher: { spr: 'garcher', hp: 14,  speed: 20, atk: 6,  atkCd: 1.7, gold: 5,  blood: '#62a03a', ranged: 62 },
     bat:     { spr: 'bat',     hp: 9,   speed: 30, atk: 4,  atkCd: 1.0, gold: 4,  blood: '#4a3460', fly: true },
     ram:     { spr: 'ram',     hp: 170, speed: 9,  atk: 48, atkCd: 1.6, gold: 22, blood: '#6e4422', ram: true },
     shaman:  { spr: 'shaman',  hp: 45,  speed: 12, atk: 5,  atkCd: 1.2, gold: 15, blood: '#62a03a', heals: true },
@@ -1831,14 +1831,14 @@
       let tgt = null, td = R;
       for (const b of st.blds) {
         if (!BUILD[b.kind].block) continue;
-        const d = Math.hypot(bCenter(b).x - e.x, tileY(b.r) + T / 2 - e.y);
+        const d = Math.hypot(bCenter(b).x - e.x, tileY(b.r) + 2 - e.y); // k stavbe (veža je vysoká), nie k päte jej políčka
         if (d < td) { td = d; tgt = b; }
       }
       const hrr = hallRect();
       const dh = Math.hypot(Math.max(hrr.x0 - e.x, 0, e.x - hrr.x1), Math.max(hrr.y0 - e.y, 0, e.y - hrr.y1));
       if (dh < td) { td = dh; tgt = HALL; }
       for (const u of st.soldiers) { const d = Math.hypot(u.x - e.x, u.y - e.y); if (d < (u.fly ? R : td * 0.8)) { td = u.fly ? 0 : d; tgt = u; } } // sokoly zostrelí prednostne
-      if (st.king && !st.king.dead && heroDef().range) { const d = Math.hypot(st.king.x - e.x, st.king.y - e.y); if (d < td * 0.8) { td = d; tgt = st.king; } } // aj na čarodejku
+      if (st.king && !st.king.dead && !(st.king.down > 0)) { const d = Math.hypot(st.king.x - e.x, st.king.y - e.y); if (d < Math.min(R, td * 0.8)) { td = d; tgt = st.king; } } // aj na hrdinu (každého, nielen čarodejku)
       if (tgt) {
         e.aimP = tgt === HALL ? { x: Math.max(hrr.x0, Math.min(hrr.x1, e.x)), y: hrr.y0 } : tgt.kind ? bCenter(tgt) : { x: tgt.x, y: tgt.y };
         attackFn(() => {
@@ -2493,7 +2493,7 @@
   // ---- formácie: lukostrelci stoja v rade vedľa seba, pešiaci pochodujú v šíkoch –
   // rytieri vpredu, kopijníci za nimi, jazdci na krídlach. Šík sa posúva plynulo za najbližšou hordou
   // a pešiak vybehne z radu až keď má nepriateľa nablízku (alebo keď sa šík s hordou zrazil).
-  const FORM_GAP = 10, FORM_ROW = 9, FORM_MAX = 8, FORM_SPD = 20, ENGAGE = 36, CLASH = 70;
+  const FORM_GAP = 10, FORM_ROW = 9, FORM_MAX = 8, FORM_SPD = 20, ENGAGE = 36, CLASH = 70, ARC_STEP = 14, ARC_OVER = 10, ARC_SPD = 20; // ARC_SPD pomalšie ako chôdza lukostrelca (24) – rad nezaostane
   // prepínač armády: útok = šík ide oproti horde a voľní vojaci búrajú tábor; obrana = šík drží miesto pred zónou
   const armyAttacks = () => st.stance !== 'defend';
   const HOLD_REACH = 22; // v obrane vojak (aj jazdec) vyrazí zo šíku len na nepriateľa takto blízko svojho miesta
@@ -2531,8 +2531,8 @@
     return sl;
   }
   // plynulý posun bodu šíku k cieľu (šík pochoduje, neskáče)
-  function stepAnchor(a, tx, ty, dt) {
-    const dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy), s = Math.min(d, FORM_SPD * dt);
+  function stepAnchor(a, tx, ty, dt, spd) {
+    const dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy), s = Math.min(d, (spd || FORM_SPD) * dt);
     if (d > 0.01) { a.x += dx / d * s; a.y += dy / d * s; }
   }
   function nearestFoe(x, y, fly) {
@@ -2608,9 +2608,17 @@
       for (const u of archers) u.hs = null;
       let tx = cx, ty = Math.max(musterY + 16, infBack + 10);
       const th = nearestFoe(F.arc.x, F.arc.y, true), cp = th ? null : nearestCampPart(F.arc.x, F.arc.y);
-      if (th) { tx = th.x; ty = Math.max(G.gy0 + 30, Math.min(ty, Math.max(th.y + ARCHER_RANGE - 14, infBack + 10))); }
+      if (th) { tx = cx + (th.x - cx) * 0.4; ty = Math.max(G.gy0 + 30, Math.min(ty, Math.max(th.y + ARCHER_RANGE - 14, infBack + 10))); } // do strán len kúsok – dostrel stačí, rad nebehá za každým nepriateľom
       else if (cp) { tx = cp.x; ty = cp.y + ARCHER_RANGE - 12; } // horda nikde – rad lukostrelcov na dostrel od tábora
-      stepAnchor(F.arc, tx, ty, dt);
+      // presun po krokoch (aj do strán a dopredu): rad stojí a strieľa; až keď je jeho cieľové miesto o ARC_STEP ďalej, presunie sa naraz
+      // (lukostrelci sklonia luk, otočia sa a prejdú, potom sa zas otočia k horde) – plynulý posun by ich nechal kĺzať či cúvať so zameraným lukom
+      const far = Math.hypot(tx - F.arc.x, ty - F.arc.y);
+      // pri ústupe (rozhodne sa na začiatku presunu) odstúpi o kus ďalej, aby ďalší ústup prišiel neskôr – viac času strieľať
+      if (!F.arcMove && far >= ARC_STEP) { F.arcMove = true; F.arcOver = ty > F.arc.y + ARC_STEP / 2 ? ARC_OVER : 0; }
+      if (F.arcMove) ty += F.arcOver || 0;
+      if (F.arcMove && Math.hypot(tx - F.arc.x, ty - F.arc.y) < 1) F.arcMove = false;
+      if (!F.arcMove) { tx = F.arc.x; ty = F.arc.y; }
+      stepAnchor(F.arc, tx, ty, dt, ARC_SPD);
       assignSlots(archers, formSlots(archers.length, F.arc.x, F.arc.y));
       for (const u of archers) u.fslot = passSlot(u.fslot);
     }
@@ -2661,9 +2669,18 @@
     let near = false, nd = 1e9;
     const prev = u.aimT;
     u.aimT = null; // na koho mieri (natočí sa k nemu a napne luk)
-    { // ústup: miesto v rade je o kus nižšie (k radnici) – otočí sa a ide dole, necúva so zameraným lukom
-      const sl = u.fslot, dx = sl ? sl.x - u.x : 0, dy = sl ? sl.y - u.y : 0, d = Math.hypot(dx, dy);
-      u.retreat = d > (u.retreat ? 2 : 5) && dy > d * 0.5;
+    { // presun na miesto v rade (aj do strán): sklonený luk, otočí sa a ide normálnou chôdzou – nekĺže ani necúva so zameraným lukom;
+      // kým sa celý rad presúva, ide stále (inak by striedal chôdzu a mierenie); drobné dorovnanie (pod 3 body) ostane pri mierení
+      const sl = u.fslot, d = sl ? Math.hypot(sl.x - u.x, sl.y - u.y) : 0;
+      const lineMove = armyAttacks() && st.form && st.form.arcMove;
+      u.retreat = lineMove ? u.retreat || d > 0.5 : d > (u.retreat ? 0.8 : 3);
+      // poistka: kto sa k miestu nedostane (hradba, tlačenica), po sekunde bez pokroku chvíľu stojí a strieľa
+      if (u.noRepos > 0) { u.noRepos -= dt; u.retreat = false; }
+      else if (u.retreat) {
+        u.repT = (u.repT || 0) + dt;
+        if (u.repD == null) u.repD = d;
+        if (u.repT >= 1) { if (d > 3 && d > u.repD - 2) u.noRepos = 1.5; u.repT = 0; u.repD = d; } // pri presune radu ide s ním (d malé) – to nie je zaseknutie
+      } else { u.repT = 0; u.repD = null; }
     }
     if (!u.retreat) for (const e of st.enemies) {
       if (e.dead || e.y <= 4) continue;
@@ -2685,9 +2702,11 @@
         u.cd = ARCHER_CD / (st.cryT > 0 ? CRY_SPD : 1) * rageMul(u); u.swing = 0.1; AUDIO.play('arrow');
       }
     }
-    // ide na svoje miesto v rade (počas mierenia pomalšie)
+    // ide na svoje miesto v rade; kto mieri, stojí (drobná odchýlka pod 3 body počká – inak by kĺzal so zameraným lukom),
+    // väčšiu odchýlku prejde ako presun (u.retreat: sklonený luk, chôdza)
     const sl = u.fslot;
     if (!sl || Math.hypot(sl.x - u.x, sl.y - u.y) < 1) return;
+    if (!u.retreat && u.aimT) return;
     const sp = (u.spd || 24) * waterMul(u) * (u.swing > 0 ? 0.3 : 1);
     moveKnight(u, sl.x, sl.y, sp * (u.retreat ? 1 : backMul(u, sl.x, sl.y)), dt); // pri ústupe ide normálnou chôdzou
   }
@@ -3717,7 +3736,7 @@
     if (moving) u._wd = (u._wd || 0) + d;
     const sd = smoothDir(u, mvx, mvy);
     if (near) turn8(u, dir8(t.x - u.x, t.y - u.y), u.archer ? 8 : 3); // lukostrelec sa otáča pomalšie (cieľ prechádza medzi smermi)
-    else if (moving && !(st.phase === 'battle' && u.fslot && Math.hypot(u.fslot.x - u.x, u.fslot.y - u.y) < 5)) turn8(u, sd, 5); // drobné dorovnanie na miesto v šíku (po odtlačení) ho neotočí
+    else if (moving && (u.retreat || !(st.phase === 'battle' && u.fslot && Math.hypot(u.fslot.x - u.x, u.fslot.y - u.y) < 5))) turn8(u, sd, u.retreat ? 2 : 5); // drobné dorovnanie na miesto v šíku (po odtlačení) ho neotočí; ústup lukostrelca áno (inak cúva)
     else if (!t) turn8(u, u.helper && !(u.helper === 'chapel' && st.phase === 'battle') ? 2 : 6, 5); // bez cieľa: vojaci aj liečiteľ v boji (v šíku) k horde, remeselník a liečiteľ mimo boja k hráčovi (na juh)
     if (u.face8 == null) u.face8 = u.helper ? 2 : 6;
     const v = set[u.face8];
