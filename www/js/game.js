@@ -1275,7 +1275,7 @@
       let type = r < pBrute ? 'brute' : r < pBrute + pOrc ? 'orc' : 'goblin';
       // noví nepriatelia od misie, v ktorej sa predstavia
       const r2 = Math.random();
-      const pSap = m >= 8 && w >= 2 ? DIFF.pSapper : 0;
+      const pSap = m >= 8 && w >= 2 && !isOrc() ? DIFF.pSapper : 0; // za orkov bez podkopníkov (remeselníci s prachom zrušení)
       if (r2 >= 1 - pSap) type = 'sapper';
       const pSh = m >= 6 && w >= 2 ? DIFF.pShaman : 0, pRam = m >= 5 && w >= 3 ? DIFF.pRam : 0, pBat = m >= 4 ? DIFF.pBat : 0, pArc = m >= 3 ? DIFF.pArcher : 0;
       const pBear = m >= 7 && w >= 3 ? DIFF.pBear : 0, pWolf = m >= 9 && w >= 2 ? DIFF.pWolf : 0;
@@ -3968,8 +3968,9 @@
       const a8 = u && u.type === 'archer' && !isOrc() && thk && SPR.footArcher8 ? SPR.footArcher8[1].idle : null; // lukostrelec z PixelLabu (otočený k nám, nohy za cimburím)
       const uh = a8 ? a8.h - U8_PB - 8 : u ? (thk ? SPR[raceSpr(WUNIT[u.type].spr)][0].h - 3 : 9) : 0;
       const y0 = Math.max(o.gate && !ga ? 15 : u ? uh : 6, ws.h - 18), R = ws.hd ? 2 : 1; // nad hradbou len toľko miesta, koľko treba; jemná kresba v jej rozlíšení
-      c.width = T * R; c.height = (y0 + 18) * R; x.scale(R, R); x.imageSmoothingEnabled = false;
-      wallImg(x, ws, 0, y0);
+      const cw = Math.max(T, ws.w); // vysoká brána (B1) je širšia ako políčko – náhľad sa rozšíri, brána na stred
+      c.width = cw * R; c.height = (y0 + 18) * R; x.scale(R, R); x.imageSmoothingEnabled = false;
+      wallImg(x, ws, (cw - ws.w) / 2, y0);
       if (o.gate && !ga) x.drawImage(gatesOf()[lv - 1].c, 0, y0 - 15);
       else if (a8) {
         x.drawImage(a8.c, Math.round(T / 2 - a8.w / 2), y0 + 8 - a8.h + U8_PB, a8.w, a8.h);
@@ -4185,7 +4186,7 @@
           const wl = Math.max(1, Math.min(5, b.lvl)) - 1, ws = wallsOf()[wl][m + 16 * wallSide(b.c)] || wallsOf()[wl][m];
           if (m & 5) wallVShadow(shCtx, ws, wallsOf()[wl][10] || ws, tileX(b.c), tileY(b.r), m); // zvislý úsek: súvislý pás tieňa doprava od celej steny
           const ga = b.gate && gateArtOf(wl), hs = ga && !(m & 5) ? ga : ws; // vodorovná brána z PixelLabu: tieň brány namiesto úseku
-          if (!(m & 5) || (m & 10)) drawShadow(shCtx, hs, tileX(b.c), tileY(b.r) + 18 - hs.h);
+          if (!(m & 5) || (m & 10)) drawShadow(shCtx, hs, tileX(b.c) + T / 2 - hs.w / 2, tileY(b.r) + 18 - hs.h);
           if (b.gate && !ga) drawShadow(shCtx, gatesOf()[wl], tileX(b.c), tileY(b.r) - 15);
           continue;
         }
@@ -4214,10 +4215,11 @@
       const wl = Math.max(1, Math.min(5, b.lvl)) - 1;
       spr = wallsOf()[wl][m + 16 * wallSide(b.c)] || wallsOf()[wl][m];
       const ga = b.gate && gateArtOf(wl), gv = ga && (m & 5); // brána z PixelLabu: na vodorovnej hradbe celý úsek, na zvislej stred brány na úseku
+      if (ga && !gv && ga.w > T) wallImg(g, spr, x0, y0); // vysoká brána je hore užšia ako políčko – za ňou úsek hradby, aby medzi hradbou a bránou nesvietila tráva
       if (ga && !gv) spr = ga;
-      if (ga && !gv) g.drawImage(bldCanvas(ga, time, b.c * 0.7 + b.r * 0.3), x0, y0 + 18 - ga.h, ga.w, ga.h); // zástavy vejú
+      if (ga && !gv) g.drawImage(bldCanvas(ga, time, b.c * 0.7 + b.r * 0.3), x0 + T / 2 - ga.w / 2, y0 + 18 - ga.h, ga.w, ga.h); // zástavy vejú; vysoká brána (B1) je širšia ako políčko – na stred
       else wallImg(g, spr, x0, y0);
-      if (gv) g.drawImage(bldCanvas(ga, time, b.c * 0.7 + b.r * 0.3), 5, 0, 22, ga.c.height, x0 + [5, 3, 7][wallSide(b.c)] / 2, y0 + 18 - ga.h - (m & 4 ? 6 : 0), 11, ga.h); // nad úsekom pod ňou (ten sa kreslí neskôr a prekryl by vráta)
+      if (gv) g.drawImage(bldCanvas(ga, time, b.c * 0.7 + b.r * 0.3), (ga.c.width - 22) / 2, 0, 22, ga.c.height, x0 + [5, 3, 7][wallSide(b.c)] / 2, y0 + 18 - ga.h - (m & 4 ? 6 : 0), 11, ga.h); // nad úsekom pod ňou (ten sa kreslí neskôr a prekryl by vráta)
       if (b.holyT > 0) holyGlow(spr, x0, y0 + 18 - spr.h, b.holyT, time);
       // napojenie na susedné budovy (veže, radnica); k okrajom obrazovky sa hradby nenaťahujú
       const flat = wallsOf()[wl][spr.hd ? 10 : m | 2 | 8], fr = flat.c.width / flat.w; // jemná kresba: rovný úsek bez piliera, fr = 2
@@ -5803,7 +5805,7 @@
     }
     if (playing) {
       if (!isAssault()) objs.push({ y: G.hallBot, x: 1e9, f: () => drawHall(time) }); // hrad je v svojom rade vždy vpredu
-      for (const b of st.blds) if (!TRAPS[b.kind] && b.kind !== 'mud') objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? 0.5 : 0), x: b.c, f: () => drawBuilding(b, time) });
+      for (const b of st.blds) if (!TRAPS[b.kind] && b.kind !== 'mud') objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? (b.gate ? 0.25 : 0.5) : 0), x: b.c, f: () => drawBuilding(b, time) }); // brána po susedných hradbách (vysoká je širšia ako políčko)
       for (const s of st.soldiers) {
         const cast = s.helper === 'chapel' && s.working && s.tgt && !s.dead; // mních pri liečení zdvihne palicu
         objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: dpt(s), id: s.slot, f: () => { drawFighter(s, raceSpr(cast ? 'monkCast' : s.spr || 'soldier')); if (cast && !(SPR.monk8 && raceSpr('monk') === 'monk')) drawStaffGlow(s, time); } }); // liečiteľ z PixelLabu má kúzlo v animácii (bez svetla na palici)

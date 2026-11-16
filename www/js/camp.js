@@ -55,7 +55,7 @@ const CAMP_PIECES = {
     icetower: { role: 'tower',   name: 'Ľadová veža',     spr: o => BSPR.mageIce[campLvl(o)], lvlArt: true }, // ohnivá veža s ľadovým plameňom (ako u hráča)
     ballista: { role: 'bombard', name: 'Balista',         spr: o => BSPR.ballista[campLvl(o)], lvlArt: true },
     chapel:   { role: 'totem',   name: 'Kaplnka',         spr: () => BSPR.chapel },
-    workshop: { role: 'spawn', unit: 'sapper', label: 'remeselníci s prachom', name: 'Dielňa remeselníka', spr: () => BSPR.workshop },
+    workshop: { role: 'support', name: 'Dielňa remeselníka', spr: () => BSPR.workshop }, // remeselníci s prachom zrušení – dielňa nikoho nevysiela
     mine:     { role: 'support', name: 'Zlatá baňa',      spr: () => BSPR.mine },
     pit:      { role: 'trap',    name: 'Jama s ostňami',  spr: () => BSPR.pit },
     firepit:  { role: 'trap',    name: 'Ohnivá jama',     spr: () => BSPR.firepit },
@@ -111,6 +111,26 @@ const GATE_SPR = {};
 function gateSprite(m, l, orc) {
   l = l || 0;
   const key = m + ',' + l + (orc ? 'o' : '');
+  const ga = !orc && BSPR.gateArt && BSPR.gateArt[l]; // brána ľudí z PixelLabu (G1–G5) – ako u hráča
+  if (ga && !(m & 5) && ga.w <= 16) return ga; // vodorovná hradba: celá brána namiesto úseku
+  if (ga && !(m & 5) && !GATE_SPR[key]) { // vysoká brána (širšia ako políčko): za ňou úsek hradby, aby medzi hradbou a bránou nesvietila tráva
+    const ws = BSPR.wall[l][m], k = ga.c.width / ga.w, H = Math.ceil(Math.max(ws.h, ga.h)), c = document.createElement('canvas');
+    c.width = ga.c.width; c.height = H * k;
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+    x.drawImage(ws.c, (ga.w - ws.w) / 2 * k, (H - ws.h) * k, ws.w * k, ws.h * k);
+    x.drawImage(ga.c, 0, (H - ga.h) * k);
+    const s = spriteFromCanvas(c); s.w = ga.w; s.h = H; if (k > 1) s.hd = true;
+    GATE_SPR[key] = s;
+  }
+  if (ga && !GATE_SPR[key]) { // zvislá hradba: úsek hradby a na ňom stred brány (ako drawBuilding v hre)
+    const ws = BSPR.wall[l][m], k = ga.c.width / ga.w, lift = m & 4 ? 6 : 0;
+    const H = Math.ceil(Math.max(ws.h, ga.h + lift)), c = document.createElement('canvas'); c.width = 16 * k; c.height = H * k;
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+    x.drawImage(ws.c, 0, (H - ws.h) * k, ws.w * k, ws.h * k);
+    x.drawImage(ga.c, (ga.c.width - 22) / 2, 0, 22, ga.c.height, 2.5 * k, (H - lift - ga.h) * k, 11 * k, ga.h * k);
+    const s = spriteFromCanvas(c); s.w = 16; s.h = H; if (k > 1) s.hd = true;
+    GATE_SPR[key] = s;
+  }
   if (!GATE_SPR[key]) {
     const S = orc ? OBSPR : BSPR; // brána ľudí alebo orkov
     const c = document.createElement('canvas'); c.width = 16; c.height = 33;

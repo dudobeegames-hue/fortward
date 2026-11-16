@@ -16,6 +16,8 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 CHARS = [chr(c) for c in range(33, 127) if chr(c) not in '."\'\\`']
 W, H = 32, 64
 TILE_TOP, FOOT = 28, 56   # horný okraj políčka v sprite, päta hradby (vodorovná aj zvislá)
+GW, GH = 48, 88           # rám vysokej brány Bn.png (v hre 24×44 bodov, stred na stred políčka); spodok rámu = spodok rámu hradby
+GF = GH - (H - FOOT)      # päta vysokej brány v jej ráme (rovnako vysoko ako päta hradby)
 GOLD_TO_STONE = {(248, 220, 104): (238, 238, 242), (224, 176, 48): (220, 220, 226), (176, 126, 28): (164, 164, 176), (122, 82, 16): (128, 128, 142), (74, 46, 8): (92, 92, 108)}  # zlato lvl5 -> biely kameň
 OUT, ROPE = (0x1c, 0x14, 0x0e, 255), (0x3e, 0x26, 0x14, 255)
 
@@ -293,7 +295,20 @@ def main():
         levels.append(rows_lv)
         print('%s: 3 × 16 variantov %dx%d px' % (p, W, H))
         gp = os.path.join(ROOT, os.path.dirname(p), 'G' + os.path.basename(p)[1:])
-        if thick[-1] and os.path.exists(gp):                   # brána Gn.png: vodorovný úsek hradby s bránou, v tom istom ráme ako Wn.png
+        bp = os.path.join(ROOT, os.path.dirname(p), 'B' + os.path.basename(p)[1:])
+        if thick[-1] and os.path.exists(bp):                   # vysoká brána Bn.png (strážnica s vežičkami, 88×88 ako veže) má prednosť pred Gn.png
+            braw = Image.open(bp).convert('RGBA')
+            braw = braw.crop(braw.split()[3].getbbox())
+            assert braw.width <= GW and braw.height <= GF, 'vysoká brána je väčšia ako rám %dx%d' % (GW, GF)
+            gi = Image.new('RGBA', (GW, GH)); gi.alpha_composite(braw, ((GW - braw.width) // 2, GF - braw.height))   # stred rámu, päta na úrovni päty hradby
+            for y in range(GH):
+                for x in range(GW):
+                    c = gi.getpixel((x, y))
+                    if c[3] >= 128 and '#%02x%02x%02x' % c[:3] not in pal: pal.append('#%02x%02x%02x' % c[:3])
+            gates.append({'rows': [''.join('.' if gi.getpixel((x, y))[3] < 128 else CHARS[pal.index('#%02x%02x%02x' % gi.getpixel((x, y))[:3])] for x in range(GW)) for y in range(GH)],
+                          'flags': []})   # zástavy má vlastné (z PixelLabu)
+            print('%s: vysoká brána %dx%d v ráme %dx%d' % (bp, braw.width, braw.height, GW, GH))
+        elif thick[-1] and os.path.exists(gp):                 # brána Gn.png: vodorovný úsek hradby s bránou, v tom istom ráme ako Wn.png
             graw = Image.open(gp).convert('RGBA')
             wraw = Image.open(os.path.join(ROOT, p)).convert('RGBA')
             dy = FOOT - wraw.split()[3].getbbox()[3]             # spodok hradby na FOOT, brána posunutá rovnako (ostane v ráme PixelLabu)

@@ -284,8 +284,7 @@ const ORC_ENEMY_INTRO = {
   6: { id: 'shaman', name: 'Mních', desc: 'lieči ostatných – zabi ho ako prvého' },
   7: [{ id: 'bear', name: 'Ťažká jazda', desc: 'nápor zrazí orka aj vlčieho jazdca – zastavia ju len surovci' },
       { id: 'giantRam', name: 'Veľké baranidlo', desc: 'obor v hrubom pancieri ide rovno na palisádu a pevnosť – veže a jednotky ho len škrabnú, obliehacie stroje ho rozbijú' }],
-  8: [{ id: 'sapper', name: 'Remeselník s prachom', desc: 'beží k palisáde a vyhodí ju do vzduchu – zastreľ ho skôr' },
-      { id: 'mammoth', name: 'Obliehacia veža', desc: 'obor v hrubom pancieri – lukostrelci z cimburia strieľajú za jazdy a veža prevalcuje vojakov; proti nej pošli obliehacie stroje' }],
+  8: { id: 'mammoth', name: 'Obliehacia veža', desc: 'obor v hrubom pancieri – lukostrelci z cimburia strieľajú za jazdy a veža prevalcuje vojakov; proti nej pošli obliehacie stroje' }, // remeselníci s prachom zrušení
   9: { id: 'wolf', name: 'Jazdci', desc: 'prebehnú cez orkov a idú po goblinoch s lukmi – zastavia ich surovci' },
   10: { id: 'orcKing', name: 'Veliteľ jazdy', desc: 'vyjde z tábora v poslednej vlne – dupnutím koňa omračuje a privoláva rytierov' },
 };
