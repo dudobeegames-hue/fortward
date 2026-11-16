@@ -4152,6 +4152,7 @@
   function drawShadows() {
     let key = buf.width + 'x' + buf.height + '|' + st.hallLvl + '|' + BUILD_RACE + '|' + isAssault();
     for (const b of st.blds) if (!TRAPS[b.kind] && b.kind !== 'mud' && b.kind !== 'hedge') key += '|' + b.kind + b.c + ',' + b.r + ',' + b.lvl + (b.gate ? 'g' : '') + (iceMage(b) ? 'i' : '');
+    if (st.camp) for (const o of st.camp.parts) if (o.hp > 0 && o.role !== 'trap') key += '|c' + o.kind + o.x + ',' + o.y + ',' + o.lvl + ',' + o.mask;
     if (key !== shKey) {
       shKey = key;
       if (shLayer.width !== buf.width || shLayer.height !== buf.height) { shLayer.width = buf.width; shLayer.height = buf.height; }
@@ -4171,6 +4172,12 @@
         }
         const spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl);
         drawShadow(shCtx, spr, tileX(b.c) + bW(b) * T / 2 - Math.floor(spr.w / 2), tileY(b.r) + T + 1 - spr.h);
+      }
+      // stavby nepriateľského tábora vrhajú rovnaký tieň ako budovy hráča (predtým len škvrna pri päte – vysoké veže akoby leteli)
+      if (st.camp) for (const o of st.camp.parts) {
+        if (!(o.hp > 0) || o.role === 'trap') continue;
+        const sp = o.skin.spr(o, 0);
+        drawShadow(shCtx, sp, Math.round(o.x - sp.w / 2), o.y - sp.h + (o.skin.dy || 0));
       }
     }
     g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = SH_A; g.drawImage(shLayer, 0, 0); g.restore();
@@ -5798,7 +5805,7 @@
     for (const tm of st.totems || []) objs.push({ y: tm.y, f: () => drawTotem(tm, time) }); // totem duchov šamana
     if (st.camp) {
       for (const o of st.camp.parts) if (o.hp > 0 && o.role !== 'trap') objs.push({ y: o.y, f: () => {
-        const sp = o.skin.spr(o, time); shadow(o.x, o.y, 8);
+        const sp = o.skin.spr(o, time); // tieň je vo vrstve tieňov (drawShadows)
         campWallSlices(g, o, o.bld, o.x - T / 2, o.y, CAMP_PIECES[foeRace()].wall); // napojenie hradby na susednú vežu
         g.drawImage(sp.c, Math.round(o.x - sp.w / 2) + hitJit(o.flash), o.y - sp.h + (o.skin.dy || 0), sp.w, sp.h);
         if (o.lvl > 1 && !o.skin.lvlArt) pxText(g, String(o.lvl), Math.round(o.x + sp.w / 2) - 4, o.y - 7, '#f8d048'); // úroveň stavby bez vlastného vzhľadu
@@ -5889,7 +5896,7 @@
   }
 
   // tlačidlá stavania na hracej ploche: viditeľné spolu so stavebným panelom; Do boja v strede viditeľného bojiska
-  // (ak by zasahovalo do stavebnej zóny, posunie sa nad ňu), Späť a Opraviť všetko vpravo v strede
+  // (ak by zasahovalo do stavebnej zóny, posunie sa nad ňu), Späť a Opraviť všetko vpravo nad zónou
   function placeBuildBtns() {
     const bb = $('buildBtns'), on = !$('build').hidden && st.phase === 'build';
     if (bb.hidden === on) bb.hidden = !on;
@@ -5900,7 +5907,8 @@
     let y = mid - 74;
     if (zone < y + 110) y = Math.max(top, zone - 110);         // vysoko nad zónou, aby nezavadzalo pri stavaní
     $('nextWave').style.top = Math.round(y) + 'px';
-    $('sideBtns').style.top = Math.round(mid - 58) + 'px';
+    // Späť a Opraviť všetko: nad hornou hranou stavebnej zóny (dve okrúhle tlačidlá s cenou ≈ 130 bodov), nezakrývajú stavebnú plochu
+    $('sideBtns').style.top = Math.round(Math.max(top, Math.min(mid - 58, zone - 136))) + 'px';
   }
   function hudTick() {
     placeBuildBtns();
