@@ -64,14 +64,15 @@
   const KTYPES = {
     knight: { name: 'Rytier',      spr: 'soldier', hp: 1,   dmg: 1,    spd: 26, desc: 'vyvážený' },
     spear:  { name: 'Kopijník',    spr: 'spear',   hp: 1.2, dmg: 0.85, spd: 24, desc: 'útočí spoza rytierov, silný proti jazde' },
+    gob:    { name: 'Goblin',      spr: 'gobknife', hp: 0.4, dmg: 0.4, spd: 30, desc: 'slabý, no z budovy ich vyjde trikrát viac', orc: true }, // len orkovia: Orkský barak prepnutý na goblinov s nožíkom
     rider:  { name: 'Jazdec',      spr: 'rider',   hp: 0.9, dmg: 1.25, spd: 44, desc: 'rýchly, ide po strelcoch a šamanoch' }, // jazda (kôň, vlk) zreteľne rýchlejšia ako pechota (26)
   };
   // každá pozemná jednotka má vlastnú budovu
   const UNIT_HOME = { barracks: 'knight', stables: 'rider', armory: 'spear' };
   // ľudia: kasárne sa prepínajú medzi rytiermi a kopijníkmi (b.mode = 'spear'); liečiteľ je z kostola, sokoly zo sokoliarne;
   // zbrojnicu stavajú už len orkovia (jama surovcov)
-  const unitOf = b => b.kind === 'barracks' && b.mode === 'spear' ? 'spear' : UNIT_HOME[b.kind];
-  const UNIT_PLURAL = { knight: 'Rytieri', rider: 'Jazdci', spear: 'Kopijníci' };
+  const unitOf = b => b.kind === 'barracks' && b.mode === 'spear' ? 'spear' : b.kind === 'barracks' && b.mode === 'gob' && isOrc() ? 'gob' : UNIT_HOME[b.kind];
+  const UNIT_PLURAL = { knight: 'Rytieri', rider: 'Jazdci', spear: 'Kopijníci', gob: 'Goblini' };
   const stakeDmg = () => (3 + 0.5 * (diffM(st.mission) - 1)) * (1 + 0.06 * perk('traps')); // koly: rastú s misiou, nie s úrovňou
   const WALL_LINK = 0.1; // +10 % zdravia hradby za každú susednú hradbu
   // kráľove schopnosti
@@ -177,7 +178,8 @@
   const bRange = b => (isTreb(b) ? TREB.range : 1) * (bDef(b).range + 4 * (b.lvl - 1) + (b.spec ? SPECS[b.spec].range : 0)) * (1 + 0.02 * perk('lookouts'));
   const bMaxHp = b => Math.round((BUILD[b.kind].hp || 1) * lvlMul(b, 0.35) * (b.kind === 'wall' ? 1 + WALL_LINK * (b.nb || 0) : 1) * (1 + 0.06 * perk('carpenters')));
   const bUpCost = b => Math.round(BUILD[b.kind].cost * 0.9 * Math.pow(1.6, b.lvl - 1) * (1 - 0.04 * perk('architects')));
-  const knightCap = b => b.lvl; // z vojenskej budovy vyjde naraz toľko vojakov, aká je jej úroveň
+  const GOB_PER_LVL = 3; // goblinov s nožíkom vyjde z baraku trikrát viac (úr. 1 = 3, úr. 2 = 6 …)
+  const knightCap = b => b.lvl * (unitOf(b) === 'gob' ? GOB_PER_LVL : 1); // z vojenskej budovy vyjde naraz toľko vojakov, aká je jej úroveň
   const knightEvery = b => Math.max(3, 7 - 0.8 * (b.lvl - 1)) * (1 - 0.04 * perk('recruits'));
   // lukostrelci zo strelnice: menej zdravia, strieľajú z diaľky (aj na netopiere), držia sa za rytiermi
   const archerCap = b => b.lvl;
@@ -484,7 +486,7 @@
     [['hall', 2, 400], ['tower', 2, 150], ['pitch', 2, 200], ['wall', 2, 150], ['mine', 1, 200], ['workshop', 1, 200], ['pit', 2, 120]],
     [['hall', 3, 900], ['tower', 3, 300], ['pitch', 3, 300], ['mage', 3, 450], ['wall', 3, 300], ['firepit', 1, 250], ['pit', 3, 220],
       ['barracks', 1, 400], ['barracks', 2, 300, 1], ['range', 1, 400], ['range', 2, 300, 1], ['hedge', 0, 150, 1], ['mine', 2, 300], ['workshop', 2, 300], ['chapel', 1, 400],
-      ['siegeRam', 0, 450], ['spear', 0, 350]],
+      ['siegeRam', 0, 450], ['spear', 0, 350], ['gobknife', 0, 250, 1, 'orc']],
     [['hall', 4, 1800], ['tower', 4, 550], ['pitch', 4, 550], ['mage', 4, 650], ['ice', 0, 400, 1], ['wall', 4, 500], ['pit', 4, 350], ['firepit', 2, 400],
       ['barracks', 3, 550], ['barracks', 4, 500, 1], ['stables', 1, 700], ['stables', 2, 500, 1], ['stables', 3, 550, 1], ['range', 3, 550], ['range', 4, 500, 1],
       ['falconry', 1, 700], ['falconry', 2, 500, 1], ['falconry', 3, 550, 1], ['mine', 3, 450], ['workshop', 3, 450], ['chapel', 2, 500], ['siegeCat', 0, 800]],
@@ -493,7 +495,8 @@
       ['mine', 4, 700], ['workshop', 4, 700], ['chapel', 3, 800]],
   ];
   const RES = []; // všetky položky: { id, kind, lvl, cost, opt, c (karta 1–5) }
-  RES_DEF.forEach((card, ci) => card.forEach(([kind, lvl, cost, opt]) => RES.push({ id: kind + (lvl || ''), kind, lvl, cost, opt: !!opt, c: ci + 1 })));
+  RES_DEF.forEach((card, ci) => card.forEach(([kind, lvl, cost, opt, race]) => RES.push({ id: kind + (lvl || ''), kind, lvl, cost, opt: !!opt, c: ci + 1, race })));
+  const resOn = r => !r.race || (r.race === 'orc') === isOrc(); // výskum len pre jednu rasu (goblin s nožíkom len za orkov)
   const RES_BY = Object.fromEntries(RES.map(r => [r.id, r]));
   st.res = new Set(); // vyskúmané (kúpené) položky; zadarmo (cena 0) platia vždy
   const resHas = id => !!RES_BY[id] && (RES_BY[id].cost === 0 || st.res.has(id));
@@ -526,7 +529,7 @@
   const open = id => has(id) && (isAssault() || st.hallLvl >= needHall(id));     // dá sa práve teraz v misii použiť (pri útoku na hrad radnica nie je)
   const hallWord = () => isOrc() ? 'pevnosť' : 'hrad';
   // karta výskumu je otvorená, keď sú vyskúmané všetky povinné výskumy predošlej karty
-  const resCardOpen = c => c <= 1 || RES.every(r => r.c !== c - 1 || r.opt || resHas(r.id));
+  const resCardOpen = c => c <= 1 || RES.every(r => r.c !== c - 1 || r.opt || !resOn(r) || resHas(r.id));
   // prečo sa položka nedá kúpiť (null = dá sa)
   function resBlock(r) {
     if (!resCardOpen(r.c)) return 'Najprv dokonči kartu ' + ROMAN[r.c - 1];
@@ -1356,7 +1359,7 @@
     for (const b of st.blds) if (UNIT_HOME[b.kind] || b.kind === 'range' || b.kind === 'falconry' || HELPERS[b.kind]) { b.spawnT = helperKey(b) ? 0.6 : 0.3; b.squadUp = true; }
     st.arcPlan = st.blds.reduce((n, b) => n + (b.kind === 'range' ? archerCap(b) : 0), 0); // toľko miest bude mať rad lukostrelcov
     st.formPlan = { knight: 0, spear: 0, rider: 0, monk: 0 }; // a toľko miest šík pešiakov, jazdy a liečiteľov
-    for (const b of st.blds) { const k = UNIT_HOME[b.kind] && unitOf(b); if (k) st.formPlan[k] += knightCap(b); else if (b.kind === 'chapel') st.formPlan.monk++; }
+    for (const b of st.blds) { const k = UNIT_HOME[b.kind] && unitOf(b); if (k) st.formPlan[k === 'gob' ? 'knight' : k] += knightCap(b); else if (b.kind === 'chapel') st.formPlan.monk++; }
     if (st.form) st.form.hold = {}; // rad lukostrelcov sa v novej vlne postaví nanovo
     banner(isAssault() ? 'Do útoku!' : st.endless ? 'Vlna ' + st.wave : st.wave === missionWaves(st.mission) ? 'Posledná vlna!' : 'Vlna ' + st.wave + ' / ' + missionWaves(st.mission));
     syncStance();
@@ -2571,7 +2574,7 @@
     const archers = live.filter(s => s.archer);
     let infBack = musterY;
     {
-      const knights = live.filter(s => s.ktype === 'knight'), spears = live.filter(s => s.ktype === 'spear'), riders = live.filter(s => s.ktype === 'rider');
+      const knights = live.filter(s => s.ktype === 'knight' || s.ktype === 'gob'), spears = live.filter(s => s.ktype === 'spear'), riders = live.filter(s => s.ktype === 'rider');
       // šík ide oproti najbližšej pozemnej horde, no nie hlbšie než k zhromaždisku pred zónou
       const th = nearestFoe(F.inf.x, F.inf.y, false);
       const atk = armyAttacks(), cp = th || !atk ? null : nearestCampPart(F.inf.x, F.inf.y);
@@ -6021,7 +6024,7 @@
   const HUMAN_UNITS = { king: { name: HEROES.king.name, spr: HEROES.king.spr, desc: HEROES.king.desc, powers: HEROES.king.powers.slice() },
     kt: Object.fromEntries(Object.entries(KTYPES).map(([k, v]) => [k, v.name])), plural: Object.assign({}, UNIT_PLURAL) };
   const ORC_UNITS = { king: { name: 'Náčelník', spr: 'chief', desc: 'Surový vodca hordy, sekerou zasiahne celú skupinu.', powers: ['rage', 'roar', 'axe'] },
-    kt: { knight: 'Ork', spear: 'Surovec', rider: 'Vlčí jazdec' }, plural: { knight: 'Orkovia', rider: 'Vlčí jazdci', spear: 'Surovci' } };
+    kt: { knight: 'Ork', spear: 'Surovec', rider: 'Vlčí jazdec', gob: 'Goblin' }, plural: { knight: 'Orkovia', rider: 'Vlčí jazdci', spear: 'Surovci', gob: 'Goblini' } };
   let previewRace = null;
   // novinky misie v rase hráča (za orkov iné poradie veží a orkské mená stavieb)
   const unlockName = u => (BUILD[u.id] && BUILD_RACE === 'orc') ? BUILD[u.id].name : u.name;
@@ -6082,7 +6085,7 @@
     const sp = k => SPR[raceSpr(k)][0];
     ICONS.u_knight = unitIcon('soldier'); ICONS.u_footArcher = unitIcon('footArcher');
     ICONS.u_archer = spriteURL(sp('archer'), 3); ICONS.u_crossbow = spriteURL(sp('knight'), 3);
-    ICONS.u_spear = unitIcon('spear'); ICONS.u_rider = unitIcon('rider'); ICONS.u_monk = unitIcon('monk'); ICONS.u_craft = unitIcon('craft'); // aj oddiely pri útoku na hrad
+    ICONS.u_spear = unitIcon('spear'); ICONS.u_gob = unitIcon('gobknife'); ICONS.u_rider = unitIcon('rider'); ICONS.u_monk = unitIcon('monk'); ICONS.u_craft = unitIcon('craft'); // aj oddiely pri útoku na hrad
     ICONS.u_falcon = isOrc() ? spriteURL(SPR.bat[0], 3) : unitIcon('falcon'); // sokol z PixelLabu
     for (const k of ['siegeRam', 'siegeCat']) { const sp = SPR[raceSpr(k) + "8"][1].idle; ICONS['u_' + k] = sp.hd ? spriteURL(trimmed({ c: sp.c, sil: sp.sil, w: sp.c.width, h: sp.c.height }), 1) : spriteURL(trimmed(sp), 2); } // jemná kresba v jej rozlíšení
     ICONS.king = ICONS.hero_king = isOrc() ? heroPortrait(SPR.chief8, 18) : heroPortrait(SPR.king8, 18);
@@ -6259,6 +6262,7 @@
       selRow(ICONS.chest, 'Vojsko · ' + n + (n === 1 ? ' jednotka' : n && n < 5 ? ' jednotky' : ' jednotiek'),
         st.armyPick ? 'ťukni do zóny · ťuk na oddiel ho vráti do truhlice' : 'vyber oddiel, ťukni do zóny a potom Do útoku');
       for (const k in ARMY) {
+        if (ARMY[k].orc && !isOrc()) continue; // goblini len za orkov
         const a = ARMY[k], name = armyName(k) + (a.n > 1 ? ' ×' + a.n : '');
         if (!armyOpen(k)) { lockAct(armyIcon(k), name, armyTech(k), !!a.siege); continue; }
         const full = a.siege && depSiege(k) >= SIEGE_MAX, picked = st.armyPick === k;
@@ -6359,8 +6363,10 @@
       if (fc) act(I.actRepair, 'Opraviť', coinTxt(fc), st.gold >= fc, () => { st.gold -= fc; b.hp = bMaxHp(b); rebuildOcc(); }, '', true);
       const refund = Math.floor(b.spent * sellShare()) + (b.unit ? Math.floor(b.unit.spent * sellShare()) : 0);
       act(ICONS.coin, 'Predať', '+' + refund, true, sellAll([b], refund), 'sell', true);
-      if (b.kind === 'barracks' && !isOrc()) { // jednotky kasární: všetky možnosti naraz, zvolená je označená; prepnutie zadarmo, medzi vlnami (vojaci odídu a vyjdú noví)
-        for (const o of [{ mode: null, u: 'knight', name: 'Rytieri' }, { mode: 'spear', u: 'spear', name: 'Kopijníci', tech: 'armory' }]) {
+      if (b.kind === 'barracks') { // jednotky kasární: všetky možnosti naraz, zvolená je označená; prepnutie zadarmo, medzi vlnami (vojaci odídu a vyjdú noví)
+        const opts = isOrc() ? [{ mode: null, u: 'knight', name: 'Orkovia' }, { mode: 'gob', u: 'gob', name: 'Goblini', tech: 'gobknife' }] // orkský barak: sekerači alebo goblini s nožíkom
+          : [{ mode: null, u: 'knight', name: 'Rytieri' }, { mode: 'spear', u: 'spear', name: 'Kopijníci', tech: 'armory' }];
+        for (const o of opts) {
           const on = (b.mode || null) === o.mode;
           if (o.tech && !open(o.tech)) { lockAct(ICONS['u_' + o.u], o.name, o.tech, true); continue; }
           if (on) { act(ICONS['u_' + o.u], o.name, 'zvolené', true, () => {}, 'sel', true); continue; }
@@ -6856,6 +6862,7 @@
   // oddiel na jedno políčko: n jednotiek za cenu cost (jednotky majú úroveň najlepších budov, ktoré hráč pozná)
   const ARMY = {
     knight: { home: 'barracks', n: 3, cost: 75 },
+    gob:    { home: 'barracks', n: 6, cost: 60, orc: true }, // len orkovia: goblini s nožíkom (z baraku, treba ich vyskúmať)
     spear:  { home: 'armory',   n: 3, cost: 90 },
     rider:  { home: 'stables',  n: 2, cost: 90 },
     archer: { home: 'range',    n: 3, cost: 75 },
@@ -6873,7 +6880,7 @@
   const armyName = k => ARMY[k].siege ? BUY[k].name : KTYPES[k] ? KTYPES[k].name
     : { archer: isOrc() ? 'Goblin strelec' : 'Lukostrelec', falcon: isOrc() ? 'Netopier' : 'Sokol', monk: isOrc() ? 'Šaman' : 'Mních' }[k];
   const armyIcon = k => ARMY[k].siege ? ICONS['u_' + BUY[k].siege] : ICONS['u_' + k];
-  const armyTech = k => ARMY[k].siege ? BUY[k].siege : isOrc() ? ARMY[k].home : { spear: 'armory' }[k] || ARMY[k].home; // ľudia: kopijníci z kasární
+  const armyTech = k => ARMY[k].siege ? BUY[k].siege : k === 'gob' ? 'gobknife' : isOrc() ? ARMY[k].home : { spear: 'armory' }[k] || ARMY[k].home; // ľudia: kopijníci z kasární
   const armyOpen = k => ARMY[k].siege ? has(BUY[k].siege) : has(armyTech(k));
   const armyUnlock = k => unlockMissionOf(armyTech(k));
   const depAt = (c, r) => st.deps.find(d => d.c === c && d.r === r);
@@ -6885,7 +6892,7 @@
     if (a.siege && depSiege(k) >= SIEGE_MAX) { toast('Najviac ' + SIEGE_MAX + '× ' + armyName(k).toLowerCase()); AUDIO.play('deny'); return false; }
     if (st.gold < a.cost) { toast('V truhlici nie je dosť zlatiek'); AUDIO.play('deny'); return false; }
     const id = ++st.depN, lvl = Math.max(1, resLvl(a.home || 'barracks')), b = { // oddiel má úroveň, akú má hráč vyskúmanú pre jeho budovu
-      kind: a.home || 'barracks', lvl, c, r, army: true, mode: k === 'spear' ? 'spear' : null }, n0 = st.soldiers.length;
+      kind: a.home || 'barracks', lvl, c, r, army: true, mode: k === 'spear' ? 'spear' : k === 'gob' ? 'gob' : null }, n0 = st.soldiers.length;
     if (a.siege) { const p = siegeCellPos(c, r); spawnSiege(a.siege, p.x, p.y); }
     else for (let i = 0; i < a.n; i++) {
       if (k === 'archer') spawnArcher(b, true);
@@ -7444,13 +7451,14 @@
     if (r.kind === 'hall') return 'Dovolí vylepšiť ' + (isOrc() ? 'pevnosť' : 'radnicu') + ' na úroveň ' + r.lvl + ' – rozšíri stavebnú zónu a otvorí výskumy karty ' + ROMAN[r.lvl] + '.';
     if (r.kind === 'wallArcher') return 'Na hradbu postavíš lukostrelca, ktorý strieľa na hordu ponad hradby.';
     if (r.kind === 'spear') return 'Kasárne prepneš na kopijníkov – útočia spoza rytierov a jazdu zastavia aj s trojnásobnou silou.';
+    if (r.kind === 'gobknife') return 'Orkský barak prepneš na goblinov s nožíkom – sú slabší ako orkovia, no z baraku ich vyjde trikrát viac (úroveň 1 = 3 goblini).';
     if (r.kind === 'ice') return 'Ohnivú vežu prepneš na ľad – ľadové strely spomalia zasiahnutého aj nepriateľov okolo neho.';
     if (r.kind === 'siegeRam') return 'Obliehací stroj zo záložky Stroje – ide na tábor hordy a rozbíja jeho stavby.';
     if (r.kind === 'siegeCat') return 'Obliehací stroj zo záložky Stroje – z diaľky ostreľuje balvanmi stavby tábora.';
     if (r.kind === 'wall') return lv + 'Brána ide spolu s hradbami. ' + BUILD.wall.desc + '.';
     return lv + (BUILD[k] ? BUILD[k].desc + '.' : '');
   }
-  const RES_NAME = { hall: () => isOrc() ? 'Pevnosť' : 'Hrad', wallArcher: () => isOrc() ? 'Strelec na palisáde' : 'Lukostrelci na hradbách', spear: () => isOrc() ? 'Zbrojnica' : 'Kopijníci',
+  const RES_NAME = { hall: () => isOrc() ? 'Pevnosť' : 'Hrad', wallArcher: () => isOrc() ? 'Strelec na palisáde' : 'Lukostrelci na hradbách', spear: () => isOrc() ? 'Zbrojnica' : 'Kopijníci', gobknife: () => 'Goblini s nožíkom',
     ice: () => 'Ľadový plameň', siegeRam: () => BUY.ram.name, siegeCat: () => 'Katapult', hedge: () => BUILD[isOrc() ? 'mud' : 'hedge'].name };
   const resBuild = r => r.kind === 'pitch' && isOrc() ? 'icetower' : r.kind; // za orkov je na mieste smolnej veže jedový kotol
   const resName = r => (RES_NAME[r.kind] ? RES_NAME[r.kind]() : BUILD[resBuild(r)].short) + (r.lvl ? ' ' + r.lvl : '');
@@ -7462,6 +7470,7 @@
       if (r.kind === 'wallArcher') return bPreview({ kind: 'wall', lvl: 1, unit: { type: 'archer', lvl: 1 } }); // hradba s lukostrelcom
       if (r.kind === 'spear') return isOrc() ? ICONS.armory : ICONS.u_spear;
       if (r.kind === 'ice') return ICONS.mageIce;
+      if (r.kind === 'gobknife') return ICONS.u_gob;
       if (r.kind === 'paving') return ICONS.paving || spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3);
       if (r.kind === 'siegeRam' || r.kind === 'siegeCat') return ICONS['u_' + r.kind];
       if (r.kind === 'hedge') return ICONS[isOrc() ? 'mud' : 'hedge'] || sprIcon(BSPR.hedge);
@@ -7495,7 +7504,7 @@
     list.innerHTML = '';
     let cur = 1; while (cur < 5 && resCardOpen(cur + 1)) cur++; // najvyššia otvorená karta
     for (let c = 5; c >= 1; c--) {
-      const items = RES.filter(r => r.c === c), need = items.filter(r => !r.opt), got = need.filter(r => resHas(r.id)).length, opn = resCardOpen(c);
+      const items = RES.filter(r => r.c === c && resOn(r)), need = items.filter(r => !r.opt), got = need.filter(r => resHas(r.id)).length, opn = resCardOpen(c);
       const card = document.createElement('section');
       card.className = 'resCard' + (opn ? '' : ' locked') + (got === need.length ? ' done' : '') + (c === cur ? ' cur' : '');
       card.innerHTML = '<header><span class="roman">' + ROMAN[c] + '</span><div><b>' + RES_NAME.hall() + ' úrovne ' + c + '</b><small>' +
