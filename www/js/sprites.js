@@ -671,7 +671,7 @@ function initSprites() {
   lazySpr('riderG8', () => buildArt8(RIDER_ART, PAL_GOLD_ARMOR, 5)); // zlaté brnenie (stajne 5. úrovne)
   lazySpr('rider8', () => buildArt8(RIDER_ART, null, 5)); // jazdec na koni v 8 smeroch z PixelLabu, jemná kresba (rider-art.js)
   if (typeof BAT_ART !== 'undefined') lazySpr('bat8', () => buildArt8(BAT_ART, null, 4)); // netopier v jemnej kresbe (bat-art.js, tools/bat_art.py): 8 smerov, run = 6 snímok mávania
-  lazySpr('falcon8', () => buildArt8(FALCON_ART, null, 4)); // sokol z PixelLabu, jemná kresba (falcon-art.js): 8 smerov, run = 5 snímok mávania krídlami
+  lazySpr('falcon8', () => buildArt8(FALCON_ART, null, 4)); // sokol v jemnej kresbe (falcon-art.js z tools/falcon_art.py): 8 smerov, run = 6 snímok mávania, atk = strmhlav, pazúry, návrat
   lazySpr('craft8', () => buildArt8(CARPENTER_ART, null, 4)); // remeselník z dielne z PixelLabu, jemná kresba (carpenter-art.js); atk = 4 snímky úderu kladivom
   lazySpr('monk8', () => buildArt8(Object.assign({}, HEALER_ART, { rot: HEALER_ART.run.map(r => r[0]) }), null, 4)); // liečiteľ (mág z kostola) z PixelLabu, jemná kresba (healer-art.js); státie = prvá snímka chôdze (v rotáciách mal biely plášť), atk = 4 snímky kúzla len hore a dole
   lazySpr('hknight8', buildHKnight8); // ťažký rytier (nepriateľ za orkov)

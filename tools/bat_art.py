@@ -120,6 +120,8 @@ def project(p, ang):
     return sx, sy, depth, (X, Y, Z)
 
 
+WING_MATS = {'wing'}  # blana/perie krídel (bez posunu hĺbky – telo má pred krídlom prednosť)
+DOTS = {'eye': 'b', 'fang': 'f', 'mouth': 'h', 'fur': '0', 'bone': '8'}  # body (oči, zuby …) → znak farby
 UP = 0.35  # telo v lete mierne vzpriamené (hlava hore) – spredu je vidieť tvár a uši nad krídlami
 
 
@@ -144,7 +146,7 @@ def render(ang, flap, lean=UP, bite=False, sweep=0.0):
                 w2 = ((C[1] - A[1]) * (qx - C[0]) + (A[0] - C[0]) * (qy - C[1])) / den
                 w3 = 1 - w1 - w2
                 if min(w1, w2, w3) < -0.001: continue
-                z = w1 * A[2] + w2 * B[2] + w3 * C[2] + (0.02 if mat != 'wing' else 0)
+                z = w1 * A[2] + w2 * B[2] + w3 * C[2] + (0.02 if mat not in WING_MATS else 0)
                 if z <= zb[py][px]: continue
                 zb[py][px] = z
                 if mat == 'ear_in': ch = RAMP['ear'][2 if lit > 0.3 else 1]
@@ -168,7 +170,7 @@ def render(ang, flap, lean=UP, bite=False, sweep=0.0):
         P = project(p, ang)
         px, py = int(P[0]), int(P[1])
         if 0 <= px < N and 0 <= py < N and P[2] >= zb[py][px] - 0.7:
-            col[py][px] = {'eye': 'b', 'fang': 'f', 'mouth': 'h', 'fur': '0', 'bone': '8'}[mat]
+            col[py][px] = DOTS[mat]
     # osamotené pixely (žiadny vyplnený sused) preč – inak z nich obrys urobí krížik
     for y in range(N):
         for x in range(N):
@@ -187,6 +189,25 @@ def render(ang, flap, lean=UP, bite=False, sweep=0.0):
 
 DIRS = 8  # poradie hry: 0 vpravo (východ), 1 vpravo dole … 7 vpravo hore
 FLAP = [62, 40, 5, -30, -14, 30]  # mávanie: hore, dole (rýchly záber), späť hore
+
+
+def preview(path, rows, pal):
+    """náhľad: rows = zoznam riadkov snímok (každá snímka = zoznam reťazcov), zväčšený 6×"""
+    from PIL import Image
+    Z, cols = 6, max(len(r) for r in rows)
+    im = Image.new('RGBA', (cols * N * Z, len(rows) * N * Z), (70, 110, 60, 255))
+    full = dict(pal, K='#1c140e')
+    for d, frames in enumerate(rows):
+        for i, fr in enumerate(frames):
+            for y, row in enumerate(fr):
+                for x, ch in enumerate(row):
+                    if ch == '.': continue
+                    h = full[ch]
+                    im.paste(tuple(int(h[k:k + 2], 16) for k in (1, 3, 5)) + (255,), (i * N * Z + x * Z, d * N * Z + y * Z, i * N * Z + x * Z + Z, d * N * Z + y * Z + Z))
+    im.save(path)
+
+
+YAW = {0: 50, 1: 65, 2: 90, 3: 115, 4: 130, 5: 245, 6: 270, 7: 295}  # natočenie modelu pre smery hry (pozri main)
 
 
 def main():
@@ -225,4 +246,5 @@ def main():
     print('BAT_ART: %d smerov, mávanie %d snímok, útok %d snímky' % (DIRS, len(FLAP), 3))
 
 
-main()
+if __name__ == '__main__':
+    main()

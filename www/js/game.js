@@ -2473,7 +2473,7 @@
     moveTo(u, c.x + Math.cos(a) * 12, c.y - 10 + Math.sin(a) * 5, u.spd * 0.6, dt);
   }
   // sokol z PixelLabu: natočí sa do smeru letu, mávanie krídlami (5 snímok); nad cieľom pri útoku krídla zloží
-  // netopier (bat-art.js) rovnako, len mává rýchlejšie; atk = snímka útoku (napriahnutie 0, výpad s hryznutím 1)
+  // sokol (falcon-art.js) aj netopier (bat-art.js, mává rýchlejšie) – obe kresby z tools/*_art.py; atk = snímka útoku (napriahnutie 0, výpad s hryznutím 1)
   function falconFrame(o, time, set, atk) {
     set = set || SPR.falcon8;
     const dx = o.x - (o._fx == null ? o.x : o._fx), dy = o.y - (o._fy == null ? o.y : o._fy);
@@ -2490,12 +2490,7 @@
   }
   function drawFalcon(u, time) {
     const bob = Math.sin(time * 5 + u.slot) * 1.5;
-    if (!isOrc() && !u.hexbat) { // nový sokol (jemná kresba, w×h v bodoch hry)
-      const fr = falconFrame(u, time);
-      shadow(u.x, u.y + 2, 3);
-      g.drawImage(u.flash > 0 ? hitSpr(fr) : fr.c, Math.round((u.x - fr.w / 2) * 2) / 2, Math.round((u.y - 3 - fr.h + bob + (u.swing > 0 ? 3 : 0)) * 2) / 2, fr.w, fr.h);
-      return;
-    }
+    if (!isOrc() && !u.hexbat) { drawBat8(u, falconFrame(u, time, SPR.falcon8, u.swing > 0 ? 1 : null), time, u.slot); return; } // sokol (falcon-art.js): pri útoku zásah pazúrmi
     if (SPR.bat8) { drawBat8(u, falconFrame(u, time, SPR.bat8, u.swing > 0 ? 1 : null), time, u.slot); return; } // netopier (za orkov aj zakliaty nepriateľ)
     const fr = SPR[isOrc() ? 'bat' : 'falcon'][Math.floor(u.anim) % 2];
     shadow(u.x, u.y + 2, 3);
@@ -3583,10 +3578,8 @@
       return;
     }
     const frames = SPR[foeSpr(e.d.spr)];
-    if (e.d.fly && foeSpr(e.d.spr) === 'falcon') { // za orkov: ľudský sokol z PixelLabu
-      const fr = falconFrame(e, time);
-      shadow(e.x, e.y + 2, 3);
-      g.drawImage(e.flash > 0 ? hitSpr(fr) : fr.c, Math.round((e.x - fr.w / 2) * 2) / 2, Math.round((e.y - 3 - fr.h + Math.sin(time * 6 + e.ph) * 1.5) * 2) / 2, fr.w, fr.h);
+    if (e.d.fly && foeSpr(e.d.spr) === 'falcon') { // za orkov: ľudský sokol, pred zásahom strmhlav, pri zásahu pazúry
+      drawBat8(e, falconFrame(e, time, SPR.falcon8, e.lunge > 0 ? 1 : e.attacking && e.atk < 0.3 ? 0 : null), time, e.ph);
       return;
     }
     if (e.d.fly && SPR.bat8) { // netopier v jemnej kresbe: mávanie, pred zásahom napriahnutie, pri zásahu výpad s hryznutím
