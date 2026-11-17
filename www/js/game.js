@@ -2473,12 +2473,20 @@
     moveTo(u, c.x + Math.cos(a) * 12, c.y - 10 + Math.sin(a) * 5, u.spd * 0.6, dt);
   }
   // sokol z PixelLabu: natočí sa do smeru letu, mávanie krídlami (5 snímok); nad cieľom pri útoku krídla zloží
-  function falconFrame(o, time) {
+  // netopier (bat-art.js) rovnako, len mává rýchlejšie; atk = snímka útoku (napriahnutie 0, výpad s hryznutím 1)
+  function falconFrame(o, time, set, atk) {
+    set = set || SPR.falcon8;
     const dx = o.x - (o._fx == null ? o.x : o._fx), dy = o.y - (o._fy == null ? o.y : o._fy);
     o._fx = o.x; o._fy = o.y;
     if (Math.hypot(dx, dy) > 0.05) o.face8 = dir8(dx, dy);
-    const v = SPR.falcon8[o.face8 == null ? 2 : o.face8];
-    return v.walk[Math.floor(time * 10 + (o.slot || o.ph || 0) * 1.7) % v.walk.length];
+    const v = set[o.face8 == null ? 2 : o.face8];
+    if (atk != null && v.atk) return v.atk[atk];
+    return v.walk[Math.floor(time * (set === SPR.bat8 ? 15 : 10) + (o.slot || o.ph || 0) * 1.7) % v.walk.length];
+  }
+  // netopier v jemnej kresbe (hráčov za orkov, zakliaty nepriateľ, nepriateľ za ľudí): tieň pod ním, mávanie, pri útoku výpad
+  function drawBat8(o, fr, time, ph) {
+    shadow(o.x, o.y + 2, 3);
+    g.drawImage(o.flash > 0 ? hitSpr(fr) : fr.c, Math.round((o.x - fr.w / 2) * 2) / 2, Math.round((o.y - 3 - fr.h + Math.sin(time * 6 + ph) * 1.5) * 2) / 2, fr.w, fr.h);
   }
   function drawFalcon(u, time) {
     const bob = Math.sin(time * 5 + u.slot) * 1.5;
@@ -2488,6 +2496,7 @@
       g.drawImage(u.flash > 0 ? hitSpr(fr) : fr.c, Math.round((u.x - fr.w / 2) * 2) / 2, Math.round((u.y - 3 - fr.h + bob + (u.swing > 0 ? 3 : 0)) * 2) / 2, fr.w, fr.h);
       return;
     }
+    if (SPR.bat8) { drawBat8(u, falconFrame(u, time, SPR.bat8, u.swing > 0 ? 1 : null), time, u.slot); return; } // netopier (za orkov aj zakliaty nepriateľ)
     const fr = SPR[isOrc() ? 'bat' : 'falcon'][Math.floor(u.anim) % 2];
     shadow(u.x, u.y + 2, 3);
     g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), Math.round(u.y - 14 + bob - (u.swing > 0 ? -3 : 0)));
@@ -3578,6 +3587,10 @@
       const fr = falconFrame(e, time);
       shadow(e.x, e.y + 2, 3);
       g.drawImage(e.flash > 0 ? hitSpr(fr) : fr.c, Math.round((e.x - fr.w / 2) * 2) / 2, Math.round((e.y - 3 - fr.h + Math.sin(time * 6 + e.ph) * 1.5) * 2) / 2, fr.w, fr.h);
+      return;
+    }
+    if (e.d.fly && SPR.bat8) { // netopier v jemnej kresbe: mávanie, pred zásahom napriahnutie, pri zásahu výpad s hryznutím
+      drawBat8(e, falconFrame(e, time, SPR.bat8, e.lunge > 0 ? 1 : e.attacking && e.atk < 0.3 ? 0 : null), time, e.ph);
       return;
     }
     if (e.d.fly) { // netopier mávajúci krídlami, tieň na zemi
@@ -6086,7 +6099,7 @@
     ICONS.u_knight = unitIcon('soldier'); ICONS.u_footArcher = unitIcon('footArcher');
     ICONS.u_archer = spriteURL(sp('archer'), 3); ICONS.u_crossbow = spriteURL(sp('knight'), 3);
     ICONS.u_spear = unitIcon('spear'); ICONS.u_gob = unitIcon('gobknife'); ICONS.u_rider = unitIcon('rider'); ICONS.u_monk = unitIcon('monk'); ICONS.u_craft = unitIcon('craft'); // aj oddiely pri útoku na hrad
-    ICONS.u_falcon = isOrc() ? spriteURL(SPR.bat[0], 3) : unitIcon('falcon'); // sokol z PixelLabu
+    ICONS.u_falcon = isOrc() ? unitIcon('bat') : unitIcon('falcon'); // netopier (bat-art.js) či sokol z PixelLabu // sokol z PixelLabu
     for (const k of ['siegeRam', 'siegeCat']) { const sp = SPR[raceSpr(k) + "8"][1].idle; ICONS['u_' + k] = sp.hd ? spriteURL(trimmed({ c: sp.c, sil: sp.sil, w: sp.c.width, h: sp.c.height }), 1) : spriteURL(trimmed(sp), 2); } // jemná kresba v jej rozlíšení
     ICONS.king = ICONS.hero_king = isOrc() ? heroPortrait(SPR.chief8, 18) : heroPortrait(SPR.king8, 18);
     ICONS.paving = spriteURL({ c: paveAt(0, 0), w: T, h: T }, 3); // kamenná dlažba či orkské dosky
@@ -6094,7 +6107,7 @@
     // ikony nepriateľov (novinky na mape, úspechy): za orkov ľudské jednotky
     for (const k of ['orc', 'garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf', 'giantRam', 'mammoth']) {
       const f = foeSpr(k), big = k === 'orcKing' || ENEMY[k].giant;
-      ICONS['e_' + k] = SPR[f] ? spriteURL(SPR[f][0], big && !isOrc() ? 2 : 3) : spriteURL(trimmed(SPR[f + '8'][1].idle), 2);
+      ICONS['e_' + k] = f === 'bat' && SPR.bat8 ? unitIcon('bat') : SPR[f] ? spriteURL(SPR[f][0], big && !isOrc() ? 2 : 3) : spriteURL(trimmed(SPR[f + '8'][1].idle), 2);
     }
   }
   function initIcons() {
