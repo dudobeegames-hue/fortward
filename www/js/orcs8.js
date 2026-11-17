@@ -500,7 +500,8 @@ function initOrcSprites() {
   lazySpr('brute8', () => buildUnit8({ body: BR8, hand: BR8_HAND, legs: orcLegs('o', 'q', 'd', 1), axe: [8, 3.25], fist: 'o', H: 28 }));
   lazySpr('warlord8', () => buildUnit8({ body: BR8, hand: BR8_HAND, legs: orcLegs('o', 'q', 'd', 1), axe: [8, 3.25], fist: 'o', H: 28, pal: PAL_WARLORD }));
   lazySpr('shaman8', () => buildUnit8({ body: SH8, hand: SH8_HAND, legs: orcLegs('P', 'p', 'q'), spear: 9, tip: ['w', 'o'], fist: 'o' }));
-  lazySpr('wolf8', () => buildUnit8({ W: 36, H: 28, body: WR8_BODY, mount: WOLF8, legs: WOLF8_LEGS, far: 'DK', hand: WR8_HAND, blade: 4, fist: 'o', stride: 3.5 }));
+  // orkský vlčí jazdec z PixelLabu, jemná kresba (wolf-art.js): beh 5 snímok, atk = napriahnutie oštepu, výpad s hryznutím, dokončenie; stará kresba ostáva ako záloha
+  lazySpr('wolf8', () => typeof WOLF_ART !== 'undefined' ? buildArt8(WOLF_ART, null, 5) : buildUnit8({ W: 36, H: 28, body: WR8_BODY, mount: WOLF8, legs: WOLF8_LEGS, far: 'DK', hand: WR8_HAND, blade: 4, fist: 'o', stride: 3.5 }));
   lazySpr('bear8', () => buildUnit8({ W: 38, H: 30, body: BR8R_BODY, mount: BEAR8, legs: BEAR8_LEGS, hand: BR8R_HAND, axe: [6, 2.5], fist: 'o', stride: 4.5 }));
   // medvedí vojvoda ako hrdina: snímka švihu (slash) = stredná snímka úderu, ako má sada hrdinov
   lazySpr('bearlord8', () => {

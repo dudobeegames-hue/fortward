@@ -64,7 +64,7 @@
   const KTYPES = {
     knight: { name: 'Rytier',      spr: 'soldier', hp: 1,   dmg: 1,    spd: 26, desc: 'vyvážený' },
     spear:  { name: 'Kopijník',    spr: 'spear',   hp: 1.2, dmg: 0.85, spd: 24, desc: 'útočí spoza rytierov, silný proti jazde' },
-    rider:  { name: 'Jazdec',      spr: 'rider',   hp: 0.9, dmg: 1.25, spd: 34, desc: 'rýchly, ide po strelcoch a šamanoch' },
+    rider:  { name: 'Jazdec',      spr: 'rider',   hp: 0.9, dmg: 1.25, spd: 44, desc: 'rýchly, ide po strelcoch a šamanoch' }, // jazda (kôň, vlk) zreteľne rýchlejšia ako pechota (26)
   };
   // každá pozemná jednotka má vlastnú budovu
   const UNIT_HOME = { barracks: 'knight', stables: 'rider', armory: 'spear' };
@@ -2500,6 +2500,7 @@
   // ...no keď sa horda pri šíku už bije so spolubojovníkom, pridajú sa aj susedia do takejto vzdialenosti od svojho miesta
   // (po boji sa vrátia na miesto) – inak by väčšina šíku len prizerala, ako bojuje pár vojakov v strede
   const HOLD_HELP = 52;
+  const RIDER_HOLD = 70; // v obrane jazdec (kôň, vlk) vyrazí zo svojho miesta na krídle skôr – na nepriateľa do takejto vzdialenosti, potom sa vráti
   const formLeft = () => G.gx0 + 6, formRight = () => G.gx0 + G.cols * T - 6;
   const formPer = () => Math.max(1, Math.min(FORM_MAX, Math.floor((formRight() - formLeft()) / FORM_GAP) + 1));
   // n miest v radoch so stredom cx: predný rad na y, ďalšie rady za ním (k radnici), každý druhý posunutý o pol medzery
@@ -3284,8 +3285,8 @@
         // jazdec sa pohybuje voľne; kto prerazil za šík, toho prenasleduje ktokoľvek
         const sl = s.fslot || { x: G.gx0 + G.cols * T / 2, y: musterY };
         const atk = armyAttacks();
-        let aggro = !atk ? HOLD_REACH : s.ktype === 'rider' ? 9999 : F.contact ? CLASH : ENGAGE; // obrana: drží šík, bije len toho, kto príde k nemu
-        if (!atk && st.enemies.some(e => !e.dead && !e.d.fly && enemyFights(e) && Math.hypot(e.x - sl.x, e.y - sl.y) <= HOLD_HELP)) aggro = HOLD_HELP; // obrana: boj pri šíku – pridá sa
+        let aggro = !atk ? (s.ktype === 'rider' ? RIDER_HOLD : HOLD_REACH) : s.ktype === 'rider' ? 9999 : F.contact ? CLASH : ENGAGE; // obrana: drží šík, bije len toho, kto príde k nemu (jazda vyráža skôr)
+        if (!atk && st.enemies.some(e => !e.dead && !e.d.fly && enemyFights(e) && Math.hypot(e.x - sl.x, e.y - sl.y) <= HOLD_HELP)) aggro = Math.max(aggro, HOLD_HELP); // obrana: boj pri šíku – pridá sa
         // obrana hradu má prednosť: kto búcha do hradu, po tom ide každý pešiak a jazdec (aj keby mal iný cieľ pri hradbách)
         if (!(s.tgt && !s.tgt.dead && atHall(s.tgt))) { const ht = nearestEnemyWhere(s.x, s.y, atHall, true); if (ht) s.tgt = ht; }
         if (!s.tgt || s.tgt.dead) { const leak = nearestEnemyWhere(s.x, s.y, e => e.y > F.inf.y + 14 && e.y > 4, true); if (leak) s.tgt = leak; }
@@ -3528,7 +3529,7 @@
     if (set.bow) { if (e.lunge > 0) return v.atk[1]; if (busy) return v.atk[0]; }
     else if (e.lunge > 0) return v.atk[e.lunge > 0.075 ? 1 : 2];
     else if (busy && e.atk < 0.3) return v.atk[0];
-    return moving ? v.walk[Math.floor((e._wd || 0) / (set.stride || 3.2)) % 4] : v.idle; // sady hrdinov (kráľ, paladin ako nepriatelia) nemajú vlastný krok
+    return moving ? v.walk[Math.floor((e._wd || 0) / (set.stride || 3.2)) % v.walk.length] : v.idle; // sady hrdinov (kráľ, paladin ako nepriatelia) nemajú vlastný krok
   }
   let enemyN = 0; // poradové číslo nepriateľa (stále poradie pri rovnakej hĺbke)
   function drawEnemy(e, time) {
@@ -3543,7 +3544,7 @@
         else if ((e.attacking || e.lunge > 0) && e.aimP) e.face8 = e.d.ram ? (e.aimP.y < e.y ? 6 : 2) : dir8(e.aimP.x - e.x, e.aimP.y - e.y); // baranidlo búši len nahor alebo nadol
         if (e.face8 == null) e.face8 = 2;
         const v = set8[e.face8];
-        fr = e.lunge > 0 ? v.act : set8.art && e.attacking && e.atk < 0.4 ? v.atk[Math.floor((1 - e.atk / 0.4) * (v.atk.length - 1))] : moving ? v.walk[Math.floor(e._wd / set8.stride) % 4] : v.idle; // kresba z PixelLabu: napriahnutie pred nárazom
+        fr = e.lunge > 0 ? v.act : set8.art && e.attacking && e.atk < 0.4 ? v.atk[Math.floor((1 - e.atk / 0.4) * (v.atk.length - 1))] : moving ? v.walk[Math.floor(e._wd / set8.stride) % v.walk.length] : v.idle; // kresba z PixelLabu: napriahnutie pred nárazom
         x = Math.round(e.x - fr.ax); y = Math.round(e.y - fr.ay);
       } else {
         fr = enemy8Frame(e, set8); x = Math.round(e.x - fr.w / 2); y = Math.round(e.y - fr.h) + U8_PB;
@@ -3645,7 +3646,7 @@
     if (u.swing > 0 && set.seq) return v.atk[set.seq[Math.max(0, Math.min(set.seq.length - 1, Math.floor((1 - u.swing / set.seqT) * set.seq.length)))]]; // kresba z PixelLabu: úder či kúzlo prehrá snímky za sebou
     if (u.swing > 0) return v.slash; // meč nahradí svetelný oblúk švihu (kladivo ostane dopadnuté)
     if (near && u.cd < 0.25) return v.atk[0]; // napriahnutie pred úderom
-    if (moving) return v.walk[Math.floor((u._wd || 0) / (set.stride || 3.2)) % 4];
+    if (moving) return v.walk[Math.floor((u._wd || 0) / (set.stride || 3.2)) % v.walk.length];
     return v.idle;
   }
   // svetelný oblúk švihu meča: rýchlo sa vykreslí v smere úderu a zhasne (biely okraj, modrastý chvost)
@@ -3735,7 +3736,10 @@
     const d = Math.hypot(mvx, mvy), moving = performance.now() - (u._walkT || 0) < 100;
     if (moving) u._wd = (u._wd || 0) + d;
     const sd = smoothDir(u, mvx, mvy);
-    if (near) turn8(u, dir8(t.x - u.x, t.y - u.y), u.archer ? 8 : 3); // lukostrelec sa otáča pomalšie (cieľ prechádza medzi smermi)
+    // jazda (kôň, vlk) necúva: keď ide naozaj dozadu (o 3 a viac osmín od smeru pohľadu), otočí sa smerom jazdy, aj keď má cieľ blízko
+    const od = u.face8 == null ? 0 : Math.min((sd - u.face8 + 8) % 8, (u.face8 - sd + 8) % 8);
+    if (u.ktype === 'rider' && moving && od >= 3 && Math.hypot(u._svx, u._svy) > 0.12) turn8(u, sd, 2);
+    else if (near) turn8(u, dir8(t.x - u.x, t.y - u.y), u.archer ? 8 : 3); // lukostrelec sa otáča pomalšie (cieľ prechádza medzi smermi)
     else if (moving && (u.retreat || !(st.phase === 'battle' && u.fslot && Math.hypot(u.fslot.x - u.x, u.fslot.y - u.y) < 5))) turn8(u, sd, u.retreat ? 2 : 5); // drobné dorovnanie na miesto v šíku (po odtlačení) ho neotočí; ústup lukostrelca áno (inak cúva)
     else if (!t) turn8(u, u.helper && !(u.helper === 'chapel' && st.phase === 'battle') ? 2 : 6, 5); // bez cieľa: vojaci aj liečiteľ v boji (v šíku) k horde, remeselník a liečiteľ mimo boja k hráčovi (na juh)
     if (u.face8 == null) u.face8 = u.helper ? 2 : 6;
@@ -3746,7 +3750,7 @@
     }
     else if (u.swing > 0) return v.atk[u.swing > 0.075 ? 1 : 2]; // švih a dokončenie úderu
     else if (near && !moving && u.cd < 0.25) return v.atk[0];  // napriahnutie
-    if (moving) return v.walk[Math.floor((u._wd || 0) / set.stride) % 4];
+    if (moving) return v.walk[Math.floor((u._wd || 0) / set.stride) % v.walk.length];
     return v.idle;
   }
   // obliehací stroj v 8 smeroch: natočí sa smerom jazdy, pri streľbe k cieľu; snímka jazdy podľa prejdenej cesty
@@ -3766,7 +3770,7 @@
     if (u.face8 == null) u.face8 = 6;
     const v = set[u.face8], k = u.siege;
     const act = k === 'ram' ? u.swing > 0 && (set.art || u.swing < 0.25) : u.fired > (set.art ? 0.3 : 0.4);
-    const fr = act ? (k === 'ram' ? siegeAtkFrame(v, u.swing, RAM_SWING) : k === 'cat' && set.art ? siegeFireFrame(v, u.fired) : v.act) : moving ? v.walk[Math.floor(u._wd / set.stride) % 4] : v.idle;
+    const fr = act ? (k === 'ram' ? siegeAtkFrame(v, u.swing, RAM_SWING) : k === 'cat' && set.art ? siegeFireFrame(v, u.fired) : v.act) : moving ? v.walk[Math.floor(u._wd / set.stride) % v.walk.length] : v.idle;
     shadow(u.x, u.y, 9);
     g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.ax), Math.round(u.y - fr.ay), fr.w, fr.h); // jemná kresba má plátno 2× väčšie
   }
