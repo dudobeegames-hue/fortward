@@ -2043,10 +2043,10 @@
   }
   // nepriateľ pri hrade (útočí naň alebo k nemu tesne dorazil) – vojaci ho idú brániť prednostne
   const atHall = e => { if (e.dead || e.d.fly || isAssault()) return false; const hr = hallRect(); return e.x > hr.x0 - 14 && e.x < hr.x1 + 14 && e.y > hr.y0 - 14 && e.y < hr.y1 + 6; };
-  function nearestEnemy(x, y, rad, preferFree) {
+  function nearestEnemy(x, y, rad, preferFree, ok) {
     let best = null, bd = 1e9;
     for (const e of st.enemies) {
-      if (e.dead || e.d.fly) continue;
+      if (e.dead || e.d.fly || (ok && !ok(e))) continue;
       let d = Math.hypot(e.x - x, e.y - y);
       if (d > rad) continue;
       if (preferFree && e.foe) d += 25;
@@ -2214,27 +2214,33 @@
     hitCamp(o, kingDmg() * (st.cryT > 0 ? CRY_DMG : 1) * (k.feastT > 0 ? 1.3 : 1));
     for (let q = 0; q < 4; q++) part(o.x + side * 4, o.y - 8, (Math.random() - 0.5) * 30, -10 - Math.random() * 20, 0.35, '#c6a272', 80);
   }
+  // nepriatelia, ku ktorým vojak nenašiel cestu: na pár sekúnd ich pri výbere cieľa vynechá
+  const skipped = (u, e) => !!(u.skip && u.skip.has(e));
+  function skipTick(u, dt) { if (u.skip) for (const [e, s] of u.skip) { if (e.dead || s - dt <= 0) u.skip.delete(e); else u.skip.set(e, s - dt); } }
   // rytier alebo kráľ: nájdi nepriateľa v okruhu domova, bojuj, inak sa vráť
   function updateFighter(u, dt, homeX, homeY, aggro, dmg, cleave, mover) {
     const go = mover || moveTo;
     u.flash = Math.max(0, u.flash - dt);
     u.cd = Math.max(0, u.cd - dt);
     const far = e => u.isKing ? !heroReaches(e, aggro + 16) : Math.hypot(e.x - homeX, e.y - homeY) > aggro + 16;
-    if (u.tgt && (u.tgt.dead || far(u.tgt))) u.tgt = null;
+    skipTick(u, dt);
+    if (u.tgt && (u.tgt.dead || far(u.tgt) || skipped(u, u.tgt))) u.tgt = null;
     // jazdec si vyberá strelcov, šamanov a podkopníkov; ostatní najbližšieho
-    if (!u.tgt && u.ktype === 'rider') u.tgt = priorityEnemy(homeX, homeY, aggro, RIDER_PRIO);
+    if (!u.tgt && u.ktype === 'rider') u.tgt = priorityEnemy(homeX, homeY, aggro, e => RIDER_PRIO(e) && !skipped(u, e));
     if (u.ktype === 'spear' && !(u.tgt && (u.tgt.d.cav || (!u.isKing && atHall(u.tgt))))) { const c = priorityEnemy(u.x, u.y, 90, e => e.d.cav); if (c) u.tgt = c; } // kopijník vyráža proti jazde
     // hrdina nevyráža po nepriateľovi, ktorého aj tak zničia iní skôr, než k nemu dôjde (inak by len poskakoval tam a späť)
-    if (!u.tgt) u.tgt = u.isKing ? nearestEnemyWhere(u.x, u.y, e => heroReaches(e, aggro) && !doomed(e, heroEta(u, e, 8)), true) : nearestEnemy(homeX, homeY, aggro, true);
+    if (!u.tgt) u.tgt = u.isKing ? nearestEnemyWhere(u.x, u.y, e => heroReaches(e, aggro) && !doomed(e, heroEta(u, e, 8)), true) : nearestEnemy(homeX, homeY, aggro, true, e => !skipped(u, e));
     const t = u.tgt;
     const cry = st.cryT > 0 ? 1 : 0, spd = (u.spd || 26) * (1 + (CRY_SPD - 1) * cry) * waterMul(u);
     if (cry) dmg *= CRY_DMG;
     if (t) {
       const d = Math.hypot(t.x - u.x, t.y - u.y);
-      const spear = u.ktype === 'spear', rider = u.ktype === 'rider', reach = spear ? SPEAR_REACH : 8, off = spear ? 12 : rider ? 7 : 5; // kopijník bodá spoza rytiera, kôň je širší
+      const spear = u.ktype === 'spear', rider = u.ktype === 'rider', reach = spear ? SPEAR_REACH : rider ? 11 : 8, off = spear ? 12 : rider ? 7 : 5; // kopijník bodá spoza rytiera, kôň (vlk) je dlhší a širší
       // strana útoku sa zvolí raz pri novom cieli – pri odtláčaní susedov by sa inak prehadzovala a kone by poskakovali
-      if (u.atkT !== t) { u.atkT = t; u.atkSide = u.x < t.x ? -1 : 1; u.inReach = false; }
-      const inReach = d <= reach + (u.inReach ? 4 : 0); // kto už bojuje, toho drobné odtlačenie nevytrhne z boja
+      if (u.atkT !== t) { u.atkT = t; u.atkSide = u.x < t.x ? -1 : 1; u.inReach = false; u.bestD = d; u.noProg = 0; }
+      // tesne pri cieli, no tlačenica či hradba ho ďalej nepustí (pol sekundy sa nepriblížil): udrie odtiaľ, kde stojí
+      if (d < u.bestD - 0.5) { u.bestD = d; u.noProg = 0; } else u.noProg += dt;
+      const inReach = d <= reach + (u.inReach ? 4 : 0) || (d <= reach + 3 && u.noProg > 0.5); // kto už bojuje, toho drobné odtlačenie nevytrhne z boja
       u.inReach = inReach;
       // viacerí na jedného: obstúpia ho z bokov a mierne nad/pod sebou, nestoja v jednom bode
       if (!inReach) {
@@ -2245,6 +2251,10 @@
           if (!okAt(ax)) { if (okAt(t.x - (ax - t.x))) ax = t.x - (ax - t.x); else { ax = t.x; ay = t.y; } }
         }
         go(u, ax, ay, spd, dt); u.run = (u.run || 0) + spd * dt;
+        if (go === moveKnight && !u.next && !u.isKing) { // k nepriateľovi niet cesty (napr. strelec na hradbe tábora): na chvíľu ho vynechá, inak by stál pod hradbou
+          const a = tileAt(u.x, u.y), b = tileAt(ax, ay);
+          if (a.c !== b.c || a.r !== b.r) { (u.skip || (u.skip = new Map())).set(t, 3); u.tgt = null; }
+        }
       }
       else {
         if (!t.foe) t.foe = u;
@@ -3293,7 +3303,7 @@
         if (s.tgt && !s.tgt.dead && (s.tgt.y > F.inf.y + 14 || atHall(s.tgt))) aggro = 9999;
         // nikto z hordy na dosah zrážky a nikto neprerazil za šík – tlačí dopredu a búra tábor (hordu stretne cestou)
         // búra len stavbu tábora, ku ktorej vedie cesta (najprv hradby a brány, potom to, čo sa za nimi otvorí)
-        const cp = atk && st.camp && (!s.tgt || s.tgt.dead) && !nearestEnemy(s.x, s.y, ENGAGE) ? nearestReachablePart(s, dt) : null;
+        const cp = atk && st.camp && (!s.tgt || s.tgt.dead) && !nearestEnemy(s.x, s.y, ENGAGE, false, e => !skipped(s, e)) ? nearestReachablePart(s, dt) : null; // nepriateľa, ku ktorému niet cesty (strelec na hradbe), si nevšíma
         if (cp) { s.tgt = null; strikeAt(s, cp.o, cp.sp, dt); }
         else updateFighter(s, dt, sl.x, sl.y, aggro, s.dmg, false, moveKnight);
       }
@@ -3733,8 +3743,9 @@
     const t = u.archer ? (u.aimT && !u.aimT.dead ? u.aimT : null) : u.tgt && !u.tgt.dead ? u.tgt : null;
     const near = t && (u.archer || Math.hypot(t.x - u.x, t.y - u.y) < (u.ktype === 'spear' ? SPEAR_REACH + 5 : 14)); // kopijník bodá z diaľky
     // chôdza = jednotka sama kráča (moveTo); odtlačenie susedom v tlačenici chôdza nie je (kôň by inak prepínal snímky klusu)
-    const d = Math.hypot(mvx, mvy), moving = performance.now() - (u._walkT || 0) < 100;
-    if (moving) u._wd = (u._wd || 0) + d;
+    const d = Math.hypot(mvx, mvy), walked = performance.now() - (u._walkT || 0) < 100;
+    const moving = stillFor(u, walked) < 6; // dobeh: zastavenie na pár snímok (naháňanie, dorovnanie pri stavbe) neprepne na státie – obraz by preskakoval
+    if (walked) u._wd = (u._wd || 0) + d;
     const sd = smoothDir(u, mvx, mvy);
     // jazda (kôň, vlk) necúva: keď ide naozaj dozadu (o 3 a viac osmín od smeru pohľadu), otočí sa smerom jazdy, aj keď má cieľ blízko
     const od = u.face8 == null ? 0 : Math.min((sd - u.face8 + 8) % 8, (u.face8 - sd + 8) % 8);
@@ -7019,8 +7030,9 @@
     return (u.pt = best);
   }
   function assaultKnight(u, dt) {
-    if (u.tgt && (u.tgt.dead || Math.hypot(u.tgt.x - u.x, u.tgt.y - u.y) > 70)) u.tgt = null;
-    if (!u.tgt) u.tgt = u.ktype === 'rider' ? priorityEnemy(u.x, u.y, 60, RIDER_PRIO) || nearestEnemy(u.x, u.y, ENGAGE + 10, true) : nearestEnemy(u.x, u.y, ENGAGE + 10, true);
+    skipTick(u, dt);
+    if (u.tgt && (u.tgt.dead || Math.hypot(u.tgt.x - u.x, u.tgt.y - u.y) > 70 || skipped(u, u.tgt))) u.tgt = null;
+    if (!u.tgt) u.tgt = u.ktype === 'rider' ? priorityEnemy(u.x, u.y, 60, e => RIDER_PRIO(e) && !skipped(u, e)) || nearestEnemy(u.x, u.y, ENGAGE + 10, true, e => !skipped(u, e)) : nearestEnemy(u.x, u.y, ENGAGE + 10, true, e => !skipped(u, e));
     if (u.tgt) { updateFighter(u, dt, u.x, u.y, 60, u.dmg, false, moveKnight); return; }
     const t = nearestReachablePart(u, dt);
     if (!t) { u.flash = Math.max(0, u.flash - dt); return; } // nič na dosah (všetko zbúrané)
@@ -7029,6 +7041,7 @@
   }
   // úder do stavby hradu z miesta vedľa nej
   function strikeAt(u, o, sp, dt) {
+    skipTick(u, dt); // vynechaní nepriatelia (bez cesty) sa po chvíli znova zvážia
     u.flash = Math.max(0, u.flash - dt); u.cd = Math.max(0, u.cd - dt); u.swing = Math.max(0, (u.swing || 0) - dt);
     const cry = st.cryT > 0, spd = (u.spd || 26) * (cry ? CRY_SPD : 1) * waterMul(u);
     const jx = ((u.slot || 0) % 3 - 1) * 4, jy = ((u.slot || 0) % 2) * 2; // viacerí pri jednej stavbe sa rozostúpia
