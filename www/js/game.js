@@ -1350,6 +1350,7 @@
       st.chest = st.gold; saveJSON(sk('chest'), st.chest); st.armyPick = null;
     }
     st.spawnT = 1.2;
+    st.waveSpan = spawnLeft(); // pásik vlny: čas od začiatku vlny po vstup posledného nepriateľa
     st.phase = 'battle';
     launchSiege();
     st.tool = null; st.sel = null; st.moving = null; bdrag = null;
@@ -5946,8 +5947,8 @@
     const gi = $('hud-gold').querySelector('img'), gsrc = isAssault() ? ICONS.chest : ICONS.coin; // pri útoku zlatky z truhlice
     if (gsrc && gi.getAttribute('src') !== gsrc) gi.src = gsrc;
     const keep = isAssault() && st.camp ? st.camp.parts.find(o => o.role === 'keep') : null; // pri útoku pruh ukazuje srdce hradu
-    $('hud-wall').style.visibility = keep ? '' : 'hidden'; // zdravie radnice je pod radnicou na bojisku
-    $('hud-boss').style.gridArea = keep ? '' : 'wall'; // zdravie bossa hore na mieste pruhu radnice
+    $('hud-wall').style.display = keep ? '' : 'none'; // zdravie radnice je pod radnicou na bojisku (skrytý pruh nesmie zväčšiť riadok – pásik vlny je vysoký ako kolónky vlny a zlatiek)
+    $('hud-boss').style.gridArea = keep || foesShown() ? '' : 'wall'; // zdravie bossa hore na mieste pruhu radnice (s pásikom nepriateľov pod ním)
     const r = keep ? Math.max(0, keep.hp / keep.max) : Math.max(0, st.hallHp / hallMax());
     $('hallFill').style.width = (r * 100) + '%';
     $('hallFill').className = r < 0.3 ? 'low' : '';
@@ -5975,8 +5976,20 @@
     // Späť a Opraviť všetko: nad hornou hranou stavebnej zóny (dve okrúhle tlačidlá s cenou ≈ 130 bodov), nezakrývajú stavebnú plochu
     $('sideBtns').style.top = Math.round(Math.max(top, Math.min(mid - 58, zone - 136))) + 'px';
   }
+  // čas (s) do vstupu posledného nepriateľa vlny: do najbližšieho + rozostupy všetkých ďalších vo fronte
+  const spawnLeft = () => st.spawnQ.length ? Math.max(0, st.spawnT) + st.spawnQ.slice(1).reduce((t, q) => t + (q.gap || 0), 0) : 0;
+  // pásik vlny: plný na začiatku vlny, plynule ubúda a zmizne, keď na bojisko vstúpi posledný nepriateľ (pri útoku na hrad nie je)
+  const foesShown = () => st.phase === 'battle' && !isAssault() && st.waveSpan > 0 && st.spawnQ.length > 0;
+  function foesTick() {
+    const on = foesShown(), box = $('hud-foes');
+    if (box.hidden === on) { box.hidden = !on; $('hud-boss').style.gridArea = on || (isAssault() && st.camp) ? '' : 'wall'; }
+    if (!on) return;
+    const w = Math.round(Math.min(1, spawnLeft() / st.waveSpan) * 1000) / 10 + '%';
+    if ($('foesFill').style.width !== w) $('foesFill').style.width = w;
+  }
   function hudTick() {
     placeBuildBtns();
+    foesTick();
     const k = st.king, kp = $('hud-king');
     if (k) {
       const r = k.dead ? 0 : Math.max(0, k.hp / kingMax());
