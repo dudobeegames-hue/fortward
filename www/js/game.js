@@ -4227,7 +4227,8 @@
     }
     g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = SH_A; g.drawImage(shLayer, 0, 0); g.restore();
   }
-  function drawBuilding(b, time) {
+  // back = len úsek hradby za vysokou bránou a jeho napojenie na veže (kreslí sa ako bežná hradba – za vežami); brána potom zvlášť v popredí
+  function drawBuilding(b, time, back) {
     const x0 = tileX(b.c), y0 = tileY(b.r);
     let spr;
     if (b.kind === 'hedge') {
@@ -4250,7 +4251,7 @@
         if (b.r === G.hr0 + HALL_ROWS - 1 && occAt(b.c - 1, b.r) === HALL) slice(x0 - 8, 8);
       };
       const tallGate = ga && !gv && ga.w > T; // vysoká brána je širšia ako políčko – napojenie na vežu vedľa sa kreslí za ňu, inak by mur zakryl jej spodok
-      if (tallGate) { wallImg(g, spr, x0, y0); links(); } // za bránou úsek hradby, aby medzi hradbou a bránou nesvietila tráva
+      if (back) { if (tallGate) { wallImg(g, spr, x0, y0); links(); } return; } // za bránou úsek hradby, aby medzi hradbou a bránou nesvietila tráva
       if (ga && !gv) spr = ga;
       if (ga && !gv) g.drawImage(bldCanvas(ga, time, b.c * 0.7 + b.r * 0.3), x0 + T / 2 - ga.w / 2, y0 + 18 - ga.h, ga.w, ga.h); // zástavy vejú; vysoká brána (B1) je širšia ako políčko – na stred
       else wallImg(g, spr, x0, y0);
@@ -5846,6 +5847,7 @@
     if (playing) {
       if (!isAssault()) objs.push({ y: G.hallBot, x: 1e9, f: () => drawHall(time) }); // hrad je v svojom rade vždy vpredu
       for (const b of st.blds) if (!TRAPS[b.kind] && b.kind !== 'mud') objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? (b.gate ? -0.1 : 0.5) : 0), x: b.c, f: () => drawBuilding(b, time) }); // brána vždy v popredí: po susedných hradbách aj vežiach v tom istom rade (vysoká je širšia ako políčko)
+      for (const b of st.blds) if (b.kind === 'wall' && b.gate) objs.push({ y: tileY(b.r) + T - 0.5, x: b.c, f: () => drawBuilding(b, time, true) }); // mur za vysokou bránou: ako hradba, za vežami vedľa (brána sama ostáva v popredí)
       for (const b of st.blds) { const q = vGateOf(b); if (q) objs.push({ y: tileY(b.r) + T + 0.1, x: b.c, f: () => drawVGate(b, time) }); } // brána na zvislej hradbe: po vlastnom úseku, no pred úsekom pod ňou – ten prekryje jej spodok so vchodom
       for (const s of st.soldiers) {
         const cast = s.helper === 'chapel' && s.working && s.tgt && !s.dead; // mních pri liečení zdvihne palicu
@@ -5958,14 +5960,15 @@
   }
 
   // tlačidlá stavania na hracej ploche: viditeľné spolu so stavebným panelom; Do boja v strede viditeľného bojiska
-  // (ak by zasahovalo do stavebnej zóny, posunie sa nad ňu), Späť a Opraviť všetko vpravo nad zónou
+  // (ak by zasahovalo do stavebnej zóny, posunie sa nad ňu), Späť a Opraviť všetko vpravo nad zónou; zóna sa berie pri hrade 5. úrovne,
+  // aby tlačidlá neskákali, keď hráč hrad vylepší
   function placeBuildBtns() {
     const bb = $('buildBtns'), on = !$('build').hidden && st.phase === 'build';
     if (bb.hidden === on) bb.hidden = !on;
     if (!on) return;
     const hud = $('hud'), top = hud && !hud.hidden ? hud.getBoundingClientRect().bottom - $('game').getBoundingClientRect().top + 8 : 60;
     const bot = $('game').clientHeight - $('build').offsetHeight - 10, mid = (top + bot) / 2;
-    const zone = (tileY(zoneTopRow()) - camY) * S / DPR; // horná hrana stavebnej zóny na obrazovke
+    const zone = (tileY(G.rows - (5 + MAX_LVL)) - camY) * S / DPR; // horná hrana stavebnej zóny hradu najvyššej úrovne – tlačidlá stoja na rovnakom mieste pri každej úrovni hradu
     let y = mid - 74;
     if (zone < y + 110) y = Math.max(top, zone - 110);         // vysoko nad zónou, aby nezavadzalo pri stavaní
     $('nextWave').style.top = Math.round(y) + 'px';

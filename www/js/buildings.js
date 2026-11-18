@@ -69,6 +69,22 @@ function flagFrames(id) {
     flags.push({ px, edge: right ? pb : pa, pole });
   }
   if (!flags.length) return null;
+  // kópie nájdených zástav (brána zboku: spodná zástava visí pred strechou zadnej vežičky, žrď nevidno) – rovnaké pixely
+  // látky inde v kresbe; pri vlnení sa uvoľnený pixel doplní farbou spod látky (strecha), nie dierou
+  const rgba = (x, y) => d.slice((y * w + x) * 4, (y * w + x) * 4 + 4).join(',');
+  const taken = new Set(); for (const fl of flags) for (const [cx, cy] of fl.px) taken.add(cy * w + cx);
+  for (const fl of flags.slice()) {
+    const mx = Math.min(...fl.px.map(p => p[0])), my = Math.min(...fl.px.map(p => p[1]));
+    const tpl = fl.px.map(([cx, cy]) => [cx - mx, cy - my, rgba(cx, cy)]);
+    const tw = Math.max(...tpl.map(t => t[0])), th = Math.max(...tpl.map(t => t[1]));
+    for (let oy = 0; oy + th < h; oy++) for (let ox = 0; ox + tw < w; ox++) {
+      if (!tpl.every(([dx, dy, c]) => A(ox + dx, oy + dy) && rgba(ox + dx, oy + dy) === c)) continue;
+      if (tpl.some(([dx, dy]) => taken.has((oy + dy) * w + ox + dx))) continue; // tá istá či už nájdená zástava
+      const px = tpl.map(([dx, dy]) => [ox + dx, oy + dy]);
+      for (const [cx, cy] of px) taken.add(cy * w + cx);
+      flags.push({ px, edge: fl.edge - mx + ox, pole: [], fill: true });
+    }
+  }
   const noShadow = new Set(); // zástavy a žrde nevrhajú tieň: zástava veje, statický tieň by s ňou nesedel
   for (const fl of flags) { for (const [cx, cy] of fl.px) noShadow.add(cy * w + cx); for (const k of fl.pole) noShadow.add(k); }
   for (const fl of flags) for (const [cx, cy] of fl.px) { // jednotná farba zástav: všetko okrem takmer čierneho obrysu
@@ -80,7 +96,11 @@ function flagFrames(id) {
     const out = new ImageData(new Uint8ClampedArray(d), w, h), o = out.data;
     for (const fl of flags) {
       const moved = fl.px.map(([cx, cy]) => { const k = (cy * w + cx) * 4, dist = Math.abs(cx - fl.edge); return [cx, cy + Math.round(Math.sin(f * Math.PI / 2 - dist * 0.7) * Math.min(1, dist / 3)), d.slice(k, k + 4)]; });
-      for (const [cx, cy] of fl.px) o[(cy * w + cx) * 4 + 3] = 0;
+      const inCloth = new Set(fl.px.map(([cx, cy]) => cy * w + cx));
+      for (const [cx, cy] of fl.px) { // uvoľnené miesto: priehľadné, pri kópii pred strechou farba pixelu pod látkou
+        const k = (cy * w + cx) * 4, below = fl.fill && cy + 1 < h && !inCloth.has((cy + 1) * w + cx) && d[k + w * 4 + 3] ? (cy + 1) * w + cx : -1;
+        if (below >= 0) o.set(d.slice(below * 4, below * 4 + 4), k); else o[k + 3] = 0;
+      }
       for (const [cx, cy, col] of moved) if (cy >= 0 && cy < h) o.set(col, (cy * w + cx) * 4);
     }
     c.getContext('2d').putImageData(out, 0, 0);

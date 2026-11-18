@@ -316,7 +316,10 @@ def main():
             bots = [max([y for y in range(braw.height) if ba.getpixel((x, y))] or [-1]) for x in range(min(3, braw.width // 4), braw.width - min(3, braw.width // 4))]
             ty = GF - braw.height if side else GF - min(b for b in bots if b >= braw.height * 0.6) - 1   # stĺpce len so zástavou či strechou (vysoko) sa nerátajú
             assert ty + braw.height <= GH, 'brána po posune nadol presahuje rám'
-            gi = Image.new('RGBA', (GW, GH)); gi.alpha_composite(braw, ((GW - braw.width) // 2 + GATE_DX.get(os.path.basename(path), 0), ty))   # stred rámu
+            # vodorovne na stred rámu podľa tela brány (spodná polovica kresby), nie podľa zástav – tie trčia doprava a bránu by posunuli doľava
+            body = [x for x in range(braw.width) if any(ba.getpixel((x, y)) for y in range(braw.height // 2, braw.height))]
+            bx = round(GW / 2 - (min(body) + max(body) + 1) / 2)
+            gi = Image.new('RGBA', (GW, GH)); gi.alpha_composite(braw, (bx + GATE_DX.get(os.path.basename(path), 0), ty))
             for y in range(GH):
                 for x in range(GW):
                     c = gi.getpixel((x, y))
