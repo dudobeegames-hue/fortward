@@ -1780,11 +1780,14 @@
     } else if (e.d.heals) {
       e.healT = (e.healT || 2) - dt;
       if (e.castT > 0) e.castT -= dt;
-      if (e.healT <= 0) {
+      // palicu zapichne (a chvíľu stojí s aurou) len vtedy, keď má pri sebe zraneného spojenca; inak ide ďalej s hordou
+      const hurt = e.healT <= 0 ? st.enemies.filter(q => !q.dead && q !== e && !q.d.heals && q.hp < q.max && Math.hypot(q.x - e.x, q.y - e.y) < 34) : [];
+      if (e.healT <= 0 && !hurt.length) e.healT = 0.4; // nikto zranený nablízku – skúsi o chvíľu znova
+      else if (e.healT <= 0) {
         e.healT = 2;
         e.castT = 1.6; // zapichne palicu a chvíľu stojí (aura na zemi)
-        { const o = st.enemies.find(q => !q.dead && q !== e && Math.hypot(q.x - e.x, q.y - e.y) < 34); e.totemFace = o ? diag8(o.x - e.x, o.y - e.y) : 1; }
-        for (const o of st.enemies) if (!o.dead && o !== e && o.hp < o.max && Math.hypot(o.x - e.x, o.y - e.y) < 34) {
+        e.totemFace = diag8(hurt[0].x - e.x, hurt[0].y - e.y);
+        for (const o of hurt) {
           o.hp = Math.min(o.max, o.hp + o.max * 0.12);
           for (let k = 0; k < 3; k++) part(o.x + (Math.random() - 0.5) * 6, o.y - o.h * 0.6, 0, -14, 0.6, '#9cd45a', 0);
         }
