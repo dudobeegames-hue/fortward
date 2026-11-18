@@ -784,6 +784,23 @@
       if (o.x < lim) o.x = lim;
     }
   }
+  // hradby tábora pre hordu (bez brány) – pamätá sa, kým sa nezbúra niektorá hradba
+  function campWallFoe(c, r) {
+    if (!st.camp || c < 0 || r < 0 || c >= G.cols || r >= G.rows) return false;
+    if (!st.eBlk || st.eBlk.v !== st.campV || st.eBlk.camp !== st.camp) st.eBlk = { v: st.campV, camp: st.camp, b: campBlocks() };
+    return !!st.eBlk.b[r * G.cols + c];
+  }
+  // poistka aj pre hordu: kto po zemi skončí v hradbe tábora (odtlačenie v tlačenici pri bráne, šikmý krok), vráti sa na posledné
+  // voľné miesto – hradbami tábora sa chodí len bránou (letci ponad ne, nepriateľ, ktorý sa v hradbe objavil v liahni, z nej vyjde)
+  function keepFoesOutOfCamp() {
+    if (!st.camp) return;
+    for (const e of st.enemies) {
+      if (e.dead || e.d.fly) continue;
+      const t = tileAt(e.x, e.y);
+      if (!campWallFoe(t.c, t.r)) { e.okX = e.x; e.okY = e.y; }
+      else if (e.okX != null) { e.x = e.okX; e.y = e.okY; e.kb = null; }
+    }
+  }
   function keepOutOfWalls() {
     const us = st.king && !st.king.dead ? st.soldiers.concat([st.king]) : st.soldiers;
     keepAshore(us);
@@ -998,6 +1015,7 @@
     if (!live.length) return;
     const o = live[Math.floor(Math.random() * live.length)], e = spawnEnemy(item);
     e.x = o.x + (Math.random() - 0.5) * 6; e.y = o.y + 3;
+    { const t = tileAt(e.x, e.y); if (campWallFoe(t.c, t.r)) e.y = o.y - 2; } // liaheň tesne za hradbou: vyjde na svojom políčku, nie v hradbe
     for (let k = 0; k < 6; k++) part(o.x, o.y, (Math.random() - 0.5) * 24, -Math.random() * 12, 0.4, '#c6a272', 40);
   }
   // tábor misie z hradov editora (js/castles.js): stavby stoja v mriežke bojiska ako budovy hráča
@@ -1930,7 +1948,7 @@
       if (!dc && !dr) continue;
       const nc = c + dc, nr = r + dr;
       if (nc < 0 || nr < 0 || nc >= G.cols || nr >= G.rows) continue;
-      if (dc && dr && (blocks(occAt(c + dc, r)) || blocks(occAt(c, r + dr)) || blocks(occAt(nc, nr)))) continue;
+      if (dc && dr && (blocks(occAt(c + dc, r)) || blocks(occAt(c, r + dr)) || blocks(occAt(nc, nr)) || campWallFoe(c + dc, r) || campWallFoe(c, r + dr))) continue; // šikmo nie cez roh hradby (ani tábora)
       const v = D[nr * G.cols + nc] + (dc && dr ? 0.45 : 0);
       if (v < bd) { bd = v; best = nr * G.cols + nc; bc = nc; br = nr; }
     }
@@ -3295,6 +3313,7 @@
     updateCamp(dt);
     separate();
     keepAshore(st.enemies);
+    keepFoesOutOfCamp();
     // budovy
     for (const b of st.blds) {
       b.flash = Math.max(0, b.flash - dt);
@@ -7272,7 +7291,7 @@
     $('map').hidden = false;
     const cl = curLand(); if (!st.mapAnim) st.mapSel = Math.max(cl.first, Math.min(st.unlocked, landLast(cl)));
     setTab('map', true);
-    renderMapPanel(); updateChest(); renderMapStyleBtn();
+    renderMapPanel(); updateChest(); renderMapStyleBtn(); renderMapBar(); // výkričníky na kartách (hrdina mohol získať úroveň v poslednej vlne)
     focusMapNode(st.mapAnim ? st.mapAnim.seg + 2 : st.mapSel, true);
     if (st.sailTo) { const to = st.sailTo; st.sailTo = null; setTimeout(() => { if (st.phase === 'map') startSail(to); }, st.provAnim ? 2100 : 300); } // územie dobyté: plavba k ďalšiemu
     updateMapUi();
@@ -7347,7 +7366,7 @@
     // čakajúca akcia (voľné hviezdy, nová trofej, voľný slot schopnosti): všade len malý výkričník v červenom krúžku
     $('hallBtnTxt').textContent = '!'; $('hallBtnTxt').hidden = !free;
     $('trophyTxt').textContent = '!'; $('trophyTxt').hidden = !fresh;
-    const es = emptySlots(); $('heroTxt').textContent = '!'; $('heroTxt').hidden = !es;
+    $('heroTxt').textContent = '!'; $('heroTxt').hidden = !heroTodo(); // nový bonus z úrovne (aj z poslednej vlny misie), voľný slot či voľné body – ako žiara hrdinu v boji
     $('heroBtn').classList.toggle('shine', heroIds().some(heroIsNew));
     renderMapHead();
   }
@@ -7821,7 +7840,7 @@
     renderHeroUp();
     $('heroUp').hidden = false;
   }
-  const closeHeroUp = () => { $('heroUp').hidden = true; updateHud(); if (st.phase === 'build') renderBuild(); };
+  const closeHeroUp = () => { $('heroUp').hidden = true; updateHud(); if (st.phase === 'build') renderBuild(); if (!$('map').hidden) renderMapBar(); };
   $('huClose').addEventListener('click', () => { AUDIO.play('click'); closeHeroUp(); });
   $('huSwap').addEventListener('click', () => { closeHeroUp(); openHeroPick(); });
   $('heroUp').addEventListener('click', ev => { if (ev.target === $('heroUp')) closeHeroUp(); });
