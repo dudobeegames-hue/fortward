@@ -501,7 +501,8 @@ function initOrcSprites() {
   lazySpr('orc8', () => typeof ORC_ART !== 'undefined' ? buildArt8(ORC_ART, null, 4) : buildUnit8({ body: OR8, hand: OR8_HAND, legs: orcLegs('o', 'q', 'd'), axe: [6, 2.5], fist: 'o' }));
   lazySpr('brute8', () => buildUnit8({ body: BR8, hand: BR8_HAND, legs: orcLegs('o', 'q', 'd', 1), axe: [8, 3.25], fist: 'o', H: 28 }));
   lazySpr('warlord8', () => buildUnit8({ body: BR8, hand: BR8_HAND, legs: orcLegs('o', 'q', 'd', 1), axe: [8, 3.25], fist: 'o', H: 28, pal: PAL_WARLORD }));
-  lazySpr('shaman8', () => buildUnit8({ body: SH8, hand: SH8_HAND, legs: orcLegs('P', 'p', 'q'), spear: 9, tip: ['w', 'o'], fist: 'o' }));
+  // šaman z PixelLabu, jemná kresba (shaman-art.js): kúzlo len šikmo (zapichnutie palice-totemu), stará kresba ostáva ako záloha
+  lazySpr('shaman8', () => typeof SHAMAN_ART !== 'undefined' ? buildArt8(SHAMAN_ART, null, 3.4) : buildUnit8({ body: SH8, hand: SH8_HAND, legs: orcLegs('P', 'p', 'q'), spear: 9, tip: ['w', 'o'], fist: 'o' }));
   // orkský vlčí jazdec z PixelLabu, jemná kresba (wolf-art.js): beh 5 snímok (krok 3,2 bodu – rýchly cval, nohy nekĺžu), atk = napriahnutie oštepu, výpad s hryznutím, dokončenie; stará kresba ostáva ako záloha
   lazySpr('wolf8', () => typeof WOLF_ART !== 'undefined' ? buildArt8(WOLF_ART, null, 3.2) : buildUnit8({ W: 36, H: 28, body: WR8_BODY, mount: WOLF8, legs: WOLF8_LEGS, far: 'DK', hand: WR8_HAND, blade: 4, fist: 'o', stride: 3.5 }));
   lazySpr('bear8', () => buildUnit8({ W: 38, H: 30, body: BR8R_BODY, mount: BEAR8, legs: BEAR8_LEGS, hand: BR8R_HAND, axe: [6, 2.5], fist: 'o', stride: 4.5 }));

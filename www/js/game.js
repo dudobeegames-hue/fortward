@@ -480,16 +480,16 @@
   // ---- Výskum: 5 kariet podľa úrovne hradu (I–V). Hráč kupuje výskumy za zlatky z truhlice; karta N+1 sa otvorí, keď má
   // vyskúmané všetky povinné výskumy karty N (opt = nepovinný). Prvý výskum karty je hrad danej úrovne, ostatné až po ňom.
   // V misii sa dá stavať / vylepšovať len to, čo je vyskúmané A na čo má hrad (radnica) v misii dosť vysokú úroveň (= číslo karty).
-  // Položka: [druh, úroveň (0 = bez úrovne), cena, nepovinné]
+  // Položka: [druh, úroveň (0 = bez úrovne), cena, nepovinné, len pre rasu] – od 2026-11-18 sú všetky výskumy povinné
   const RES_DEF = [
-    [['hall', 1, 0], ['tower', 1, 0], ['wall', 1, 0], ['pit', 1, 80], ['wallArcher', 0, 120], ['paving', 0, 40, 1]],
+    [['hall', 1, 0], ['tower', 1, 0], ['wall', 1, 0], ['pit', 1, 80], ['wallArcher', 0, 120], ['paving', 0, 40]],
     [['hall', 2, 400], ['tower', 2, 150], ['pitch', 2, 200], ['wall', 2, 150], ['mine', 1, 200], ['workshop', 1, 200], ['pit', 2, 120]],
     [['hall', 3, 900], ['tower', 3, 300], ['pitch', 3, 300], ['mage', 3, 450], ['wall', 3, 300], ['firepit', 1, 250], ['pit', 3, 220],
-      ['barracks', 1, 400], ['barracks', 2, 300, 1], ['range', 1, 400], ['range', 2, 300, 1], ['hedge', 0, 150, 1], ['mine', 2, 300], ['workshop', 2, 300], ['chapel', 1, 400],
-      ['siegeRam', 0, 450], ['spear', 0, 350], ['gobknife', 0, 250, 1, 'orc']],
-    [['hall', 4, 1800], ['tower', 4, 550], ['pitch', 4, 550], ['mage', 4, 650], ['ice', 0, 400, 1], ['wall', 4, 500], ['pit', 4, 350], ['firepit', 2, 400],
-      ['barracks', 3, 550], ['barracks', 4, 500, 1], ['stables', 1, 700], ['stables', 2, 500, 1], ['stables', 3, 550, 1], ['range', 3, 550], ['range', 4, 500, 1],
-      ['falconry', 1, 700], ['falconry', 2, 500, 1], ['falconry', 3, 550, 1], ['mine', 3, 450], ['workshop', 3, 450], ['chapel', 2, 500], ['siegeCat', 0, 800]],
+      ['barracks', 1, 400], ['barracks', 2, 300], ['range', 1, 400], ['range', 2, 300], ['hedge', 0, 150], ['mine', 2, 300], ['workshop', 2, 300], ['chapel', 1, 400],
+      ['siegeRam', 0, 450], ['spear', 0, 350], ['gobknife', 0, 250, 0, 'orc']],
+    [['hall', 4, 1800], ['tower', 4, 550], ['pitch', 4, 550], ['mage', 4, 650], ['ice', 0, 400, 0, 'human'], ['wall', 4, 500], ['pit', 4, 350], ['firepit', 2, 400],
+      ['barracks', 3, 550], ['barracks', 4, 500], ['stables', 1, 700], ['stables', 2, 500], ['stables', 3, 550], ['range', 3, 550], ['range', 4, 500],
+      ['falconry', 1, 700], ['falconry', 2, 500], ['falconry', 3, 550], ['mine', 3, 450], ['workshop', 3, 450], ['chapel', 2, 500], ['siegeCat', 0, 800]],
     [['hall', 5, 3200], ['tower', 5, 900], ['pitch', 5, 900], ['mage', 5, 1000], ['ballista', 1, 1200], ['wall', 5, 800], ['pit', 5, 550], ['firepit', 3, 600],
       ['barracks', 5, 900], ['range', 5, 900], ['stables', 4, 800], ['stables', 5, 900], ['falconry', 4, 800], ['falconry', 5, 900],
       ['mine', 4, 700], ['workshop', 4, 700], ['chapel', 3, 800]],
@@ -722,7 +722,8 @@
   // surovec = ťažký rytier (tmavá oceľ), vojvodca a veľkráľ = kapitán jazdy v pozlátenej zbroji
   const FOE_SPR = { goblin: 'soldier', orc: 'spear', brute: 'hknight', warlord: 'captain', orcKing: 'captain', garcher: 'footArcher', bat: 'falcon',
     shaman: 'monk', wolf: 'rider', bear: 'rider', sapper: 'craft', ram: 'siegeRam', giantRam: 'siegeRam', mammoth: 'siegeTower' };
-  const foeSpr = k => (isOrc() && FOE_SPR[k]) || k;
+  const HORDE_SPR = { goblin: 'gobknife' }; // za ľudí: goblin hordy = goblin s nožíkom z PixelLabu (gobknife-art.js)
+  const foeSpr = k => (isOrc() ? FOE_SPR[k] : SPR[HORDE_SPR[k] + '8'] && HORDE_SPR[k]) || k;
   const enemyIntro = m => (isOrc() ? ORC_ENEMY_INTRO : ENEMY_INTRO)[m];
   const bossName = d => isOrc() ? (d.king ? 'Veliteľ jazdy' : d.giant ? (d.howdah ? 'Obliehacia veža' : 'Veľké baranidlo') : 'Kapitán')
     : d.king ? 'Veľkráľ' : d.title || 'Vojvodca';
@@ -1760,8 +1761,11 @@
       }
     } else if (e.d.heals) {
       e.healT = (e.healT || 2) - dt;
+      if (e.castT > 0) e.castT -= dt;
       if (e.healT <= 0) {
         e.healT = 2;
+        e.castT = 1.6; // zapichne palicu a chvíľu stojí (aura na zemi)
+        { const o = st.enemies.find(q => !q.dead && q !== e && Math.hypot(q.x - e.x, q.y - e.y) < 34); e.totemFace = o ? diag8(o.x - e.x, o.y - e.y) : 1; }
         for (const o of st.enemies) if (!o.dead && o !== e && o.hp < o.max && Math.hypot(o.x - e.x, o.y - e.y) < 34) {
           o.hp = Math.min(o.max, o.hp + o.max * 0.12);
           for (let k = 0; k < 3; k++) part(o.x + (Math.random() - 0.5) * 6, o.y - o.h * 0.6, 0, -14, 0.6, '#9cd45a', 0);
@@ -1802,6 +1806,7 @@
         return;
       }
     } else e.trap = null;
+    if (e.castT > 0) { e.attacking = false; return; } // šaman so zapichnutou palicou stojí
 
     // liečiteľ sa drží v zadnej línii: stojí kúsok za čelom hordy a dopredu ide, len keď treba niekoho vyliečiť
     if (e.d.heals) {
@@ -2237,6 +2242,7 @@
     const t = u.tgt;
     const cry = st.cryT > 0 ? 1 : 0, spd = (u.spd || 26) * (1 + (CRY_SPD - 1) * cry) * waterMul(u);
     if (cry) dmg *= CRY_DMG;
+    if (u.auraT > 0) { u.auraT -= dt; dmg *= TOTEM.dmg; } // aura šamanovho totemu
     if (t) {
       const d = Math.hypot(t.x - u.x, t.y - u.y);
       const spear = u.ktype === 'spear', rider = u.ktype === 'rider', reach = spear ? SPEAR_REACH : rider ? 11 : 8, off = spear ? 12 : rider ? 7 : 5; // kopijník bodá spoza rytiera, kôň (vlk) je dlhší a širší
@@ -2742,6 +2748,10 @@
   }
   // mních ide za najviac zraneným rytierom/kráľom, remeselník k najviac poškodenej budove; inak sa vráti domov
   const HEAL_RANGE = 40; // mních lieči kúzlom z tejto vzdialenosti
+  // orkský šaman (hráč za orkov): pri zranených zapichne palicu-totem a 5 s stojí – aura lieči a posilňuje bojovníkov okolo;
+  // keď šamana zabijú, aura hneď zhasne. Potom chvíľu oddychuje, kým zapichne znova
+  const TOTEM = { t: 5, cd: 2.5, r: 34, dmg: 1.25, heal: 0.7 };
+  const totemOn = u => u.totemT > 0 && !u.dead;
   // miesta remeselníkov okolo opravovanej budovy (od stredu jej políčka): pod ňou, po bokoch, nad ňou
   const REPAIR_SPOTS = [[0, T / 2 + 3], [-T / 2 - 3, 2], [T / 2 + 3, 2], [-6, T / 2 + 5], [6, T / 2 + 5], [0, -T / 2 - 5]];
   // miesto na opravu, na ktoré sa remeselník naozaj dostane: nie v hradbe ani v hrade a s cestou od neho (inak by sa zasekol);
@@ -2760,6 +2770,19 @@
     u.flash = Math.max(0, u.flash - dt);
     u.swing = Math.max(0, (u.swing || 0) - dt);
     if (u.home) u.rate = HELPERS[u.helper].rate(u.home);
+    if (u.totemCd > 0) u.totemCd -= dt;
+    if (totemOn(u)) { // šaman stojí so zapichnutým totemom: aura lieči a posilňuje bojovníkov v okolí
+      u.totemT -= dt; u.plantT = (u.plantT || 0) + dt; u.working = true;
+      for (const o of st.soldiers.concat(st.king && !st.king.dead ? [st.king] : [])) {
+        if (o === u || o.dead || o.siege || o.helper || Math.hypot(o.x - u.x, (o.y - u.y) * 1.4) > TOTEM.r) continue;
+        o.auraT = 0.25; // posila trvá, kým je bojovník v aure (a chvíľu po nej)
+        const mx = o.isKing ? kingMax() : o.max;
+        if (o.hp < mx) o.hp = Math.min(mx, o.hp + u.rate * TOTEM.heal * dt);
+      }
+      if (Math.random() < dt * 14) { const a = Math.random() * 6.28, r = Math.random() * TOTEM.r; part(u.x + Math.cos(a) * r, u.y + Math.sin(a) * r / 1.4, 0, -10 - Math.random() * 8, 0.7, Math.random() < 0.5 ? '#5aff8a' : '#b8ffcc', 0); }
+      if (u.totemT <= 0) { u.totemCd = TOTEM.cd; u.working = false; }
+      return;
+    }
     // drží sa svojho cieľa, kým ho úplne neopraví / nevylieči; až potom si vyberie najviac poškodený ďalší
     const healMax = o => o.isKing ? kingMax() : o.max;
     const valid = t => !!t && (u.helper === 'chapel'
@@ -2769,7 +2792,8 @@
     if (u.stuckT > 2) { (u.skip = u.skip || new Map()).set(u.tgt, 6); u.tgt = null; u.stuckT = 0; } // nedostal sa k nej – chvíľu ju vynechá
     // obrana: liečiteľ drží svoje miesto v šíku (u.fslot) – lieči len toho, na koho dosiahne, keď od miesta podíde najviac o HOLD_REACH
     const hold = u.helper === 'chapel' && st.phase === 'battle' && !armyAttacks() && u.fslot ? u.fslot : null;
-    const reach = o => !hold || Math.hypot(o.x - hold.x, o.y - hold.y) <= HEAL_RANGE + HOLD_REACH;
+    const healR = u.helper === 'chapel' && isOrc() ? TOTEM.r * 0.55 : HEAL_RANGE; // šaman zapichne totem blízko zraneného (aura ho zasiahne aj so susedmi)
+    const reach = o => !hold || Math.hypot(o.x - hold.x, o.y - hold.y) <= healR + HOLD_REACH;
     if (u.tgt && !reach(u.tgt)) u.tgt = null;
     if (!valid(u.tgt)) {
       u.tgt = null;
@@ -2792,11 +2816,11 @@
     let tx = 0, ty = 0;
     const monk = u.helper === 'chapel';
     if (tgt && monk && hold) { // obrana: podíde od svojho miesta k zranenému len toľko, aby naňho dosiahol
-      const dx = tgt.x - hold.x, dy = tgt.y - hold.y, d = Math.hypot(dx, dy) || 1, k = Math.max(0, Math.min(HOLD_REACH, d - (HEAL_RANGE - 6))) / d;
+      const dx = tgt.x - hold.x, dy = tgt.y - hold.y, d = Math.hypot(dx, dy) || 1, k = Math.max(0, Math.min(HOLD_REACH, d - (healR - 6))) / d;
       tx = hold.x + dx * k; ty = hold.y + dy * k;
     }
     else if (tgt && monk) { // liečiteľ lieči kúzlom na diaľku: postaví sa za zraneného (bližšie k radnici), nie pred neho
-      tx = tgt.x; ty = tgt.y + HEAL_RANGE - 10;
+      tx = tgt.x; ty = tgt.y + healR - 10;
     }
     else if (tgt) { // viacerí remeselníci pri jednej budove: každý má svoje dosiahnuteľné miesto okolo nej a opravy sa sčítajú
       const crew = st.soldiers.filter(o => o.helper === u.helper && !o.dead && o.tgt === tgt);
@@ -2818,7 +2842,7 @@
       if (u.home && !(monk && st.phase === 'battle')) moveKnight(u, tileX(u.home.c) + T / 2 + 1, tileY(u.home.r) + T + 2, spd * 0.85, dt);
       return;
     }
-    if (monk && hold ? Math.hypot(tx - u.x, ty - u.y) > 2 && Math.hypot(tgt.x - u.x, tgt.y - u.y) > HEAL_RANGE + (casting ? 6 : 0) : monk ? Math.hypot(tgt.x - u.x, tgt.y - u.y) > HEAL_RANGE + (casting ? 6 : 0) || (!casting && u.y < tgt.y + 4 && Math.hypot(tx - u.x, ty - u.y) > 8) /* pred zraneným ani vedľa neho neostane – obíde ho dozadu */ : Math.hypot(tx - u.x, ty - u.y) > 7 && !(casting && Math.hypot(bCenter(tgt).x - u.x, bCenter(tgt).y - u.y) < T + 6)) {
+    if (monk && hold ? Math.hypot(tx - u.x, ty - u.y) > 2 && Math.hypot(tgt.x - u.x, tgt.y - u.y) > healR + (casting ? 6 : 0) : monk ? Math.hypot(tgt.x - u.x, tgt.y - u.y) > healR + (casting ? 6 : 0) || (!casting && u.y < tgt.y + 4 && Math.hypot(tx - u.x, ty - u.y) > 8) /* pred zraneným ani vedľa neho neostane – obíde ho dozadu */ : Math.hypot(tx - u.x, ty - u.y) > 7 && !(casting && Math.hypot(bCenter(tgt).x - u.x, bCenter(tgt).y - u.y) < T + 6)) {
       const x0 = u.x, y0 = u.y;
       moveKnight(u, tx, ty, spd, dt);
       if (!monk) u.stuckT = Math.hypot(u.x - x0, u.y - y0) < spd * dt * 0.2 ? (u.stuckT || 0) + dt : 0; // remeselník stojí na mieste, hoci má ísť – zasekol sa
@@ -2827,7 +2851,11 @@
     u.stuckT = 0; // kto už opravuje pri budove, toho tlačenica neodženie
     // pri cieli: lieči / opravuje
     u.working = true;
-    if (monk) {
+    if (monk && isOrc()) { // šaman: zapichne totem (ak ho práve neoddychuje) – lieči aura, nie lúč
+      if (!(u.totemCd > 0)) { u.totemT = TOTEM.t; u.plantT = 0; u.totemFace = diag8(tgt.x - u.x, tgt.y - u.y); AUDIO.play('thud'); }
+      else u.working = false;
+    }
+    else if (monk) {
       tgt.hp = Math.min(tgt.isKing ? kingMax() : tgt.max, tgt.hp + u.rate * dt);
       if (Math.random() < 0.2) part(tgt.x + (Math.random() - 0.5) * 8, tgt.y - 4 - Math.random() * 10, (Math.random() - 0.5) * 6, -14, 0.6, Math.random() < 0.5 ? '#bfe3ff' : '#ffffff', 0);
     } else {
@@ -3543,6 +3571,7 @@
     else if (busy && e.aimP) turn8(e, dir8(e.aimP.x - e.x, e.aimP.y - e.y), 3);
     else if (moving) turn8(e, sd, 5);
     if (e.face8 == null) e.face8 = 2;
+    if (e.castT > 0 && e.totemFace != null) { const p = 1.6 - e.castT; e.face8 = e.totemFace; return set[e.face8].atk[p < 0.18 ? 0 : p < 0.36 ? 1 : 2]; } // šaman zapichol palicu
     const v = set[e.face8];
     if (set.bow) { if (e.lunge > 0) return v.atk[1]; if (busy) return v.atk[0]; }
     else if (e.lunge > 0) return v.atk[e.lunge > 0.075 ? 1 : 2];
@@ -3565,6 +3594,7 @@
         fr = e.lunge > 0 ? v.act : set8.art && e.attacking && e.atk < 0.4 ? v.atk[Math.floor((1 - e.atk / 0.4) * (v.atk.length - 1))] : moving ? v.walk[Math.floor(e._wd / set8.stride) % v.walk.length] : v.idle; // kresba z PixelLabu: napriahnutie pred nárazom
         x = Math.round(e.x - fr.ax); y = Math.round(e.y - fr.ay);
       } else {
+        if (e.castT > 0) drawTotemAura(e); // šaman hordy so zapichnutou palicou
         fr = enemy8Frame(e, set8); x = Math.round(e.x - fr.w / 2); y = Math.round(e.y - fr.h) + U8_PB;
       }
       shadow(e.x, e.y, Math.ceil(e.w * 0.35));
@@ -3637,6 +3667,21 @@
   }
   // kráľ v 8 smeroch: natočí sa k nepriateľovi, inak smerom chôdze, doma pozerá na hordu; chôdza zo 4 snímok, úder z 3
   const dir8 = (dx, dy) => (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
+  const diag8 = (dx, dy) => dy >= 0 ? (dx >= 0 ? 1 : 3) : (dx >= 0 ? 7 : 5); // najbližší šikmý smer (šaman má kúzlo len šikmo)
+  // aura totemu na zemi okolo šamana: dva zelené pulzujúce ovály a slabá žiara vnútri
+  function drawTotemAura(o) {
+    const t = performance.now() / 1000, r = TOTEM.r, p = (Math.sin(t * 4) + 1) / 2;
+    g.save();
+    g.fillStyle = 'rgba(90,255,138,' + (0.07 + 0.05 * p) + ')';
+    g.beginPath(); g.ellipse(o.x, o.y, r, r / 1.4, 0, 0, 6.29); g.fill();
+    g.lineWidth = 1;
+    g.strokeStyle = 'rgba(90,255,138,' + (0.45 + 0.3 * p) + ')';
+    g.beginPath(); g.ellipse(o.x, o.y, r, r / 1.4, 0, 0, 6.29); g.stroke();
+    const k = (t * 0.8) % 1; // vlna, ktorá sa šíri od totemu von
+    g.strokeStyle = 'rgba(184,255,204,' + (0.6 * (1 - k)) + ')';
+    g.beginPath(); g.ellipse(o.x, o.y, r * k, r * k / 1.4, 0, 0, 6.29); g.stroke();
+    g.restore();
+  }
   // proti preblikovaniu: nový smer sa prijme, až keď vydrží niekoľko snímok (drobné odtlačenia v šíku či zákruta
   // cez stred políčka postavu neotočia sem a tam), smer chôdze sa berie z vyhladeného pohybu
   function turn8(u, nd, hold) {
@@ -3804,9 +3849,11 @@
       const heal = u.helper === 'chapel' && u.working && u.tgt && !u.tgt.dead; // liečiteľ: kúzlo má len smerom hore a dole – natočí sa podľa cieľa
       const hammer = repair && set === SPR.craft8; // remeselník z PixelLabu má údery kladivom v snímkach útoku
       if (repair && u.working) { if (hammer && u.tgt) { const bc = bCenter(u.tgt); u.face8 = dir8(bc.x - u.x, bc.y - u.y); u._lx = u.x; u._ly = u.y; } else u.face8 = 6; } // natočí sa k opravovanej budove
-      if (heal) { u.face8 = u.tgt.y < u.y - 2 ? 6 : 2; u._lx = u.x; u._ly = u.y; }
-      const cast = (heal || (hammer && u.working)) && set[u.face8].atk; // kúzlo liečiteľa / búchanie kladivom: snímky útoku dokola
-      const fr = cast ? cast[Math.floor(performance.now() / 120) % cast.length] : repair && u.working ? set[6].idle : unit8Frame(u, set), y = Math.round(u.y - fr.h) + U8_PB;
+      const totem = totemOn(u); // šaman so zapichnutým totemom: napriahne sa, zapichne palicu a stojí (len šikmé smery kúzla)
+      if (totem) { u.face8 = u.totemFace; u._lx = u.x; u._ly = u.y; drawTotemAura(u); }
+      else if (heal) { u.face8 = u.tgt.y < u.y - 2 ? 6 : 2; u._lx = u.x; u._ly = u.y; }
+      const cast = !totem && (heal || (hammer && u.working)) && set[u.face8].atk; // kúzlo liečiteľa / búchanie kladivom: snímky útoku dokola
+      const fr = totem ? set[u.face8].atk[u.plantT < 0.18 ? 0 : u.plantT < 0.36 ? 1 : 2] : cast ? cast[Math.floor(performance.now() / 120) % cast.length] : repair && u.working ? set[6].idle : unit8Frame(u, set), y = Math.round(u.y - fr.h) + U8_PB;
       if (fr.hd) { // tieň pod kopytami / nohami: výška zeme zo státia v tomto smere (v kluse neposkakuje), šírka podľa snímky
         const fw = u.helper === 'chapel' ? 2 : 0, ft = footOf(fr, fw), gr = footOf(set[u.face8 == null ? 6 : u.face8].idle, fw), left = Math.round(u.x - fr.w / 2);
         shadow(left + (ft.x0 + ft.x1) / 2, y + gr.y, Math.max(3, Math.round((ft.x1 - ft.x0) / 2)));
@@ -5851,7 +5898,7 @@
       for (const b of st.blds) if (b.kind === 'wall' && b.gate) objs.push({ y: tileY(b.r) + T - 0.5, x: b.c, f: () => drawBuilding(b, time, true) }); // mur za vysokou bránou: ako hradba, za vežami vedľa (brána sama ostáva v popredí)
       for (const b of st.blds) { const q = vGateOf(b); if (q) objs.push({ y: tileY(b.r) + T + 0.1, x: b.c, f: () => drawVGate(b, time) }); } // brána na zvislej hradbe: po vlastnom úseku, no pred úsekom pod ňou – ten prekryje jej spodok so vchodom
       for (const s of st.soldiers) {
-        const cast = s.helper === 'chapel' && s.working && s.tgt && !s.dead; // mních pri liečení zdvihne palicu
+        const cast = s.helper === 'chapel' && s.working && s.tgt && !s.dead && !totemOn(s); // mních pri liečení zdvihne palicu (šaman s totemom má auru, nie lúč)
         objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: dpt(s), id: s.slot, f: () => { drawFighter(s, raceSpr(cast ? 'monkCast' : s.spr || 'soldier')); if (cast && !(SPR.monk8 && raceSpr('monk') === 'monk')) drawStaffGlow(s, time); } }); // liečiteľ z PixelLabu má kúzlo v animácii (bez svetla na palici)
         if (cast) { const t = s.tgt; objs.push({ y: t.y - healAuraH(t) - 1, f: () => drawHealAura(s, t, time) }); }
       }
@@ -5948,7 +5995,7 @@
     if (gsrc && gi.getAttribute('src') !== gsrc) gi.src = gsrc;
     const keep = isAssault() && st.camp ? st.camp.parts.find(o => o.role === 'keep') : null; // pri útoku pruh ukazuje srdce hradu
     $('hud-wall').style.display = keep ? '' : 'none'; // zdravie radnice je pod radnicou na bojisku (skrytý pruh nesmie zväčšiť riadok – pásik vlny je vysoký ako kolónky vlny a zlatiek)
-    $('hud-boss').style.gridArea = keep || foesShown() ? '' : 'wall'; // zdravie bossa hore na mieste pruhu radnice (s pásikom nepriateľov pod ním)
+    $('hud-boss').style.gridArea = ''; // zdravie bossa vždy v druhom riadku (pod pásikom vlny) – keď pásik vlny zmizne, nepreskočí vyššie
     const r = keep ? Math.max(0, keep.hp / keep.max) : Math.max(0, st.hallHp / hallMax());
     $('hallFill').style.width = (r * 100) + '%';
     $('hallFill').className = r < 0.3 ? 'low' : '';
@@ -5982,7 +6029,7 @@
   const foesShown = () => st.phase === 'battle' && !isAssault() && st.waveSpan > 0 && st.spawnQ.length > 0;
   function foesTick() {
     const on = foesShown(), box = $('hud-foes');
-    if (box.hidden === on) { box.hidden = !on; $('hud-boss').style.gridArea = on || (isAssault() && st.camp) ? '' : 'wall'; }
+    if (box.hidden === on) box.hidden = !on;
     if (!on) return;
     const w = Math.round(Math.min(1, spawnLeft() / st.waveSpan) * 1000) / 10 + '%';
     if ($('foesFill').style.width !== w) $('foesFill').style.width = w;
@@ -7641,7 +7688,7 @@
         focusMapNode(st.mapSel);
         AUDIO.play('unlock');
         const nm = st.mapSel;
-        setTimeout(() => { if (st.phase === 'map') showUnlockDeck(nm); }, 2400); // nový región najprv chvíľu pobliká, až potom kartičky
+        setTimeout(() => { if (st.phase === 'map') showUnlockDeck(nm); }, 400); // kartičky nových nepriateľov hneď po prefarbení provincie (nečaká sa, kým nový región dobliká)
       }
     }
   }
