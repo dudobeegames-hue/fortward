@@ -122,13 +122,13 @@ function gateSprite(m, l, orc) {
     const s = spriteFromCanvas(c); s.w = ga.w; s.h = H; if (k > 1) s.hd = true;
     GATE_SPR[key] = s;
   }
-  if (ga && !GATE_SPR[key]) { // zvislá hradba: úsek hradby a na ňom stred brány (ako drawBuilding v hre)
-    const ws = BSPR.wall[l][m], k = ga.c.width / ga.w, lift = m & 4 ? 6 : 0;
-    const H = Math.ceil(Math.max(ws.h, ga.h + lift)), c = document.createElement('canvas'); c.width = 16 * k; c.height = H * k;
+  if (ga && !GATE_SPR[key]) { // zvislá hradba: úsek hradby a na ňom celá brána v rovnakej výške ako na vodorovnej (ako v hre); brána zboku, ak je
+    const gv = ga.v || ga, ws = BSPR.wall[l][m], k = gv.c.width / gv.w, W = Math.max(16, gv.w), H = Math.ceil(Math.max(ws.h, gv.h));
+    const c = document.createElement('canvas'); c.width = W * k; c.height = H * k;
     const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
-    x.drawImage(ws.c, 0, (H - ws.h) * k, ws.w * k, ws.h * k);
-    x.drawImage(ga.c, (ga.c.width - 22) / 2, 0, 22, ga.c.height, 2.5 * k, (H - lift - ga.h) * k, 11 * k, ga.h * k);
-    const s = spriteFromCanvas(c); s.w = 16; s.h = H; if (k > 1) s.hd = true;
+    x.drawImage(ws.c, (W - ws.w) / 2 * k, (H - ws.h) * k, ws.w * k, ws.h * k);
+    x.drawImage(gv.c, (W - gv.w) / 2 * k, (H - gv.h) * k, gv.w * k, gv.h * k);
+    const s = spriteFromCanvas(c); s.w = W; s.h = H; if (k > 1) s.hd = true;
     GATE_SPR[key] = s;
   }
   if (!GATE_SPR[key]) {

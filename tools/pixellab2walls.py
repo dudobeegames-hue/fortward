@@ -16,7 +16,8 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 CHARS = [chr(c) for c in range(33, 127) if chr(c) not in '."\'\\`']
 W, H = 32, 64
 TILE_TOP, FOOT = 28, 56   # horný okraj políčka v sprite, päta hradby (vodorovná aj zvislá)
-GW, GH = 48, 88           # rám vysokej brány Bn.png (v hre 24×44 bodov, stred na stred políčka); spodok rámu = spodok rámu hradby
+GW, GH = 48, 100          # rám vysokej brány Bn.png / Tn.png (v hre 24×50 bodov, stred na stred políčka); spodok rámu = spodok rámu hradby
+GATE_DX = {}              # posun brány doprava v px podľa súboru (brána natočená do 3/4 má vráta mimo stredu kresby)
 GF = GH - (H - FOOT)      # päta vysokej brány v jej ráme (rovnako vysoko ako päta hradby)
 GOLD_TO_STONE = {(248, 220, 104): (238, 238, 242), (224, 176, 48): (220, 220, 226), (176, 126, 28): (164, 164, 176), (122, 82, 16): (128, 128, 142), (74, 46, 8): (92, 92, 108)}  # zlato lvl5 -> biely kameň
 OUT, ROPE = (0x1c, 0x14, 0x0e, 255), (0x3e, 0x26, 0x14, 255)
@@ -296,19 +297,36 @@ def main():
         print('%s: 3 × 16 variantov %dx%d px' % (p, W, H))
         gp = os.path.join(ROOT, os.path.dirname(p), 'G' + os.path.basename(p)[1:])
         bp = os.path.join(ROOT, os.path.dirname(p), 'B' + os.path.basename(p)[1:])
-        if thick[-1] and os.path.exists(bp):                   # vysoká brána Bn.png (strážnica s vežičkami, 88×88 ako veže) má prednosť pred Gn.png
-            braw = Image.open(bp).convert('RGBA')
+        tp = os.path.join(ROOT, os.path.dirname(p), 'T' + os.path.basename(p)[1:])
+        sp = os.path.join(ROOT, os.path.dirname(p), 'staré', 'B' + os.path.basename(p)[1:])
+        # vysoká brána (strážnica s vežičkami, 88×88 ako veže): najnovšia Gn.png (88×88), potom Tn.png, Bn.png,
+        # a kým nie je nová, stará staré/Bn.png; GnB.png = tá istá brána zboku na zvislú hradbu
+        if os.path.exists(gp) and Image.open(gp).width > W: bp = gp
+        elif os.path.exists(tp): bp = tp
+        elif not os.path.exists(bp) and os.path.exists(sp): bp = sp
+        vp = os.path.join(ROOT, os.path.dirname(p), 'G' + os.path.basename(p)[1:-4] + 'B.png')
+
+        def tall(path, side=False):  # brána do rámu GW×GH: na stred, päta na úrovni päty hradby (side = brána zboku: spodok kresby na pätu)
+            braw = Image.open(path).convert('RGBA')
             braw = braw.crop(braw.split()[3].getbbox())
             assert braw.width <= GW and braw.height <= GF, 'vysoká brána je väčšia ako rám %dx%d' % (GW, GF)
-            gi = Image.new('RGBA', (GW, GH)); gi.alpha_composite(braw, ((GW - braw.width) // 2, GF - braw.height))   # stred rámu, päta na úrovni päty hradby
+            # päta: brána siaha v každom stĺpci (okrem krajných 3 px) aspoň po pätu hradby, aby spod nej netrčala hradba za ňou;
+            # brána natočená do 3/4 má pätu šikmú – predná vežička potom siaha nižšie (pred hradbu)
+            ba = braw.split()[3]
+            bots = [max([y for y in range(braw.height) if ba.getpixel((x, y))] or [-1]) for x in range(min(3, braw.width // 4), braw.width - min(3, braw.width // 4))]
+            ty = GF - braw.height if side else GF - min(b for b in bots if b >= braw.height * 0.6) - 1   # stĺpce len so zástavou či strechou (vysoko) sa nerátajú
+            assert ty + braw.height <= GH, 'brána po posune nadol presahuje rám'
+            gi = Image.new('RGBA', (GW, GH)); gi.alpha_composite(braw, ((GW - braw.width) // 2 + GATE_DX.get(os.path.basename(path), 0), ty))   # stred rámu
             for y in range(GH):
                 for x in range(GW):
                     c = gi.getpixel((x, y))
                     if c[3] >= 128 and '#%02x%02x%02x' % c[:3] not in pal: pal.append('#%02x%02x%02x' % c[:3])
-            gates.append({'rows': [''.join('.' if gi.getpixel((x, y))[3] < 128 else CHARS[pal.index('#%02x%02x%02x' % gi.getpixel((x, y))[:3])] for x in range(GW)) for y in range(GH)],
-                          'flags': []})   # zástavy má vlastné (z PixelLabu)
-            print('%s: vysoká brána %dx%d v ráme %dx%d' % (bp, braw.width, braw.height, GW, GH))
-        elif thick[-1] and os.path.exists(gp):                 # brána Gn.png: vodorovný úsek hradby s bránou, v tom istom ráme ako Wn.png
+            print('%s: vysoká brána %dx%d v ráme %dx%d' % (path, braw.width, braw.height, GW, GH))
+            return [''.join('.' if gi.getpixel((x, y))[3] < 128 else CHARS[pal.index('#%02x%02x%02x' % gi.getpixel((x, y))[:3])] for x in range(GW)) for y in range(GH)]
+        if thick[-1] and os.path.exists(bp) and Image.open(bp).width > W:
+            gates.append({'rows': tall(bp), 'flags': []})   # zástavy má vlastné (z PixelLabu)
+            if os.path.exists(vp): gates[-1]['v'] = tall(vp, True)  # brána zboku na zvislú hradbu
+        elif thick[-1] and os.path.exists(gp):                 # stará nízka brána Gn.png (32 px): vodorovný úsek hradby s bránou, v tom istom ráme ako Wn.png
             graw = Image.open(gp).convert('RGBA')
             wraw = Image.open(os.path.join(ROOT, p)).convert('RGBA')
             dy = FOOT - wraw.split()[3].getbbox()[3]             # spodok hradby na FOOT, brána posunutá rovnako (ostane v ráme PixelLabu)
@@ -335,7 +353,7 @@ def main():
           '// %s: hradby z PixelLabu, jemná kresba. Vygenerované: tools/pixellab2walls.py – ručne neupravovať.' % name,
           '// lv[úroveň][maska susedov N=1 E=2 S=4 W=8 + 16 × strana] = riadky znakov (znak = index v pal, \'.\' = priehľadné);',
           '// strana 0 = zvislý úsek v strede políčka, 1 = pri ľavom okraji (vľavo od hradu), 2 = pri pravom okraji (vpravo od hradu)',
-          '// gate[úroveň] = {rows: brána v ráme hradby, flags: [[x, y] vrcholy pre vlajočky v px]} alebo null',
+          '// gate[úroveň] = {rows: brána v ráme hradby, v: tá istá brána zboku na zvislú hradbu (ak je), flags: [[x, y] vrcholy pre vlajočky v px]} alebo null',
           'const %s = %s;' % (name, json.dumps({'chars': ''.join(CHARS[:len(pal)]), 'pal': pal, 'thick': thick, 'gate': gates, 'lv': levels}, separators=(',', ':')).replace('],[', '],\n[')), '']
     open(os.path.join(ROOT, out), 'w', encoding='utf8').write('\n'.join(js))
     print('%s: %d úrovní, %d farieb' % (name, len(levels), len(pal)))

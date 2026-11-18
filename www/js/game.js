@@ -4212,6 +4212,7 @@
           const ga = b.gate && gateArtOf(wl), hs = ga && !(m & 5) ? ga : ws; // vodorovná brána z PixelLabu: tieň brány namiesto úseku
           if (!(m & 5) || (m & 10)) drawShadow(shCtx, hs, tileX(b.c) + T / 2 - hs.w / 2, tileY(b.r) + 18 - hs.h);
           if (b.gate && !ga) drawShadow(shCtx, gatesOf()[wl], tileX(b.c), tileY(b.r) - 15);
+          { const q = vGateOf(b); if (q) drawShadow(shCtx, q.ga, q.x, q.y); } // celá brána na zvislej hradbe
           continue;
         }
         const spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl);
@@ -4239,19 +4240,23 @@
       const wl = Math.max(1, Math.min(5, b.lvl)) - 1;
       spr = wallsOf()[wl][m + 16 * wallSide(b.c)] || wallsOf()[wl][m];
       const ga = b.gate && gateArtOf(wl), gv = ga && (m & 5); // brána z PixelLabu: na vodorovnej hradbe celý úsek, na zvislej stred brány na úseku
-      if (ga && !gv && ga.w > T) wallImg(g, spr, x0, y0); // vysoká brána je hore užšia ako políčko – za ňou úsek hradby, aby medzi hradbou a bránou nesvietila tráva
-      if (ga && !gv) spr = ga;
-      if (ga && !gv) g.drawImage(bldCanvas(ga, time, b.c * 0.7 + b.r * 0.3), x0 + T / 2 - ga.w / 2, y0 + 18 - ga.h, ga.w, ga.h); // zástavy vejú; vysoká brána (B1) je širšia ako políčko – na stred
-      else wallImg(g, spr, x0, y0);
-      if (gv) g.drawImage(bldCanvas(ga, time, b.c * 0.7 + b.r * 0.3), (ga.c.width - 22) / 2, 0, 22, ga.c.height, x0 + [5, 3, 7][wallSide(b.c)] / 2, y0 + 18 - ga.h - (m & 4 ? 6 : 0), 11, ga.h); // nad úsekom pod ňou (ten sa kreslí neskôr a prekryl by vráta)
-      if (b.holyT > 0) holyGlow(spr, x0, y0 + 18 - spr.h, b.holyT, time);
       // napojenie na susedné budovy (veže, radnica); k okrajom obrazovky sa hradby nenaťahujú
       const flat = wallsOf()[wl][spr.hd ? 10 : m | 2 | 8], fr = flat.c.width / flat.w; // jemná kresba: rovný úsek bez piliera, fr = 2
       const slice = (dx, w) => { for (let k = 0; k < w; k += 4) { const ww = Math.min(4, w - k); g.drawImage(flat.c, 6 * fr, 0, ww * fr, flat.c.height, dx + k, y0 + 18 - flat.h, ww, flat.h); } };
-      if (joinsBuilding(b.c + 1, b.r)) slice(x0 + T, 4);
-      if (joinsBuilding(b.c - 1, b.r)) slice(x0 - 4, 4);
-      if (b.r === G.hr0 + HALL_ROWS - 1 && occAt(b.c + 1, b.r) === HALL) slice(x0 + T, 8); // pod okraj hradu (hrad sa kreslí neskôr a koniec prekryje)
-      if (b.r === G.hr0 + HALL_ROWS - 1 && occAt(b.c - 1, b.r) === HALL) slice(x0 - 8, 8);
+      const links = () => {
+        if (joinsBuilding(b.c + 1, b.r)) slice(x0 + T, 4);
+        if (joinsBuilding(b.c - 1, b.r)) slice(x0 - 4, 4);
+        if (b.r === G.hr0 + HALL_ROWS - 1 && occAt(b.c + 1, b.r) === HALL) slice(x0 + T, 8); // pod okraj hradu (hrad sa kreslí neskôr a koniec prekryje)
+        if (b.r === G.hr0 + HALL_ROWS - 1 && occAt(b.c - 1, b.r) === HALL) slice(x0 - 8, 8);
+      };
+      const tallGate = ga && !gv && ga.w > T; // vysoká brána je širšia ako políčko – napojenie na vežu vedľa sa kreslí za ňu, inak by mur zakryl jej spodok
+      if (tallGate) { wallImg(g, spr, x0, y0); links(); } // za bránou úsek hradby, aby medzi hradbou a bránou nesvietila tráva
+      if (ga && !gv) spr = ga;
+      if (ga && !gv) g.drawImage(bldCanvas(ga, time, b.c * 0.7 + b.r * 0.3), x0 + T / 2 - ga.w / 2, y0 + 18 - ga.h, ga.w, ga.h); // zástavy vejú; vysoká brána (B1) je širšia ako políčko – na stred
+      else wallImg(g, spr, x0, y0);
+      // zvislá hradba: celá brána (nie orezaný pás) v rovnakej výške ako na vodorovnej – kreslí ju drawVGate, úsek hradby pod ňou prekryje vchod
+      if (b.holyT > 0) holyGlow(spr, x0, y0 + 18 - spr.h, b.holyT, time);
+      if (!tallGate) links();
       if (b.gate) {
         if (!ga) { // stará kresba (orkovia): strážnica a vlajočky na pilieroch; brána z PixelLabu má zástavy v kresbe
           const gh = gatesOf()[wl];
@@ -4313,6 +4318,17 @@
   const wallThick = wl => BUILD_RACE !== 'orc' && typeof WALL_ART !== 'undefined' && WALL_ART.thick && WALL_ART.thick[wl]; // hradba s ochodzou (strelec na nej stojí celý)
   const wallSide = c =>c < G.hc0 ? 1 : c > G.hc0 + 2 ? 2 : 0;
   const wallImg = (ctx, spr, x, y) => ctx.drawImage(spr.c, x, y + 18 - spr.h, spr.w, spr.h);
+  // brána na zvislej hradbe: celá kresba brány na stred zvislého úseku (podľa strany hradu), päta ako na vodorovnej hradbe
+  function vGateOf(b) {
+    if (b.kind !== 'wall' || !b.gate) return null;
+    const m = (joinsV(b.c, b.r - 1) ? 1 : 0) | (joins(b.c + 1, b.r) ? 2 : 0) | (joinsV(b.c, b.r + 1) ? 4 : 0) | (joins(b.c - 1, b.r) ? 8 : 0);
+    const gf = (m & 5) && gateArtOf(Math.max(1, Math.min(5, b.lvl)) - 1), ga = gf && (gf.v || gf); // brána zboku (GnB.png), inak predná
+    return ga ? { ga, m, x: tileX(b.c) + [8, 7, 9][wallSide(b.c)] - ga.w / 2, y: tileY(b.r) + 18 - ga.h } : null;
+  }
+  function drawVGate(b, time) {
+    const q = vGateOf(b);
+    if (q) g.drawImage(bldCanvas(q.ga, time, b.c * 0.7 + b.r * 0.3), q.x, q.y, q.ga.w, q.ga.h); // zástavy vejú
+  }
   const JOINERS = { wall: 1, tower: 1, mage: 1, pitch: 1, icetower: 1, ballista: 1 }; // hradby sa napájajú len na hradby a veže (strážna, mága) – na ostatné budovy nie
   const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL ? r === G.hr0 + HALL_ROWS - 1 : !!JOINERS[o.kind]); }; // na hrad len zo spodného radu (tam má bočné múry)
   const joinsV = (c, r) => occAt(c, r) !== HALL && joins(c, r); // na radnicu sa hradby napájajú len z bokov, nie zhora
@@ -5829,7 +5845,8 @@
     }
     if (playing) {
       if (!isAssault()) objs.push({ y: G.hallBot, x: 1e9, f: () => drawHall(time) }); // hrad je v svojom rade vždy vpredu
-      for (const b of st.blds) if (!TRAPS[b.kind] && b.kind !== 'mud') objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? (b.gate ? 0.25 : 0.5) : 0), x: b.c, f: () => drawBuilding(b, time) }); // brána po susedných hradbách (vysoká je širšia ako políčko)
+      for (const b of st.blds) if (!TRAPS[b.kind] && b.kind !== 'mud') objs.push({ y: tileY(b.r) + T - (b.kind === 'wall' ? (b.gate ? -0.1 : 0.5) : 0), x: b.c, f: () => drawBuilding(b, time) }); // brána vždy v popredí: po susedných hradbách aj vežiach v tom istom rade (vysoká je širšia ako políčko)
+      for (const b of st.blds) { const q = vGateOf(b); if (q) objs.push({ y: tileY(b.r) + T + 0.1, x: b.c, f: () => drawVGate(b, time) }); } // brána na zvislej hradbe: po vlastnom úseku, no pred úsekom pod ňou – ten prekryje jej spodok so vchodom
       for (const s of st.soldiers) {
         const cast = s.helper === 'chapel' && s.working && s.tgt && !s.dead; // mních pri liečení zdvihne palicu
         objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: dpt(s), id: s.slot, f: () => { drawFighter(s, raceSpr(cast ? 'monkCast' : s.spr || 'soldier')); if (cast && !(SPR.monk8 && raceSpr('monk') === 'monk')) drawStaffGlow(s, time); } }); // liečiteľ z PixelLabu má kúzlo v animácii (bez svetla na palici)
