@@ -32,7 +32,7 @@
     // smolná veža len pre ľudí: krátky dosah, leje smolu pod seba a k hradbám v okolí (PITCH_WALL) – zraní a spomalí každého na zemi
     pitch:    { name: 'Smolná veža',  short: 'Smola',  cost: 80,  hp: 300, range: 30, dmg: 16, cd: 2.4, block: true, human: true, desc: 'Leje vriacu smolu pod seba a k blízkym hradbám – kto do nich búcha, dostane veľké poškodenie a zlepí sa' },
     icetower: { name: 'Ľadová veža',  short: 'Ľad',    cost: 90,  hp: 220, range: 72, dmg: 5,  cd: 1.3, proj: 'ice', speed: 150, chill: 2.2, block: true, orc: true, desc: 'Ľadové strely spomalia zasiahnutého aj nepriateľov okolo neho' }, // ľudia ju nestavajú: ohnivá veža sa prepne na ľad (b.mode), strieľa potom s týmito hodnotami; orkovia = jedový kotol
-    ballista: { name: 'Balista',      short: 'Balista', cost: 140, hp: 260, range: 118, dmg: 34, cd: 3.2, proj: 'lance', speed: 250, block: true, desc: 'Ťažký šíp prestrelí celý rad nepriateľov na zemi' },
+    ballista: { name: 'Balista',      short: 'Balista', cost: 170, hp: 260, range: 118, dmg: 34, cd: 3.2, proj: 'lance', speed: 250, block: true, desc: 'Ťažký šíp prestrelí celý rad nepriateľov na zemi' },
     wall:     { name: 'Hradby',       short: 'Hradby', cost: 12,  hp: 240, block: true, desc: 'Zatarasí cestu – horda ich musí rozbiť alebo obísť' },
     // koly len za orkov: lacné, nevylepšujú sa (fixed), kto do nich udrie, ten sa napichne
     stake:    { name: 'Koly',         short: 'Koly',     cost: 6, hp: 110, block: true, fixed: true, orc: true, desc: 'Lacné zahrotené koly – nevylepšujú sa a kto do nich udrie, ten sa napichne' },
@@ -4306,7 +4306,7 @@
           continue;
         }
         const spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl);
-        drawShadow(shCtx, spr, tileX(b.c) + bW(b) * T / 2 - Math.floor(spr.w / 2), tileY(b.r) + T + 1 - spr.h);
+        drawShadow(shCtx, spr, tileX(b.c) + bW(b) * T / 2 - Math.floor(spr.w / 2) + artDX(b.kind), tileY(b.r) + T + 1 - spr.h);
       }
       // stavby nepriateľského tábora vrhajú rovnaký tieň ako budovy hráča (predtým len škvrna pri päte – vysoké veže akoby leteli)
       if (st.camp) for (const o of st.camp.parts) {
@@ -4381,7 +4381,7 @@
       }
     } else {
       spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl); // trebuchet po výstrele s ramenom hore; ohnivá veža na ľad má modrý plameň
-      const bx = x0 + bW(b) * T / 2 - Math.floor(spr.w / 2); // stred stavby (aj širšej na viacerých políčkach)
+      const bx = x0 + bW(b) * T / 2 - Math.floor(spr.w / 2) + artDX(b.kind); // stred stavby (aj širšej na viacerých políčkach)
       g.drawImage(bldCanvas(spr, time, b.c * 0.7 + b.r * 0.3), bx + hitJit(b.flash), y0 + T + 1 - spr.h, spr.w, spr.h); // w, h v bodoch hry (jemná kresba má plátno 2×); zástavy vejú
       if (b.holyT > 0) holyGlow(spr, bx, y0 + T + 1 - spr.h, b.holyT, time);
       if (b.kind === 'ballista' && hasTurret(b)) { // otočná balista na plošine (v pokoji mieri na sever k horde)
@@ -4412,6 +4412,7 @@
   const wallFrontPx = wl => { const a = wallArtOf(); return (a && a.front && a.front[wl]) || WALL_FRONT_PX; }; // orkská palisáda je vyššia – chodník vyššie
   const wallSide = c =>c < G.hc0 ? 1 : c > G.hc0 + 2 ? 2 : 0;
   const wallImg = (ctx, spr, x, y) => ctx.drawImage(spr.c, x, y + 18 - spr.h, spr.w, spr.h);
+  // posun kresby stavby v bodoch: lukostrelecká veža ľudí z PixelLabu má teleso o kus vpravo od stredu kresby (rebrík vpravo) – posunie sa na stred políčka
   // brána na zvislej hradbe: celá kresba brány na stred zvislého úseku (podľa strany hradu), päta ako na vodorovnej hradbe
   function vGateOf(b) {
     if (b.kind !== 'wall' || !b.gate) return null;
@@ -4423,6 +4424,7 @@
     const q = vGateOf(b);
     if (q) g.drawImage(bldCanvas(q.ga, time, b.c * 0.7 + b.r * 0.3), q.x, q.y, q.ga.w, q.ga.h); // zástavy vejú
   }
+  const artDX = kind => kind === 'tower' && BUILD_RACE !== 'orc' ? -0.5 : 0; // teleso potom stojí ako pri ostatných vežiach
   const JOINERS = { wall: 1, tower: 1, mage: 1, pitch: 1, icetower: 1, ballista: 1 }; // hradby sa napájajú len na hradby a veže (strážna, mága) – na ostatné budovy nie
   const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL ? r === G.hr0 + HALL_ROWS - 1 : !!JOINERS[o.kind]); }; // na hrad len zo spodného radu (tam má bočné múry)
   const joinsV = (c, r) => occAt(c, r) !== HALL && joins(c, r); // na radnicu sa hradby napájajú len z bokov, nie zhora
@@ -4552,7 +4554,7 @@
     if (kind === 'wall') wallImg(g, spr, hx, hy);
     else if (TRAPS[kind]) trapImg(g, spr, hx, hy);
     else if (isPave(kind)) drawPave(g, hx, hy, PAVE[kind]);
-    else g.drawImage(spr.c, hx + pw / 2 - Math.floor(spr.w / 2), hy + T + 1 - spr.h, spr.w, spr.h);
+    else g.drawImage(spr.c, hx + pw / 2 - Math.floor(spr.w / 2) + artDX(kind), hy + T + 1 - spr.h, spr.w, spr.h);
     g.globalAlpha = 1;
     corners(hx, hy, hx + pw - 1, hy + T - 1, ok ? '#9cd45a' : (blink ? '#e84838' : '#ff9a80'));
     if (BUILD[kind].range) drawRange(hx + T / 2, hy + T / 2, bRange({ kind, lvl: 1 }), time); // dosah už pri ukladaní
@@ -4643,7 +4645,7 @@
         g.globalAlpha = 0.7;
         if (mv.kind === 'wall') wallImg(g, spr, hx, hy);
         else if (TRAPS[mv.kind]) trapImg(g, spr, hx, hy);
-        else g.drawImage(spr.c, hx + mw / 2 - Math.floor(spr.w / 2), hy + T + 1 - spr.h, spr.w, spr.h);
+        else g.drawImage(spr.c, hx + mw / 2 - Math.floor(spr.w / 2) + artDX(mv.kind), hy + T + 1 - spr.h, spr.w, spr.h);
         g.globalAlpha = 1;
       } else corners(ox, oy, ox + mw - 1, oy + T - 1, blink ? '#9cd45a' : '#ffffff');
     }
@@ -6126,7 +6128,8 @@
   // ikona stavby: jemná kresba z PixelLabu v jej vlastných pixeloch (natiahnutá 1,5× pôsobila hrubo), stará kresba 3×
   const sprIcon = spr => spr.hd ? spriteURL({ c: spr.c, w: spr.c.width, h: spr.c.height }, 1) : spriteURL(spr, 3);
   function buildingIcons() {
-    for (const k of ['tower', 'barracks', 'mage', 'mageIce', 'pitch', 'icetower', 'ballista', 'mine', 'chapel', 'workshop', 'range', 'stables', 'armory', 'falconry']) ICONS[k] = sprIcon(bsprOf(k, 1));
+    // obrázok v podobe, v akej sa stavba postaví (smolná veža na 2. úrovni, ohnivá na 3.) – nie vždy 1. úroveň
+    for (const k of ['tower', 'barracks', 'mage', 'mageIce', 'pitch', 'icetower', 'ballista', 'mine', 'chapel', 'workshop', 'range', 'stables', 'armory', 'falconry']) ICONS[k] = sprIcon(bsprOf(k, resMin(k === 'mageIce' ? 'mage' : k)));
     ICONS.pit = sprIcon(BSPR.pit);
     for (const k of ['firepit', 'beartrap']) ICONS[k] = BSPR[k].hd ? sprIcon(BSPR[k]) : spriteURL(BSPR[k], 3);
     ICONS.stake = spriteURL(BSPR.stake, 3);
