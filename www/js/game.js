@@ -2447,10 +2447,12 @@
   function wallFoot(b) {
     const m = wallMask(b);
     const vert = (m & 5) && !(m & 10), sd = wallSide(b.c), x0 = tileX(b.c), y0 = tileY(b.r);
-    return vert ? { x: x0 + (sd === 1 ? 7 : sd === 2 ? 9 : 8), y: y0 + 10, vert } : { x: x0 + T / 2, y: y0 + 8, vert }; // vodorovná: päta za predným cimburím (nohy skryje)
+    const dy = (WALL_FRONT_PX - wallFrontPx(Math.max(1, Math.min(5, b.lvl)) - 1)) / 2; // vyššia palisáda: chodník vyššie
+    return vert ? { x: x0 + (sd === 1 ? 7 : sd === 2 ? 9 : 8), y: y0 + 10, vert } : { x: x0 + T / 2, y: y0 + 8 - dy, vert }; // vodorovná: päta za predným cimburím (nohy skryje)
   }
   // ľudský lukostrelec na hrubej hradbe kreslený sadou z PixelLabu v 8 smeroch (inak null)
-  const wallArcher8 = (b, wl) => b.unit && b.unit.type === 'archer' && !isOrc() && wallThick(wl) && SPR.footArcher8 || null; // ten istý lukostrelec ako v armáde
+  const archer8 = () => isOrc() ? SPR.garcher8 : SPR.footArcher8; // ten istý lukostrelec ako v armáde (za orkov goblin z PixelLabu)
+  const wallArcher8 = (b, wl) => b.unit && b.unit.type === 'archer' && wallThick(wl) && archer8() || null;
   function fireWallUnit(b) {
     const u = b.unit, d = WUNIT[u.type], c = bCenter(b), wl = Math.max(1, Math.min(5, b.lvl)) - 1;
     if (wallArcher8(b, wl)) { // šíp letí z luku natočeného strelca
@@ -4077,7 +4079,7 @@
     const c = document.createElement('canvas'), x = c.getContext('2d');
     if (o.kind === 'wall') {
       const ga = o.gate && gateArtOf(lv - 1), ws = ga || wallsOf()[lv - 1][10], thk = wallThick(lv - 1);
-      const a8 = u && u.type === 'archer' && !isOrc() && thk && SPR.footArcher8 ? SPR.footArcher8[1].idle : null; // lukostrelec z PixelLabu (otočený k nám, nohy za cimburím)
+      const a8 = u && u.type === 'archer' && thk && archer8() ? archer8()[1].idle : null; // lukostrelec z PixelLabu (otočený k nám, nohy za cimburím)
       const uh = a8 ? a8.h - U8_PB - 8 : u ? (thk ? SPR[raceSpr(WUNIT[u.type].spr)][0].h - 3 : 9) : 0;
       const y0 = Math.max(o.gate && !ga ? 15 : u ? uh : 6, ws.h - 18), R = ws.hd ? 2 : 1; // nad hradbou len toľko miesta, koľko treba; jemná kresba v jej rozlíšení
       const cw = Math.max(T, ws.w); // vysoká brána (B1) je širšia ako políčko – náhľad sa rozšíri, brána na stred
@@ -4085,12 +4087,12 @@
       wallImg(x, ws, (cw - ws.w) / 2, y0);
       if (o.gate && !ga) x.drawImage(gatesOf()[lv - 1].c, 0, y0 - 15);
       else if (a8) {
-        x.drawImage(a8.c, Math.round(T / 2 - a8.w / 2), y0 + 8 - a8.h + U8_PB, a8.w, a8.h);
-        const yr = WALL_FRONT_PX; x.drawImage(ws.c, 0, yr, ws.c.width, ws.c.height - yr, 0, y0 + 18 - ws.h + yr / 2, ws.w, (ws.c.height - yr) / 2); // predné cimburie cez nohy ako v hre
+        x.drawImage(a8.c, Math.round(T / 2 - a8.w / 2), y0 + 8 - (WALL_FRONT_PX - wallFrontPx(lv - 1)) / 2 - a8.h + U8_PB, a8.w, a8.h);
+        const yr = wallFrontPx(lv - 1); x.drawImage(ws.c, 0, yr, ws.c.width, ws.c.height - yr, 0, y0 + 18 - ws.h + yr / 2, ws.w, (ws.c.height - yr) / 2); // predné cimburie cez nohy ako v hre
         if (u.lvl > 1) pxText(x, String(u.lvl), 1, y0 - 8, '#88b4ff');
       } else if (u) {
         const us = SPR[raceSpr(WUNIT[u.type].spr)][0];
-        if (thk) x.drawImage(us.c, 0, 0, us.c.width, us.c.height, Math.round(T / 2 - us.w / 2), y0 + 3 - us.h, us.w, us.h);
+        if (thk) x.drawImage(us.c, 0, 0, us.c.width, us.c.height, Math.round(T / 2 - us.w / 2), y0 + 3 - (WALL_FRONT_PX - wallFrontPx(lv - 1)) / 2 - us.h, us.w, us.h);
         else x.drawImage(us.c, 0, 0, us.w, 11, 1, y0 - 9, us.w, 11);
         if (u.lvl > 1) pxText(x, String(u.lvl), 1, y0 - 8, '#88b4ff');
       }
@@ -4370,10 +4372,11 @@
           turn8(u, t ? dir8(t.x - f.x, t.y - f.y) : 6, t ? 4 : 10); // bez cieľa pozerá k horde (na sever)
           const v = s8[u.face8], fr = u.swing > 0 ? v.atk[1] : t ? v.atk[0] : v.idle;
           g.drawImage(u.flash > 0 && fr.f ? fr.f : fr.c, Math.round(f.x - fr.w / 2), Math.round(f.y - fr.h) + U8_PB, fr.w, fr.h);
-          if (!f.vert) { const yr = WALL_FRONT_PX; g.drawImage(spr.c, 0, yr, spr.c.width, spr.c.height - yr, x0, y0 + 18 - spr.h + yr / 2, spr.w, (spr.c.height - yr) / 2); } // predné cimburie a čelo cez nohy (ako na zvislej hradbe, strelec nie je obrovský)
+          if (!f.vert) { const yr = wallFrontPx(wl); g.drawImage(spr.c, 0, yr, spr.c.width, spr.c.height - yr, x0, y0 + 18 - spr.h + yr / 2, spr.w, (spr.c.height - yr) / 2); } // predné cimburie a čelo cez nohy (ako na zvislej hradbe, strelec nie je obrovský)
         } else if (wallThick(wl)) { // hrubá hradba: strelec celý stojí na ochodzi (vodorovná za cimburím, zvislá v strede chodníka)
           const f = wallFoot(b);
           g.drawImage(us.c, 0, 0, us.c.width, us.c.height, Math.round(f.x - us.w / 2), f.y - us.h, us.w, us.h);
+          if (!f.vert && isOrc()) { const yr = wallFrontPx(wl); g.drawImage(spr.c, 0, yr, spr.c.width, spr.c.height - yr, x0, y0 + 18 - spr.h + yr / 2, spr.w, (spr.c.height - yr) / 2); } // predné koly palisády cez nohy
         } else g.drawImage(us.c, 0, 0, us.w, 11, isOrc() ? Math.round(x0 + T / 2 - us.w / 2) : x0 + 1, y0 - 9, us.w, 11);
       }
     } else {
@@ -4404,7 +4407,9 @@
   }
   // hradba na políčku (x, y): spodok 2 body pod políčkom, jemná kresba je vyššia ako stará (24 bodov)
   // strana od hradu pre zvislý úsek hradby: 1 = vľavo (úsek pri ľavom okraji políčka), 2 = vpravo (pri pravom), 0 = nad/pod hradom (v strede)
-  const wallThick = wl => BUILD_RACE !== 'orc' && typeof WALL_ART !== 'undefined' && WALL_ART.thick && WALL_ART.thick[wl]; // hradba s ochodzou (strelec na nej stojí celý)
+  const wallArtOf = () => BUILD_RACE === 'orc' ? (typeof ORC_WALL_ART !== 'undefined' ? ORC_WALL_ART : null) : (typeof WALL_ART !== 'undefined' ? WALL_ART : null);
+  const wallThick = wl => { const a = wallArtOf(); return a && a.thick && a.thick[wl]; }; // hradba s ochodzou (strelec na nej stojí celý)
+  const wallFrontPx = wl => { const a = wallArtOf(); return (a && a.front && a.front[wl]) || WALL_FRONT_PX; }; // orkská palisáda je vyššia – chodník vyššie
   const wallSide = c =>c < G.hc0 ? 1 : c > G.hc0 + 2 ? 2 : 0;
   const wallImg = (ctx, spr, x, y) => ctx.drawImage(spr.c, x, y + 18 - spr.h, spr.w, spr.h);
   // brána na zvislej hradbe: celá kresba brány na stred zvislého úseku (podľa strany hradu), päta ako na vodorovnej hradbe

@@ -1640,7 +1640,10 @@ function initBuildingSprites() {
     chapel: BSPR.shamanHut[0], workshop: BSPR.orcTent,
   });
   OBSPR.wall = [];
-  for (let l = 1; l <= 5; l++) { OBSPR.wall[l - 1] = []; for (let m = 0; m < 16; m++) OBSPR.wall[l - 1][m] = makeWall(m, l, true); }
+  for (let l = 1; l <= 5; l++) { // palisáda z PixelLabu (orc-wall-art.js, 3 × 16 variantov), chýbajúce úrovne stará kresba
+    OBSPR.wall[l - 1] = []; const lv = typeof ORC_WALL_ART !== 'undefined' && ORC_WALL_ART.lv[l - 1];
+    for (let m = 0; m < (lv ? lv.length : 16); m++) OBSPR.wall[l - 1][m] = lv ? artBuilding({ chars: ORC_WALL_ART.chars, pal: ORC_WALL_ART.pal, lv }, m, false) : makeWall(m, l, true);
+  }
   OBSPR.gatehouse = [1, 2, 3, 4, 5].map(l => makeGatehouse(l, true));
   const oc = document.createElement('canvas'); oc.width = 16; oc.height = 33;
   const ox = oc.getContext('2d');

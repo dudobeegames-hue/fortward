@@ -198,7 +198,7 @@ def thick_variants(s, cx=16, tower=None, nt=(7, 11, 13, 14, 15)):   # T-spoje a 
         im = Image.new('RGBA', (W, H))
         vx = max(0, min(W - VW, tc - VW // 2))
         if N or S:
-            top = (FOOT + 2 - tower.height // 2 - 32 + 6 if tower is not None else 0) if N else wy0 - 3   # zhora kúsok pod polovicou vežičky vyššieho políčka (hradba vchádza do veže, nie ako vyššie poschodie)
+            top = (FOOT + 2 - tower.height // 2 - 32 + 6 if tower is not None else 16) if N else wy0 - 3   # bez vežičky tiež nie od vrchu sprite – inak prekryje strelca na políčku nad ním   # zhora kúsok pod polovicou vežičky vyššieho políčka (hradba vchádza do veže, nie ako vyššie poschodie)
             bot = H if S else wy1
             if tower is not None and m not in STR:        # pod vežičkou: zvislý úsek len od jej stredu (nevytŕča spod šikmých rohov)
                 tmid = FOOT + 2 - tower.height // 2
@@ -271,16 +271,21 @@ def thick_variants(s, cx=16, tower=None, nt=(7, 11, 13, 14, 15)):   # T-spoje a 
 
 def main():
     out, name, paths = sys.argv[1], sys.argv[2], sys.argv[3:]
-    pal, levels, thick, gates = [], [], [], []
+    pal, levels, thick, gates, front = [], [], [], [], []
     for p in paths:
         rows_lv = []
-        thick.append(1 if os.path.basename(p).upper().startswith('W') else 0)
+        bn = os.path.basename(p)
+        pre = bn[0] if bn[:2].upper() == 'OW' else ''      # OW1.png = orkská hradba: vežička OWT1.png, brány OG1.png …
+        core = bn[len(pre):]
+        thick.append(1 if core.upper().startswith('W') else 0)
         tw = None
         if thick[-1]:                                         # k W1.png vežička WT1.png (roh a koniec hradby), ak je
-            tp = os.path.join(ROOT, os.path.dirname(p), 'WT' + os.path.basename(p)[1:])
+            tp = os.path.join(ROOT, os.path.dirname(p), pre + 'WT' + core[1:])
             if os.path.exists(tp):
                 tw = Image.open(tp).convert('RGBA'); tw = tw.crop(tw.split()[3].getbbox())
         vf = (lambda sm, cx: thick_variants(sm, cx, tw)) if thick[-1] else variants
+        smp = sample(p)
+        front.append(FOOT - smp.height + thick_rows(smp)[2] if thick[-1] else 0)   # riadok predného radu kolov / zubov v sprite (game.js: strelec stojí za ním)
         for im in [v for cx in SIDES for v in vf(sample(p), cx)]:
             rows = []
             for y in range(H):
@@ -295,16 +300,16 @@ def main():
             rows_lv.append(rows)
         levels.append(rows_lv)
         print('%s: 3 × 16 variantov %dx%d px' % (p, W, H))
-        gp = os.path.join(ROOT, os.path.dirname(p), 'G' + os.path.basename(p)[1:])
-        bp = os.path.join(ROOT, os.path.dirname(p), 'B' + os.path.basename(p)[1:])
-        tp = os.path.join(ROOT, os.path.dirname(p), 'T' + os.path.basename(p)[1:])
-        sp = os.path.join(ROOT, os.path.dirname(p), 'staré', 'B' + os.path.basename(p)[1:])
+        gp = os.path.join(ROOT, os.path.dirname(p), pre + 'G' + core[1:])
+        bp = os.path.join(ROOT, os.path.dirname(p), pre + 'B' + core[1:])
+        tp = os.path.join(ROOT, os.path.dirname(p), pre + 'T' + core[1:])
+        sp = os.path.join(ROOT, os.path.dirname(p), 'staré', pre + 'B' + core[1:])
         # vysoká brána (strážnica s vežičkami, 88×88 ako veže): najnovšia Gn.png (88×88), potom Tn.png, Bn.png,
         # a kým nie je nová, stará staré/Bn.png; GnB.png = tá istá brána zboku na zvislú hradbu
         if os.path.exists(gp) and Image.open(gp).width > W: bp = gp
         elif os.path.exists(tp): bp = tp
         elif not os.path.exists(bp) and os.path.exists(sp): bp = sp
-        vp = os.path.join(ROOT, os.path.dirname(p), 'G' + os.path.basename(p)[1:-4] + 'B.png')
+        vp = os.path.join(ROOT, os.path.dirname(p), pre + 'G' + core[1:-4] + 'B.png')
 
         def tall(path, side=False):  # brána do rámu GW×GH: na stred, päta na úrovni päty hradby (side = brána zboku: spodok kresby na pätu)
             braw = Image.open(path).convert('RGBA')
@@ -357,7 +362,7 @@ def main():
           '// lv[úroveň][maska susedov N=1 E=2 S=4 W=8 + 16 × strana] = riadky znakov (znak = index v pal, \'.\' = priehľadné);',
           '// strana 0 = zvislý úsek v strede políčka, 1 = pri ľavom okraji (vľavo od hradu), 2 = pri pravom okraji (vpravo od hradu)',
           '// gate[úroveň] = {rows: brána v ráme hradby, v: tá istá brána zboku na zvislú hradbu (ak je), flags: [[x, y] vrcholy pre vlajočky v px]} alebo null',
-          'const %s = %s;' % (name, json.dumps({'chars': ''.join(CHARS[:len(pal)]), 'pal': pal, 'thick': thick, 'gate': gates, 'lv': levels}, separators=(',', ':')).replace('],[', '],\n[')), '']
+          'const %s = %s;' % (name, json.dumps({'chars': ''.join(CHARS[:len(pal)]), 'pal': pal, 'thick': thick, 'front': front, 'gate': gates, 'lv': levels}, separators=(',', ':')).replace('],[', '],\n[')), '']
     open(os.path.join(ROOT, out), 'w', encoding='utf8').write('\n'.join(js))
     print('%s: %d úrovní, %d farieb' % (name, len(levels), len(pal)))
 
