@@ -31,7 +31,7 @@ function artBuilding(art, i, anim) {
   const x = c.getContext('2d'), id = x.createImageData(c.width, c.height), cols = art.pal.map(hexRGB);
   rows.forEach((r, y) => { for (let k = 0; k < r.length; k++) { if (r[k] === '.') continue; const col = cols[art.chars.indexOf(r[k])], o = (y * c.width + k) * 4; id.data[o] = col[0]; id.data[o + 1] = col[1]; id.data[o + 2] = col[2]; id.data[o + 3] = 255; } });
   if (anim === 'ice') recolorFlame(id, ICE_RAMP, i < 4); // úrovne 1–4: aj žiara pod strechou a okná; na 5. je tá istá farba v zlatých ozdobách
-  const frames = anim === 'fire' ? fireFrames(id) : anim === 'ice' ? fireFrames(id, ICE_RAMP) : anim === false ? null : flagFrames(id); // zástavy sa prefarbia v id, preto pred vykreslením
+  const frames = anim === 'fire' ? fireFrames(id) : anim === 'ice' ? fireFrames(id, ICE_RAMP) : anim === false ? null : flagFrames(id, anim !== 'ownFlag'); // zástavy sa prefarbia v id, preto pred vykreslením
   x.putImageData(id, 0, 0);
   return lazyVariants({ c, w: c.width / 2, h: c.height / 2, hd: true, frames, noShadow: frames && frames.noShadow, fps: anim === 'fire' || anim === 'ice' ? 9 : 5, px: id }); // px: pixely na záblesk a siluetu bez čítania z plátna
 }
@@ -40,7 +40,7 @@ function artBuilding(art, i, anim) {
 // a látku pri nich; látku prefarbí na modrú zástavu hradu (FLAG_BLUE, tmavý obrys ostáva) a vráti 4 snímky,
 // v ktorých sa látka vlní (pri žrdi pevná, ku koncu o 1 px hore a dole), alebo null
 const FLAG_BLUE = [0x3c, 0x64, 0xc8]; // farba zástavy na hrade z PixelLabu
-function flagFrames(id) {
+function flagFrames(id, recolor = true) { // recolor = false: zástava si nechá farby z kresby (orkská oranžová s pruhmi)
   const w = id.width, h = id.height, d = id.data, A = (x, y) => x >= 0 && y >= 0 && x < w && y < h && d[(y * w + x) * 4 + 3] > 0;
   const run = (x, y) => { let a = x, b = x; while (A(a - 1, y)) a--; while (A(b + 1, y)) b++; return [a, b]; };
   const narrow = (x, y) => { if (!A(x, y)) return false; const [a, b] = run(x, y); return b - a <= 2; }; // žrď široká najviac 3 px
@@ -89,7 +89,7 @@ function flagFrames(id) {
   for (const fl of flags) { for (const [cx, cy] of fl.px) noShadow.add(cy * w + cx); for (const k of fl.pole) noShadow.add(k); }
   for (const fl of flags) for (const [cx, cy] of fl.px) { // jednotná farba zástav: všetko okrem takmer čierneho obrysu
     const k = (cy * w + cx) * 4;
-    if (Math.max(d[k], d[k + 1], d[k + 2]) >= 0x48) d.set(FLAG_BLUE, k);
+    if (recolor && Math.max(d[k], d[k + 1], d[k + 2]) >= 0x48) d.set(FLAG_BLUE, k);
   }
   const frames = [0, 1, 2, 3].map(f => {
     const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -1633,7 +1633,7 @@ function initBuildingSprites() {
   BSPR.gateIcon = tall ? ga1 : spriteFromCanvas(ic);
   // orkské podoby stavieb hráča: budovy hordy, ktoré už poznáme z tábora, plus palisáda, brána a jedový kotol
   Object.assign(OBSPR, {
-    hall: [1, 2, 3, 4, 5].map(l => makeOrcKeep(l)), tower: [1, 2, 3, 4, 5].map(l => makeOrcTower(true, l)),
+    hall: [1, 2, 3, 4, 5].map(l => typeof ORC_CASTLE_ART !== 'undefined' && ORC_CASTLE_ART.lv[l - 1] ? artBuilding(ORC_CASTLE_ART, l - 1, 'ownFlag') : makeOrcKeep(l)), // pevnosť z PixelLabu (orc-castle-art.js), chýbajúce úrovne stará kresba tower: [1, 2, 3, 4, 5].map(l => makeOrcTower(true, l)),
     mage: [1, 2, 3, 4, 5].map(l => makeOrcFireTotem(l)), icetower: [1, 2, 3, 4, 5].map(l => makeOrcPoison(l)),
     ballista: makeOrcTrebuchet(3), ballistaFired: makeOrcTrebuchet(3, true), // trebuchet hráča strieľa nahor, nevylepšuje sa
     barracks: BSPR.orcBarracks, range: BSPR.goblinRange, stables: BSPR.wolfPen, armory: BSPR.brutePit, falconry: BSPR.batCave[0],

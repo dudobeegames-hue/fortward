@@ -1775,14 +1775,20 @@
         }
       }
     }
-    // šaman lieči okolie; ľudský mních (hráč za orkov) lieči ako mních hráča: priebežne, so svetlom na palici a aurou
+    // šaman lieči okolie; ľudský mních (hráč za orkov) lieči ako mních hráča za ľudí: jedného zraneného (najviac poškodeného),
+    // drží sa ho, kým ho nevylieči; z dosahu HEAL_RANGE zastane, natočí sa k nemu a čaruje (svetelný stĺp na liečenom)
     if (e.d.heals && isOrc()) {
-      let tg = null, worst = 1;
-      for (const o of st.enemies) if (!o.dead && o !== e && o.hp < o.max && Math.hypot(o.x - e.x, o.y - e.y) < 34 && o.hp / o.max < worst) { worst = o.hp / o.max; tg = o; }
-      e.healTgt = tg;
-      if (tg) for (const o of st.enemies) if (!o.dead && o !== e && o.hp < o.max && Math.hypot(o.x - e.x, o.y - e.y) < 34) {
-        o.hp = Math.min(o.max, o.hp + o.max * 0.06 * dt);
-        if (o === tg && Math.random() < 0.2) part(o.x + (Math.random() - 0.5) * 8, o.y - 4 - Math.random() * 10, (Math.random() - 0.5) * 6, -14, 0.6, Math.random() < 0.5 ? '#bfe3ff' : '#ffffff', 0);
+      const ok = o => !!o && !o.dead && o !== e && !o.d.heals && o.hp < o.max && st.enemies.includes(o);
+      if (!ok(e.healTgt) || Math.hypot(e.healTgt.x - e.x, e.healTgt.y - e.y) > HEAL_RANGE + 6) {
+        let tg = null, worst = 1;
+        for (const o of st.enemies) if (ok(o) && Math.hypot(o.x - e.x, o.y - e.y) <= HEAL_RANGE && o.hp / o.max < worst) { worst = o.hp / o.max; tg = o; }
+        e.healTgt = tg;
+      }
+      const tg = e.healTgt;
+      if (tg) {
+        tg.hp = Math.min(tg.max, tg.hp + tg.max * 0.12 * dt);
+        if (Math.random() < 0.2) part(tg.x + (Math.random() - 0.5) * 8, tg.y - 4 - Math.random() * 10, (Math.random() - 0.5) * 6, -14, 0.6, Math.random() < 0.5 ? '#bfe3ff' : '#ffffff', 0);
+        if (!e.guard) { e.attacking = false; e.foe = null; return; } // počas kúzla stojí (ako mních hráča)
       }
     } else if (e.d.heals) {
       e.healT = (e.healT || 2) - dt;
@@ -3603,6 +3609,7 @@
     else if (moving) turn8(e, sd, 5);
     if (e.face8 == null) e.face8 = 2;
     if (e.castT > 0 && e.totemFace != null) { const p = 1.6 - e.castT; e.face8 = e.totemFace; return set[e.face8].atk[p < 0.18 ? 0 : p < 0.36 ? 1 : 2]; } // šaman zapichol palicu
+    if (e.healTgt && !e.healTgt.dead && e.d.heals && set[e.healTgt.y < e.y - 2 ? 6 : 2].atk) { e.face8 = e.healTgt.y < e.y - 2 ? 6 : 2; const c = set[e.face8].atk; return c[Math.floor(performance.now() / 120) % c.length]; } // mních lieči: kúzlo len smerom hore a dole, snímky útoku dokola (ako liečiteľ hráča)
     const v = set[e.face8];
     if (set.bow) { if (e.lunge > 0) return v.atk[1]; if (busy) return v.atk[0]; }
     else if (e.lunge > 0) return v.atk[e.lunge > 0.075 ? 1 : 2];
@@ -5943,7 +5950,7 @@
       else if (st.king && kingLying(st.king)) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
     }
     for (const e of st.enemies) {
-      objs.push({ y: e.d.fly ? 9990 : dpt(e), id: 1e5 + (e._id || (e._id = ++enemyN)), f: () => { drawEnemy(e, time); if (e.healTgt && !e.healTgt.dead && foeSpr(e.d.spr) === 'monk') drawStaffGlow(e, time); } }); // letci (netopiere) sa kreslia ponad hradby a stavby
+      objs.push({ y: e.d.fly ? 9990 : dpt(e), id: 1e5 + (e._id || (e._id = ++enemyN)), f: () => { drawEnemy(e, time); if (e.healTgt && !e.healTgt.dead && foeSpr(e.d.spr) === 'monk' && !SPR.monk8) drawStaffGlow(e, time); } }); // letci (netopiere) sa kreslia ponad hradby a stavby
       const t = e.healTgt; // aura liečeného (ako pri mníchovi hráča)
       if (t && !t.dead && !e.dead && foeSpr(e.d.spr) === 'monk') objs.push({ y: t.y - healAuraH(t) - 1, f: () => drawHealAura(e, t, time) });
     }
