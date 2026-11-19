@@ -496,6 +496,8 @@ function initOrcSprites() {
   lazySpr('garcher8', () => Object.assign(typeof GARCHER_ART !== 'undefined' ? buildArt8(GARCHER_ART, null, 4) : buildUnit8({ body: GA8, bow: GA8_BOW, hand: GB8_HAND, legs: GOB_LEGS, fist: 'o' }), { bow: true }));
   // goblin s nožíkom z PixelLabu, jemná kresba (gobknife-art.js): lacná jednotka Orkského baraku, atk = prikrčenie, bodnutie, sek
   lazySpr('gobknife8', () => buildArt8(GOBKNIFE_ART, null, 3));
+  // goblin-opravár z PixelLabu, jemná kresba (gobrepair-art.js): Dielňa za orkov, atk = 4 údery paličkou pri oprave
+  lazySpr('gobrepair8', () => buildArt8(GOBREPAIR_ART, null, 3));
   lazySpr('sapper8', () => buildUnit8({ body: SA8, hand: GB8_HAND, legs: GOB_LEGS, noWeapon: true, fist: 'o' }));
   // orkský bojovník z PixelLabu, jemná kresba (orc-art.js): atk = napriahnutie, sek, dokončenie; stará kresba ostáva ako záloha
   lazySpr('orc8', () => typeof ORC_ART !== 'undefined' ? buildArt8(ORC_ART, null, 4) : buildUnit8({ body: OR8, hand: OR8_HAND, legs: orcLegs('o', 'q', 'd'), axe: [6, 2.5], fist: 'o' }));

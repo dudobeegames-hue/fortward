@@ -715,7 +715,7 @@
   // rozloženie tábora z editora hradov (misie mimo domovského ostrova si ho požičiavajú)
   const castleLay = m => typeof CASTLES !== 'undefined' && CASTLES[foeRace()] && CASTLES[foeRace()][missionDef(m).castle || m];
   // jednotky hráča za orkov: rovnaké roly, orkský vzhľad (rytier → ork, kopijník → surovec, jazdec → vlčí jazdec, …)
-  const ORC_SPR = { soldier: 'orc', spear: 'brute', rider: 'wolf', footArcher: 'garcher', monk: 'shaman', monkCast: 'shaman', craft: 'goblin',
+  const ORC_SPR = { soldier: 'orc', spear: 'brute', rider: 'wolf', footArcher: 'garcher', monk: 'shaman', monkCast: 'shaman', craft: 'gobrepair',
     archer: 'garcher', knight: 'orc', siegeRam: 'oSiegeRam', siegeCat: 'oSiegeCat' };
   const raceSpr = k => (isOrc() && ORC_SPR[k]) || k;
   // za orkov útočia ľudia: rovnaké druhy nepriateľov, vzhľad ľudských jednotiek (goblin → rytier, ork → kopijník, …)
@@ -3880,7 +3880,7 @@
       const set = (u.gold && SPR[sprName + 'G8']) || SPR[sprName + '8']; // zlaté brnenie z budovy najvyššej úrovne
       const repair = u.helper === 'workshop'; // goblin-opravár (za orkov) nosí kladivo, pri oprave stojí chrbtom a klepe do budovy
       const heal = u.helper === 'chapel' && u.working && u.tgt && !u.tgt.dead; // liečiteľ: kúzlo má len smerom hore a dole – natočí sa podľa cieľa
-      const hammer = repair && set === SPR.craft8; // remeselník z PixelLabu má údery kladivom v snímkach útoku
+      const hammer = (set === SPR.craft8 || set === SPR.gobrepair8) && u.helper === 'workshop'; // remeselník / goblin-opravár z PixelLabu má údery kladivom v snímkach útoku
       if (repair && u.working) { if (hammer && u.tgt) { const bc = bCenter(u.tgt); u.face8 = dir8(bc.x - u.x, bc.y - u.y); u._lx = u.x; u._ly = u.y; } else u.face8 = 6; } // natočí sa k opravovanej budove
       const totem = totemOn(u); // šaman so zapichnutým totemom: napriahne sa, zapichne palicu a stojí (len šikmé smery kúzla)
       if (totem) { u.face8 = u.totemFace; u._lx = u.x; u._ly = u.y; drawTotemAura(u); }
