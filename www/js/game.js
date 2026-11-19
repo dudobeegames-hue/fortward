@@ -785,6 +785,13 @@
     }
   }
   // hradby tábora pre hordu (bez brány) – pamätá sa, kým sa nezbúra niektorá hradba
+  // je medzi dvoma bodmi hradba tábora (bez brány)? cez múr sa nebojuje – vojak aj nepriateľ musia obísť bránou
+  function campWallBetween(a, b) {
+    if (!st.camp) return false;
+    const d = Math.hypot(b.x - a.x, b.y - a.y), n = Math.ceil(d / 3);
+    for (let k = 1; k < n; k++) { const t = tileAt(a.x + (b.x - a.x) * k / n, a.y + (b.y - a.y) * k / n); if (campWallFoe(t.c, t.r)) return true; }
+    return false;
+  }
   function campWallFoe(c, r) {
     if (!st.camp || c < 0 || r < 0 || c >= G.cols || r >= G.rows) return false;
     if (!st.eBlk || st.eBlk.v !== st.campV || st.eBlk.camp !== st.camp) st.eBlk = { v: st.campV, camp: st.camp, b: campBlocks() };
@@ -1851,8 +1858,9 @@
     if (!e.foe && !e.d.ram && !e.d.sapper && !e.d.fly && sk0 && !sk0.dead && heroDef().range && Math.hypot(sk0.x - e.x, sk0.y - e.y) < 14) e.foe = sk0;
     if (e.foe) {
       const fd = Math.hypot(e.foe.x - e.x, e.foe.y - e.y);
-      if (fd < (e.foe.siege ? 17 : 12)) { attack(() => hitUnit(e.foe, e.d.atk * 0.7 * 1)); return; }
-      if (e.foe.siege && fd < SIEGE_AGGRO + 14) { moveTo(e, e.foe.x + (e.x < e.foe.x ? -10 : 10), e.foe.y + 2, spd, dt); return; } // beží k obliehaciemu stroju
+      if (campWallBetween(e, e.foe)) e.foe = null; // cez vlastnú hradbu sa nebije – ide ďalej k bráne
+      else if (fd < (e.foe.siege ? 17 : 12)) { attack(() => hitUnit(e.foe, e.d.atk * 0.7 * 1)); return; }
+      if (e.foe && e.foe.siege && fd < SIEGE_AGGRO + 14) { moveTo(e, e.foe.x + (e.x < e.foe.x ? -10 : 10), e.foe.y + 2, spd, dt); return; } // beží k obliehaciemu stroju
       e.foe = null;
     }
     // goblin-lukostrelec: zastaví v dosahu a strieľa
@@ -2271,10 +2279,11 @@
       if (u.atkT !== t) { u.atkT = t; u.atkSide = u.x < t.x ? -1 : 1; u.inReach = false; u.bestD = d; u.noProg = 0; }
       // tesne pri cieli, no tlačenica či hradba ho ďalej nepustí (pol sekundy sa nepriblížil): udrie odtiaľ, kde stojí
       if (d < u.bestD - 0.5) { u.bestD = d; u.noProg = 0; } else u.noProg += dt;
-      const inReach = d <= reach + (u.inReach ? 4 : 0) || (d <= reach + 3 && u.noProg > 0.5); // kto už bojuje, toho drobné odtlačenie nevytrhne z boja
+      const inReach = (d <= reach + (u.inReach ? 4 : 0) || (d <= reach + 3 && u.noProg > 0.5)) && !campWallBetween(u, t); // kto už bojuje, toho drobné odtlačenie nevytrhne z boja; cez hradbu tábora nie
       u.inReach = inReach;
       // viacerí na jedného: obstúpia ho z bokov a mierne nad/pod sebou, nestoja v jednom bode
-      if (!inReach) {
+      if (!inReach && u.swing > 0) { } // rozbehnutý úder dokončí na mieste – počas švihu sa nepohne (inak by sa so sekerou šmýkal)
+      else if (!inReach) {
         let ax = t.x + u.atkSide * off;
         let ay = t.y + 1 + (u.isKing ? 0 : ((u.slot || 0) % 3 - 1) * (rider ? 5 : 4));
         if (go === moveKnight) { // bod vedľa nepriateľa padol do hradby (nepriateľ za ňou): druhá strana, inak priamo k nemu – cez bránu
@@ -3819,14 +3828,16 @@
     u._lx = u.x; u._ly = u.y;
     const t = u.archer ? (u.aimT && !u.aimT.dead ? u.aimT : null) : u.tgt && !u.tgt.dead ? u.tgt : null;
     const near = t && (u.archer || Math.hypot(t.x - u.x, t.y - u.y) < (u.ktype === 'spear' ? SPEAR_REACH + 5 : 14)); // kopijník bodá z diaľky
-    // chôdza = jednotka sama kráča (moveTo); odtlačenie susedom v tlačenici chôdza nie je (kôň by inak prepínal snímky klusu)
-    const d = Math.hypot(mvx, mvy), walked = performance.now() - (u._walkT || 0) < 100;
+    // chôdza = jednotka sama kráča (moveTo); drobné odtlačenie susedom chôdza nie je (kôň by inak prepínal snímky klusu),
+    // väčšie odtlačenie (viac ako štvrť bodu za snímku) už áno – inak by sa jednotka v rade šmýkala bez krokov
+    const d = Math.hypot(mvx, mvy), walked = performance.now() - (u._walkT || 0) < 100 || d > 0.25;
     const moving = stillFor(u, walked) < 6; // dobeh: zastavenie na pár snímok (naháňanie, dorovnanie pri stavbe) neprepne na státie – obraz by preskakoval
     if (walked) u._wd = (u._wd || 0) + d;
     const sd = smoothDir(u, mvx, mvy);
-    // jazda (kôň, vlk) necúva: keď ide naozaj dozadu (o 3 a viac osmín od smeru pohľadu), otočí sa smerom jazdy, aj keď má cieľ blízko
+    // nikto necúva: keď ide naozaj dozadu (o 3 a viac osmín od smeru pohľadu), otočí sa smerom chôdze – aj pri cieli či pri
+    // dorovnaní na miesto v šíku; len lukostrelec, ktorý mieri, ostane natočený k cieľu (ustupuje inak, cez u.retreat)
     const od = u.face8 == null ? 0 : Math.min((sd - u.face8 + 8) % 8, (u.face8 - sd + 8) % 8);
-    if (u.ktype === 'rider' && moving && od >= 3 && Math.hypot(u._svx, u._svy) > 0.12) turn8(u, sd, 2);
+    if (moving && od >= 3 && Math.hypot(u._svx, u._svy) > 0.12 && !(u.archer && near && !u.retreat)) turn8(u, sd, 2);
     else if (near) turn8(u, dir8(t.x - u.x, t.y - u.y), u.archer ? 8 : 3); // lukostrelec sa otáča pomalšie (cieľ prechádza medzi smermi)
     else if (moving && (u.retreat || !(st.phase === 'battle' && u.fslot && Math.hypot(u.fslot.x - u.x, u.fslot.y - u.y) < 5))) turn8(u, sd, u.retreat ? 2 : 5); // drobné dorovnanie na miesto v šíku (po odtlačení) ho neotočí; ústup lukostrelca áno (inak cúva)
     else if (!t) turn8(u, u.helper && !(u.helper === 'chapel' && st.phase === 'battle') ? 2 : 6, 5); // bez cieľa: vojaci aj liečiteľ v boji (v šíku) k horde, remeselník a liečiteľ mimo boja k hráčovi (na juh)
@@ -7249,7 +7260,10 @@
     }
     if (!pk) return;
     const cell = siegeCell(x, y);
-    if (!siegeSpotOk(cell.c, cell.r, pk.order || pk.unit)) { AUDIO.play('deny'); return; } // len voľné políčko pri vlastnom území
+    if (!siegeSpotOk(cell.c, cell.r, pk.order || pk.unit)) { // len voľné políčko pri vlastnom území; zdvihnutý stroj ťuk vedľa pustí (výber sa zruší)
+      if (!pk.key) { st.siegePick = null; AUDIO.play('click'); renderBuild(); return; }
+      AUDIO.play('deny'); return;
+    }
     ({ x, y } = siegeCellPos(cell.c, cell.r));
     if (pk.key) {
       if (siegeCount(pk.key) >= SIEGE_MAX || st.gold < BUY[pk.key].cost) { st.siegePick = null; AUDIO.play('deny'); renderBuild(); return; }
