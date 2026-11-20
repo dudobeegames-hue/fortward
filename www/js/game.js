@@ -3638,13 +3638,14 @@
       if (set8.vox) { // baran, obrí baran, mamut: 3D model, akcia = úder kmeňom či dupnutie
         const mvx = e.x - (e._lx == null ? e.x : e._lx), mvy = e.y - (e._ly == null ? e.y : e._ly), d = Math.hypot(mvx, mvy);
         e._lx = e.x; e._ly = e.y;
-        const moving = d > 0.02 && !e.attacking;
-        if (moving) { e._wd = (e._wd || 0) + d; e.face8 = dir8(mvx, mvy); }
+        if (d > 0.02) e._mvT = performance.now(); // obraz sa kreslí častejšie ako krok hry (60/s) – snímka bez posunu ešte nie je státie (inak bliká chôdza/státie a stroj seká)
+        const moving = !e.attacking && performance.now() - (e._mvT || 0) < 120;
+        if (moving && d > 0.02) { e._wd = (e._wd || 0) + d; e.face8 = dir8(mvx, mvy); }
         else if ((e.attacking || e.lunge > 0) && e.aimP) e.face8 = e.d.ram ? (e.aimP.y < e.y ? 6 : 2) : dir8(e.aimP.x - e.x, e.aimP.y - e.y); // baranidlo búši len nahor alebo nadol
         if (e.face8 == null) e.face8 = 2;
         const v = set8[e.face8];
         fr = e.lunge > 0 ? v.act : set8.art && e.attacking && e.atk < 0.4 ? v.atk[Math.floor((1 - e.atk / 0.4) * (v.atk.length - 1))] : moving ? v.walk[Math.floor(e._wd / set8.stride) % v.walk.length] : v.idle; // kresba z PixelLabu: napriahnutie pred nárazom
-        x = Math.round(e.x - fr.ax); y = Math.round(e.y - fr.ay);
+        x = Math.round((e.x - fr.ax) * BR) / BR; y = Math.round((e.y - fr.ay) * BR) / BR; // jemná kresba: posun po polbodoch, pomalý stroj sa inak posúva trhane
       } else {
         if (e.castT > 0) drawTotemAura(e); // šaman hordy so zapichnutou palicou
         fr = enemy8Frame(e, set8); x = Math.round(e.x - fr.w / 2); y = Math.round(e.y - fr.h) + U8_PB;
@@ -3878,9 +3879,11 @@
   function drawSiege8(u, set) {
     const mvx = u.x - (u._lx == null ? u.x : u._lx), mvy = u.y - (u._ly == null ? u.y : u._ly);
     u._lx = u.x; u._ly = u.y;
-    const d = Math.hypot(mvx, mvy), moving = d > 0.03 && d < 8 && performance.now() - (u._walkT || 0) < 150; // ide sám (nie odtlačenie)
+    const d = Math.hypot(mvx, mvy); // obraz sa kreslí častejšie ako krok hry (60/s): snímka bez posunu ešte nie je státie (inak bliká chôdza/státie a stroj seká)
+    if (d > 0.03 && d < 8) u._mvT = performance.now();
+    const moving = performance.now() - (u._walkT || 0) < 150 && performance.now() - (u._mvT || 0) < 120; // ide sám (nie odtlačenie)
     const busy = set.art && (u.siege === 'cat' ? u.fired > 0.3 : u.siege === 'ram' && u.swing > 0); // pri výstrele či údere sa neotáča, ani keď ho susedia odtlačia
-    if (moving) { u._svx = (u._svx || 0) * 0.92 + mvx * 0.08; u._svy = (u._svy || 0) * 0.92 + mvy * 0.08; } // ťažký voz mení smer pomaly
+    if (moving && d > 0.03) { u._svx = (u._svx || 0) * 0.92 + mvx * 0.08; u._svy = (u._svy || 0) * 0.92 + mvy * 0.08; } // ťažký voz mení smer pomaly
     const sd = dir8(u._svx || 0, u._svy || 0);
     if (moving && !busy) { u._wd = (u._wd || 0) + d; turn8(u, sd, 14); } // smer len vyhladený a s oneskorením – cik-cak po ceste ani krátke uhnutie ho neotočí
     else if ((busy || !moving) && u.aimP && (u.fired > 0 || u.cd > 0)) { // katapult z PixelLabu strieľa len na sever alebo na juh
@@ -3892,7 +3895,7 @@
     const act = k === 'ram' ? u.swing > 0 && (set.art || u.swing < 0.25) : u.fired > (set.art ? 0.3 : 0.4);
     const fr = act ? (k === 'ram' ? siegeAtkFrame(v, u.swing, RAM_SWING) : k === 'cat' && set.art ? siegeFireFrame(v, u.fired) : v.act) : moving ? v.walk[Math.floor(u._wd / set.stride) % v.walk.length] : v.idle;
     shadow(u.x, u.y, 9);
-    g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.ax), Math.round(u.y - fr.ay), fr.w, fr.h); // jemná kresba má plátno 2× väčšie
+    g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round((u.x - fr.ax) * BR) / BR, Math.round((u.y - fr.ay) * BR) / BR, fr.w, fr.h); // jemná kresba má plátno 2× väčšie – posun po polbodoch (pomalý stroj sa inak posúva trhane)
   }
   function drawFighter(u, sprName) {
     if (u.siege) return drawSiege8(u, SPR[sprName + '8']);
@@ -6104,8 +6107,8 @@
   // pásik vlny: plný na začiatku vlny, plynule ubúda a zmizne, keď na bojisko vstúpi posledný nepriateľ (pri útoku na hrad nie je)
   const foesShown = () => st.phase === 'battle' && !isAssault() && st.waveSpan > 0 && st.spawnQ.length > 0;
   function foesTick() {
-    const on = foesShown(), box = $('hud-foes');
-    if (box.hidden === on) box.hidden = !on;
+    const on = foesShown(), box = $('foesBar');
+    if (box.hidden === on) { box.hidden = !on; $('hud-wave').classList.toggle('foes', on); } // údaj o vlne a pásik v jednej kolónke
     if (!on) return;
     const w = Math.round(Math.min(1, spawnLeft() / st.waveSpan) * 1000) / 10 + '%';
     if ($('foesFill').style.width !== w) $('foesFill').style.width = w;

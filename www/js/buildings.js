@@ -1646,10 +1646,16 @@ function initBuildingSprites() {
     for (let m = 0; m < (lv ? lv.length : 16); m++) OBSPR.wall[l - 1][m] = lv ? artBuilding({ chars: ORC_WALL_ART.chars, pal: ORC_WALL_ART.pal, lv }, m, false) : makeWall(m, l, true);
   }
   OBSPR.gatehouse = [1, 2, 3, 4, 5].map(l => makeGatehouse(l, true));
-  const oc = document.createElement('canvas'); oc.width = 16; oc.height = 33;
-  const ox = oc.getContext('2d');
-  ox.drawImage(OBSPR.wall[1][10].c, 0, 9); ox.drawImage(OBSPR.gatehouse[1].c, 0, 0);
-  OBSPR.gateIcon = spriteFromCanvas(oc);
+  // orkské brány z PixelLabu (OG1–OG3, index podoby hradby); oranžová vlajka ako na pevnosti veje a neprefarbí sa
+  const ogSpr = rows => artBuilding({ chars: ORC_WALL_ART.chars, pal: ORC_WALL_ART.pal, lv: [rows] }, 0, 'ownFlag');
+  OBSPR.gateArt = typeof ORC_WALL_ART === 'undefined' ? [] : (ORC_WALL_ART.gate || []).map(gt => gt ? Object.assign(ogSpr(gt.rows), { flags: gt.flags, v: gt.v ? ogSpr(gt.v) : null }) : null);
+  if (OBSPR.gateArt[0]) OBSPR.gateIcon = OBSPR.gateArt[0];
+  else {
+    const oc = document.createElement('canvas'); oc.width = 16; oc.height = 33;
+    const ox = oc.getContext('2d');
+    ox.drawImage(OBSPR.wall[1][10].c, 0, 9); ox.drawImage(OBSPR.gatehouse[1].c, 0, 0);
+    OBSPR.gateIcon = spriteFromCanvas(oc);
+  }
 }
 
 // orkské hradby majú 3 podoby: úroveň 1–2 = OW1, 3–4 = OW2, 5 = OW3 (kým OW3 nie je, ostane OW2)
@@ -1661,7 +1667,7 @@ let BUILD_RACE = 'human';
 const OBSPR = {}; // orkské podoby stavieb hráča
 const wallsOf = () => BUILD_RACE === 'orc' ? OBSPR.wall : BSPR.wall;
 const gatesOf = () => BUILD_RACE === 'orc' ? OBSPR.gatehouse : BSPR.gatehouse;
-const gateArtOf = wl => BUILD_RACE !== 'orc' && BSPR.gateArt && BSPR.gateArt[wl]; // brána z PixelLabu (nahrádza úsek hradby) alebo nič
+const gateArtOf = wl => BUILD_RACE === 'orc' ? (OBSPR.gateArt && OBSPR.gateArt[orcWallArtIdx(wl)]) || null : BSPR.gateArt && BSPR.gateArt[wl]; // brána z PixelLabu (nahrádza úsek hradby) alebo nič
 function bsprOf(kind, lvl) {
   const v = (BUILD_RACE === 'orc' && OBSPR[kind]) || BSPR[kind];
   return Array.isArray(v) ? v[Math.max(1, Math.min(5, lvl || 1)) - 1] : v;
