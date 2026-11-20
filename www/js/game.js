@@ -1927,12 +1927,12 @@
     const attack = e.d.sapper ? () => explode(e) : attackFn;
 
     // súboj s rytierom / kráľom (beranidlo a podkopník rytierov ignorujú)
-    if (e.d.ram || e.d.sapper) e.foe = null;
+    if (e.d.ram || e.d.sapper || e.d.heals) e.foe = null; // liečiteľ (šaman, mních) sa nebije – za baranidlom či vojakom nebehá
     if (e.foe && (e.foe.dead || e.foe.down > 0)) e.foe = null;
-    if (!e.foe && !e.d.ram && !e.d.sapper) for (const s of st.soldiers) if ((s.helper || s.archer || (s.siege && !e.d.fly && !e.d.ranged) || s.hexbat) && (!s.fly || s.hexbat) && !s.dead && Math.hypot(s.x - e.x, s.y - e.y) < (s.siege ? SIEGE_AGGRO : 9)) { e.foe = s; break; } // aj obliehací stroj v okolí
+    if (!e.foe && !e.d.ram && !e.d.sapper && !e.d.heals) for (const s of st.soldiers) if ((s.helper || s.archer || (s.siege && !e.d.fly && !e.d.ranged) || s.hexbat) && (!s.fly || s.hexbat) && !s.dead && Math.hypot(s.x - e.x, s.y - e.y) < (s.siege ? SIEGE_AGGRO : 9)) { e.foe = s; break; } // aj obliehací stroj v okolí
     // čarodejka nikoho nenapadne mečom, preto si ju horda nájde sama, keď je blízko
     const sk0 = st.king;
-    if (!e.foe && !e.d.ram && !e.d.sapper && !e.d.fly && sk0 && !sk0.dead && heroDef().range && Math.hypot(sk0.x - e.x, sk0.y - e.y) < 14) e.foe = sk0;
+    if (!e.foe && !e.d.ram && !e.d.sapper && !e.d.heals && !e.d.fly && sk0 && !sk0.dead && heroDef().range && Math.hypot(sk0.x - e.x, sk0.y - e.y) < 14) e.foe = sk0;
     if (e.foe) {
       const fd = Math.hypot(e.foe.x - e.x, e.foe.y - e.y);
       if (campWallBetween(e, e.foe)) e.foe = null; // cez vlastnú hradbu sa nebije – ide ďalej k bráne
@@ -6332,7 +6332,8 @@
   // ikona jednotky: nová kresba z PixelLabu (jemná, státie tvárou k nám, orezané na postavu, 2× jej pixely), inak stará kresba 3×
   function unitIcon(k) {
     const s8 = SPR[raceSpr(k) + '8'], f = s8 && s8[2].idle;
-    if (!f || !f.hd) return SPR[raceSpr(k)] ? spriteURL(SPR[raceSpr(k)][0], 3) : ICONS['u_' + k];
+    if (f && !f.hd) return spriteURL(trimmed(f), 3); // sada v 8 smeroch bez jemnej kresby – tá istá postava ako na bojisku (nie stará kresba)
+    if (!f) return SPR[raceSpr(k)] ? spriteURL(SPR[raceSpr(k)][0], 3) : ICONS['u_' + k];
     const c = f.c, d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
     let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
     for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
@@ -6342,7 +6343,7 @@
   function unitIcons() {
     const sp = k => SPR[raceSpr(k)][0];
     ICONS.u_knight = unitIcon('soldier'); ICONS.u_footArcher = unitIcon('footArcher');
-    ICONS.u_archer = spriteURL(sp('archer'), 3); ICONS.u_crossbow = spriteURL(sp('knight'), 3);
+    ICONS.u_archer = ICONS.u_footArcher; ICONS.u_crossbow = spriteURL(sp('knight'), 3); // lukostrelec (vojsko aj na hradbách) = ten istý z PixelLabu ako na bojisku
     ICONS.u_spear = unitIcon('spear'); ICONS.u_gob = unitIcon('gobknife'); ICONS.u_rider = unitIcon('rider'); ICONS.u_monk = unitIcon('monk'); ICONS.u_craft = unitIcon('craft'); // aj oddiely pri útoku na hrad
     ICONS.u_falcon = isOrc() ? unitIcon('bat') : unitIcon('falcon'); // netopier (bat-art.js) či sokol z PixelLabu // sokol z PixelLabu
     for (const k of ['siegeRam', 'siegeCat']) { const sp = SPR[raceSpr(k) + "8"][1].idle; ICONS['u_' + k] = sp.hd ? spriteURL(trimmed({ c: sp.c, sil: sp.sil, w: sp.c.width, h: sp.c.height }), 1) : spriteURL(trimmed(sp), 2); } // jemná kresba v jej rozlíšení
