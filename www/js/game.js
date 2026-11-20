@@ -1177,8 +1177,8 @@
         o.cd = 1.5;
         st.eproj.push({ x: o.x, y: o.y - 28, tx: tg.x, ty: tg.y - (tg.fly ? 16 : 6), tgt: tg, dmg: 5 * pw * campPowMul(o.lvl) });
       } else if (o.role === 'totem') { // horda sa pomaly lieči
-        for (const e of st.enemies) if (!e.dead && e.hp < e.max) {
-          e.hp = Math.min(e.max, e.hp + e.max * CAMP_TOTEM * (1 + 0.25 * (o.lvl - 1)) * dt); // vyšší totem lieči rýchlejšie
+        for (const e of st.enemies) if (!e.dead && e.hp < e.max && healable(e)) {
+          e.hp = Math.min(e.max, e.hp + healBase(e) * CAMP_TOTEM * (1 + 0.25 * (o.lvl - 1)) * dt); // vyšší totem lieči rýchlejšie
           if (Math.random() < 0.01) part(e.x + (Math.random() - 0.5) * 6, e.y - e.h * 0.6, 0, -12, 0.5, '#5aff8a', 0);
         }
         if (Math.random() < 0.15) part(o.x + (Math.random() - 0.5) * 6, o.y - 22, (Math.random() - 0.5) * 6, -10, 0.6, '#5aff8a', 0);
@@ -1847,7 +1847,7 @@
     // šaman lieči okolie; ľudský mních (hráč za orkov) lieči ako mních hráča za ľudí: jedného zraneného (najviac poškodeného),
     // drží sa ho, kým ho nevylieči; z dosahu HEAL_RANGE zastane, natočí sa k nemu a čaruje (svetelný stĺp na liečenom)
     if (e.d.heals && isOrc()) {
-      const ok = o => !!o && !o.dead && o !== e && !o.d.heals && o.hp < o.max && st.enemies.includes(o);
+      const ok = o => !!o && !o.dead && o !== e && !o.d.heals && healable(o) && o.hp < o.max && st.enemies.includes(o);
       if (!ok(e.healTgt) || Math.hypot(e.healTgt.x - e.x, e.healTgt.y - e.y) > HEAL_RANGE + 6) {
         let tg = null, worst = 1;
         for (const o of st.enemies) if (ok(o) && Math.hypot(o.x - e.x, o.y - e.y) <= HEAL_RANGE && o.hp / o.max < worst) { worst = o.hp / o.max; tg = o; }
@@ -1855,7 +1855,7 @@
       }
       const tg = e.healTgt;
       if (tg) {
-        tg.hp = Math.min(tg.max, tg.hp + tg.max * 0.12 * dt);
+        tg.hp = Math.min(tg.max, tg.hp + healBase(tg) * 0.12 * dt);
         if (Math.random() < 0.2) part(tg.x + (Math.random() - 0.5) * 8, tg.y - 4 - Math.random() * 10, (Math.random() - 0.5) * 6, -14, 0.6, Math.random() < 0.5 ? '#bfe3ff' : '#ffffff', 0);
         if (!e.guard) { e.attacking = false; e.foe = null; return; } // počas kúzla stojí (ako mních hráča)
       }
@@ -1863,14 +1863,14 @@
       e.healT = (e.healT || 2) - dt;
       if (e.castT > 0) e.castT -= dt;
       // palicu zapichne (a chvíľu stojí s aurou) len vtedy, keď má pri sebe zraneného spojenca; inak ide ďalej s hordou
-      const hurt = e.healT <= 0 ? st.enemies.filter(q => !q.dead && q !== e && !q.d.heals && q.hp < q.max && Math.hypot(q.x - e.x, q.y - e.y) < 34) : [];
+      const hurt = e.healT <= 0 ? st.enemies.filter(q => !q.dead && q !== e && !q.d.heals && healable(q) && q.hp < q.max && Math.hypot(q.x - e.x, q.y - e.y) < 34) : [];
       if (e.healT <= 0 && !hurt.length) e.healT = 0.4; // nikto zranený nablízku – skúsi o chvíľu znova
       else if (e.healT <= 0) {
         e.healT = 2;
         e.castT = 1.6; // zapichne palicu a chvíľu stojí (aura na zemi)
         e.totemFace = diag8(hurt[0].x - e.x, hurt[0].y - e.y);
         for (const o of hurt) {
-          o.hp = Math.min(o.max, o.hp + o.max * 0.12);
+          o.hp = Math.min(o.max, o.hp + healBase(o) * 0.12);
           for (let k = 0; k < 3; k++) part(o.x + (Math.random() - 0.5) * 6, o.y - o.h * 0.6, 0, -14, 0.6, '#9cd45a', 0);
         }
         for (let k = 0; k < 8; k++) { const a = k / 8 * 6.28; part(e.x + Math.cos(a) * 10, e.y - 6 + Math.sin(a) * 6, 0, -6, 0.5, '#5aff8a', 0); }
@@ -1917,7 +1917,7 @@
       for (const o of st.enemies) {
         if (o.dead || o === e || o.d.heals || o.d.fly) continue;
         if (o.y > front) front = o.y;
-        if (o.hp < o.max && Math.hypot(o.x - e.x, o.y - e.y) > 28 && o.y > e.y - 10) needs = true; // zranený spojenec mimo dosahu liečenia
+        if (o.hp < o.max && healable(o) && Math.hypot(o.x - e.x, o.y - e.y) > 28 && o.y > e.y - 10) needs = true; // zranený spojenec mimo dosahu liečenia
       }
       if (!needs && front > -1e9 && e.y > front - 36) { e.attacking = false; return; } // dosť vpredu – čaká
     }
@@ -2855,6 +2855,10 @@
   }
   // mních ide za najviac zraneným rytierom/kráľom, remeselník k najviac poškodenej budove; inak sa vráti domov
   const HEAL_RANGE = 40; // mních lieči kúzlom z tejto vzdialenosti
+  // liečenie hordy (šaman, mních, totem tábora): stroje (baranidlá, obliehacia veža) sa liečiť nedajú; obor (mamut) sa lieči
+  // ako keby mal najviac 200 zdravia – percento z jeho obrovského zdravia by ho liečilo rýchlejšie, než ho hráč stihne zraniť
+  const healable = o => !o.d.ram && foeSpr(o.d.spr) !== 'siegeTower' && foeSpr(o.d.spr) !== 'siegeRam';
+  const healBase = o => o.d.giant ? Math.min(o.max, 200) : o.max;
   // orkský šaman (hráč za orkov): pri zranených zapichne palicu-totem a 5 s stojí – aura lieči a posilňuje bojovníkov okolo;
   // keď šamana zabijú, aura hneď zhasne. Potom chvíľu oddychuje, kým zapichne znova
   const TOTEM = { t: 5, cd: 2.5, r: 34, dmg: 1.25, heal: 0.7 };
@@ -6185,10 +6189,11 @@
   // pásik vlny: plný na začiatku vlny, plynule ubúda a zmizne, keď na bojisko vstúpi posledný nepriateľ (pri útoku na hrad nie je)
   const foesShown = () => st.phase === 'battle' && !isAssault() && st.waveSpan > 0 && st.spawnQ.length > 0;
   function foesTick() {
-    const on = foesShown(), box = $('foesBar');
-    if (box.hidden === on) { box.hidden = !on; $('hud-wave').classList.toggle('foes', on); } // údaj o vlne a pásik v jednej kolónke
-    if (!on) return;
-    const w = Math.round(Math.min(1, spawnLeft() / st.waveSpan) * 1000) / 10 + '%';
+    // údaj o vlne a pásik v jednej kolónke, ktorá sa nezatvára: keď vlna nepribúda (stavanie, posledný nepriateľ už vstúpil), pásik je prázdny
+    const wide = !isAssault(), box = $('foesBar');
+    if (box.hidden === wide) { box.hidden = !wide; $('hud-wave').classList.toggle('foes', wide); }
+    if (!wide) return;
+    const w = foesShown() ? Math.round(Math.min(1, spawnLeft() / st.waveSpan) * 1000) / 10 + '%' : '0%';
     if ($('foesFill').style.width !== w) $('foesFill').style.width = w;
   }
   function hudTick() {
