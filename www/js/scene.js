@@ -97,6 +97,31 @@ function plankRGB(X, Y) {
   return pickRamp(PLANK, Math.max(0, Math.min(1, v)), X, Y);
 }
 
+// orkské dosky v jemnej kresbe (pixel X, Y = 2 × bod hry): doska 6 px široká (3 body), dĺžka 20 px s posunutými koncami;
+// škára 1 px, svetlá ľavá a horná hrana, zatienená pravá a spodná, pozdĺžne letokruhy, suky, na koncoch železné klince s leskom.
+// Počíta sa z polohy, takže susedné políčka (aj nádvorie pevnosti) na seba plynulo nadväzujú.
+const PLANK2 = ['#1c120a', '#2a1a0e', '#3e2614', '#523420', '#6e4422', '#86562c', '#a86c38', '#c08848', '#d4a060'].map(hexRGB);
+const NAIL = ['#3a3a44', '#6a6a78', '#a0a0aa', '#d8d8e0'].map(hexRGB);
+const PW = 6, PL = 20; // šírka a dĺžka dosky v pixeloch jemnej kresby
+function plankRGB2(X, Y) {
+  const p = Math.floor(X / PW), x = X - p * PW, o = Math.floor(hash2(p, 0, 31) * PL), Yo = Y + o, seg = Math.floor(Yo / PL), yy = Yo - seg * PL;
+  if (x === 0 || yy === 0) return PLANK2[0];                                                        // škára
+  if ((yy === 2 || yy === PL - 3) && x === 3) return NAIL[hash2(p, seg, 36) > 0.5 ? 3 : 2];          // klinec pri konci dosky (lesk)
+  if ((yy === 3 || yy === PL - 2) && x === 3) return NAIL[0];                                        // jeho tieň
+  let v = 0.55 + (hash2(p, seg, 32) - 0.5) * 0.28;                                                    // každá doska trochu iná
+  const gx = 2 + Math.floor(hash2(p, seg, 37) * 3);                                                  // letokruh (pozdĺžna tmavá čiara)
+  if (x === gx && hash2(p, Math.floor(Yo / 4), 38) > 0.3) v -= 0.15;
+  v += (hash2(X, Math.floor(Yo / 2), 33) - 0.5) * 0.1;                                                // drobná textúra dreva
+  if (x === 1) v += 0.18; else if (x === PW - 1) v -= 0.16;                                          // osvetlená a zatienená hrana
+  if (yy === 1) v += 0.14; else if (yy === PL - 1) v -= 0.18;
+  if (hash2(p, seg, 35) > 0.7) {                                                                     // suk: tmavé očko 2 × 2 so svetlým lemom zhora
+    const ky = 6 + Math.floor(hash2(p, seg, 34) * 8);
+    if ((x === 2 || x === 3) && (yy === ky || yy === ky + 1)) v -= 0.32;
+    else if ((x === 2 || x === 3) && yy === ky - 1) v += 0.1;
+  }
+  return pickRamp(PLANK2, Math.max(0, Math.min(1, v)), X, Y);
+}
+
 // kamenná dlažba v jemnej kresbe (pixel X, Y = 2 × bod hry): tehlička 6 × 5 pixelov (polovica starej), škára 1 px, svetlá horná a ľavá hrana,
 // zatienená spodná a pravá; počíta sa z polohy, takže dlažba hráča a nádvorie radnice na seba nadväzujú
 function paveRGB(X, Y) {
@@ -167,7 +192,7 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard, terr, hd) {
       const dd = R === 1 ? roadD(x, y) : y > G.hallTop + 4 ? 99 : Math.abs(x - cx) - hw + pt(nRoad, pi, (bxp, byp) => (vnoise(bxp * 0.3, byp * 0.3, seed + 3) - 0.5) * 3);
       const yd = yard === 'none' ? 99 : yardD(x, y);
       if (yd < 0 && yard === 'planks') { // orkské nádvorie: hrubé dosky ako orkský chodník, okraj tmavší
-        const c = plankRGB(px / R | 0, yi);
+        const c = R > 1 ? plankRGB2(px, py) : plankRGB(px / R | 0, yi); // pri jemnej kresbe rovnaké dosky ako chodník hráča
         setH(px, py, yd > -2 ? [c[0] * 0.75, c[1] * 0.75, c[2] * 0.75] : c);
       } else if (yd < 0) { // dlaždice nádvoria (pri jemnej kresbe rovnaké ako dlažba hráča – paveRGB)
         if (R > 1) { const c = paveRGB(px, py); setH(px, py, yd > -2 ? [c[0] * 0.8, c[1] * 0.8, c[2] * 0.8] : c); continue; }

@@ -1640,6 +1640,10 @@ function initBuildingSprites() {
     barracks: BSPR.orcBarracks, range: BSPR.goblinRange, stables: BSPR.wolfPen, armory: BSPR.brutePit, falconry: BSPR.batCave[0],
     chapel: BSPR.shamanHut[0], workshop: BSPR.orcTent,
   });
+  // podporné budovy orkov z PixelLabu (orc-*-art.js): baňa, šamanský stan, opravárska chatrč (tábor hordy si nechá svoje kresby)
+  if (typeof ORC_MINE_ART !== 'undefined') OBSPR.mine = artBuilding(ORC_MINE_ART, 0, false);
+  if (typeof ORC_CHAPEL_ART !== 'undefined') OBSPR.chapel = artBuilding(ORC_CHAPEL_ART, 0, false);
+  if (typeof ORC_WORKSHOP_ART !== 'undefined') OBSPR.workshop = artBuilding(ORC_WORKSHOP_ART, 0, false);
   OBSPR.wall = [];
   for (let l = 1; l <= 5; l++) { // palisáda z PixelLabu (orc-wall-art.js, 3 × 16 variantov), chýbajúce úrovne stará kresba
     OBSPR.wall[l - 1] = []; const lv = typeof ORC_WALL_ART !== 'undefined' && ORC_WALL_ART.lv[orcWallArtIdx(l - 1)];

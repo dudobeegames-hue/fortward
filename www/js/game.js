@@ -2427,10 +2427,14 @@
   }
   // ľudské jednotky z budovy najvyššej úrovne majú zlaté brnenie (za orkov nie)
   const goldArmor = b => !isOrc() && b.lvl >= MAX_LVL;
+  // orkovia z budovy najvyššej úrovne: namiesto zlatého brnenia krvavá zúrivosť – červená aura pod nohami a o 10 % viac sily
+  // vojaci z budovy najvyššej úrovne (zlatí ľudia aj orkovia s krvavou zúrivosťou) majú o 10 % viac sily
+  const bloodRage = b => isOrc() && b.lvl >= MAX_LVL, RAGE5_DMG = 1.1;
+  const topMul = b => b.lvl >= MAX_LVL ? RAGE5_DMG : 1;
   function spawnKnight(b, extra, dx) {
     const c = bCenter(b);
     const ktype = unitOf(b) || 'knight', kt = KTYPES[ktype], khp = knightHp(b) * kt.hp;
-    st.soldiers.push({ home: b, extra, gold: goldArmor(b), x: c.x + 1 + (dx || 0), y: tileY(b.r) + T + 1, hp: khp, max: khp, dmg: knightDmg(b) * kt.dmg, spd: kt.spd, spr: kt.spr, ktype, cd: 0, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
+    st.soldiers.push({ home: b, extra, gold: goldArmor(b), rage5: bloodRage(b), x: c.x + 1 + (dx || 0), y: tileY(b.r) + T + 1, hp: khp, max: khp, dmg: knightDmg(b) * kt.dmg * topMul(b), spd: kt.spd, spr: kt.spr, ktype, cd: 0, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
     for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
   }
 
@@ -2560,7 +2564,7 @@
     const n = squadDue(b, dt, Math.max(4, 8 - 0.8 * (b.lvl - 1)), falconCap(b));
     if (!n) return;
     const c = bCenter(b), hp = falconHp(b);
-    for (let i = 0; i < n; i++) st.soldiers.push({ home: b, fly: true, x: c.x + squadDx(i, n), y: tileY(b.r) + 4, hp, max: hp, dmg: falconDmg(b), spd: 52, cd: 0.3, tgt: null, anim: Math.random() * 2, flash: 0, dead: false, slot: st.soldierN++ });
+    for (let i = 0; i < n; i++) st.soldiers.push({ home: b, fly: true, rage5: bloodRage(b), x: c.x + squadDx(i, n), y: tileY(b.r) + 4, hp, max: hp, dmg: falconDmg(b) * topMul(b), spd: 52, cd: 0.3, tgt: null, anim: Math.random() * 2, flash: 0, dead: false, slot: st.soldierN++ });
     for (let k = 0; k < 5; k++) part(c.x, tileY(b.r), (Math.random() - 0.5) * 20, -Math.random() * 20, 0.4, '#d8c0a0', 20);
   }
   function updateFalcon(u, dt) {
@@ -2605,6 +2609,7 @@
     g.drawImage(o.flash > 0 ? hitSpr(fr) : fr.c, Math.round((o.x - fr.w / 2) * 2) / 2, Math.round((o.y - 3 - fr.h + Math.sin(time * 6 + ph) * 1.5) * 2) / 2, fr.w, fr.h);
   }
   function drawFalcon(u, time) {
+    if (u.rage5) drawRage5(u.x, u.y + 2, time, u.slot, 4); // netopier: aura na zemi pod ním (menšia)
     const bob = Math.sin(time * 5 + u.slot) * 1.5;
     if (!isOrc() && !u.hexbat) { drawBat8(u, falconFrame(u, time, SPR.falcon8, u.swing > 0 ? 1 : null), time, u.slot); return; } // sokol (falcon-art.js): pri útoku zásah pazúrmi
     if (SPR.bat8) { drawBat8(u, falconFrame(u, time, SPR.bat8, u.swing > 0 ? 1 : null), time, u.slot); return; } // netopier (za orkov aj zakliaty nepriateľ)
@@ -2620,7 +2625,7 @@
   }
   function spawnArcher(b, extra, dx) {
     const c = bCenter(b), hp = archerHp(b);
-    st.soldiers.push({ home: b, archer: true, extra, gold: goldArmor(b), x: c.x + 1 + (dx || 0), y: tileY(b.r) + T + 1, hp, max: hp, dmg: archerDmg(b), spd: 24, spr: 'footArcher', cd: 0.3, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
+    st.soldiers.push({ home: b, archer: true, extra, gold: goldArmor(b), rage5: bloodRage(b), x: c.x + 1 + (dx || 0), y: tileY(b.r) + T + 1, hp, max: hp, dmg: archerDmg(b) * topMul(b), spd: 24, spr: 'footArcher', cd: 0.3, tgt: null, anim: 0, flash: 0, dead: false, slot: st.soldierN++ });
     for (let k = 0; k < 4; k++) part(c.x, tileY(b.r) + T, (Math.random() - 0.5) * 20, -Math.random() * 10, 0.3, '#c6a272', 40);
   }
   // ---- formácie: lukostrelci stoja v rade vedľa seba, pešiaci pochodujú v šíkoch –
@@ -3967,7 +3972,20 @@
     shadow(u.x, u.y, 9);
     g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round((u.x - fr.ax) * BR) / BR, Math.round((u.y - fr.ay) * BR) / BR, fr.w, fr.h); // jemná kresba má plátno 2× väčšie – posun po polbodoch (pomalý stroj sa inak posúva trhane)
   }
+  // krvavá zúrivosť (orkovia z budovy úrovne 5): malá pulzujúca červená aura na zemi pod jednotkou, po polbodoch (jemná kresba)
+  function drawRage5(x, y, time, seed, rx) {
+    rx = rx || 6;
+    const ry = rx / 2, p = 0.5 + 0.5 * Math.sin(time * 4 + (seed || 0) * 1.7);
+    g.save(); // bežné prekrytie (sčítanie farieb by na zelenej tráve dalo žltú) – červená ostane červenou
+    for (const [k, col, a] of [[1, '200,24,16', 0.28 + 0.12 * p], [0.6, '240,56,32', 0.3 + 0.15 * p]]) {
+      g.fillStyle = 'rgba(' + col + ',' + a.toFixed(3) + ')';
+      const R = rx * k, Ry = ry * k;
+      for (let dy = -Ry; dy <= Ry; dy += 0.5) { const w = R * Math.sqrt(Math.max(0, 1 - (dy / Ry) * (dy / Ry))); g.fillRect(Math.round((x - w) * 2) / 2, Math.round((y + dy) * 2) / 2, Math.round(w * 4) / 2, 0.5); }
+    }
+    g.restore();
+  }
   function drawFighter(u, sprName) {
+    if (u.rage5 && !u.dead) drawRage5(u.x, u.y, performance.now() / 1000, u.slot);
     if (u.siege) return drawSiege8(u, SPR[sprName + '8']);
     if (sprName === 'monkCast') sprName = 'monk'; // liečiteľ v 8 smeroch má kúzlo medzi snímkami útoku
     if (!u.isKing && SPR[sprName + '8']) {
@@ -4252,30 +4270,48 @@
   // bahno: plochá kaluž na zemi, so susedným bahnom sa zleje do jedného (maska ako pri plote); tmavé blato, mláky s odleskom
   const mudAt = (c, r) => { const o = occAt(c, r); return !!o && o !== HALL && o.kind === 'mud'; };
   const mudMask = (c, r, has) => (has(c, r - 1) ? 1 : 0) | (has(c + 1, r) ? 2 : 0) | (has(c, r + 1) ? 4 : 0) | (has(c - 1, r) ? 8 : 0);
-  const MUD = ['#1e140c', '#2c1e12', '#3a2818', '#4a3420', '#5c4228'].map(hexRGB), MUD_WET = ['#24303a', '#3a4a56', '#6a7e8c'].map(hexRGB);
+  // jemná kresba (2 pixely na bod): blato s hrudkami a kamienkami, tmavší vlhký lem, mláky s tmavým okrajom, odleskom oblohy a vlnkou
+  const MUD = ['#160e08', '#1e140c', '#2c1e12', '#3a2818', '#4a3420', '#5c4228', '#6e5034'].map(hexRGB), MUD_WET = ['#1a2028', '#24303a', '#3a4a56', '#56687a', '#8a9eac'].map(hexRGB);
   const mudCache = {};
-  function mudSpr(m) {
-    if (mudCache[m]) return mudCache[m];
-    const c = document.createElement('canvas'); c.width = T; c.height = T;
-    const x2 = c.getContext('2d'), id = x2.createImageData(T, T);
-    const up = m & 1, rt = m & 2, dn = m & 4, lf = m & 8, h = (T - 1) / 2;
-    for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) {
-      // vzdialenosť od okraja kaluže: strany so susedným bahnom nemajú okraj (kaluž pokračuje)
+  // wx, wy = poloha políčka v pixeloch jemnej kresby (2 × bod) – šum sa počíta z polohy, mláky a hrudky tak plynulo prechádzajú cez susedné políčka
+  function mudSpr(m, wx, wy) {
+    wx = wx || 0; wy = wy || 0;
+    const ck = m + ':' + wx + ',' + wy;
+    if (mudCache[ck]) return mudCache[ck];
+    const S = 2 * T, c = document.createElement('canvas'); c.width = S; c.height = S;
+    const x2 = c.getContext('2d'), id = x2.createImageData(S, S);
+    const up = m & 1, rt = m & 2, dn = m & 4, lf = m & 8, h = (S - 1) / 2;
+    const edgeD = (x, y) => { // vzdialenosť od okraja kaluže: strany so susedným bahnom nemajú okraj (kaluž pokračuje)
       const ex = Math.max(lf ? 0 : h - x, rt ? 0 : x - h, 0), ey = Math.max(up ? 0 : h - y, dn ? 0 : y - h, 0);
-      const d = Math.hypot(ex, ey) + (hash2(x + m * 7, y, 51) - 0.5) * 1.6;
-      if (d > 6.2) continue; // mimo kaluže ostane tráva
-      const n = hash2(x + m * 13, y, 52), pud = vnoise((x + m * 3) * 0.35, y * 0.35, 53);
+      return Math.hypot(ex, ey) + (vnoise((wx + x) * 0.22, (wy + y) * 0.22, 51) - 0.5) * 4;
+    };
+    const pudAt = (x, y) => vnoise((wx + x) * 0.11, (wy + y) * 0.11, 53) + (vnoise((wx + x) * 0.3, (wy + y) * 0.3, 56) - 0.5) * 0.06; // mláky: okrúhle, spojité cez políčka
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const d = edgeD(x, y);
+      if (d > 12.6) continue; // mimo kaluže ostane tráva
+      const n = hash2(wx + x, wy + y, 52), lump = vnoise((wx + x) * 0.5, (wy + y) * 0.5, 54), pud = pudAt(x, y);
       let rgb;
-      if (d > 5.2) rgb = MUD[1]; // tmavší okraj
-      else if (pud > 0.66) rgb = pud > 0.8 && n > 0.6 ? MUD_WET[2] : pud > 0.72 ? MUD_WET[1] : MUD_WET[0]; // mláka s odleskom
-      else rgb = MUD[2 + Math.floor(n * 2.99)];
-      const k = (y * T + x) * 4; id.data[k] = rgb[0]; id.data[k + 1] = rgb[1]; id.data[k + 2] = rgb[2]; id.data[k + 3] = 255;
+      if (d > 11.4) rgb = MUD[0];                                   // obrys
+      else if (d > 9.6) rgb = pickRamp(MUD, 0.18 + n * 0.12, x, y); // tmavší vlhký lem
+      else if (pud > 0.66 && d < 8.5) {                             // mláka (nie pri okraji kaluže)
+        const rim = pudAt(x, y - 1) <= 0.66 || pudAt(x - 1, y) <= 0.66;
+        if (rim) rgb = MUD[1];                                      // tmavý okraj mláky (hore a vľavo – zapustená)
+        else if (pudAt(x - 2, y - 2) <= 0.66 && pudAt(x - 1, y - 1) > 0.66 && n > 0.35) rgb = MUD_WET[4]; // odlesk oblohy pri hornom okraji
+        else rgb = pickRamp(MUD_WET, 0.25 + Math.min(0.5, (pud - 0.66) * 4), x, y);
+      } else {                                                      // blato s hrudkami
+        let v = 0.45 + (lump - 0.5) * 0.5 + (n - 0.5) * 0.12;
+        if (d < 8.5 && (pudAt(x, y + 1) > 0.66 || pudAt(x + 1, y) > 0.66)) v += 0.18; // vyvýšený okraj pri mláke (svetlo)
+        if (lump > 0.68 && vnoise((wx + x) * 0.5, (wy + y - 1) * 0.5, 54) <= 0.68) v += 0.2; // vrch hrudky na svetle
+        rgb = pickRamp(MUD, Math.max(0.1, Math.min(1, v)), x, y);
+        if (hash2((wx + x) >> 1, (wy + y) >> 1, 57) > 0.985) rgb = (x & 1) ? MUD[6] : MUD[1]; // kamienok s tieňom
+      }
+      const k = (y * S + x) * 4; id.data[k] = rgb[0]; id.data[k + 1] = rgb[1]; id.data[k + 2] = rgb[2]; id.data[k + 3] = 255;
     }
     x2.putImageData(id, 0, 0);
-    return (mudCache[m] = { c, w: T, h: T });
+    return (mudCache[ck] = { c, w: T, h: T, hd: true });
   }
   BSPR.mud = mudSpr(0);
-  const drawMud = b => g.drawImage(mudSpr(mudMask(b.c, b.r, mudAt)).c, tileX(b.c), tileY(b.r));
+  const drawMud = b => g.drawImage(mudSpr(mudMask(b.c, b.r, mudAt), 2 * tileX(b.c), 2 * tileY(b.r)).c, tileX(b.c), tileY(b.r), T, T); // jemná kresba: plátno 2×
   // vrhnutý tieň budovy: kresby sú osvetlené zľava zhora, tieň padá po zemi doprava a trochu dole; vyrobí sa raz z obrysu kresby
   // (každý pixel vo výške v nad pätou sa posunie o v·SH_X doprava a v·SH_Y nadol) a kreslí sa polopriehľadne pod budovy aj jednotky
   const SH_X = 0.45, SH_Y = 0.28, SH_A = 0.3, shadowCache = new WeakMap();
@@ -4792,7 +4828,7 @@
       drag.path.forEach((q, i) => {
         const x = tileX(q.c), y = tileY(q.r);
         const m = (jv(q.c, q.r - 1) ? 1 : 0) | (j(q.c + 1, q.r) ? 2 : 0) | (jv(q.c, q.r + 1) ? 4 : 0) | (j(q.c - 1, q.r) ? 8 : 0);
-        if (drag.kind === 'mud') { const ms = mudSpr(mudMask(q.c, q.r, (c, r) => inPath.has(key(c, r)) || mudAt(c, r))); g.drawImage(ms.c, x, y); }
+        if (drag.kind === 'mud') { const ms = mudSpr(mudMask(q.c, q.r, (c, r) => inPath.has(key(c, r)) || mudAt(c, r)), 2 * x, 2 * y); g.drawImage(ms.c, x, y, T, T); }
         else if (drag.kind === 'hedge') { const hs = hedgeSpr((inPath.has(key(q.c, q.r - 1)) || hedgeAt(q.c, q.r - 1) ? 1 : 0) | (inPath.has(key(q.c + 1, q.r)) || hedgeAt(q.c + 1, q.r) ? 2 : 0) | (inPath.has(key(q.c, q.r + 1)) || hedgeAt(q.c, q.r + 1) ? 4 : 0) | (inPath.has(key(q.c - 1, q.r)) || hedgeAt(q.c - 1, q.r) ? 8 : 0)); g.drawImage(hs.c, x, y + T + 1 - hs.h, hs.w, hs.h); }
         else if (stake) g.drawImage(BSPR.stake.c, x, y + T + 1 - BSPR.stake.h); else wallImg(g, wallsOf()[0][m + 16 * wallSide(q.c)] || wallsOf()[0][m], x, y);
         if (i >= ok) { g.fillStyle = 'rgba(232,72,56,0.55)'; g.fillRect(x, y - 6, T, T + 6); }
@@ -6276,8 +6312,8 @@
     mage:     { name: 'Ohnivý totem',      short: 'Totem',     desc: 'Šamanský oheň zasiahne celú skupinu' },
     icetower: { name: 'Jedový kotol',      short: 'Kotol',     desc: 'Vrhá jed – otrávi a spomalí zasiahnutých, na zemi nechá jedovatú mláku' },
     ballista: { name: 'Trebuchet',         short: 'Trebuchet', desc: 'Pevný vrhač – z veľkej diaľky hádže obrovské balvany do celej skupiny, nabíja sa však dlho. Nevylepšuje sa' },
-    chapel:   { name: 'Šamanská chatrč',   short: 'Chatrč',    desc: 'Vyšle šamana, ktorý chodí za orkmi a náčelníkom a lieči ich' },
-    workshop: { name: 'Goblinský stan',    short: 'Stan',      desc: 'Vyšle goblina, ktorý chodí opravovať poškodené budovy' },
+    chapel:   { name: 'Šamanský stan',     short: 'Stan',      desc: 'Vyšle šamana, ktorý chodí za orkmi a náčelníkom a lieči ich' },
+    workshop: { name: 'Opravárska chatrč', short: 'Chatrč',    desc: 'Vyšle goblina, ktorý chodí opravovať poškodené budovy' },
   };
   const HUMAN_UNITS = { king: { name: HEROES.king.name, spr: HEROES.king.spr, desc: HEROES.king.desc, powers: HEROES.king.powers.slice() },
     kt: Object.fromEntries(Object.entries(KTYPES).map(([k, v]) => [k, v.name])), plural: Object.assign({}, UNIT_PLURAL) };
@@ -6604,9 +6640,9 @@
       else if (isTreb(b)) stats = 'balvan ' + Math.round(bDmg(b)) + ' celej skupine · dosah ' + Math.round(bRange(b)) + ' · výstrel každých ' + bCd(b).toFixed(1) + ' s';
       else if (b.kind === 'ballista') stats = 'poškodenie ' + Math.round(bDmg(b)) + ' každému v rade · dosah ' + bRange(b);
       else if (d.range) stats = 'poškodenie ' + Math.round(bDmg(b)) + ' · dosah ' + bRange(b);
-      else if (UNIT_HOME[b.kind]) { const kt = KTYPES[unitOf(b)]; stats = UNIT_PLURAL[unitOf(b)].toLowerCase() + ' ' + knightCap(b) + ' · sila ' + Math.round(knightDmg(b) * kt.dmg); }
-      else if (b.kind === 'falconry') stats = (isOrc() ? 'netopiere ' : 'sokoly ') + falconCap(b) + ' · sila ' + Math.round(falconDmg(b));
-      else if (b.kind === 'range') stats = 'lukostrelci ' + archerCap(b) + ' · poškodenie ' + Math.round(archerDmg(b));
+      else if (UNIT_HOME[b.kind]) { const kt = KTYPES[unitOf(b)]; stats = UNIT_PLURAL[unitOf(b)].toLowerCase() + ' ' + knightCap(b) + ' · sila ' + Math.round(knightDmg(b) * kt.dmg * topMul(b)) + (b.lvl >= MAX_LVL ? (isOrc() ? ' · krvavá zúrivosť +10 %' : ' · zlaté brnenie +10 %') : ''); }
+      else if (b.kind === 'falconry') stats = (isOrc() ? 'netopiere ' : 'sokoly ') + falconCap(b) + ' · sila ' + Math.round(falconDmg(b) * topMul(b)) + (b.lvl >= MAX_LVL ? (isOrc() ? ' · krvavá zúrivosť +10 %' : ' · zlaté brnenie +10 %') : '');
+      else if (b.kind === 'range') stats = (isOrc() ? 'strelci ' : 'lukostrelci ') + archerCap(b) + ' · poškodenie ' + Math.round(archerDmg(b) * topMul(b)) + (b.lvl >= MAX_LVL ? (isOrc() ? ' · krvavá zúrivosť +10 %' : ' · zlaté brnenie +10 %') : '');
       else if (b.kind === 'pit') stats = 'poškodenie ' + Math.round(bDmg(b)) + ' · spomalí';
       if (d.hp) stats += (stats ? ' · ' : '') + 'zdravie ' + Math.ceil(b.hp) + '/' + bMaxHp(b);
       if (b.kind === 'stake') stats += ' · útočník sa napichne za ' + Math.round(stakeDmg());
@@ -6780,11 +6816,11 @@
     type = type || 1;
     const orc = BUILD_RACE === 'orc', key = (orc ? 'o' : '') + type + ':' + px + ',' + py;
     if (paveCache[key]) return paveCache[key];
-    const S = orc ? T : 2 * T; // ľudská dlažba v jemnej kresbe (2 pixely na bod), orkské dosky po bodoch; hra ju kreslí na T × T bodov
+    const S = 2 * T; // dlažba aj orkské dosky v jemnej kresbe (2 pixely na bod); hra ju kreslí na T × T bodov
     const c = document.createElement('canvas'); c.width = S; c.height = S;
     const x2 = c.getContext('2d'), id = x2.createImageData(S, S);
     const put = (x, y, rgb) => { const k = (y * S + x) * 4; id.data[k] = rgb[0]; id.data[k + 1] = rgb[1]; id.data[k + 2] = rgb[2]; id.data[k + 3] = 255; };
-    if (orc) for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) put(x, y, plankRGB(px + x, py + y));
+    if (orc) for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) put(x, y, plankRGB2(2 * px + x, 2 * py + y));
     else for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) put(x, y, paveRGB(2 * px + x, 2 * py + y));
     x2.putImageData(id, 0, 0);
     return (paveCache[key] = c);
@@ -7160,7 +7196,7 @@
     if (a.siege) { const p = siegeCellPos(c, r); spawnSiege(a.siege, p.x, p.y); }
     else for (let i = 0; i < a.n; i++) {
       if (k === 'archer') spawnArcher(b, true);
-      else if (k === 'falcon') { const hp = falconHp(b); st.soldiers.push({ home: b, fly: true, x: 0, y: 0, hp, max: hp, dmg: falconDmg(b), spd: 52, cd: 0.3, tgt: null, anim: Math.random() * 2, flash: 0, dead: false, slot: st.soldierN++ }); }
+      else if (k === 'falcon') { const hp = falconHp(b); st.soldiers.push({ home: b, fly: true, rage5: bloodRage(b), x: 0, y: 0, hp, max: hp, dmg: falconDmg(b) * topMul(b), spd: 52, cd: 0.3, tgt: null, anim: Math.random() * 2, flash: 0, dead: false, slot: st.soldierN++ }); }
       else if (k === 'monk') { const h = HELPERS.chapel, hp = h.hp * lvlMul(b, 0.3); st.soldiers.push({ home: b, helper: 'chapel', x: 0, y: 0, hp, max: hp, spd: h.spd, spr: h.spr, rate: h.rate(b), cd: 0, tgt: null, anim: 0, flash: 0, swing: 0, dead: false }); }
       else spawnKnight(b, true);
     }
