@@ -1647,7 +1647,8 @@ function initBuildingSprites() {
   }
   OBSPR.gatehouse = [1, 2, 3, 4, 5].map(l => makeGatehouse(l, true));
   // orkské brány z PixelLabu (OG1–OG3, index podoby hradby); oranžová vlajka ako na pevnosti veje a neprefarbí sa
-  const ogSpr = rows => artBuilding({ chars: ORC_WALL_ART.chars, pal: ORC_WALL_ART.pal, lv: [rows] }, 0, 'ownFlag');
+  // malé zástavky brány majú krátku vlnu – pri 5 snímkach/s ako na pevnosti pôsobia pomalšie, preto rýchlejšie
+  const ogSpr = rows => Object.assign(artBuilding({ chars: ORC_WALL_ART.chars, pal: ORC_WALL_ART.pal, lv: [rows] }, 0, 'ownFlag'), { fps: 8 });
   OBSPR.gateArt = typeof ORC_WALL_ART === 'undefined' ? [] : (ORC_WALL_ART.gate || []).map(gt => gt ? Object.assign(ogSpr(gt.rows), { flags: gt.flags, v: gt.v ? ogSpr(gt.v) : null }) : null);
   if (OBSPR.gateArt[0]) OBSPR.gateIcon = OBSPR.gateArt[0];
   else {
