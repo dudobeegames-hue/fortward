@@ -1633,7 +1633,8 @@ function initBuildingSprites() {
   BSPR.gateIcon = tall ? ga1 : spriteFromCanvas(ic);
   // orkské podoby stavieb hráča: budovy hordy, ktoré už poznáme z tábora, plus palisáda, brána a jedový kotol
   Object.assign(OBSPR, {
-    hall: [1, 2, 3, 4, 5].map(l => typeof ORC_CASTLE_ART !== 'undefined' && ORC_CASTLE_ART.lv[l - 1] ? artBuilding(ORC_CASTLE_ART, l - 1, 'ownFlag') : makeOrcKeep(l)), // pevnosť z PixelLabu (orc-castle-art.js), chýbajúce úrovne stará kresba tower: [1, 2, 3, 4, 5].map(l => makeOrcTower(true, l)),
+    hall: [1, 2, 3, 4, 5].map(l => typeof ORC_CASTLE_ART !== 'undefined' && ORC_CASTLE_ART.lv[l - 1] ? artBuilding(ORC_CASTLE_ART, l - 1, 'ownFlag') : makeOrcKeep(l)), // pevnosť z PixelLabu (orc-castle-art.js), chýbajúce úrovne stará kresba
+    tower: [1, 2, 3, 4, 5].map(l => makeOrcTower(true, l)),
     mage: [1, 2, 3, 4, 5].map(l => makeOrcFireTotem(l)), icetower: [1, 2, 3, 4, 5].map(l => makeOrcPoison(l)),
     ballista: makeOrcTrebuchet(3), ballistaFired: makeOrcTrebuchet(3, true), // trebuchet hráča strieľa nahor, nevylepšuje sa
     barracks: BSPR.orcBarracks, range: BSPR.goblinRange, stables: BSPR.wolfPen, armory: BSPR.brutePit, falconry: BSPR.batCave[0],

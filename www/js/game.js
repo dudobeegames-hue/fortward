@@ -194,7 +194,13 @@
   const knightDmg = b => 6 * lvlMul(b, 0.35) * (1 + 0.05 * perk('drill')) * (1 + 0.1 * tal('command'));
   const hallMax = () => Math.round((400 + 200 * (st.hallLvl - 1)) * (1 + 0.06 * perk('foundations')));
   const hallUpCost = () => Math.round(110 * Math.pow(1.7, st.hallLvl - 1) * (1 - 0.04 * perk('architects'))); // lacnejšie – radnica odomyká aj úrovne stavieb
-  const zoneRows = () => 5 + st.hallLvl;
+  // stavebná zóna podľa úrovne radnice: [stĺpce, riadky] vrátane radnice (3 × 2 dole v strede); párna šírka má stĺpec navyše vpravo
+  const ZONE_SIZE = [[5, 4], [7, 4], [7, 5], [8, 5], [8, 6]];
+  const zoneSize = () => ZONE_SIZE[Math.max(1, Math.min(ZONE_SIZE.length, st.hallLvl || 1)) - 1];
+  const zoneRows = () => zoneSize()[1];
+  const zoneCol0 = () => Math.max(0, G.hc0 + 1 - Math.floor((zoneSize()[0] - 1) / 2)); // stred zóny = stredný stĺpec radnice
+  const zoneCol1 = () => Math.min(G.cols, zoneCol0() + zoneSize()[0]); // za posledným stĺpcom zóny
+  const ZONE_MAX_ROWS = Math.max(...ZONE_SIZE.map(z => z[1]));
   const kingMax = () => 120 * heroDef().hp * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.2 * tal('vit'));
   const kingDmg = () => 12 * heroDef().dmg * (1 + 0.3 * (st.hallLvl - 1)) * (1 + 0.15 * tal('str'));
   const volleyDmg = () => (6 + 4 * (st.volleyLvl - 1));
@@ -735,7 +741,7 @@
   const hallTile = (c, r) => c >= G.hc0 && c < G.hc0 + 3 && r >= G.hr0 && r < G.hr0 + HALL_ROWS;
   const inHall = hallTile;
   const zoneTopRow = () => G.rows - zoneRows();
-  const inZone = (c, r) => c >= 0 && c < G.cols && r >= zoneTopRow() && r <= G.rows - 1;
+  const inZone = (c, r) => c >= zoneCol0() && c < zoneCol1() && r >= zoneTopRow() && r <= G.rows - 1;
   const tileAt = (x, y) => ({
     c: Math.max(0, Math.min(G.cols - 1, Math.floor((x - G.gx0) / T))),
     r: Math.max(0, Math.min(G.rows - 1, Math.floor((y - G.gy0) / T))),
@@ -883,7 +889,7 @@
     g2.rows = Math.floor((fh - GROUND_PAD) / T); g2.gy0 = fh - GROUND_PAD - g2.rows * T;
     g2.hc0 = Math.floor(g2.cols / 2) - 1; g2.hr0 = g2.rows - HALL_ROWS;
     g2.hallCx = g2.gx0 + g2.hc0 * T + 1.5 * T; g2.hallTop = g2.gy0 + g2.hr0 * T; g2.hallBot = g2.hallTop + HALL_ROWS * T;
-    g2.zoneTopMax = g2.gy0 + (g2.rows - (5 + MAX_LVL)) * T;
+    g2.zoneTopMax = g2.gy0 + (g2.rows - ZONE_MAX_ROWS) * T;
     return { fh, g2 };
   }
   function sceneFor(m, endless) {
@@ -915,7 +921,7 @@
     G.rows = Math.floor((FH - GROUND_PAD) / T); G.gy0 = FH - GROUND_PAD - G.rows * T;
     G.hc0 = Math.floor(G.cols / 2) - 1; G.hr0 = G.rows - HALL_ROWS;
     G.hallCx = tileX(G.hc0) + 1.5 * T; G.hallTop = tileY(G.hr0); G.hallBot = G.hallTop + HALL_ROWS * T;
-    G.zoneTopMax = tileY(G.rows - (5 + MAX_LVL));
+    G.zoneTopMax = tileY(G.rows - ZONE_MAX_ROWS);
     scene = sceneFor(st.mission, st.endless);
     if (had) { // posuň stavby, ak sa zmenila mriežka
       const dc = G.hc0 - oldHc, dr = G.hr0 - oldHr;
@@ -4549,15 +4555,12 @@
     const ok = (isPave(kind) ? inZone(c, r) : canPlace(c, r, kind)) && st.gold >= costOf(kind); // zelená = dá sa postaviť, červená = posuň prst ďalej
     const pw = (BUILD[kind].w || 1) * T; // šírka stavby (viac políčok)
     g.fillStyle = ok ? 'rgba(156,212,90,0.35)' : 'rgba(232,72,56,0.5)'; g.fillRect(hx, hy, pw, T);
-    const spr = kind === 'wall' ? wallsOf()[0][10] : TRAPS[kind] ? BSPR[kind] : isPave(kind) ? { c: paveAt(hx, hy, PAVE[kind]) } : bsprOf(kind, 1);
     g.globalAlpha = ok ? 0.75 : 0.45;
-    if (kind === 'wall') wallImg(g, spr, hx, hy);
-    else if (TRAPS[kind]) trapImg(g, spr, hx, hy);
-    else if (isPave(kind)) drawPave(g, hx, hy, PAVE[kind]);
-    else g.drawImage(spr.c, hx + pw / 2 - Math.floor(spr.w / 2) + artDX(kind), hy + T + 1 - spr.h, spr.w, spr.h);
+    if (isPave(kind)) drawPave(g, hx, hy, PAVE[kind]);
+    else ghostBld({ kind, c, r, lvl: resMin(kind) }, time); // v podobe, v akej sa postaví (smolná veža na 2. úrovni, ohnivá na 3.)
     g.globalAlpha = 1;
     corners(hx, hy, hx + pw - 1, hy + T - 1, ok ? '#9cd45a' : (blink ? '#e84838' : '#ff9a80'));
-    if (BUILD[kind].range) drawRange(hx + T / 2, hy + T / 2, bRange({ kind, lvl: 1 }), time); // dosah už pri ukladaní
+    if (BUILD[kind].range) drawRange(hx + T / 2, hy + T / 2, bRange({ kind, lvl: resMin(kind) }), time); // dosah už pri ukladaní (na úrovni, na ktorej sa postaví)
   }
 
   // liečivé kúzlo mnícha: na zdvihnutej palici bledomodré svetlo, liečeného obklopí bledomodrá svetelná aura
@@ -4604,13 +4607,34 @@
       g.fillStyle = '#ff9a80'; g.fillRect(x, y, 1, 5);
     }
   }
+  // polopriehľadná stavba pri ukladaní a presúvaní: kreslí sa tak isto ako postavená (drawBuilding) – úroveň, ľadový režim,
+  // trebuchet, vejúce zástavy a plameň, otočná balista, brána v hradbe
+  function ghostBld(b, time) {
+    const x0 = tileX(b.c), y0 = tileY(b.r), wl = Math.max(1, Math.min(5, b.lvl || 1)) - 1, seed = b.c * 0.7 + b.r * 0.3;
+    if (b.kind === 'wall') {
+      const ga = b.gate && gateArtOf(wl);
+      if (ga) { g.drawImage(bldCanvas(ga, time, seed), x0 + T / 2 - ga.w / 2, y0 + 18 - ga.h, ga.w, ga.h); return; }
+      const m = (joinsV(b.c, b.r - 1) ? 1 : 0) | (joins(b.c + 1, b.r) ? 2 : 0) | (joinsV(b.c, b.r + 1) ? 4 : 0) | (joins(b.c - 1, b.r) ? 8 : 0); // napojí sa na susedov na novom mieste
+      wallImg(g, wallsOf()[wl][m + 16 * wallSide(b.c)] || wallsOf()[wl][m], x0, y0);
+      if (b.gate) g.drawImage(gatesOf()[wl].c, x0, y0 - 15);
+      return;
+    }
+    if (TRAPS[b.kind]) { trapImg(g, BSPR[b.kind], x0, y0); return; }
+    const spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl);
+    g.drawImage(bldCanvas(spr, time, seed), x0 + bW(b) * T / 2 - Math.floor(spr.w / 2) + artDX(b.kind), y0 + T + 1 - spr.h, spr.w, spr.h);
+    if (b.kind === 'ballista' && hasTurret(b)) {
+      const tu = BSPR.ballistaTurret[b.face == null ? 6 : b.face], p = turretAt(b);
+      g.drawImage(tu.c, Math.round((p.x - tu.w / 2) * 2) / 2, Math.round((p.y + 2 - tu.h) * 2) / 2, tu.w, tu.h);
+    }
+  }
   function drawBuildOverlay(time) {
     const zt = zoneTopRow();
     const blink = Math.floor(time * 4) % 2;
     // hranica zóny
     g.fillStyle = 'rgba(255,240,112,0.55)';
-    const yb = tileY(zt);
-    for (let x = G.gx0; x < G.gx0 + G.cols * T; x += 4) g.fillRect(x, yb, 2, 1);
+    const yb = tileY(zt), xl = tileX(zoneCol0()), xr = tileX(zoneCol1()) - 1, yz = tileY(G.rows);
+    for (let x = xl; x < xr + 1; x += 4) g.fillRect(x, yb, 2, 1);       // horná hranica a boky zóny (zóna nie je cez celú šírku)
+    for (let y = yb; y < yz; y += 4) { g.fillRect(xl, y, 1, 2); g.fillRect(xr, y, 1, 2); }
     // mriežka: tenké čiary po okrajoch políčok, výraznejšie keď je zvolená stavba alebo sa vkladá stroj
     // (stroj stojí pred zónou – mriežka vtedy siaha aj na jeho dva rady, voľné políčka sa podfarbia)
     const active = st.tool || st.siegePick;
@@ -4619,11 +4643,12 @@
     const r0 = st.siegePick ? siegeRow0() : zt;
     for (let r = r0; r <= G.rows - 1; r++) for (let c = 0; c < G.cols; c++) {
       if (inHall(c, r)) continue;
+      if (r >= zt && (c < zoneCol0() || c >= zoneCol1())) continue; // mimo zóny po stranách mriežka nie je (pred zónou pre stroj áno)
       const x = tileX(c), y = tileY(r), o = occAt(c, r);
       if (!o && (st.tool || (st.siegePick && r < zt))) { g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(x + 1, y + 1, T - 2, T - 2); }
       g.fillStyle = lineCol;
       g.fillRect(x + 1, y, T - 1, 1); g.fillRect(x, y + 1, 1, T - 1);       // horná a ľavá hrana
-      if (c === G.cols - 1 || inHall(c + 1, r)) g.fillRect(x + T - 1, y + 1, 1, T - 1);
+      if (c === G.cols - 1 || inHall(c + 1, r) || (r >= zt && c === zoneCol1() - 1)) g.fillRect(x + T - 1, y + 1, 1, T - 1);
       if (r === G.rows - 1 || inHall(c, r + 1)) g.fillRect(x + 1, y + T - 1, T - 1, 1);
       g.fillStyle = active ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.3)'; // rohy
       g.fillRect(x, y, 1, 1);
@@ -4641,11 +4666,8 @@
         const h = bdrag.hover, ok = canMoveTo(mv, h.c, h.r), hx = tileX(h.c), hy = tileY(h.r);
         g.fillStyle = ok ? 'rgba(156,212,90,0.35)' : 'rgba(232,72,56,0.4)'; g.fillRect(hx, hy, mw, T);
         corners(hx, hy, hx + mw - 1, hy + T - 1, ok ? '#9cd45a' : '#e84838');
-        const spr = mv.kind === 'wall' ? wallsOf()[Math.max(1, Math.min(5, mv.lvl)) - 1][10] : TRAPS[mv.kind] ? BSPR[mv.kind] : bsprOf(mv.kind, mv.lvl);
         g.globalAlpha = 0.7;
-        if (mv.kind === 'wall') wallImg(g, spr, hx, hy);
-        else if (TRAPS[mv.kind]) trapImg(g, spr, hx, hy);
-        else g.drawImage(spr.c, hx + mw / 2 - Math.floor(spr.w / 2) + artDX(mv.kind), hy + T + 1 - spr.h, spr.w, spr.h);
+        ghostBld(Object.assign({}, mv, { c: h.c, r: h.r }), time); // presne tá podoba, akú má stavba na mieste (úroveň, režim, plameň, zástavy, brána)
         g.globalAlpha = 1;
       } else corners(ox, oy, ox + mw - 1, oy + T - 1, blink ? '#9cd45a' : '#ffffff');
     }
@@ -6063,7 +6085,7 @@
     if (!on) return;
     const hud = $('hud'), top = hud && !hud.hidden ? hud.getBoundingClientRect().bottom - $('game').getBoundingClientRect().top + 8 : 60;
     const bot = $('game').clientHeight - $('build').offsetHeight - 10, mid = (top + bot) / 2;
-    const zone = (tileY(G.rows - (5 + MAX_LVL)) - camY) * S / DPR; // horná hrana stavebnej zóny hradu najvyššej úrovne – tlačidlá stoja na rovnakom mieste pri každej úrovni hradu
+    const zone = (tileY(G.rows - ZONE_MAX_ROWS) - camY) * S / DPR; // horná hrana stavebnej zóny hradu najvyššej úrovne – tlačidlá stoja na rovnakom mieste pri každej úrovni hradu
     let y = mid - 74;
     if (zone < y + 110) y = Math.max(top, zone - 110);         // vysoko nad zónou, aby nezavadzalo pri stavaní
     $('nextWave').style.top = Math.round(y) + 'px';
@@ -7138,7 +7160,7 @@
   function armyReach() {
     if (st.aReach && st.aReach.v === st.campV && st.aReach.camp === st.camp) return st.aReach.r;
     const n = G.cols * G.rows, r = new Uint8Array(n), q = [];
-    for (let row = zoneTopRow(); row < G.rows; row++) for (let c = 0; c < G.cols; c++) if (knightPass(c, row)) { r[row * G.cols + c] = 1; q.push(row * G.cols + c); }
+    for (let row = zoneTopRow(); row < G.rows; row++) for (let c = zoneCol0(); c < zoneCol1(); c++) if (knightPass(c, row)) { r[row * G.cols + c] = 1; q.push(row * G.cols + c); }
     while (q.length) {
       const i = q.pop(), c = i % G.cols, row = (i / G.cols) | 0;
       for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
