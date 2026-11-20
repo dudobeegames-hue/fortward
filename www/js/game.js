@@ -1179,9 +1179,8 @@
       } else if (o.role === 'totem') { // horda sa pomaly lieči
         for (const e of st.enemies) if (!e.dead && e.hp < e.max && healable(e)) {
           e.hp = Math.min(e.max, e.hp + healBase(e) * CAMP_TOTEM * (1 + 0.25 * (o.lvl - 1)) * dt); // vyšší totem lieči rýchlejšie
-          if (Math.random() < 0.01) part(e.x + (Math.random() - 0.5) * 6, e.y - e.h * 0.6, 0, -12, 0.5, '#5aff8a', 0);
         }
-        if (Math.random() < 0.15) part(o.x + (Math.random() - 0.5) * 6, o.y - 22, (Math.random() - 0.5) * 6, -10, 0.6, '#5aff8a', 0);
+        // bez svetielok (kaplnka v dedine nič neprská) – liečenie je opísané v ponuke tábora
       } else if (o.role === 'drum' && o.cd <= 0) { // údery bubna (len efekt, zrýchlenie hordy platí stále)
         o.cd = 0.5;
         for (let k = 0; k < 3; k++) part(o.x + (Math.random() - 0.5) * 10, o.y - 12, (Math.random() - 0.5) * 30, -8 - Math.random() * 8, 0.3, '#ccb08a', 30);
@@ -1740,7 +1739,7 @@
       return true;
     }
     e.attacking = false;
-    if (td > 11) { moveTo(e, tg.x, tg.y + 2, e.spd, dt); return true; }
+    if (td > 11) { footTo(e, tg.x, tg.y + 2, e.spd, dt); return true; }
     e.attacking = true;
     e.atk -= dt;
     if (e.atk <= 0) { e.atk = e.d.atkCd; e.lunge = 0.15; AUDIO.play('clang'); hitUnit(tg, e.d.atk * e.pow); }
@@ -1787,6 +1786,9 @@
     }
   }
 
+  // krok nepriateľa k bodu: rovno, a keď je v ceste hradba vlastného tábora, okolo nej bránou (inak by do nej narážal –
+  // poistka ho vracia späť a zasekne sa pri hradbe)
+  const footTo = (e, tx, ty, sp, dt) => !e.d.fly && st.camp && campWallBetween(e, { x: tx, y: ty }) ? campStep(e, tx, ty, sp, dt) : moveTo(e, tx, ty, sp, dt);
   const SIEGE_AGGRO = 34; // na takú diaľku horda zbadá obliehací stroj a vyrazí naň
   function updateEnemy(e, dt) {
     e.flash = Math.max(0, e.flash - dt);
@@ -1839,7 +1841,7 @@
         for (const u of st.soldiers) if (u.archer && !u.dead && u.y < zoneY) { const d = Math.hypot(u.x - e.x, u.y - e.y); if (d < td) { td = d; tg = u; } }
         if (tg) {
           if (td < 9) { attackFn(() => hitUnit(tg, e.d.atk * e.pow)); return; }
-          moveTo(e, tg.x, tg.y, e.spd * slow * waterMul(e), dt);
+          footTo(e, tg.x, tg.y, e.spd * slow * waterMul(e), dt); // za lukostrelcom, ale nie rovno cez hradbu tábora (zasekol by sa na nej)
           return;
         }
       }
@@ -1935,7 +1937,7 @@
       const fd = Math.hypot(e.foe.x - e.x, e.foe.y - e.y);
       if (campWallBetween(e, e.foe)) e.foe = null; // cez vlastnú hradbu sa nebije – ide ďalej k bráne
       else if (fd < (e.foe.siege ? 17 : 12)) { attack(() => hitUnit(e.foe, e.d.atk * 0.7 * 1)); return; }
-      if (e.foe && e.foe.siege && fd < SIEGE_AGGRO + 14) { moveTo(e, e.foe.x + (e.x < e.foe.x ? -10 : 10), e.foe.y + 2, spd, dt); return; } // beží k obliehaciemu stroju
+      if (e.foe && e.foe.siege && fd < SIEGE_AGGRO + 14) { footTo(e, e.foe.x + (e.x < e.foe.x ? -10 : 10), e.foe.y + 2, spd, dt); return; } // beží k obliehaciemu stroju
       e.foe = null;
     }
     // goblin-lukostrelec: zastaví v dosahu a strieľa
@@ -1986,7 +1988,7 @@
     if (e.d.sapper && e.y > 4) {
       let tw = null, td = 1e9;
       for (const b of st.blds) if (b.kind === 'wall') { const d = Math.hypot(tileX(b.c) + T / 2 - e.x, tileY(b.r) + T / 2 - e.y); if (d < td) { td = d; tw = b; } }
-      if (tw) { moveTo(e, tileX(tw.c) + T / 2, tileY(tw.r) + T / 2, spd, dt); return; }
+      if (tw) { footTo(e, tileX(tw.c) + T / 2, tileY(tw.r) + T / 2, spd, dt); return; }
     }
     // pri radnici?
     const hr = hallRect();
@@ -2681,7 +2683,7 @@
   // (bez stavieb na hornom okraji zóny)
   function defLineY() {
     let r = null;
-    for (const b of st.blds) if (r == null || b.r < r) r = b.r;
+    for (const b of st.blds) if ((r == null || b.r < r) && inZone(b.c, b.r)) r = b.r; // bane na rude za zónou šík nepresúvajú dopredu (horda by prešla popri ňom)
     return r == null ? tileY(zoneTopRow()) + 2 : Math.max(G.gy0 + 24, tileY(r - 2) + T / 2);
   }
   function updateFormations(dt, musterY) {
@@ -2836,6 +2838,13 @@
     }
     // ide na svoje miesto v rade; kto mieri, stojí (drobná odchýlka pod 3 body počká – inak by kĺzal so zameraným lukom),
     // väčšiu odchýlku prejde ako presun (u.retreat: sklonený luk, chôdza)
+    // obrana: horda prenikla za rad (k stavbám a hradu) a nikto iný nie je na dostrel – lukostrelec podíde k nej, kým nedostrelí
+    // (inak by stál v rade a díval sa, ako mu búra hrad); keď je po nej, vráti sa na svoje miesto
+    if (!near && !armyAttacks() && st.form && st.form.arcY != null) {
+      let th = null, td = 1e9;
+      for (const e of st.enemies) { if (e.dead || e.y <= st.form.arcY + 10) continue; const d = Math.hypot(e.x - u.x, e.y - u.y); if (d < td) { td = d; th = e; } }
+      if (th) { u.retreat = false; moveKnight(u, th.x, th.y, (u.spd || 24) * waterMul(u), dt); return; }
+    }
     const sl = u.fslot;
     if (!sl || Math.hypot(sl.x - u.x, sl.y - u.y) < 1) return;
     if (!u.retreat && u.aimT) return;
@@ -6343,7 +6352,11 @@
     // ikony nepriateľov (novinky na mape, úspechy): za orkov ľudské jednotky
     for (const k of ['orc', 'garcher', 'bat', 'ram', 'shaman', 'sapper', 'orcKing', 'bear', 'wolf', 'giantRam', 'mammoth']) {
       const f = foeSpr(k), big = k === 'orcKing' || ENEMY[k].giant;
-      ICONS['e_' + k] = f === 'bat' && SPR.bat8 ? unitIcon('bat') : SPR[f] ? spriteURL(SPR[f][0], big && !isOrc() ? 2 : 3) : spriteURL(trimmed(SPR[f + '8'][1].idle), 2);
+      // tá istá kresba ako na bojisku: sada v 8 smeroch (pohľad zo juhovýchodu), stará kresba len ak sada nie je
+      const s8 = SPR[f + '8'], fr = s8 && s8[ENEMY[k].fly ? 2 : 1] && s8[ENEMY[k].fly ? 2 : 1].idle; // letec (sokol) spredu, inak je z boku len čiarka
+      ICONS['e_' + k] = f === 'bat' && SPR.bat8 ? unitIcon('bat')
+        : fr ? (fr.hd ? spriteURL(trimmed({ c: fr.c, sil: fr.sil || fr.c, w: fr.c.width, h: fr.c.height }), big ? 1 : 2) : spriteURL(trimmed(fr), big ? 2 : 3))
+        : spriteURL(SPR[f][0], big && !isOrc() ? 2 : 3);
     }
   }
   function initIcons() {
