@@ -177,7 +177,10 @@
   const bCd = b => (isTreb(b) ? TREB.cd : 1) * bDef(b).cd * Math.pow(0.92, b.lvl - 1) * (b.spec ? SPECS[b.spec].cd : 1) / (1 + 0.03 * perk('reload'));
   const bRange = b => (isTreb(b) ? TREB.range : 1) * (bDef(b).range + 4 * (b.lvl - 1) + (b.spec ? SPECS[b.spec].range : 0)) * (1 + 0.02 * perk('lookouts'));
   const bMaxHp = b => Math.round((BUILD[b.kind].hp || 1) * lvlMul(b, 0.35) * (b.kind === 'wall' ? 1 + WALL_LINK * (b.nb || 0) : 1) * (1 + 0.06 * perk('carpenters')));
-  const bUpCost = b => Math.round(BUILD[b.kind].cost * 0.9 * Math.pow(1.6, b.lvl - 1) * (1 - 0.04 * perk('architects')));
+  const bUpCost = b => { // skok o viac úrovní (orkské hradby) stojí ako všetky kroky spolu
+    let c = 0; for (let l = b.lvl, n = nextLvl(b.kind, b.lvl); l < n; l++) c += Math.pow(1.6, l - 1);
+    return Math.round(BUILD[b.kind].cost * 0.9 * c * (1 - 0.04 * perk('architects')));
+  };
   const GOB_PER_LVL = 3; // goblinov s nožíkom vyjde z baraku trikrát viac (úr. 1 = 3, úr. 2 = 6 …)
   const knightCap = b => b.lvl * (unitOf(b) === 'gob' ? GOB_PER_LVL : 1); // z vojenskej budovy vyjde naraz toľko vojakov, aká je jej úroveň
   const knightEvery = b => Math.max(3, 7 - 0.8 * (b.lvl - 1)) * (1 - 0.04 * perk('recruits'));
@@ -489,11 +492,11 @@
   // Položka: [druh, úroveň (0 = bez úrovne), cena, nepovinné, len pre rasu] – od 2026-11-18 sú všetky výskumy povinné
   const RES_DEF = [
     [['hall', 1, 0], ['tower', 1, 0], ['wall', 1, 0], ['pit', 1, 80], ['wallArcher', 0, 120], ['paving', 0, 40]],
-    [['hall', 2, 400], ['tower', 2, 150], ['pitch', 2, 200], ['wall', 2, 150], ['mine', 1, 200], ['workshop', 1, 200], ['pit', 2, 120]],
+    [['hall', 2, 400], ['tower', 2, 150], ['pitch', 2, 200], ['wall', 2, 150, 0, 'human'], ['mine', 1, 200], ['workshop', 1, 200], ['pit', 2, 120]],
     [['hall', 3, 900], ['tower', 3, 300], ['pitch', 3, 300], ['mage', 3, 450], ['wall', 3, 300], ['firepit', 1, 250], ['pit', 3, 220],
       ['barracks', 1, 400], ['barracks', 2, 300], ['range', 1, 400], ['range', 2, 300], ['hedge', 0, 150], ['mine', 2, 300], ['workshop', 2, 300], ['chapel', 1, 400],
       ['siegeRam', 0, 450], ['spear', 0, 350], ['gobknife', 0, 250, 0, 'orc']],
-    [['hall', 4, 1800], ['tower', 4, 550], ['pitch', 4, 550], ['mage', 4, 650], ['ice', 0, 400, 0, 'human'], ['wall', 4, 500], ['pit', 4, 350], ['firepit', 2, 400],
+    [['hall', 4, 1800], ['tower', 4, 550], ['pitch', 4, 550], ['mage', 4, 650], ['ice', 0, 400, 0, 'human'], ['wall', 4, 500, 0, 'human'], ['pit', 4, 350], ['firepit', 2, 400],
       ['barracks', 3, 550], ['barracks', 4, 500], ['stables', 1, 700], ['stables', 2, 500], ['stables', 3, 550], ['range', 3, 550], ['range', 4, 500],
       ['falconry', 1, 700], ['falconry', 2, 500], ['falconry', 3, 550], ['mine', 3, 450], ['workshop', 3, 450], ['chapel', 2, 500], ['siegeCat', 0, 800]],
     [['hall', 5, 3200], ['tower', 5, 900], ['pitch', 5, 900], ['mage', 5, 1000], ['ballista', 1, 1200], ['wall', 5, 800], ['pit', 5, 550], ['firepit', 3, 600],
@@ -508,10 +511,13 @@
   const resHas = id => !!RES_BY[id] && (RES_BY[id].cost === 0 || st.res.has(id));
   // druh stavby → druh vo výskume: za orkov je jedový kotol na mieste smolnej veže a bahno na mieste živého plota; zbrojnica ide s kasárňami
   const resKindOf = kind => kind === 'icetower' && isOrc() ? 'pitch' : kind === 'mud' ? 'hedge' : kind === 'armory' ? 'barracks' : kind;
-  const resLevels = kind => RES.filter(r => r.kind === resKindOf(kind) && r.lvl > 0).sort((a, b) => a.lvl - b.lvl);
+  const resLevels = kind => RES.filter(r => r.kind === resKindOf(kind) && r.lvl > 0 && resOn(r)).sort((a, b) => a.lvl - b.lvl);
   // najvyššia vyskúmaná úroveň druhu (úrovne idú za sebou); 0 = nevyskúmané
   const resLvl = kind => { let l = 0; for (const r of resLevels(kind)) { if (!resHas(r.id)) break; l = r.lvl; } return l; };
   const resMax = kind => { const L = resLevels(kind); return L.length ? L[L.length - 1].lvl : MAX_LVL; }; // najvyššia úroveň druhu v hre
+  // ďalšia úroveň stavby: orkské hradby majú len 3 podoby (úr. 1 → 3 → 5, odomknú sa s TH1, TH3, TH5)
+  const nextLvl = (kind, l) => { const n = resLevels(kind).find(r => r.lvl > l); return n ? n.lvl : l + 1; };
+  const dispLvl = (kind, l) => kind === 'wall' && isOrc() ? Math.ceil(l / 2) : l; // číslo úrovne, ako ho vidí hráč
   const resMin = kind => { const L = resLevels(kind); return L.length ? L[0].lvl : 1; };                    // úroveň, na ktorej sa stavba stavia (smolná veža 2, ohnivá 3)
   // najvyššia úroveň stavby v tejto misii: vyskúmaná a zároveň na ňu stačí úroveň hradu
   function kindCap(kind) {
@@ -540,8 +546,8 @@
   function resBlock(r) {
     if (!resCardOpen(r.c)) return 'Najprv dokonči kartu ' + ROMAN[r.c - 1];
     if (r.kind !== 'hall' && !resHas('hall' + r.c)) return 'Najprv vyskúmaj ' + hallWord() + ' ' + r.c;
-    const prev = r.lvl > 1 && RES.find(q => q.kind === r.kind && q.lvl === r.lvl - 1);
-    if (prev && !resHas(prev.id)) return 'Najprv vyskúmaj úroveň ' + prev.lvl;
+    const prev = resLevels(r.kind).filter(q => q.lvl < r.lvl).pop(); // predošlá úroveň (orkské hradby preskakujú 2 a 4)
+    if (prev && !resHas(prev.id)) return 'Najprv vyskúmaj úroveň ' + dispLvl(r.kind, prev.lvl);
     return null;
   }
   const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
@@ -4414,8 +4420,9 @@
   // hradba na políčku (x, y): spodok 2 body pod políčkom, jemná kresba je vyššia ako stará (24 bodov)
   // strana od hradu pre zvislý úsek hradby: 1 = vľavo (úsek pri ľavom okraji políčka), 2 = vpravo (pri pravom), 0 = nad/pod hradom (v strede)
   const wallArtOf = () => BUILD_RACE === 'orc' ? (typeof ORC_WALL_ART !== 'undefined' ? ORC_WALL_ART : null) : (typeof WALL_ART !== 'undefined' ? WALL_ART : null);
-  const wallThick = wl => { const a = wallArtOf(); return a && a.thick && a.thick[wl]; }; // hradba s ochodzou (strelec na nej stojí celý)
-  const wallFrontPx = wl => { const a = wallArtOf(); return (a && a.front && a.front[wl]) || WALL_FRONT_PX; }; // orkská palisáda je vyššia – chodník vyššie
+  const wallArtLv = wl => BUILD_RACE === 'orc' ? orcWallArtIdx(wl) : wl; // za orkov 3 podoby hradieb na 5 úrovní
+  const wallThick = wl => { const a = wallArtOf(); return a && a.thick && a.thick[wallArtLv(wl)]; }; // hradba s ochodzou (strelec na nej stojí celý)
+  const wallFrontPx = wl => { const a = wallArtOf(); return (a && a.front && a.front[wallArtLv(wl)]) || WALL_FRONT_PX; }; // orkská palisáda je vyššia – chodník vyššie
   const wallSide = c =>c < G.hc0 ? 1 : c > G.hc0 + 2 ? 2 : 0;
   const wallImg = (ctx, spr, x, y) => ctx.drawImage(spr.c, x, y + 18 - spr.h, spr.w, spr.h);
   // posun kresby stavby v bodoch: lukostrelecká veža ľudí z PixelLabu má teleso o kus vpravo od stredu kresby (rebrík vpravo) – posunie sa na stred políčka
@@ -6395,11 +6402,11 @@
     // ďalšia úroveň: kúpiť / najprv radnica / zamknutá do misie / maximum
     // icon = náhľad stavby na ďalšej úrovni
     const upAct = (lvl, cap, cost, apply, label, icon, newId, kind) => {
-      const nx = RES.find(r => r.kind === resKindOf(kind) && r.lvl === lvl + 1); // výskum ďalšej úrovne
+      const nx = resLevels(kind).find(r => r.lvl > lvl); // výskum ďalšej úrovne
       if (lvl < cap) shineTech(act(icon, label || 'Vylepšiť', coinTxt(cost), st.gold >= cost, apply, 'up'), newId || (nx && nx.id));
       else if (lvl >= resMax(kind)) act(I.star, 'Max. úr.', '', false, null, 'max', true);
-      else if (nx && resHas(nx.id) && kind !== 'hall') waitCard(icon, 'Úr. ' + (lvl + 1), nx.c, nx.id);
-      else lockCard('výskum', 'Úroveň ' + (lvl + 1) + ' treba najprv vyskúmať (záložka Výskum na mape)', nx ? nx.id : newId);
+      else if (nx && resHas(nx.id) && kind !== 'hall') waitCard(icon, 'Úr. ' + (dispLvl(kind, lvl) + 1), nx.c, nx.id);
+      else lockCard('výskum', 'Úroveň ' + (dispLvl(kind, lvl) + 1) + ' treba najprv vyskúmať (záložka Výskum na mape)', nx ? nx.id : newId);
     };
     const selRow = (icon, title, stats) => {
       const d = document.createElement('div'); d.className = 'selLine';
@@ -6454,7 +6461,7 @@
       // hromadné akcie pre označenú skupinu (rad hradieb alebo všetky stavby jedného druhu)
       const grp = st.selGroup, kind = grp[0].kind, d = BUILD[kind], isWall = kind === 'wall', cap = kindCap(kind);
       const minL = Math.min(...grp.map(w => w.lvl)), maxL = Math.max(...grp.map(w => w.lvl));
-      selRow(after(grp.find(w => w.lvl === maxL) || grp[0], { unit: null, gate: false }), (isWall ? 'Rad hradieb' : d.name + ' – všetky') + ' · ' + grp.length + ' ks', 'úroveň ' + (minL === maxL ? minL : minL + '–' + maxL) + ' · akcie platia pre celú skupinu, najprv pre najslabšie');
+      selRow(after(grp.find(w => w.lvl === maxL) || grp[0], { unit: null, gate: false }), (isWall ? 'Rad hradieb' : d.name + ' – všetky') + ' · ' + grp.length + ' ks', 'úroveň ' + (minL === maxL ? dispLvl(kind, minL) : dispLvl(kind, minL) + '–' + dispLvl(kind, maxL)) + ' · akcie platia pre celú skupinu, najprv pre najslabšie');
       // karta „pre všetky“: ak zlato nestačí, urobí toľko, koľko sa dá („3/6“)
       const bulk = (icon, name, list, costFn, apply, cls, px) => {
         if (!list.length) return;
@@ -6466,12 +6473,12 @@
       };
       const cand = fixedKind(kind) ? [] : grp.filter(w => w.lvl < cap).sort((a, b) => a.lvl - b.lvl);
       if (fixedKind(kind)) { /* koly a trebuchet sa nevylepšujú */ }
-      else if (cand.length) bulk(after(cand[0], { lvl: cand[0].lvl + 1, unit: null, gate: false, spec: null }), 'Vylepšiť', cand, bUpCost, w => {
+      else if (cand.length) bulk(after(cand[0], { lvl: nextLvl(kind, cand[0].lvl), unit: null, gate: false, spec: null }), 'Vylepšiť', cand, bUpCost, w => {
         const ratio = d.hp ? w.hp / bMaxHp(w) : 1, c = bUpCost(w);
-        st.gold -= c; w.spent += c; w.lvl++;
+        st.gold -= c; w.spent += c; w.lvl = nextLvl(kind, w.lvl);
         if (d.hp) w.hp = Math.ceil(bMaxHp(w) * ratio);
       }, 'up');
-      else upAct(maxL, maxL, 0, null, null, bPreview({ kind, lvl: maxL + 1 }), null, kind);
+      else upAct(maxL, maxL, 0, null, null, bPreview({ kind, lvl: nextLvl(kind, maxL) }), null, kind);
       if (d.hp) bulk(I.actRepair, 'Opraviť', grp.filter(w => bRepairCost(w) > 0), bRepairCost, w => { st.gold -= bRepairCost(w); w.hp = bMaxHp(w); }, '', true);
       const refund = grp.reduce((t, w) => t + Math.floor(w.spent * sellShare()) + (w.unit ? Math.floor(w.unit.spent * sellShare()) : 0), 0);
       act(ICONS.coin, 'Predať ' + grp.length + '×', '+' + refund, true, sellAll(grp, refund), 'sell', true);
@@ -6508,13 +6515,13 @@
       if (b.spec) stats += ' · ' + SPECS[b.spec].name;
       if (b.gate) stats += ' · rytieri cez ňu prejdú';
       if ((UNIT_HOME[b.kind] || b.kind === 'range') && knightsBlocked(b)) stats = '<span class="warn">⚠ vojaci sa nedostanú von</span> · ' + stats;
-      selRow(after(b, {}), (b.gate ? 'Brána' : iceMage(b) ? BUILD.icetower.name : d.name) + (fixedKind(b.kind) ? '' : ' · úr. ' + b.lvl), stats);
+      selRow(after(b, {}), (b.gate ? 'Brána' : iceMage(b) ? BUILD.icetower.name : d.name) + (fixedKind(b.kind) ? '' : ' · úr. ' + dispLvl(b.kind, b.lvl)), stats);
       if (!fixedKind(b.kind)) upAct(b.lvl, kindCap(b.kind), bUpCost(b), () => {
         const ratio = d.hp ? b.hp / bMaxHp(b) : 1, c = bUpCost(b);
-        st.gold -= c; b.spent += c; b.lvl++;
+        st.gold -= c; b.spent += c; b.lvl = nextLvl(b.kind, b.lvl);
         if (d.hp) b.hp = Math.ceil(bMaxHp(b) * ratio);
         rebuildOcc();
-      }, null, after(b, { lvl: b.lvl + 1 }), null, b.kind);
+      }, null, after(b, { lvl: nextLvl(b.kind, b.lvl) }), null, b.kind);
       const fc = bRepairCost(b);
       if (fc) act(I.actRepair, 'Opraviť', coinTxt(fc), st.gold >= fc, () => { st.gold -= fc; b.hp = bMaxHp(b); rebuildOcc(); }, '', true);
       const refund = Math.floor(b.spent * sellShare()) + (b.unit ? Math.floor(b.unit.spent * sellShare()) : 0);
@@ -7620,7 +7627,7 @@
   const RES_NAME = { hall: () => isOrc() ? 'Pevnosť' : 'Hrad', wallArcher: () => isOrc() ? 'Strelec na palisáde' : 'Lukostrelci na hradbách', spear: () => isOrc() ? 'Zbrojnica' : 'Kopijníci', gobknife: () => 'Goblini s nožíkom',
     ice: () => 'Ľadový plameň', siegeRam: () => BUY.ram.name, siegeCat: () => 'Katapult', hedge: () => BUILD[isOrc() ? 'mud' : 'hedge'].name };
   const resBuild = r => r.kind === 'pitch' && isOrc() ? 'icetower' : r.kind; // za orkov je na mieste smolnej veže jedový kotol
-  const resName = r => (RES_NAME[r.kind] ? RES_NAME[r.kind]() : BUILD[resBuild(r)].short) + (r.lvl ? ' ' + r.lvl : '');
+  const resName = r => (RES_NAME[r.kind] ? RES_NAME[r.kind]() : BUILD[resBuild(r)].short) + (r.lvl ? ' ' + dispLvl(r.kind, r.lvl) : '');
   function resIcon(r) {
     try {
       const k = resBuild(r);

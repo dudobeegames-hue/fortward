@@ -1642,7 +1642,7 @@ function initBuildingSprites() {
   });
   OBSPR.wall = [];
   for (let l = 1; l <= 5; l++) { // palisáda z PixelLabu (orc-wall-art.js, 3 × 16 variantov), chýbajúce úrovne stará kresba
-    OBSPR.wall[l - 1] = []; const lv = typeof ORC_WALL_ART !== 'undefined' && ORC_WALL_ART.lv[l - 1];
+    OBSPR.wall[l - 1] = []; const lv = typeof ORC_WALL_ART !== 'undefined' && ORC_WALL_ART.lv[orcWallArtIdx(l - 1)];
     for (let m = 0; m < (lv ? lv.length : 16); m++) OBSPR.wall[l - 1][m] = lv ? artBuilding({ chars: ORC_WALL_ART.chars, pal: ORC_WALL_ART.pal, lv }, m, false) : makeWall(m, l, true);
   }
   OBSPR.gatehouse = [1, 2, 3, 4, 5].map(l => makeGatehouse(l, true));
@@ -1652,6 +1652,9 @@ function initBuildingSprites() {
   OBSPR.gateIcon = spriteFromCanvas(oc);
 }
 
+// orkské hradby majú 3 podoby: úroveň 1–2 = OW1, 3–4 = OW2, 5 = OW3 (kým OW3 nie je, ostane OW2)
+const ORC_WALL_OF = [0, 0, 1, 1, 2];
+const orcWallArtIdx = wl => typeof ORC_WALL_ART === 'undefined' ? wl : Math.min(ORC_WALL_ART.lv.length - 1, ORC_WALL_OF[Math.max(0, Math.min(4, wl))]);
 // sprite budovy podľa jej úrovne (niektoré budovy majú 5 vzhľadov)
 // rasa hráča: jeho stavby sa kreslia v jej podobe (orkovia = budovy hordy z tábora); tábor protivníka berie BSPR priamo
 let BUILD_RACE = 'human';
