@@ -198,7 +198,7 @@
   const hallMax = () => Math.round((400 + 200 * (st.hallLvl - 1)) * (1 + 0.06 * perk('foundations')));
   const hallUpCost = () => Math.round(110 * Math.pow(1.7, st.hallLvl - 1) * (1 - 0.04 * perk('architects'))); // lacnejšie – radnica odomyká aj úrovne stavieb
   // stavebná zóna podľa úrovne radnice: [stĺpce, riadky] vrátane radnice (3 × 2 dole v strede); párna šírka má stĺpec navyše vpravo
-  const ZONE_SIZE = [[5, 4], [7, 4], [7, 5], [8, 5], [8, 6]];
+  const ZONE_SIZE = [[5, 4], [7, 4], [7, 5], [9, 5], [9, 6]];
   const zoneSize = () => ZONE_SIZE[Math.max(1, Math.min(ZONE_SIZE.length, st.hallLvl || 1)) - 1];
   const zoneRows = () => zoneSize()[1];
   const zoneCol0 = () => Math.max(0, G.hc0 + 1 - Math.floor((zoneSize()[0] - 1) / 2)); // stred zóny = stredný stĺpec radnice
@@ -747,6 +747,62 @@
   const hallTile = (c, r) => c >= G.hc0 && c < G.hc0 + 3 && r >= G.hr0 && r < G.hr0 + HALL_ROWS;
   const inHall = hallTile;
   const zoneTopRow = () => G.rows - zoneRows();
+  // ---- zlatá ruda: v každej misii 5 náhodných políčok najviac 10 radov odspodu, vždy mimo najväčšej stavebnej zóny (9 × 6),
+  // nie na ceste ani pri vode (breh s kamienkami); bane sa dajú postaviť len na ne – teda len za stavebnou zónou.
+  // Náhoda je daná misiou a obtiažnosťou – po reštarte misie je ruda na tých istých miestach ----
+  const ORE_N = 5, ORE_ROWS = 10;
+  const oreAt = (c, r) => !!(st.ore && st.ore.has(c + ',' + r));
+  function makeOre() {
+    let a = (st.mission * 7919 + (st.tier || 0) * 104729 + (st.endless ? 31337 : 0)) >>> 0; // mulberry32
+    const rnd = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const hc = G.hc0 + 1, wMax = Math.max(...ZONE_SIZE.map(z => z[0])), hMax = ZONE_MAX_ROWS;
+    const c0 = Math.max(0, hc - Math.floor((wMax - 1) / 2)), c1 = Math.min(G.cols, c0 + wMax);
+    const inMaxZone = (c, r) => c >= c0 && c < c1 && r >= G.rows - hMax;
+    const wet = (c, r) => { // voda alebo breh s kamienkami (3 body okolo)
+      const w = scene && scene.water; if (!w) return false;
+      for (let y = tileY(r) - 3; y < tileY(r) + T + 3; y++) for (let x = tileX(c) - 3; x < tileX(c) + T + 3; x++) if (x >= 0 && y >= 0 && x < W && y < FH && w[y * W + x]) return true;
+      return false;
+    };
+    const road = (c, r) => scene && scene.roadD && [[4, 4], [12, 4], [8, 8], [4, 12], [12, 12]].some(([dx, dy]) => scene.roadD(tileX(c) + dx, tileY(r) + dy) < 3);
+    const cand = [];
+    for (let r = Math.max(0, G.rows - ORE_ROWS); r < G.rows; r++) for (let c = 0; c < G.cols; c++) if (!inMaxZone(c, r) && !hallTile(c, r) && !wet(c, r) && !road(c, r)) cand.push(c + ',' + r);
+    st.ore = new Set();
+    while (st.ore.size < ORE_N && cand.length) st.ore.add(cand.splice(Math.floor(rnd() * cand.length), 1)[0]);
+  }
+  // kresba rudy (16 × 16 bodov, jemná kresba 2×): kamene s vrúbkami zlata
+  const oreCache = {};
+  function oreImg(c, r) {
+    const key = (c * 7 + r * 13) % 4;
+    if (oreCache[key]) return oreCache[key];
+    const S = 2 * T, cv = document.createElement('canvas'); cv.width = S; cv.height = S;
+    const x = cv.getContext('2d');
+    let a = 977 + key * 131;
+    const rnd = () => { a = (a * 1103515245 + 12345) & 0x7fffffff; return a / 0x7fffffff; };
+    // podklad: tmavá rozkopaná hlina – zakryje kamienky krajiny, ruda sa s nimi nemieša
+    for (let py = 0; py < S; py++) for (let px = 0; px < S; px++) {
+      const dx = (px - 15.5) / 14, dy = (py - 18) / 11, d = dx * dx + dy * dy + (rnd() - 0.5) * 0.12;
+      if (d > 1) continue;
+      x.fillStyle = d > 0.82 ? '#5a3a1e' : rnd() < 0.15 ? '#3e2614' : '#4a2e18'; x.fillRect(px, py, 1, 1);
+    }
+    const rocks = [[9, 19, 7, 5], [19, 21, 6, 4], [14, 13, 6, 5], [23, 14, 4, 3], [6, 25, 4, 3]];
+    for (const [cx, cy, rx, ry] of rocks) {
+      const dx = Math.round((rnd() - 0.5) * 3), dy = Math.round((rnd() - 0.5) * 2);
+      for (let py = -ry - 1; py <= ry + 1; py++) for (let px = -rx - 1; px <= rx + 1; px++) {
+        const d = (px * px) / ((rx + 1) * (rx + 1)) + (py * py) / ((ry + 1) * (ry + 1));
+        if (d > 1) continue;
+        const inner = (px * px) / (rx * rx) + (py * py) / (ry * ry) <= 1;
+        x.fillStyle = !inner ? '#1c140e' : py < -ry * 0.35 ? '#6a6a7a' : py > ry * 0.4 ? '#26262e' : '#44444f';
+        x.fillRect(cx + dx + px, cy + dy + py, 1, 1);
+      }
+      for (let k = 0; k < 4; k++) { // zlaté žilky
+        const gx = cx + dx + Math.round((rnd() - 0.5) * rx * 1.2), gy = cy + dy + Math.round((rnd() - 0.6) * ry);
+        x.fillStyle = '#b88420'; x.fillRect(gx, gy, 2, 2);
+        x.fillStyle = '#f8d048'; x.fillRect(gx, gy, 1, 1);
+      }
+    }
+    return (oreCache[key] = cv);
+  }
+  const drawOre = () => { if (st.ore) for (const k of st.ore) { const [c, r] = k.split(',').map(Number); g.drawImage(oreImg(c, r), tileX(c), tileY(r), T, T); } };
   const inZone = (c, r) => c >= zoneCol0() && c < zoneCol1() && r >= zoneTopRow() && r <= G.rows - 1;
   const tileAt = (x, y) => ({
     c: Math.max(0, Math.min(G.cols - 1, Math.floor((x - G.gx0) / T))),
@@ -1264,6 +1320,7 @@
       spellSel: null, siegeOrder: [], siegePick: null, fallFx: [], blasts: [], healFx: [], bolts: [], hallHolyT: 0, stance: isAssaultM(st.mission) && !st.endless ? 'attack' : 'defend', introPan: null, // v misiách začína armáda v obrane, pri útoku na hrad útočí
     });
     rebuildOcc(); // nová misia: zabudni obsadenie políčok aj cesty hordy z predošlej hry
+    makeOre();
     st.camp = makeCamp(); // od misie 6 si horda hore na bojisku rozloží tábor
     Object.assign(st, { deps: [], depN: 0, armyPick: null, assaultSpent: 0, assaultDone: false, assaultKing: false, campV: 0, ePaths: null });
     rebuildOcc(); // cesta hordy už s hradbami tábora (a pri útoku bez radnice)
@@ -4396,6 +4453,7 @@
       }
     } else {
       spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl); // trebuchet po výstrele s ramenom hore; ohnivá veža na ľad má modrý plameň
+      hallLink(b, x0, y0); // veža hneď vedľa hradu: kúsok hradby od jej stredu pod okraj hradu (ako pri hradbe vedľa hradu)
       const bx = x0 + bW(b) * T / 2 - Math.floor(spr.w / 2) + artDX(b.kind); // stred stavby (aj širšej na viacerých políčkach)
       g.drawImage(bldCanvas(spr, time, b.c * 0.7 + b.r * 0.3), bx + hitJit(b.flash), y0 + T + 1 - spr.h, spr.w, spr.h); // w, h v bodoch hry (jemná kresba má plátno 2×); zástavy vejú
       if (b.holyT > 0) holyGlow(spr, bx, y0 + T + 1 - spr.h, b.holyT, time);
@@ -4444,6 +4502,17 @@
   const JOINERS = { wall: 1, tower: 1, mage: 1, pitch: 1, icetower: 1, ballista: 1 }; // hradby sa napájajú len na hradby a veže (strážna, mága) – na ostatné budovy nie
   const joins = (c, r) => { const o = occAt(c, r); return !!o && (o === HALL ? r === G.hr0 + HALL_ROWS - 1 : !!JOINERS[o.kind]); }; // na hrad len zo spodného radu (tam má bočné múry)
   const joinsV = (c, r) => occAt(c, r) !== HALL && joins(c, r); // na radnicu sa hradby napájajú len z bokov, nie zhora
+  // veža (strážna, mága, smolná …) na spodnom rade hradu tesne vedľa neho: úsek hradby od stredu veže pod okraj hradu
+  // (hrad sa kreslí neskôr a koniec prekryje); hradba v podobe podľa úrovne hradu
+  function hallLink(b, x0, y0) {
+    if (!JOINERS[b.kind] || b.kind === 'wall' || b.r !== G.hr0 + HALL_ROWS - 1) return;
+    const R = occAt(b.c + 1, b.r) === HALL, L = occAt(b.c - 1, b.r) === HALL;
+    if (!R && !L) return;
+    const flat = wallsOf()[Math.max(1, Math.min(5, st.hallLvl)) - 1][10], fr = flat.c.width / flat.w;
+    const seg = (dx, w) => { for (let k = 0; k < w; k += 4) { const ww = Math.min(4, w - k); g.drawImage(flat.c, 6 * fr, 0, ww * fr, flat.c.height, dx + k, y0 + 18 - flat.h, ww, flat.h); } };
+    if (R) seg(x0 + T / 2, T / 2 + 8);
+    if (L) seg(x0 - 8, T / 2 + 8);
+  }
   const joinsBuilding = (c, r) => { const o = occAt(c, r); return !!o && o !== HALL && o.kind !== 'wall' && !!JOINERS[o.kind]; };
 
   // stanovište hrdinu: zapichnutá zástavka v rase hráča a krúžok na zemi
@@ -4655,7 +4724,8 @@
       if (inHall(c, r)) continue;
       if (r >= zt && (c < zoneCol0() || c >= zoneCol1())) continue; // mimo zóny po stranách mriežka nie je (pred zónou pre stroj áno)
       const x = tileX(c), y = tileY(r), o = occAt(c, r);
-      if (!o && (st.tool || (st.siegePick && r < zt))) { g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(x + 1, y + 1, T - 2, T - 2); }
+      if (!o && st.tool === 'mine') { /* baňa: len na zlatej rude za zónou (nižšie) */ }
+      else if (!o && (st.tool || (st.siegePick && r < zt))) { g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(x + 1, y + 1, T - 2, T - 2); }
       g.fillStyle = lineCol;
       g.fillRect(x + 1, y, T - 1, 1); g.fillRect(x, y + 1, 1, T - 1);       // horná a ľavá hrana
       if (c === G.cols - 1 || inHall(c + 1, r) || (r >= zt && c === zoneCol1() - 1)) g.fillRect(x + T - 1, y + 1, 1, T - 1);
@@ -4664,11 +4734,18 @@
       g.fillRect(x, y, 1, 1);
     }
     const col = blink ? '#f8d048' : '#fff070';
+    // baňa (stavanie či presúvanie): blikajúce voľné políčka so zlatou rudou
+    const mvMine = (bdrag && bdrag.moved ? bdrag.b : st.moving);
+    if ((st.tool === 'mine' || (mvMine && mvMine.kind === 'mine')) && st.ore) for (const k of st.ore) {
+      const [c, r] = k.split(',').map(Number); if (occAt(c, r)) continue;
+      g.fillStyle = blink ? 'rgba(248,208,72,0.4)' : 'rgba(248,208,72,0.25)'; g.fillRect(tileX(c) + 1, tileY(r) + 1, T - 2, T - 2);
+      corners(tileX(c), tileY(r), tileX(c) + T - 1, tileY(r) + T - 1, col);
+    }
     // presúvanie: zvýrazni cieľ a ukáž polopriehľadnú stavbu
     const mv = bdrag && bdrag.moved ? bdrag.b : st.moving;
     if (mv) {
       if (st.moving) for (let r = zt; r <= G.rows - 1; r++) for (let c = 0; c < G.cols; c++) {
-        if (!inHall(c, r) && !occAt(c, r)) { g.fillStyle = 'rgba(156,212,90,0.13)'; g.fillRect(tileX(c) + 1, tileY(r) + 1, T - 2, T - 2); }
+        if (!inHall(c, r) && !occAt(c, r) && mv.kind !== 'mine') { g.fillStyle = 'rgba(156,212,90,0.13)'; g.fillRect(tileX(c) + 1, tileY(r) + 1, T - 2, T - 2); }
       }
       const ox = tileX(mv.c), oy = tileY(mv.r), mw = bW(mv) * T;
       g.fillStyle = 'rgba(28,20,14,0.45)'; g.fillRect(ox, oy, mw, T); // pôvodné miesto
@@ -5953,6 +6030,7 @@
     drawSceneFx(time);
     const playing = st.phase !== 'title';
     if (playing) for (const key in st.paving) { const [pc, pr] = key.split(','), px = tileX(+pc), py = tileY(+pr); drawPave(g, px, py, st.paving[key]); } // dlažba pod všetkým
+    if (playing && !isAssault()) drawOre(); // zlatá ruda (miesta pre bane)
     if (playing) { firepitN = 0; for (const b of st.blds) if (b.kind === 'firepit') firepitN++; }
     if (playing) for (const b of st.blds) if (TRAPS[b.kind]) drawPit(b, time); else if (b.kind === 'mud') drawMud(b); // pasce a bahno ležia na zemi
     if (playing && st.camp) for (const o of st.camp.parts) if (o.role === 'trap') drawPit({ kind: o.kind, c: o.c, r: o.r, lvl: 1, armT: o.armT }, time); // pasce tábora tiež na zemi
@@ -6671,7 +6749,7 @@
   }
 
   // dá sa na políčko postaviť? (na farbu náhľadu a pri pustení prsta)
-  const canPlace = (c, r, kind) => { for (let k = 0; k < ((kind && BUILD[kind].w) || 1); k++) if (!inZone(c + k, r) || inHall(c + k, r) || occAt(c + k, r)) return false; return true; }; // všetky políčka stavby voľné
+  const canPlace = (c, r, kind) => { for (let k = 0; k < ((kind && BUILD[kind].w) || 1); k++) if ((kind === 'mine' ? !oreAt(c + k, r) : !inZone(c + k, r)) || inHall(c + k, r) || occAt(c + k, r)) return false; return true; }; // všetky políčka stavby voľné; baňa len na zlatej rude (tá je za stavebnou zónou)
   // dlažba: presne ako nádvorie pod radnicou (scene.js) – rovnaké tehlové rady 6×5, škáry a farby RAMP.walk;
   // počíta sa z polohy na bojisku, takže susedné dlaždice aj nádvorie na seba plynule nadväzujú
   // druhy dlažby: v st.paving[„c,r“] je číslo druhu (1 = dlažba / dosky); iné číslo zo starších uložených hier sa kreslí ako dlažba
@@ -6707,8 +6785,9 @@
   function placeAt(kind, c, r) {
     if (isPave(kind)) return placePaving(c, r, kind);
     const dc = costOf(kind);
-    if (!inZone(c, r)) { dropTool(); return false; }
+    if (!inZone(c, r) && !(kind === 'mine' && oreAt(c, r))) { if (kind === 'mine') { toast('Baňa sa dá postaviť len na zlatej rude'); AUDIO.play('deny'); return false; } dropTool(); return false; }
     if (!canPlace(c, r, kind) && canPlace(c - 1, r, kind)) c--; // široká budova sa zmestí, keď ju posunieme o políčko doľava
+    if (kind === 'mine' && !occAt(c, r) && !oreAt(c, r)) { toast('Baňa sa dá postaviť len na zlatej rude'); AUDIO.play('deny'); return false; }
     if (!canPlace(c, r, kind)) { AUDIO.play('deny'); return false; } // políčko je obsadené
     if (bldFull(kind)) { toast(limitMsg(kind)); AUDIO.play('deny'); st.tool = null; renderBuild(); return false; }
     if (st.gold < dc) { toast('Nedostatok zlata'); AUDIO.play('deny'); return false; }
@@ -6781,7 +6860,7 @@
     }
     return [...seen];
   }
-  const canMoveTo = (b, c, r) => { for (let k = 0; k < bW(b); k++) if (!inZone(c + k, r) || inHall(c + k, r) || (occAt(c + k, r) && occAt(c + k, r) !== b)) return false; return true; };
+  const canMoveTo = (b, c, r) => { for (let k = 0; k < bW(b); k++) if ((b.kind === 'mine' ? !oreAt(c + k, r) : !inZone(c + k, r)) || inHall(c + k, r) || (occAt(c + k, r) && occAt(c + k, r) !== b)) return false; return true; };
   function moveBuilding(b, c, r) {
     if (b.c === c && b.r === r) return true;
     if (!canMoveTo(b, c, r)) { AUDIO.play('deny'); return false; } // sem sa stavba presunúť nedá

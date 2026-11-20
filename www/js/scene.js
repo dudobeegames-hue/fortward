@@ -1042,5 +1042,5 @@ function buildScene(W, H, G, seed, themeIdx, clear, yard, terr, hd) {
   }
 
   bx.putImageData(img, 0, 0);
-  return { bg, R, theme: th, foam, lava, spawn, water, mill, fortX, seaX };
+  return { bg, R, theme: th, foam, lava, spawn, water, mill, fortX, seaX, roadD }; // roadD: vzdialenosť bodu od okraja cesty (záporná = na ceste)
 }
