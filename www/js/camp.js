@@ -115,21 +115,23 @@ function gateSprite(m, l, orc) {
   const WS = (orc ? OBSPR : BSPR).wall; // úsek hradby pod bránou v rase tábora
   if (ga && !(m & 5) && ga.w <= 16) return ga; // vodorovná hradba: celá brána namiesto úseku
   if (ga && !(m & 5) && !GATE_SPR[key]) { // vysoká brána (širšia ako políčko): za ňou úsek hradby, aby medzi hradbou a bránou nesvietila tráva
-    const ws = WS[l][m], k = ga.c.width / ga.w, H = Math.ceil(Math.max(ws.h, ga.h)), c = document.createElement('canvas');
-    c.width = ga.c.width; c.height = H * k;
-    const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
-    x.drawImage(ws.c, (ga.w - ws.w) / 2 * k, (H - ws.h) * k, ws.w * k, ws.h * k);
-    x.drawImage(ga.c, 0, (H - ga.h) * k);
-    const s = spriteFromCanvas(c); s.w = ga.w; s.h = H; if (k > 1) s.hd = true;
+    const ws = WS[l][m], k = ga.c.width / ga.w, H = Math.ceil(Math.max(ws.h, ga.h));
+    const comp = src => { const c = document.createElement('canvas'); c.width = ga.c.width; c.height = H * k;
+      const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+      x.drawImage(ws.c, (ga.w - ws.w) / 2 * k, (H - ws.h) * k, ws.w * k, ws.h * k);
+      x.drawImage(src, 0, (H - ga.h) * k); return c; };
+    const s = spriteFromCanvas(comp(ga.c)); s.w = ga.w; s.h = H; if (k > 1) s.hd = true;
+    if (ga.frames) { s.frames = ga.frames.map(comp); s.fps = ga.fps; } // zástavy na bráne vejú aj v tábore
     GATE_SPR[key] = s;
   }
   if (ga && !GATE_SPR[key]) { // zvislá hradba: úsek hradby a na ňom celá brána v rovnakej výške ako na vodorovnej (ako v hre); brána zboku, ak je
     const gv = ga.v || ga, ws = WS[l][m], k = gv.c.width / gv.w, W = Math.max(16, gv.w), H = Math.ceil(Math.max(ws.h, gv.h));
-    const c = document.createElement('canvas'); c.width = W * k; c.height = H * k;
-    const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
-    x.drawImage(ws.c, (W - ws.w) / 2 * k, (H - ws.h) * k, ws.w * k, ws.h * k);
-    x.drawImage(gv.c, (W - gv.w) / 2 * k, (H - gv.h) * k, gv.w * k, gv.h * k);
-    const s = spriteFromCanvas(c); s.w = W; s.h = H; if (k > 1) s.hd = true;
+    const comp = src => { const c = document.createElement('canvas'); c.width = W * k; c.height = H * k;
+      const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+      x.drawImage(ws.c, (W - ws.w) / 2 * k, (H - ws.h) * k, ws.w * k, ws.h * k);
+      x.drawImage(src, (W - gv.w) / 2 * k, (H - gv.h) * k, gv.w * k, gv.h * k); return c; };
+    const s = spriteFromCanvas(comp(gv.c)); s.w = W; s.h = H; if (k > 1) s.hd = true;
+    if (gv.frames) { s.frames = gv.frames.map(comp); s.fps = gv.fps; }
     GATE_SPR[key] = s;
   }
   if (!GATE_SPR[key]) {

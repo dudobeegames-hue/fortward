@@ -1019,11 +1019,21 @@
   // ---------------- Hra ----------------
   // rieka spomalí každého, kto ňou brodí (po moste nie); plytčina na brode spomalí menej
   // to isté pre živý plot a bahno: kto sa nimi prediera (pešo, nie letci), ide pomalšie
-  const WATER_MUL = [1, 0.5, 0.75], HEDGE_MUL = 0.7;
-  const slowAt = (c, r) => { const o = occAt(c, r); return !!o && o !== HALL && (o.kind === 'hedge' || o.kind === 'mud'); };
+  const WATER_MUL = [1, 0.5, 0.75], HEDGE_MUL = 0.7, MUD_MUL = 0.6; // bahno spomalí viac ako živý plot (nohy sa v ňom boria)
+  const slowAt = (c, r) => { const o = occAt(c, r); return !!o && o !== HALL && (o.kind === 'hedge' || o.kind === 'mud') ? (o.kind === 'mud' ? MUD_MUL : HEDGE_MUL) : 0; };
+  // jednotka po zemi v bahne: kreslí sa o kúsok nižšie a nohy sú zaborené (spodok postavy sa oreže), okolo nôh tmavý lem blata
+  const inMud = o => !o.fly && !(o.d && o.d.fly) && (q => !!q && q !== HALL && q.kind === 'mud')(occAt(Math.floor((o.x - G.gx0) / T), Math.floor((o.y - G.gy0) / T)));
+  function sunk(o, draw) {
+    if (o.dead || !inMud(o)) { draw(); return; }
+    const D = 2.5;
+    g.save(); g.beginPath(); g.rect(-1e4, -1e4, 2e4, 1e4 + o.y - 0.5); g.clip(); g.translate(0, D); draw(); g.restore();
+    const w = o.siege ? 9 : o.d && o.d.giant ? 12 : 4.5; // lem blata okolo nôh (kolies)
+    g.fillStyle = '#2c1e12'; g.fillRect(Math.round((o.x - w) * 2) / 2, Math.round((o.y - 1) * 2) / 2, w * 2, 1);
+    g.fillStyle = '#5c4228'; g.fillRect(Math.round((o.x - w + 1) * 2) / 2, Math.round((o.y - 1) * 2) / 2, w * 2 - 2, 0.5);
+  }
   function waterMul(o) {
     const w = scene && scene.water, x = Math.round(o.x), y = Math.round(o.y);
-    const hm = !o.fly && !(o.d && o.d.fly) && slowAt(Math.floor((o.x - G.gx0) / T), Math.floor((o.y - G.gy0) / T)) ? HEDGE_MUL : 1;
+    const hm = !o.fly && !(o.d && o.d.fly) && slowAt(Math.floor((o.x - G.gx0) / T), Math.floor((o.y - G.gy0) / T)) || 1;
     if (!w || x < 0 || y < 0 || x >= W || y >= FH) return hm;
     const k = w[y * W + x];
     if (k && Math.random() < 0.06) part(o.x + (Math.random() - 0.5) * 6, o.y - 1, (Math.random() - 0.5) * 12, -8 - Math.random() * 8, 0.35, Math.random() < 0.5 ? '#bcd8f0' : '#ffffff', 60); // čľapot
@@ -6130,18 +6140,18 @@
       for (const b of st.blds) { const q = vGateOf(b); if (q) objs.push({ y: tileY(b.r) + T + 0.1, x: b.c, f: () => drawVGate(b, time) }); } // brána na zvislej hradbe: po vlastnom úseku, no pred úsekom pod ňou – ten prekryje jej spodok so vchodom
       for (const s of st.soldiers) {
         const cast = s.helper === 'chapel' && s.working && s.tgt && !s.dead && !totemOn(s); // mních pri liečení zdvihne palicu (šaman s totemom má auru, nie lúč)
-        objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: dpt(s), id: s.slot, f: () => { drawFighter(s, raceSpr(cast ? 'monkCast' : s.spr || 'soldier')); if (cast && !(SPR.monk8 && raceSpr('monk') === 'monk')) drawStaffGlow(s, time); } }); // liečiteľ z PixelLabu má kúzlo v animácii (bez svetla na palici)
+        objs.push(s.fly ? { y: 9990, f: () => drawFalcon(s, time) } : { y: dpt(s), id: s.slot, f: () => { sunk(s, () => drawFighter(s, raceSpr(cast ? 'monkCast' : s.spr || 'soldier'))); if (cast && !(SPR.monk8 && raceSpr('monk') === 'monk')) drawStaffGlow(s, time); } }); // liečiteľ z PixelLabu má kúzlo v animácii (bez svetla na palici)
         if (cast) { const t = s.tgt; objs.push({ y: t.y - healAuraH(t) - 1, f: () => drawHealAura(s, t, time) }); }
       }
       if (st.phase === 'build') for (const o of st.siegeOrder) { // kúpené obliehacie stroje čakajú na mieste, odkiaľ vyrazia
         const sp = SPR[raceSpr(BUY[o.key].siege) + '8'][6].idle; // otočený k horde
         objs.push({ y: o.y, f: () => { shadow(o.x, o.y, 9); g.drawImage(sp.c, Math.round(o.x - sp.ax), Math.round(o.y - sp.ay), sp.w, sp.h); } });
       }
-      if (st.king && !st.king.dead) objs.push({ y: st.king.y, f: () => drawFighter(st.king, heroDef().spr) });
+      if (st.king && !st.king.dead) objs.push({ y: st.king.y, f: () => sunk(st.king, () => drawFighter(st.king, heroDef().spr)) });
       else if (st.king && kingLying(st.king)) objs.push({ y: st.king.y, f: () => drawDeadKing(st.king, time) });
     }
     for (const e of st.enemies) {
-      objs.push({ y: e.d.fly ? 9990 : dpt(e), id: 1e5 + (e._id || (e._id = ++enemyN)), f: () => { drawEnemy(e, time); if (e.healTgt && !e.healTgt.dead && foeSpr(e.d.spr) === 'monk' && !SPR.monk8) drawStaffGlow(e, time); } }); // letci (netopiere) sa kreslia ponad hradby a stavby
+      objs.push({ y: e.d.fly ? 9990 : dpt(e), id: 1e5 + (e._id || (e._id = ++enemyN)), f: () => { sunk(e, () => drawEnemy(e, time)); if (e.healTgt && !e.healTgt.dead && foeSpr(e.d.spr) === 'monk' && !SPR.monk8) drawStaffGlow(e, time); } }); // letci (netopiere) sa kreslia ponad hradby a stavby
       const t = e.healTgt; // aura liečeného (ako pri mníchovi hráča)
       if (t && !t.dead && !e.dead && foeSpr(e.d.spr) === 'monk') objs.push({ y: t.y - healAuraH(t) - 1, f: () => drawHealAura(e, t, time) });
     }
@@ -6150,7 +6160,7 @@
       for (const o of st.camp.parts) if (o.hp > 0 && o.role !== 'trap') objs.push({ y: o.y, f: () => {
         const sp = o.skin.spr(o, time); // tieň je vo vrstve tieňov (drawShadows)
         campWallSlices(g, o, o.bld, o.x - T / 2, o.y, CAMP_PIECES[foeRace()].wall); // napojenie hradby na susednú vežu
-        g.drawImage(sp.c, Math.round(o.x - sp.w / 2) + hitJit(o.flash), o.y - sp.h + (o.skin.dy || 0), sp.w, sp.h);
+        g.drawImage(bldCanvas(sp, time, o.x * 0.07 + o.y * 0.03), Math.round(o.x - sp.w / 2) + hitJit(o.flash), o.y - sp.h + (o.skin.dy || 0), sp.w, sp.h); // vlajky vejú, ohne horia (ako stavby hráča)
         if (o.lvl > 1 && !o.skin.lvlArt) pxText(g, String(o.lvl), Math.round(o.x + sp.w / 2) - 4, o.y - 7, '#f8d048'); // úroveň stavby bez vlastného vzhľadu
       } });
       for (const r of st.camp.rocks) objs.push({ y: 9999, f: () => drawRock(r) });
@@ -7540,8 +7550,10 @@
       const pc = pieces[q.k], [w, h] = campSize(pc);
       return { kind: q.k, skin: pc, lvl: pc.fixed ? 1 : q.l || 1, fired: 0, x: g2.gx0 + q.c * T + w * T / 2, y: g2.gy0 + (q.r + h) * T, mask: CAMP_WALLS[q.k] ? campWallMask(lay, q) : null, bld: CAMP_WALLS[q.k] ? campWallBld(lay, q) : 0 };
     }).sort((a, b) => a.y - b.y);
-    const c = document.createElement('canvas'); c.width = W; c.height = Math.min(sc.bg.height / sc.R, Math.max(...parts.map(o => o.y)) + 10);
-    const x = c.getContext('2d'); x.drawImage(sc.bg, 0, 0, sc.bg.width / sc.R, sc.bg.height / sc.R);
+    // výrez od vrchu najvyššej stavby (nad mriežkou je pás krajiny TOP_PAD – ten do náhľadu nepatrí, inak by sa hrad dole odrezal)
+    const y0 = Math.max(0, Math.floor(Math.min(...parts.map(o => o.y - o.skin.spr(o, 0).h + (o.skin.dy || 0))) - 4));
+    const c = document.createElement('canvas'); c.width = W; c.height = Math.min(sc.bg.height / sc.R, Math.max(...parts.map(o => o.y)) + 10) - y0;
+    const x = c.getContext('2d'); x.translate(0, -y0); x.drawImage(sc.bg, 0, 0, sc.bg.width / sc.R, sc.bg.height / sc.R);
     for (const o of parts) { const sp = o.skin.spr(o, 0); campWallSlices(x, o, o.bld, o.x - T / 2, o.y, pieces.wall); x.drawImage(sp.c, Math.round(o.x - sp.w / 2), o.y - sp.h + (o.skin.dy || 0), sp.w, sp.h); }
     return (castlePrev[key] = c.toDataURL());
   }
