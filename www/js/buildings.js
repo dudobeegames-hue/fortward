@@ -1318,6 +1318,40 @@ function makeWolfPen() {
   return p.finish();
 }
 // zahrotené koly 16x9 pred hradbami (misie 7+): dva prekrížené rady kolov s kostenými hrotmi
+// koly v jemnej kresbe (plátno 32 × 20, v hre 16 × 10 bodov): ležiaci trám s kôrou a dva páry prekrížených zaostrených kolov
+// s kostenými hrotmi a lanom v mieste kríženia; svetlo zľava, obrys okolo siluety
+function makeStakesFine() {
+  const W2 = 32, H2 = 20, px = new Array(W2 * H2).fill(null);
+  const WOOD = ['#2a1a0e', '#3e2614', '#5a3a1e', '#6e4422', '#8a5a2e', '#a86c38', '#c48a50', '#c8945a'], BON = ['#8a8478', '#c8b890', '#e8dcc0'], ROPE = ['#8a6a40', '#c8b890'], K = '#1c140e';
+  const set = (x, y, c) => { if (x >= 0 && y >= 0 && x < W2 && y < H2) px[y * W2 + x] = c; };
+  const stake = (x0, y0, x1, y1, front) => { // kol od päty (x0, y0) po hrot (x1, y1), 3 px hrubý, svetlá ľavá hrana
+    const n = y0 - y1;
+    for (let i = 0; i <= n; i++) {
+      const y = y0 - i, x = Math.round(x0 + (x1 - x0) * i / n), tip = n - i;
+      const w = tip < 2 ? 1 : tip < 4 ? 2 : 3;
+      for (let k = 0; k < w; k++) {
+        let c = tip < 4 ? BON[tip < 2 ? 2 : k === 0 ? 2 : 1] : WOOD[(front ? 4 : 2) + (k === 0 ? 2 : k === 1 ? 1 : 0)];
+        if (tip >= 4 && (y + x0) % 5 === 0 && k === 1) c = WOOD[front ? 3 : 1]; // letokruhy
+        set(x + k, y, c);
+      }
+    }
+  };
+  for (const sx of [2, 18]) stake(sx + 10, 17, sx + 1, 3, false);  // zadné koly (v tieni)
+  for (let x = 0; x < W2; x++) {                                      // ležiaci trám s kôrou
+    set(x, 13, WOOD[6]); set(x, 14, (x * 7) % 9 === 0 ? WOOD[3] : WOOD[5]); set(x, 15, (x * 5) % 7 === 0 ? WOOD[2] : WOOD[4]); set(x, 16, WOOD[3]); set(x, 17, WOOD[1]);
+  }
+  for (const sx of [2, 18]) {
+    stake(sx, 18, sx + 10, 1, true);                                   // predné koly (na svetle)
+    for (const [dx, dy, c] of [[4, 9, 0], [5, 9, 1], [6, 9, 0], [4, 10, 1], [5, 10, 0], [6, 10, 1]]) set(sx + dx, dy, ROPE[c]); // lano v mieste kríženia
+  }
+  const out = px.slice();                                              // obrys okolo siluety
+  for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) if (!px[y * W2 + x] && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const nx = x + dx, ny = y + dy; return nx >= 0 && ny >= 0 && nx < W2 && ny < H2 && px[ny * W2 + nx]; })) out[y * W2 + x] = K;
+  const c = document.createElement('canvas'); c.width = W2; c.height = H2;
+  const x2 = c.getContext('2d'), id = x2.createImageData(W2, H2);
+  out.forEach((col, i) => { if (!col) return; const rgb = hexRGB(col); id.data.set([rgb[0], rgb[1], rgb[2], 255], i * 4); });
+  x2.putImageData(id, 0, 0);
+  return lazyVariants({ c, w: 16, h: 10, hd: true, px: id });
+}
 function makeStakes() {
   const p = painter(16, 10);
   for (let x = 0; x <= 15; x++) { p.shade(x, 7, ORC_WOOD, 0.5 - x * 0.012); p.shade(x, 8, ORC_WOOD, 0.22); } // ležiaci trám
@@ -1593,7 +1627,7 @@ function initBuildingSprites() {
   BSPR.armory = artBuilding(ARMORY_ART, 0, false); // zbrojnica z PixelLabu (armory-art.js), jedna podoba pre všetky úrovne; stará kresba: makeArmory
   BSPR.orcKeep = makeOrcKeep(2); // pevnosť v tábore hordy (úroveň 2)
   BSPR.orcTower = [1, 2, 3, 4, 5].map(l => makeOrcTower(false, l)); // veža tábora hordy: ork spredu, pozerá na hráča
-  BSPR.stakes = makeStakes();
+  BSPR.stakes = makeStakesFine(); // koly v jemnej kresbe; stará kresba: makeStakes
   BSPR.stake = BSPR.stakes; // koly hráča za orkov (rovnaký obrázok ako koly v tábore hordy)
   BSPR.orcTrebuchet = [makeOrcTrebuchet(3, false, true), makeOrcTrebuchet(3, true, true)]; // trebuchet tábora hordy strieľa nadol k hráčovi
   BSPR.orcTotem = [makeOrcTotem(false), makeOrcTotem(true)];

@@ -27,7 +27,7 @@ const CAMP_PIECES = {
     armory:    { role: 'spawn', unit: 'brute',             name: 'Jama surovcov',       spr: () => OBSPR.armory || BSPR.brutePit },
     falconry:  { role: 'spawn', unit: 'bat',               name: 'Netopierí brloh',     spr: (o, t) => OBSPR.falconry || BSPR.batCave[Math.floor(t * 4) % 2] },
     chapel:    { role: 'spawn', unit: 'shaman',            name: 'Šamanský stan',       spr: (o, t) => OBSPR.chapel || BSPR.shamanHut[Math.floor(t * 3) % 2] },
-    workshop:  { role: 'spawn', unit: ['goblin', 'sapper'], label: 'gobliny a podkopníci', name: 'Goblinský stan', spr: () => BSPR.orcTent },
+    workshop:  { role: 'spawn', unit: ['goblin', 'sapper'], label: 'gobliny a podkopníci', name: 'Goblinská chatrč', spr: () => OBSPR.workshop || BSPR.orcTent }, // opravárska chatrč z PixelLabu
     // veže a vrhač: tábor hordy ich má otočené k hráčovi (veža spredu, trebuchet strieľa nadol)
     tower:     { role: 'tower',   name: 'Orkská veža',     spr: o => (OBSPR.tower && OBSPR.tower[campLvl(o)]) || BSPR.orcTower[campLvl(o)], lvlArt: true },
     mage:      { role: 'tower',   name: 'Ohnivý totem',    spr: o => OBSPR.mage[campLvl(o)], lvlArt: true },
@@ -111,10 +111,11 @@ const GATE_SPR = {};
 function gateSprite(m, l, orc) {
   l = l || 0;
   const key = m + ',' + l + (orc ? 'o' : '');
-  const ga = !orc && BSPR.gateArt && BSPR.gateArt[l]; // brána ľudí z PixelLabu (G1–G5) – ako u hráča
+  const ga = orc ? OBSPR.gateArt && OBSPR.gateArt[orcWallArtIdx(l)] : BSPR.gateArt && BSPR.gateArt[l]; // brána z PixelLabu (ľudia G1–G5, orkovia OG1–OG3) – ako u hráča
+  const WS = (orc ? OBSPR : BSPR).wall; // úsek hradby pod bránou v rase tábora
   if (ga && !(m & 5) && ga.w <= 16) return ga; // vodorovná hradba: celá brána namiesto úseku
   if (ga && !(m & 5) && !GATE_SPR[key]) { // vysoká brána (širšia ako políčko): za ňou úsek hradby, aby medzi hradbou a bránou nesvietila tráva
-    const ws = BSPR.wall[l][m], k = ga.c.width / ga.w, H = Math.ceil(Math.max(ws.h, ga.h)), c = document.createElement('canvas');
+    const ws = WS[l][m], k = ga.c.width / ga.w, H = Math.ceil(Math.max(ws.h, ga.h)), c = document.createElement('canvas');
     c.width = ga.c.width; c.height = H * k;
     const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
     x.drawImage(ws.c, (ga.w - ws.w) / 2 * k, (H - ws.h) * k, ws.w * k, ws.h * k);
@@ -123,7 +124,7 @@ function gateSprite(m, l, orc) {
     GATE_SPR[key] = s;
   }
   if (ga && !GATE_SPR[key]) { // zvislá hradba: úsek hradby a na ňom celá brána v rovnakej výške ako na vodorovnej (ako v hre); brána zboku, ak je
-    const gv = ga.v || ga, ws = BSPR.wall[l][m], k = gv.c.width / gv.w, W = Math.max(16, gv.w), H = Math.ceil(Math.max(ws.h, gv.h));
+    const gv = ga.v || ga, ws = WS[l][m], k = gv.c.width / gv.w, W = Math.max(16, gv.w), H = Math.ceil(Math.max(ws.h, gv.h));
     const c = document.createElement('canvas'); c.width = W * k; c.height = H * k;
     const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
     x.drawImage(ws.c, (W - ws.w) / 2 * k, (H - ws.h) * k, ws.w * k, ws.h * k);

@@ -14,6 +14,7 @@
   const T = 16;            // veľkosť políčka mriežky
   const MAX_LVL = 5;
   const GRID_COLS = 11;     // šírka hracej mriežky v políčkach
+  const TOP_PAD = 64;      // pás krajiny nad mriežkou (herné px): bojisko sa dá posunúť tak, aby vrch mriežky (tábor, dedina) nebol pod horným panelom
   const GROUND_PAD = 14;    // pás terénu pod mriežkou (herné px), aby radnica nestála priamo na paneli (hrad z PixelLabu siaha 4 body pod políčka)
   let W = 180, H = 360, FH = 360, S = 1, DPR = 1, scene = null; // FH = výška bojiska (v útočných misiách vyššia ako obrazovka)
   let camY = 0; // y hornej hrany obrazovky na bojisku (herné px)
@@ -948,9 +949,9 @@
   const sceneCache = new Map();
   const HD_GROUND = () => true; // terén všetkých misií v jemnej kresbe (2 pixely na bod)
   function fieldGeom(m, endless) {
-    const fh = H + (m > HOME_PROVINCES && !endless ? Math.round(H * CAMP_EXTRA) : 0), g2 = Object.assign({}, G);
+    const fh = H + TOP_PAD + (m > HOME_PROVINCES && !endless ? Math.round(H * CAMP_EXTRA) : 0), g2 = Object.assign({}, G);
     g2.cols = Math.min(GRID_COLS, Math.floor(W / T)); g2.gx0 = Math.floor((W - g2.cols * T) / 2);
-    g2.rows = Math.floor((fh - GROUND_PAD) / T); g2.gy0 = fh - GROUND_PAD - g2.rows * T;
+    g2.rows = Math.floor((fh - GROUND_PAD - TOP_PAD) / T); g2.gy0 = fh - GROUND_PAD - g2.rows * T;
     g2.hc0 = Math.floor(g2.cols / 2) - 1; g2.hr0 = g2.rows - HALL_ROWS;
     g2.hallCx = g2.gx0 + g2.hc0 * T + 1.5 * T; g2.hallTop = g2.gy0 + g2.hr0 * T; g2.hallBot = g2.hallTop + HALL_ROWS * T;
     g2.zoneTopMax = g2.gy0 + (g2.rows - ZONE_MAX_ROWS) * T;
@@ -977,12 +978,12 @@
     prepT = setTimeout(() => { if (st.phase === 'map' && st.mapSel === m) sceneFor(m); }, 250);
   }
   function layoutField() {
-    FH = H + (st.mission > HOME_PROVINCES && !st.endless ? Math.round(H * CAMP_EXTRA) : 0); // misie s táborom: dlhšie bojisko, posúva sa prstom
+    FH = H + TOP_PAD + (st.mission > HOME_PROVINCES && !st.endless ? Math.round(H * CAMP_EXTRA) : 0); // misie s táborom: dlhšie bojisko, posúva sa prstom; navrchu pás krajiny pod horný panel
     sizeBuf(W, FH);
     const oldHc = G.hc0, oldHr = G.hr0, had = !!scene;
     // pevný počet stĺpcov na každom zariadení (zmestí sa aj do najužšej plochy 180 px) – zmena okna tak mriežku neposúva
     G.cols = Math.min(GRID_COLS, Math.floor(W / T)); G.gx0 = Math.floor((W - G.cols * T) / 2);
-    G.rows = Math.floor((FH - GROUND_PAD) / T); G.gy0 = FH - GROUND_PAD - G.rows * T;
+    G.rows = Math.floor((FH - GROUND_PAD - TOP_PAD) / T); G.gy0 = FH - GROUND_PAD - G.rows * T; // mriežka začína pod pásom TOP_PAD
     G.hc0 = Math.floor(G.cols / 2) - 1; G.hr0 = G.rows - HALL_ROWS;
     G.hallCx = tileX(G.hc0) + 1.5 * T; G.hallTop = tileY(G.hr0); G.hallBot = G.hallTop + HALL_ROWS * T;
     G.zoneTopMax = tileY(G.rows - ZONE_MAX_ROWS);
@@ -1602,7 +1603,7 @@
     const spr = SPR[d.spr][0];
     const e = {
       d, x: scene.spawn[0] + spr.w / 2 + Math.random() * Math.max(1, scene.spawn[1] - scene.spawn[0] - spr.w),
-      y: -2,
+      y: G.gy0 - 2, // vrch mriežky (nad ňou je len pás krajiny pod horným panelom)
       hp: d.hp * item.hpMul, max: d.hp * item.hpMul, spd: d.speed * (0.9 + Math.random() * 0.2),
       atk: Math.random() * d.atkCd, anim: Math.random() * 2, flash: 0, lunge: 0,
       jx: (Math.random() - 0.5) * 7, jy: (Math.random() - 0.5) * 5, ph: Math.random() * 6.28,
@@ -1943,7 +1944,7 @@
       e.foe = null;
     }
     // goblin-lukostrelec: zastaví v dosahu a strieľa
-    if (e.d.ranged && e.y > 10) {
+    if (e.d.ranged && e.y > G.gy0 + 10) {
       const R = e.d.ranged;
       let tgt = null, td = R;
       for (const b of st.blds) {
@@ -1987,7 +1988,7 @@
       e.aimP = bCenter(nearB); attack(() => hitBuilding(nearB, e.d.atk, e)); return;
     }
     // podkopník beží rovno k najbližšej hradbe
-    if (e.d.sapper && e.y > 4) {
+    if (e.d.sapper && e.y > G.gy0 + 4) {
       let tw = null, td = 1e9;
       for (const b of st.blds) if (b.kind === 'wall') { const d = Math.hypot(tileX(b.c) + T / 2 - e.x, tileY(b.r) + T / 2 - e.y); if (d < td) { td = d; tw = b; } }
       if (tw) { footTo(e, tileX(tw.c) + T / 2, tileY(tw.r) + T / 2, spd, dt); return; }
@@ -2463,7 +2464,7 @@
   function firePitch(b) {
     const c = bCenter(b), rng = bRange(b);
     const walls = st.blds.filter(w => w.kind === 'wall' && w.hp > 0 && Math.hypot(bCenter(w).x - c.x, bCenter(w).y - c.y) <= PITCH_WALL).map(bCenter);
-    const hit = st.enemies.filter(e => !e.dead && !e.d.fly && e.y >= 4 && (Math.hypot(e.x - c.x, e.y - c.y) <= rng || walls.some(w => Math.hypot(e.x - w.x, e.y - w.y) <= PITCH_SPLASH)));
+    const hit = st.enemies.filter(e => !e.dead && !e.d.fly && e.y >= G.gy0 + 4 && (Math.hypot(e.x - c.x, e.y - c.y) <= rng || walls.some(w => Math.hypot(e.x - w.x, e.y - w.y) <= PITCH_SPLASH)));
     if (!hit.length) return false;
     const dmg = bDmg(b), chill = 1.5 + 0.2 * (b.lvl - 1), ox = c.x, oy = tileY(b.r) + T + 1 - bsprOf('pitch', b.lvl).h + 7; // z kotla na vrchu veže
     for (const e of hit.slice(0, 10)) { // chuchvalce smoly letia po oblúku (ako jed z orkského kotla), zraní a zlepí až pri dopade
@@ -2489,7 +2490,7 @@
     const def = BUILD.ballista, c = bCenter(b), rng = bRange(b), tp = hasTurret(b) && turretAt(b), ox = tp ? tp.x : c.x, oy = tp ? tp.y - 3 : tileY(b.r) + T - 26;
     let best = null, bd = 1e9;
     for (const e of st.enemies) {
-      if (e.dead || e.d.fly || e.y < 4 || Math.hypot(e.x - c.x, e.y - c.y) > rng) continue;
+      if (e.dead || e.d.fly || e.y < G.gy0 + 4 || Math.hypot(e.x - c.x, e.y - c.y) > rng) continue;
       const t = tileAt(e.x, e.y), v = st.dist[t.r * G.cols + t.c] || 0;
       if (v < bd) { bd = v; best = e; }
     }
@@ -2506,7 +2507,7 @@
     const c = bCenter(b), rng = bRange(b), sx = c.x, sy = tileY(b.r) + T - 24;
     let best = null, bn = 0;
     for (const e of st.enemies) {
-      if (e.dead || e.d.fly || e.y < 4 || Math.hypot(e.x - c.x, e.y - c.y) > rng) continue;
+      if (e.dead || e.d.fly || e.y < G.gy0 + 4 || Math.hypot(e.x - c.x, e.y - c.y) > rng) continue;
       let n = 0; for (const o of st.enemies) if (!o.dead && !o.d.fly && Math.hypot(o.x - e.x, o.y - e.y) < TREB.splash) n++;
       if (n > bn) { bn = n; best = e; }
     }
@@ -2549,7 +2550,7 @@
     const c = { x: cx, y: cy };
     let best = null, bd = 1e9;
     for (const e of st.enemies) {
-      if (e.dead || e.y < 4) continue;
+      if (e.dead || e.y < G.gy0 + 4) continue;
       if (Math.hypot(e.x - c.x, e.y - c.y) > rng) continue;
       const t = tileAt(e.x, e.y), v = (st.dist[t.r * G.cols + t.c] || 0) - (prio && prio(e) ? 1e6 : 0); // prednostné ciele
       if (v < bd) { bd = v; best = e; }
@@ -2581,7 +2582,7 @@
     if (!u.tgt || !FALCON_PRIO(u.tgt)) { // prednostný cieľ kdekoľvek na bojisku, inak najbližší nepriateľ
       let best = null, bd = 1e9, bestP = false;
       for (const e of st.enemies) {
-        if (e.dead || e.y < 4) continue;
+        if (e.dead || e.y < G.gy0 + 4) continue;
         const p = !!FALCON_PRIO(e), d = Math.hypot(e.x - u.x, e.y - u.y);
         if ((p && !bestP) || (p === bestP && d < bd)) { best = e; bd = d; bestP = p; }
       }
@@ -2684,7 +2685,7 @@
   function nearestFoe(x, y, fly) {
     let best = null, bd = 1e9;
     for (const e of st.enemies) {
-      if (e.dead || e.y <= 4 || (e.d.fly && !fly)) continue;
+      if (e.dead || e.y <= G.gy0 + 4 || (e.d.fly && !fly)) continue;
       const d = Math.hypot(e.x - x, e.y - y);
       if (d < bd) { bd = d; best = e; }
     }
@@ -2829,12 +2830,12 @@
       } else { u.repT = 0; u.repD = null; }
     }
     if (!u.retreat) for (const e of st.enemies) {
-      if (e.dead || e.y <= 4) continue;
+      if (e.dead || e.y <= G.gy0 + 4) continue;
       const d = Math.hypot(e.x - u.x, e.y - u.y);
       if (d <= ARCHER_RANGE) { near = true; if (d < nd) { nd = d; u.aimT = e; } }
     }
     // drží si cieľ, kým žije a je v dosahu – inak by sa pri viacerých nepriateľoch otáčal z jedného na druhého a blikal
-    if (near && prev && prev.d && !prev.dead && prev.y > 4 && Math.hypot(prev.x - u.x, prev.y - u.y) <= ARCHER_RANGE) u.aimT = prev;
+    if (near && prev && prev.d && !prev.dead && prev.y > G.gy0 + 4 && Math.hypot(prev.x - u.x, prev.y - u.y) <= ARCHER_RANGE) u.aimT = prev;
     if (near && u.cd <= 0 && shoot(u.x, u.y, u.x, u.y - 9, ARCHER_RANGE, 'arrow', 180, u.dmg * (st.cryT > 0 ? CRY_DMG : 1), 0, ARCHER_PRIO)) {
       u.cd = ARCHER_CD / (st.cryT > 0 ? CRY_SPD : 1) * rageMul(u); u.swing = 0.1;
       u.aimT = st.proj[st.proj.length - 1].tgt || u.aimT; // vystrelil na prednostný cieľ – k nemu sa otočí
@@ -3473,7 +3474,7 @@
         if (!atk && st.enemies.some(e => !e.dead && !e.d.fly && enemyFights(e) && Math.hypot(e.x - sl.x, e.y - sl.y) <= HOLD_HELP)) aggro = Math.max(aggro, HOLD_HELP); // obrana: boj pri šíku – pridá sa
         // obrana hradu má prednosť: kto búcha do hradu, po tom ide každý pešiak a jazdec (aj keby mal iný cieľ pri hradbách)
         if (!(s.tgt && !s.tgt.dead && atHall(s.tgt))) { const ht = nearestEnemyWhere(s.x, s.y, atHall, true); if (ht) s.tgt = ht; }
-        if (!s.tgt || s.tgt.dead) { const leak = nearestEnemyWhere(s.x, s.y, e => e.y > F.inf.y + 14 && e.y > 4, true); if (leak) s.tgt = leak; }
+        if (!s.tgt || s.tgt.dead) { const leak = nearestEnemyWhere(s.x, s.y, e => e.y > F.inf.y + 14 && e.y > G.gy0 + 4, true); if (leak) s.tgt = leak; }
         if (s.tgt && !s.tgt.dead && (s.tgt.y > F.inf.y + 14 || atHall(s.tgt))) aggro = 9999;
         // nikto z hordy na dosah zrážky a nikto neprerazil za šík – tlačí dopredu a búra tábor (hordu stretne cestou)
         // búra len stavbu tábora, ku ktorej vedie cesta (najprv hradby a brány, potom to, čo sa za nimi otvorí)
@@ -6958,7 +6959,7 @@
 
   screen.addEventListener('pointerdown', ev => {
     const p = evPos(ev);
-    if (st.phase === 'battle' && camBase() > 0) { // dlhé bojisko: ťah = posúvanie, ťuk = salva
+    if (st.phase === 'battle') { // ťah = posúvanie (aj nad vrch bojiska, spod horného panela), ťuk = salva
       vscroll = { y0: ev.clientY, v0: st.viewUp || 0, moved: false, p };
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
       return;
@@ -7385,7 +7386,7 @@
   }
   // lukostrelec: keď nemá na dostrel nikoho ani žiadnu stavbu, podíde k najbližšej stavbe, na ktorú vedie cesta
   function assaultArcherSpot(u) {
-    const near = st.enemies.some(e => !e.dead && e.y > 4 && Math.hypot(e.x - u.x, e.y - u.y) <= ARCHER_RANGE);
+    const near = st.enemies.some(e => !e.dead && e.y > G.gy0 + 4 && Math.hypot(e.x - u.x, e.y - u.y) <= ARCHER_RANGE);
     const part = nearestCampPart(u.x, u.y);
     if (near || (part && Math.hypot(part.x - u.x, part.y - u.y) <= ARCHER_RANGE - 6)) { u.fslot = { x: u.x, y: u.y }; return; }
     const t = nearestReachablePart(u, DT);
