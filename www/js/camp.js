@@ -29,7 +29,7 @@ const CAMP_PIECES = {
     chapel:    { role: 'spawn', unit: 'shaman',            name: 'Šamanský stan',       spr: (o, t) => OBSPR.chapel || BSPR.shamanHut[Math.floor(t * 3) % 2] },
     workshop:  { role: 'spawn', unit: ['goblin', 'sapper'], label: 'gobliny a podkopníci', name: 'Goblinský stan', spr: () => BSPR.orcTent },
     // veže a vrhač: tábor hordy ich má otočené k hráčovi (veža spredu, trebuchet strieľa nadol)
-    tower:     { role: 'tower',   name: 'Orkská veža',     spr: o => BSPR.orcTower[campLvl(o)], lvlArt: true },
+    tower:     { role: 'tower',   name: 'Orkská veža',     spr: o => (OBSPR.tower && OBSPR.tower[campLvl(o)]) || BSPR.orcTower[campLvl(o)], lvlArt: true },
     mage:      { role: 'tower',   name: 'Ohnivý totem',    spr: o => OBSPR.mage[campLvl(o)], lvlArt: true },
     icetower:  { role: 'tower',   name: 'Jedový kotol',    spr: o => OBSPR.icetower[campLvl(o)], lvlArt: true },
     ballista:  { role: 'bombard', name: 'Trebuchet',       spr: o => BSPR.orcTrebuchet[o.fired > 0 ? 1 : 0], fixed: true }, // nevylepšuje sa (ako v hre)

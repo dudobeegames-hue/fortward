@@ -1650,6 +1650,8 @@ function initBuildingSprites() {
   if (typeof ORC_STABLES_ART !== 'undefined') OBSPR.stables = artBuilding(ORC_STABLES_ART, 0, false);
   if (typeof ORC_FALCONRY_ART !== 'undefined') OBSPR.falconry = artBuilding(ORC_FALCONRY_ART, 0, false);
   if (typeof ORC_ARMORY_ART !== 'undefined') OBSPR.armory = artBuilding(ORC_ARMORY_ART, 0, false);
+  // orkská strážna veža z PixelLabu (orc-tower-art.js, 5 úrovní, bez strelca); oranžová vlajka ako na pevnosti veje a neprefarbí sa
+  if (typeof ORC_TOWER_ART !== 'undefined') OBSPR.tower = ORC_TOWER_ART.lv.map((_, i) => artBuilding(ORC_TOWER_ART, i, 'ownFlag'));
   OBSPR.wall = [];
   for (let l = 1; l <= 5; l++) { // palisáda z PixelLabu (orc-wall-art.js, 3 × 16 variantov), chýbajúce úrovne stará kresba
     OBSPR.wall[l - 1] = []; const lv = typeof ORC_WALL_ART !== 'undefined' && ORC_WALL_ART.lv[orcWallArtIdx(l - 1)];
