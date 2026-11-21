@@ -86,8 +86,8 @@ def main():
         rot = [['.' * aw] * py + ['.' * px + r + '.' * (aw - rw - px) for r in fr] + ['.' * aw] * (ah - rh - py) for fr in rot]
         rw, rh = aw, ah
     # animácie: Attack* = útok, prvá ďalšia = chôdza/klus (PixelLab ju pomenuje podľa zadania)
-    names = sorted(os.listdir(os.path.join(base, 'animations')))
-    is_atk = lambda n: any(k in n.lower() for k in ('attack', 'cast', 'spell', 'hammer'))  # PixelLab pomenuje animáciu podľa zadania („Attack…“, „spear_thrust_attack…“, „Casting_spell…“, „Hammering_repair…“)
+    names = sorted(n for n in os.listdir(os.path.join(base, 'animations')) if len(os.listdir(os.path.join(base, 'animations', n))) >= 4)  # len animácie v smeroch (nie vzorky efektov s jedným smerom)
+    is_atk = lambda n: any(k in n.lower() for k in ('attack', 'cast', 'spell', 'hammer', 'raise'))  # PixelLab pomenuje animáciu podľa zadania („Attack…“, „spear_thrust_attack…“, „Casting_spell…“, „Hammering_repair…“)
     atk_dir = next((n for n in names if is_atk(n)), None)  # bez útoku: snímky útoku = státie (kým PixelLab útok nedorobí)
     run_dir = next(n for n in names if not is_atk(n))
 

@@ -1419,7 +1419,7 @@
   // schopnosti hrdinu po vlne dohasnú – nič z nich (pokrik, štít, ohnivá stena, padajúca guľa, zvolené kúzlo) sa neprenesie do ďalšej vlny
   function clearHeroFx() {
     st.cryT = 0; st.spellSel = null;
-    st.fireWalls = []; st.shields = []; st.fallFx = []; st.bolts = []; st.blasts = []; st.healFx = [];
+    st.fireWalls = []; st.shields = []; st.fallFx = []; st.bolts = []; st.blasts = []; st.healFx = []; st.castFx = [];
     st.clouds = []; st.totems = []; st.pools = []; st.axes = [];
     const k = st.king; // zúrivosť, medvedia koža, hostina a rozbehnutý nápor sa do ďalšej vlny neprenesú
     if (k) { k.rageT = 0; k.hideT = 0; k.feastT = 0; k.charge = null; k.stunT = 0; k.kb = null; k.post = null; } // po vlne sa hrdina vráti k radnici
@@ -2298,6 +2298,7 @@
         if (set) k.face8 = dir8(t.x - k.x, t.y - k.y); // natočí sa k cieľu ešte pred výstrelom
         const tip = set ? set[k.face8].tip : { x: 5, y: -15 };
         st.proj.push({ k: heroDef().proj || 'fire', x: k.x + tip.x, y: k.y + tip.y, tgt: t, tx: t.x, ty: t.y - t.h * 0.5, dmg: kingDmg(), spd: 150, splash: 8, vx: 0, vy: -1 });
+        if (heroDef().proj === 'spirit') (st.castFx || (st.castFx = [])).push({ x: k.x + tip.x, y: k.y + tip.y, t: 0, max: 0.75, seed: Math.random() * 6 }); // zelený vír pri kameni palice
         AUDIO.play('fire');
       }
     } else {
@@ -2310,6 +2311,7 @@
           if (set) k.face8 = dir8(cp.x - k.x, cp.y - k.y);
           const tip = set ? set[k.face8].tip : { x: 5, y: -15 };
           st.proj.push({ k: heroDef().proj || 'fire', x: k.x + tip.x, y: k.y + tip.y, tgt: null, tx: a.x, ty: a.y, campT: cp, dmg: kingDmg(), spd: 150, splash: 8, vx: 0, vy: -1 });
+          if (heroDef().proj === 'spirit') (st.castFx || (st.castFx = [])).push({ x: k.x + tip.x, y: k.y + tip.y, t: 0, max: 0.75, seed: Math.random() * 6 });
           AUDIO.play('fire');
         }
       } else { const h = heroPos(k); if (Math.hypot(h.x - k.x, h.y - k.y) > 2) { moveKnight(k, h.x, h.y, k.spd * waterMul(k), dt); k.anim += dt * 6; } }
@@ -3306,37 +3308,41 @@
     g.fillStyle = col;
     for (let y = -ry; y <= ry; y++) { const w = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y / (ry + 0.5)) ** 2))); g.fillRect(Math.round(cx) - w, Math.round(cy) + y, w * 2 + 1, 1); }
   }
-  // jedový mrak v jemnej mriežke (pol bodu): na zemi tmavozelená škvrna s bodkovaným okrajom, nad ňou valiace sa chumáče
-  // (tmavý obrys, telo v troch odtieňoch zelenej, svetlý vršok s leskom) a bublinky, ktoré stúpajú a prasknú
+  // jedový mrak: výrazný žiarivý zelený plyn, ktorý šľahá ako oheň – nad žiariacou škvrnou na zemi sa vlnia jazyky plynu
+  // (tmavá päta, jasný vrch, svetlé jadro), mihocú sa, rastú a klesajú; pod nimi aditívna žiara (jemná mriežka)
   function drawClouds(time) {
     for (const c of st.clouds) {
-      const a = Math.min(1, c.t / 0.6, (c.max - c.t) / 0.3 + 0.2), R = c.R, ry = R * 0.62;
-      g.globalAlpha = 0.3 * a; fDisc(c.x, c.y, R, ry, '#10300c');
-      g.globalAlpha = 0.22 * a; fDisc(c.x, c.y, R - 2, ry - 1.5, '#2a6a1e');
-      g.globalAlpha = 0.8 * a;
-      for (let i = 0; i < 56; i++) { const t = i / 56 * 6.28 + time * 0.6; if (i % 2) fpx(c.x + Math.cos(t) * R, c.y + Math.sin(t) * ry, i % 4 === 1 ? '#c8f070' : '#7ad040'); } // bodkovaný okraj
-      const puffs = [];
-      for (let k = 0; k < 11; k++) { // chumáče krúžia a dýchajú, zoradené zozadu dopredu
-        const ang = k * 2.4 + time * (k % 2 ? 0.5 : -0.4), rr = R * (0.18 + (k % 3) * 0.24), r = 3.5 + (k % 3) + Math.sin(time * 3 + k) * 0.75;
-        puffs.push({ x: c.x + Math.cos(ang) * rr, y: c.y - 5 - (k % 4) * 1.5 + Math.sin(ang) * rr * 0.45, r });
+      const a = Math.min(1, c.t / 0.4, (c.max - c.t) / 0.4 + 0.15), R = c.R, ry = R * 0.55;
+      g.save();
+      g.globalCompositeOperation = 'lighter'; // žiara plynu na zemi
+      g.globalAlpha = 0.35 * a; g.fillStyle = '#3a8a2a'; g.beginPath(); g.ellipse(c.x, c.y, R + 2, ry + 1.5, 0, 0, 6.29); g.fill();
+      g.globalAlpha = (0.22 + 0.08 * Math.sin(time * 6)) * a; g.fillStyle = '#7ad040'; g.beginPath(); g.ellipse(c.x, c.y - 1, R * 0.7, ry * 0.65, 0, 0, 6.29); g.fill();
+      g.globalCompositeOperation = 'source-over';
+      g.globalAlpha = 0.5 * a; fDisc(c.x, c.y, R, ry, '#10300c'); // tmavá škvrna, z ktorej plyn šľahá
+      g.globalAlpha = 0.6 * a; fDisc(c.x, c.y, R - 1.5, ry - 1, '#1e4a14');
+      const tongues = [];
+      const n = Math.round(10 + R * 0.5);
+      for (let k = 0; k < n; k++) { // jazyky plynu rozložené po ploche (stále miesta, mihocú sa)
+        const u = (k * 0.618034 + c.x * 0.013) % 1, v = ((k * 0.381966 + c.y * 0.017) % 1);
+        const ang = u * 6.283, rr = Math.sqrt(v) * 0.85;
+        tongues.push({ x: c.x + Math.cos(ang) * R * rr, y: c.y + Math.sin(ang) * ry * rr, k });
       }
-      puffs.sort((p, q) => p.y - q.y);
-      for (const pf of puffs) {
-        const r = pf.r, rv = r * 0.75;
-        g.globalAlpha = 0.72 * a;
-        fDisc(pf.x, pf.y, r + 0.5, rv + 0.5, '#10300c');                                              // obrys
-        fDisc(pf.x, pf.y, r, rv, '#2a6a1e');                                                          // tienistá spodná časť
-        fDisc(pf.x - 0.5, pf.y - rv * 0.25, r - 0.75, rv * 0.7, '#3a8a2a');                         // telo
-        fDisc(pf.x - 1, pf.y - rv * 0.45, Math.max(0.5, r - 2), Math.max(0.5, rv * 0.38), '#7ad040'); // svetlý vršok
-        fpx(pf.x - r * 0.45, pf.y - rv * 0.65, '#c8f070', 1, 0.5); fpx(pf.x - r * 0.45, pf.y - rv * 0.65, '#f0ffd0'); // lesk
+      tongues.sort((p, q) => p.y - q.y);
+      for (const tg of tongues) {
+        const ph = tg.k * 1.9 + c.x * 0.05, H = (8 + (tg.k % 4) * 2.2) * (0.75 + 0.35 * Math.sin(time * 5 + ph)) * a, W = 2 + (tg.k % 3) * 0.6;
+        const steps = Math.max(3, Math.round(H * 2));
+        g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.25 * a; g.fillStyle = '#7ad040';
+        g.beginPath(); g.ellipse(tg.x, tg.y - H * 0.4, W + 1.5, H * 0.6 + 1, 0, 0, 6.29); g.fill(); // žiara jazyka
+        g.globalCompositeOperation = 'source-over'; g.globalAlpha = 0.95 * a;
+        for (let j = 0; j <= steps; j++) { // od päty k špičke: zužuje sa a mení farbu, špička sa kýve
+          const f = j / steps, w = W * Math.pow(1 - f, 0.7) + 0.25, sway = Math.sin(time * 7 + ph + f * 3) * f * 1.6;
+          const col = f < 0.2 ? '#2a6a1e' : f < 0.45 ? '#3a8a2a' : f < 0.7 ? '#7ad040' : f < 0.9 ? '#c8f070' : '#f0ffd0';
+          fDisc(tg.x + sway, tg.y - f * H, w, 0.5, col);
+          if (f > 0.2 && f < 0.75 && w > 0.9) fpx(tg.x + sway - 0.25, tg.y - f * H, f < 0.5 ? '#7ad040' : '#e0ffb0', 0.5, 0.5); // svetlé jadro
+        }
+        if ((Math.floor(time * 10) + tg.k) % 7 === 0) fpx(tg.x + Math.sin(time * 9 + ph) * 1.5, tg.y - H - 1.5, '#c8f070'); // odtrhnutý jazýček nad špičkou
       }
-      g.globalAlpha = 0.9 * a;
-      for (let k = 0; k < 5; k++) { // bublinky stúpajú z mraku a prasknú
-        const ph = (time * 0.8 + k * 0.21 + c.x * 0.01) % 1, bx = c.x + Math.sin(k * 3.1 + c.y) * R * 0.6, by = c.y - 6 - ph * 14;
-        if (ph < 0.85) { const s2 = ph < 0.3 ? 1 : 1.5; fpx(bx - s2 / 2, by - s2 / 2, '#10300c', s2 + 0.5, s2 + 0.5); fpx(bx - s2 / 2 + 0.5, by - s2 / 2 + 0.5, '#7ad040', s2 - 0.5, s2 - 0.5); fpx(bx - s2 / 2 + 0.5, by - s2 / 2 + 0.5, '#f0ffd0'); }
-        else { fpx(bx - 1.5, by, '#c8f070'); fpx(bx + 1.5, by, '#c8f070'); fpx(bx, by - 1.5, '#c8f070'); fpx(bx - 1, by - 1, '#7ad040'); fpx(bx + 1, by - 1, '#7ad040'); }
-      }
-      g.globalAlpha = 1;
+      g.restore();
     }
   }
   // mláka smoly: tmavohnedá až čierna lesklá kaluž v jemnej mriežke (pol bodu), pomaly bublá a stmavne, kým zaschne
@@ -3476,6 +3482,10 @@
     for (const e of st.enemies) e.atkN = 0;
     for (const s of st.soldiers) if (!s.dead && s.tgt && !s.tgt.dead && s.tgt.atkN != null) s.tgt.atkN++;
     const F = st.form;
+    if (!st.king || st.king.dead) for (const s of st.soldiers) if (s.hexbat && !s.dead) { // padol šaman: netopiere zo zakliatia sa rozplynú
+      s.dead = true;
+      for (let k = 0; k < 8; k++) part(s.x + (Math.random() - 0.5) * 6, s.y - 14 + (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 16, -6 - Math.random() * 12, 0.6, ['#7ad040', '#3a8a2a', '#2e2a38', '#c8f070'][k % 4], -10);
+    }
     for (const s of st.soldiers) {
       if (s.dead) continue;
       if (s.stunT > 0) { s.stunT -= dt; s.flash = Math.max(0, s.flash - dt); continue; } // omráčený dupnutím veľkráľa
@@ -3624,6 +3634,8 @@
     }
     st.fallFx = st.fallFx.filter(f => !f.done);
     for (const bl of st.blasts || []) bl.t += dt;
+    for (const cf of st.castFx || []) cf.t += dt;
+    st.castFx = (st.castFx || []).filter(cf => cf.t < cf.max);
     for (const h of st.healFx || []) h.t += dt;
     st.healFx = (st.healFx || []).filter(h => h.t < h.max);
     st.blasts = (st.blasts || []).filter(bl => bl.t < bl.max);
@@ -4954,14 +4966,14 @@
       for (let k = 0; k < 5; k++) { g.fillStyle = cols[k]; g.fillRect(r(p.x - p.vx * k), r(p.y - p.vy * k), 1, 1); }
       g.fillStyle = 'rgba(255,255,255,0.25)';
       for (let k = 5; k < 9; k++) g.fillRect(r(p.x - p.vx * k), r(p.y - p.vy * k), 1, 1);
-    } else if (p.k === 'spirit') { // duchovná strela šamana: zelená žiariaca guľa s bielym jadrom
-      const x = r(p.x), y = r(p.y);
+    } else if (p.k === 'spirit') { // žiarivá zelená guľa temného šamana (jemná mriežka): pulzujúca žiara, tmavý okraj, svetlé jadro, lesk
+      const x = h2(p.x), y = h2(p.y), pu = 0.5 + 0.5 * Math.sin(performance.now() / 70);
       g.globalCompositeOperation = 'lighter';
-      g.fillStyle = 'rgba(120,230,80,0.35)'; g.beginPath(); g.arc(x + 0.5, y + 0.5, 5, 0, 6.29); g.fill();
+      g.fillStyle = 'rgba(122,208,64,' + (0.2 + 0.12 * pu) + ')'; g.beginPath(); g.arc(x, y, 5.5 + pu, 0, 6.29); g.fill();
+      g.fillStyle = 'rgba(200,240,112,0.25)'; g.beginPath(); g.arc(x, y, 3.5, 0, 6.29); g.fill();
       g.globalCompositeOperation = 'source-over';
-      g.fillStyle = '#24581a'; g.fillRect(x - 1, y - 2, 3, 5); g.fillRect(x - 2, y - 1, 5, 3);
-      g.fillStyle = '#62c030'; g.fillRect(x - 1, y - 1, 3, 3);
-      g.fillStyle = '#d8ffa0'; g.fillRect(x, y - 1, 1, 2); g.fillRect(x - 1, y, 2, 1);
+      fDisc(x, y, 2.5, 2.5, '#1e4a14'); fDisc(x, y, 2, 2, '#3a8a2a'); fDisc(x - 0.25, y - 0.25, 1.5, 1.5, '#7ad040');
+      fDisc(x - 0.5, y - 0.5, 0.75, 0.75, '#c8f070'); fpx(x - 1, y - 1, '#f0ffd0', 1, 0.5); fpx(x - 1, y - 1, '#ffffff');
     } else {
       const x = r(p.x), y = r(p.y);
       g.globalCompositeOperation = 'lighter';
@@ -5035,6 +5047,29 @@
     g.globalAlpha = 1;
   }
   // výbuch ohnivej gule: oslnivý záblesk, ohnivá guľa rozpínajúca sa do strán a rázová vlna po zemi
+  // kúzlo temného šamana pri kameni palice: rozplývajúca sa zelená para – nepravidelné chumáče sa nafúknu, stúpajú
+  // a unáša ich to nabok, rednú a blednú (každé kúzlo iné podľa cf.seed); na začiatku krátky záblesk kameňa
+  function drawCastSwirl(cf) {
+    const p = cf.t / cf.max, sd = cf.seed, rnd = i => { const v = Math.sin(sd * 12.9898 + i * 78.233) * 43758.5453; return v - Math.floor(v); };
+    if (p < 0.22) { const f = 1 - p / 0.22; g.save(); g.globalCompositeOperation = 'lighter'; g.fillStyle = 'rgba(200,240,112,' + (0.5 * f) + ')'; g.beginPath(); g.arc(cf.x, cf.y, 2 + p * 10, 0, 6.29); g.fill(); g.restore(); fDisc(cf.x, cf.y, 1.5 * f + 0.5, 1.5 * f + 0.5, '#f0ffd0'); }
+    for (let i = 0; i < 9; i++) { // chumáče pary
+      const st0 = rnd(i) * 0.25, q = (p - st0) / (1 - st0); if (q <= 0 || q >= 1) continue;
+      const ang = rnd(i + 20) * 6.283, dist = (1.5 + rnd(i + 40) * 4) * Math.sqrt(q); // para sa rozvalí okolo kameňa pri hlave, nestúpa
+      const drift = (rnd(i + 60) - 0.5) * 3 * q + Math.sin(q * 6 + i) * 1; // jemné vlnenie
+      const x = cf.x + Math.cos(ang) * dist + drift, y = cf.y + 2 + Math.sin(ang) * dist * 0.6 + Math.cos(q * 5 + i) * 0.6;
+      const r = (1 + rnd(i + 100) * 1.6) * (0.6 + q * 1.1), a = (1 - q) * (q < 0.15 ? q / 0.15 : 1);
+      g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = a * 0.45; g.fillStyle = '#7ad040'; g.beginPath(); g.ellipse(x, y, r + 1.2, (r + 1.2) * 0.8, 0, 0, 6.29); g.fill(); g.restore(); // mäkký okraj
+      g.globalAlpha = a * 0.85;
+      fDisc(x, y, r, r * 0.8, q < 0.45 ? '#7ad040' : '#3a8a2a');
+      if (r > 1.2) fDisc(x - r * 0.3, y - r * 0.3, r * 0.5, r * 0.4, q < 0.5 ? '#c8f070' : '#7ad040'); // svetlejší vrch chumáča
+      g.globalAlpha = 1;
+    }
+    for (let i = 0; i < 7; i++) { // drobné iskierky stúpajú s parou
+      const q = p - rnd(i + 200) * 0.3; if (q <= 0 || q >= 0.9) continue;
+      const x = cf.x + (rnd(i + 220) - 0.5) * 10 + Math.sin(q * 9 + i) * 1.5, y = cf.y + 2 + (rnd(i + 240) - 0.5) * 8 + Math.sin(q * 7 + i) * 1.5; // iskierky blikajú v pare, nestúpajú
+      if ((i + Math.floor(p * 24)) % 3) fpx(x, y, q < 0.5 ? '#f0ffd0' : '#c8f070');
+    }
+  }
   function drawBlast(bl) {
     const p = bl.t / bl.max, e = 1 - Math.pow(1 - p, 3), R = bl.R;
     g.globalCompositeOperation = 'lighter';
@@ -6202,6 +6237,7 @@
     for (const b of st.bolts) drawBolt(b);
     for (const f of st.fallFx) drawFallingFireball(f);
     for (const bl of st.blasts || []) drawBlast(bl);
+    for (const cf of st.castFx || []) drawCastSwirl(cf);
     for (const h of st.healFx || []) if (h.t >= 0) drawHealFx(h);
     drawLvlFx(time); // žiara novej úrovne hrdinu
     for (const sh of st.shields || []) {

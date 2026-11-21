@@ -1972,16 +1972,16 @@ const OSH8_ART = {
   ],
 };
 // guľa na palici je zelená (y = svetlé jadro, f = okraj, G = objímka), M/D = drevo palice, plášť čierny s fialovým nádychom
-// temný šaman z PixelLabu (oshaman-art.js): kúzlo 4 snímky – rozžiarenie kameňa, iskry, záblesk (výstrel), dosvit
+// temný šaman z PixelLabu (oshaman-art.js): útok = zdvihnutie palice (začína dvíhať, palica hore, drží, spúšťa)
 function buildOrcShamanArt8() {
   const set = buildArt8(OSHAMAN_ART, null, 3);
   set.cast = true;
-  set.seq = [2, 3]; set.seqT = 0.26; // počas kúzla: záblesk, dosvit (ako čarodejka)
+  set.seq = [1, 2, 3]; set.seqT = 0.26; // počas kúzla: palica hore, drží, spúšťa (napriahnutie = 1. snímka)
   set.forEach((v, d) => {
-    v.slash = v.atk[2];
+    v.slash = v.atk[1];
     const fr = v.slash, W = fr.c.width, H = fr.c.height, k = W / fr.w, px = fr.px.data, fx = W / 2, fy = H - U8_PB * k;
     let sx = 0, sy = 0, n = 0;
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; if (px[i + 3] && px[i + 1] > 230 && px[i + 1] >= px[i] && px[i + 1] > px[i + 2]) { sx += x; sy += y; n++; } } // svetlý zelený záblesk kameňa
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; if (px[i + 3] && px[i + 1] > 190 && px[i + 1] >= px[i] && px[i + 1] > px[i + 2] + 40) { sx += x; sy += y; n++; } } // svetlý zelený kameň na zdvihnutej palici
     if (!n) { const a = d * Math.PI / 4; sx = fx + Math.cos(a) * 8 * k; sy = fy - 20 * k; n = 1; }
     v.tip = { x: (sx / n - fx) / k, y: (sy / n - fy) / k }; // odtiaľ vyletí duchovná strela
   });
