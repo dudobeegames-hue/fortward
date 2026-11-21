@@ -1972,7 +1972,23 @@ const OSH8_ART = {
   ],
 };
 // guľa na palici je zelená (y = svetlé jadro, f = okraj, G = objímka), M/D = drevo palice, plášť čierny s fialovým nádychom
+// temný šaman z PixelLabu (oshaman-art.js): kúzlo 4 snímky – rozžiarenie kameňa, iskry, záblesk (výstrel), dosvit
+function buildOrcShamanArt8() {
+  const set = buildArt8(OSHAMAN_ART, null, 3);
+  set.cast = true;
+  set.seq = [2, 3]; set.seqT = 0.26; // počas kúzla: záblesk, dosvit (ako čarodejka)
+  set.forEach((v, d) => {
+    v.slash = v.atk[2];
+    const fr = v.slash, W = fr.c.width, H = fr.c.height, k = W / fr.w, px = fr.px.data, fx = W / 2, fy = H - U8_PB * k;
+    let sx = 0, sy = 0, n = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; if (px[i + 3] && px[i + 1] > 230 && px[i + 1] >= px[i] && px[i + 1] > px[i + 2]) { sx += x; sy += y; n++; } } // svetlý zelený záblesk kameňa
+    if (!n) { const a = d * Math.PI / 4; sx = fx + Math.cos(a) * 8 * k; sy = fy - 20 * k; n = 1; }
+    v.tip = { x: (sx / n - fx) / k, y: (sy / n - fy) / k }; // odtiaľ vyletí duchovná strela
+  });
+  return set;
+}
 const buildOrcShaman8 = () => {
+  if (typeof OSHAMAN_ART !== 'undefined') return buildOrcShamanArt8();
   const S = outlineRows(OSH8_ART.S), E = outlineRows(OSH8_ART.E), N = outlineRows(OSH8_ART.N);
   return buildHero8({ body: { S, SE: turnHead8(S, 7), E, NE: turnHead8(N, 7), N }, kneel: outlineRows(OSH8_ART.kneel), weapon: 'staff', hand: SORC8_HAND,
     pal: { y: '#d8ffa0', f: '#62c030', G: '#3c8a22', M: '#6e4422', D: '#3e2614', n: '#2c2834', c: '#4a4456', B: '#201c26' } });
