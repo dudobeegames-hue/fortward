@@ -1644,6 +1644,12 @@ function initBuildingSprites() {
   if (typeof ORC_MINE_ART !== 'undefined') OBSPR.mine = artBuilding(ORC_MINE_ART, 0, false);
   if (typeof ORC_CHAPEL_ART !== 'undefined') OBSPR.chapel = artBuilding(ORC_CHAPEL_ART, 0, false);
   if (typeof ORC_WORKSHOP_ART !== 'undefined') OBSPR.workshop = artBuilding(ORC_WORKSHOP_ART, 0, false);
+  // obranné budovy orkov z PixelLabu (orc-*-art.js): barak, strelnica, vlčia ohrada, netopierí brloh, jama surovcov – aj v tábore hordy
+  if (typeof ORC_BARRACKS_ART !== 'undefined') OBSPR.barracks = artBuilding(ORC_BARRACKS_ART, 0, false);
+  if (typeof ORC_RANGE_ART !== 'undefined') OBSPR.range = artBuilding(ORC_RANGE_ART, 0, false);
+  if (typeof ORC_STABLES_ART !== 'undefined') OBSPR.stables = artBuilding(ORC_STABLES_ART, 0, false);
+  if (typeof ORC_FALCONRY_ART !== 'undefined') OBSPR.falconry = artBuilding(ORC_FALCONRY_ART, 0, false);
+  if (typeof ORC_ARMORY_ART !== 'undefined') OBSPR.armory = artBuilding(ORC_ARMORY_ART, 0, false);
   OBSPR.wall = [];
   for (let l = 1; l <= 5; l++) { // palisáda z PixelLabu (orc-wall-art.js, 3 × 16 variantov), chýbajúce úrovne stará kresba
     OBSPR.wall[l - 1] = []; const lv = typeof ORC_WALL_ART !== 'undefined' && ORC_WALL_ART.lv[orcWallArtIdx(l - 1)];

@@ -21,12 +21,12 @@ const CAMP_ROLES = {
 const CAMP_PIECES = {
   orc: { // všetky stavby, ktoré má hráč za orkov (rovnaké druhy a mená ako v hre)
     // liahne vypúšťajú druhy hordy z vĺn (unit)
-    barracks:  { role: 'spawn', unit: 'orc',               name: 'Orkský barak',        spr: () => BSPR.orcBarracks },
-    range:     { role: 'spawn', unit: 'garcher',           name: 'Goblinská strelnica', spr: () => BSPR.goblinRange },
-    stables:   { role: 'spawn', unit: ['wolf', 'bear'], label: 'vlčí a medvedí jazdci', name: 'Vlčia ohrada', spr: () => BSPR.wolfPen },
-    armory:    { role: 'spawn', unit: 'brute',             name: 'Jama surovcov',       spr: () => BSPR.brutePit },
-    falconry:  { role: 'spawn', unit: 'bat',               name: 'Netopierí brloh',     spr: (o, t) => BSPR.batCave[Math.floor(t * 4) % 2] },
-    chapel:    { role: 'spawn', unit: 'shaman',            name: 'Šamanská chatrč',     spr: (o, t) => BSPR.shamanHut[Math.floor(t * 3) % 2] },
+    barracks:  { role: 'spawn', unit: 'orc',               name: 'Orkský barak',        spr: () => OBSPR.barracks || BSPR.orcBarracks },
+    range:     { role: 'spawn', unit: 'garcher',           name: 'Goblinská strelnica', spr: () => OBSPR.range || BSPR.goblinRange },
+    stables:   { role: 'spawn', unit: ['wolf', 'bear'], label: 'vlčí a medvedí jazdci', name: 'Vlčia ohrada', spr: () => OBSPR.stables || BSPR.wolfPen },
+    armory:    { role: 'spawn', unit: 'brute',             name: 'Jama surovcov',       spr: () => OBSPR.armory || BSPR.brutePit },
+    falconry:  { role: 'spawn', unit: 'bat',               name: 'Netopierí brloh',     spr: (o, t) => OBSPR.falconry || BSPR.batCave[Math.floor(t * 4) % 2] },
+    chapel:    { role: 'spawn', unit: 'shaman',            name: 'Šamanský stan',       spr: (o, t) => OBSPR.chapel || BSPR.shamanHut[Math.floor(t * 3) % 2] },
     workshop:  { role: 'spawn', unit: ['goblin', 'sapper'], label: 'gobliny a podkopníci', name: 'Goblinský stan', spr: () => BSPR.orcTent },
     // veže a vrhač: tábor hordy ich má otočené k hráčovi (veža spredu, trebuchet strieľa nadol)
     tower:     { role: 'tower',   name: 'Orkská veža',     spr: o => BSPR.orcTower[campLvl(o)], lvlArt: true },

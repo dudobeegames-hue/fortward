@@ -751,6 +751,13 @@
   // nie na ceste ani pri vode (breh s kamienkami); bane sa dajú postaviť len na ne – teda len za stavebnou zónou.
   // Náhoda je daná misiou a obtiažnosťou – po reštarte misie je ruda na tých istých miestach ----
   const ORE_N = 5, ORE_ROWS = 10;
+  // stavebná zóna (podľa hradu) platí len pre podlahy, veže a hradby; ostatné budovy a obliehacie stroje sa stavajú kdekoľvek
+  // najviac FREE_ROWS radov odspodu (bane len na zlatú rudu)
+  const FREE_ROWS = 10;
+  const ZONE_KINDS = { paving: 1, wall: 1, stake: 1, tower: 1, mage: 1, pitch: 1, icetower: 1, ballista: 1 }; // plot a bahno idú kamkoľvek do 10. radu
+  const freeRow0 = () => Math.max(0, G.rows - FREE_ROWS);
+  const inFree = (c, r) => c >= 0 && c < G.cols && r >= freeRow0() && r < G.rows;
+  const placeOk = (kind, c, r) => kind === 'mine' ? oreAt(c, r) : ZONE_KINDS[kind] ? inZone(c, r) : inFree(c, r); // kam sa druh stavby smie postaviť
   const oreAt = (c, r) => !!(st.ore && st.ore.has(c + ',' + r));
   function makeOre() {
     let a = (st.mission * 7919 + (st.tier || 0) * 104729 + (st.endless ? 31337 : 0)) >>> 0; // mulberry32
@@ -2746,7 +2753,7 @@
     else if (archers.length) {
       for (const u of archers) u.hs = null;
       let tx = cx, ty = Math.max(musterY + 16, infBack + 10);
-      const th = nearestFoe(F.arc.x, F.arc.y, true), cp = th ? null : nearestCampPart(F.arc.x, F.arc.y);
+      const th = nearestFoe(F.arc.x, F.arc.y, false), cp = th ? null : nearestCampPart(F.arc.x, F.arc.y); // rad sa riadi pozemnou hordou – za letcami (sokoly, netopiere) necúva, na tie sa len otočí a strieľa, kým sú na dostrel (zvyšok vybavia veže)
       if (th) { tx = cx + (th.x - cx) * 0.4; ty = Math.max(G.gy0 + 30, Math.min(ty, Math.max(th.y + ARCHER_RANGE - 14, infBack + 10))); } // do strán len kúsok – dostrel stačí, rad nebehá za každým nepriateľom
       else if (cp) { tx = cp.x; ty = cp.y + ARCHER_RANGE - 12; } // horda nikde – rad lukostrelcov na dostrel od tábora
       // presun po krokoch (aj do strán a dopredu): rad stojí a strieľa; až keď je jeho cieľové miesto o ARC_STEP ďalej, presunie sa naraz
@@ -3448,7 +3455,7 @@
       if (s.stunT > 0) { s.stunT -= dt; s.flash = Math.max(0, s.flash - dt); continue; } // omráčený dupnutím veľkráľa
       if (s.helper) { updateHelper(s, dt); continue; }
       if (s.fly) { updateFalcon(s, dt); continue; }
-      if (s.archer) { if (armyAttacks() && st.camp && (isAssault() || !nearestFoe(s.x, s.y, true))) assaultArcherSpot(s); updateArcher(s, dt); continue; }
+      if (s.archer) { if (armyAttacks() && st.camp && (isAssault() || !nearestFoe(s.x, s.y, false))) assaultArcherSpot(s); updateArcher(s, dt); continue; }
       if (s.siege) { updateSiege(s, dt); continue; }
       if (isAssault() && armyAttacks()) { assaultKnight(s, dt); continue; } // útok na hrad: bez šíku, každý bojuje alebo búra
       const prev = s.tgt;
@@ -4768,16 +4775,17 @@
     const active = st.tool || st.siegePick;
     const lineCol = active ? 'rgba(255,255,255,0.24)' : 'rgba(255,255,255,0.13)';
     const inHall = (c, r) => !isAssault() && hallTile(c, r); // pri útoku na hrad radnica nie je – mriežka aj na jej mieste
-    const r0 = st.siegePick ? siegeRow0() : zt;
+    const freeT = st.siegePick || (st.tool && st.tool !== 'mine' && !ZONE_KINDS[st.tool]); // budova či stroj mimo zóny: mriežka do 10. radu odspodu
+    const r0 = freeT ? freeRow0() : zt;
     for (let r = r0; r <= G.rows - 1; r++) for (let c = 0; c < G.cols; c++) {
       if (inHall(c, r)) continue;
-      if (r >= zt && (c < zoneCol0() || c >= zoneCol1())) continue; // mimo zóny po stranách mriežka nie je (pred zónou pre stroj áno)
+      if (!freeT && r >= zt && (c < zoneCol0() || c >= zoneCol1())) continue; // mimo zóny po stranách mriežka nie je (pre voľné budovy a stroj áno)
       const x = tileX(c), y = tileY(r), o = occAt(c, r);
       if (!o && st.tool === 'mine') { /* baňa: len na zlatej rude za zónou (nižšie) */ }
-      else if (!o && (st.tool || (st.siegePick && r < zt))) { g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(x + 1, y + 1, T - 2, T - 2); }
+      else if (!o && (st.tool || st.siegePick)) { g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(x + 1, y + 1, T - 2, T - 2); }
       g.fillStyle = lineCol;
       g.fillRect(x + 1, y, T - 1, 1); g.fillRect(x, y + 1, 1, T - 1);       // horná a ľavá hrana
-      if (c === G.cols - 1 || inHall(c + 1, r) || (r >= zt && c === zoneCol1() - 1)) g.fillRect(x + T - 1, y + 1, 1, T - 1);
+      if (c === G.cols - 1 || inHall(c + 1, r) || (!freeT && r >= zt && c === zoneCol1() - 1)) g.fillRect(x + T - 1, y + 1, 1, T - 1);
       if (r === G.rows - 1 || inHall(c, r + 1)) g.fillRect(x + 1, y + T - 1, T - 1, 1);
       g.fillStyle = active ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.3)'; // rohy
       g.fillRect(x, y, 1, 1);
@@ -4793,8 +4801,8 @@
     // presúvanie: zvýrazni cieľ a ukáž polopriehľadnú stavbu
     const mv = bdrag && bdrag.moved ? bdrag.b : st.moving;
     if (mv) {
-      if (st.moving) for (let r = zt; r <= G.rows - 1; r++) for (let c = 0; c < G.cols; c++) {
-        if (!inHall(c, r) && !occAt(c, r) && mv.kind !== 'mine') { g.fillStyle = 'rgba(156,212,90,0.13)'; g.fillRect(tileX(c) + 1, tileY(r) + 1, T - 2, T - 2); }
+      if (st.moving) for (let r = freeRow0(); r <= G.rows - 1; r++) for (let c = 0; c < G.cols; c++) {
+        if (!inHall(c, r) && !occAt(c, r) && mv.kind !== 'mine' && placeOk(mv.kind, c, r)) { g.fillStyle = 'rgba(156,212,90,0.13)'; g.fillRect(tileX(c) + 1, tileY(r) + 1, T - 2, T - 2); }
       }
       const ox = tileX(mv.c), oy = tileY(mv.r), mw = bW(mv) * T;
       g.fillStyle = 'rgba(28,20,14,0.45)'; g.fillRect(ox, oy, mw, T); // pôvodné miesto
@@ -6804,7 +6812,8 @@
   }
 
   // dá sa na políčko postaviť? (na farbu náhľadu a pri pustení prsta)
-  const canPlace = (c, r, kind) => { for (let k = 0; k < ((kind && BUILD[kind].w) || 1); k++) if ((kind === 'mine' ? !oreAt(c + k, r) : !inZone(c + k, r)) || inHall(c + k, r) || occAt(c + k, r)) return false; return true; }; // všetky políčka stavby voľné; baňa len na zlatej rude (tá je za stavebnou zónou)
+  const canPlace = (c, r, kind) => { for (let k = 0; k < ((kind && BUILD[kind].w) || 1); k++) if (!placeOk(kind, c + k, r) || inHall(c + k, r) || occAt(c + k, r) || siegeOn(c + k, r)) return false; return true; }; // všetky políčka stavby voľné (aj bez obliehacieho stroja) a na povolenom mieste (placeOk)
+  const siegeOn = (c, r) => st.siegeOrder.some(o => { const q = siegeCell(o.x, o.y); return q.c === c && q.r === r; }) || st.soldiers.some(u => u.siege && !u.dead && (q => q.c === c && q.r === r)(siegeCell(u.hx != null ? u.hx : u.x, u.hy != null ? u.hy : u.y)));
   // dlažba: presne ako nádvorie pod radnicou (scene.js) – rovnaké tehlové rady 6×5, škáry a farby RAMP.walk;
   // počíta sa z polohy na bojisku, takže susedné dlaždice aj nádvorie na seba plynule nadväzujú
   // druhy dlažby: v st.paving[„c,r“] je číslo druhu (1 = dlažba / dosky); iné číslo zo starších uložených hier sa kreslí ako dlažba
@@ -6840,7 +6849,7 @@
   function placeAt(kind, c, r) {
     if (isPave(kind)) return placePaving(c, r, kind);
     const dc = costOf(kind);
-    if (!inZone(c, r) && !(kind === 'mine' && oreAt(c, r))) { if (kind === 'mine') { toast('Baňa sa dá postaviť len na zlatej rude'); AUDIO.play('deny'); return false; } dropTool(); return false; }
+    if (!placeOk(kind, c, r) && !(BUILD[kind].w > 1 && placeOk(kind, c - 1, r))) { if (kind === 'mine') { toast('Baňa sa dá postaviť len na zlatej rude'); AUDIO.play('deny'); return false; } dropTool(); return false; }
     if (!canPlace(c, r, kind) && canPlace(c - 1, r, kind)) c--; // široká budova sa zmestí, keď ju posunieme o políčko doľava
     if (kind === 'mine' && !occAt(c, r) && !oreAt(c, r)) { toast('Baňa sa dá postaviť len na zlatej rude'); AUDIO.play('deny'); return false; }
     if (!canPlace(c, r, kind)) { AUDIO.play('deny'); return false; } // políčko je obsadené
@@ -6885,9 +6894,9 @@
 
   // hradby: ťuk = jedna, ťahanie = náhľad radu s cenou, pustením prsta sa postaví (kým stačí zlato)
   let drag = null;                        // {path: [{c, r}], last}
-  const wallFree = (c, r) => inZone(c, r) && !inHall(c, r) && !occAt(c, r);
+  const wallFree = (c, r, kind) => placeOk(kind || 'wall', c, r) && !inHall(c, r) && !occAt(c, r) && !siegeOn(c, r); // hradby a koly v zóne, plot a bahno do 10. radu
   const paveFree = (c, r) => inZone(c, r) && !st.paving[c + ',' + r]; // dlažba ide aj pod budovy a radnicu
-  const dragFree = (c, r) => (drag && isPave(drag.kind) ? paveFree : wallFree)(c, r);
+  const dragFree = (c, r) => drag && isPave(drag.kind) ? paveFree(c, r) : wallFree(c, r, drag && drag.kind);
   const dragAfford = () => Math.floor(st.gold / costOf(drag ? drag.kind : 'wall'));
   const wallsAfford = () => Math.floor(st.gold / costOf('wall'));
   function placeWall(c, r, kind) { // hradba alebo koly
@@ -6915,7 +6924,7 @@
     }
     return [...seen];
   }
-  const canMoveTo = (b, c, r) => { for (let k = 0; k < bW(b); k++) if ((b.kind === 'mine' ? !oreAt(c + k, r) : !inZone(c + k, r)) || inHall(c + k, r) || (occAt(c + k, r) && occAt(c + k, r) !== b)) return false; return true; };
+  const canMoveTo = (b, c, r) => { for (let k = 0; k < bW(b); k++) if (!placeOk(b.kind, c + k, r) || inHall(c + k, r) || (occAt(c + k, r) && occAt(c + k, r) !== b)) return false; return true; };
   function moveBuilding(b, c, r) {
     if (b.c === c && b.r === r) return true;
     if (!canMoveTo(b, c, r)) { AUDIO.play('deny'); return false; } // sem sa stavba presunúť nedá
@@ -6970,7 +6979,7 @@
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
       return;
     }
-    if ((st.tool === 'wall' || st.tool === 'stake' || st.tool === 'hedge' || st.tool === 'mud') && wallFree(t.c, t.r)) {
+    if ((st.tool === 'wall' || st.tool === 'stake' || st.tool === 'hedge' || st.tool === 'mud') && wallFree(t.c, t.r, st.tool)) {
       drag = { kind: st.tool, path: [t], last: t };
       try { screen.setPointerCapture(ev.pointerId); } catch (e) { }
       return;
@@ -7399,13 +7408,13 @@
   // ťuk na stroj na bojisku (kúpený alebo ten, čo prežil vlnu) ho zdvihne a ďalší ťuk ho presunie ----
   // stroj začína vždy za stavebnou plochou: v dvoch radoch políčok tesne pred zónou (smerom k nepriateľovi), nikdy v nej
   const SIEGE_ROWS = 2;
-  const siegeRow0 = () => Math.max(0, zoneTopRow() - SIEGE_ROWS);
+  const siegeRow0 = () => freeRow0(); // stroj sa dá postaviť kdekoľvek do FREE_ROWS radov odspodu (aj v zóne)
   // stroje stoja v mriežke ako budovy: jeden stroj na políčko, kotva (stred stroja na zemi) mierne pod stredom políčka
   const siegeCell = (x, y) => ({ c: Math.floor((x - G.gx0) / T), r: Math.floor((y - G.gy0) / T) });
   const siegeCellPos = (c, r) => ({ x: tileX(c) + T / 2, y: tileY(r) + T / 2 + 3 });
   function siegeSpotOk(c, r, self) {
     if (c < 0 || c >= G.cols || r < 0 || r >= G.rows) return false;
-    if (r < siegeRow0() || r >= zoneTopRow()) return false;
+    if (r < siegeRow0() || hallTile(c, r)) return false;
     if (occAt(c, r)) return false;
     const taken = o => o !== self && (o.siege ? !o.dead : true) && (q => q.c === c && q.r === r)(siegeCell(o.hx != null ? o.hx : o.x, o.hy != null ? o.hy : o.y)); // stroj na ceste domov už má miesto svoje
     return !st.siegeOrder.some(taken) && !st.soldiers.some(u => u.siege && taken(u));
@@ -7414,6 +7423,7 @@
   function freeSiegeSpot(x, self) {
     const c0 = siegeCell(x, 0).c;
     for (let r = zoneTopRow() - 1; r >= siegeRow0(); r--) for (let k = 0; k < G.cols; k++) for (const c of k ? [c0 - k, c0 + k] : [c0]) if (siegeSpotOk(c, r, self)) return siegeCellPos(c, r);
+    for (let r = zoneTopRow(); r < G.rows; r++) for (let k = 0; k < G.cols; k++) for (const c of k ? [c0 - k, c0 + k] : [c0]) if (siegeSpotOk(c, r, self)) return siegeCellPos(c, r); // pred zónou plno – v zóne
     return null;
   }
   // po vlne sa stroje vrátia na štartové miesto (ak už nie je voľné – napr. zóna sa po vylepšení radnice zväčšila –, na najbližšie voľné)
