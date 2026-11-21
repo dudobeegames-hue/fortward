@@ -501,7 +501,7 @@ function initOrcSprites() {
   lazySpr('sapper8', () => buildUnit8({ body: SA8, hand: GB8_HAND, legs: GOB_LEGS, noWeapon: true, fist: 'o' }));
   // orkský bojovník z PixelLabu, jemná kresba (orc-art.js): atk = napriahnutie, sek, dokončenie; stará kresba ostáva ako záloha
   lazySpr('orc8', () => typeof ORC_ART !== 'undefined' ? buildArt8(ORC_ART, null, 4) : buildUnit8({ body: OR8, hand: OR8_HAND, legs: orcLegs('o', 'q', 'd'), axe: [6, 2.5], fist: 'o' }));
-  lazySpr('brute8', () => buildUnit8({ body: BR8, hand: BR8_HAND, legs: orcLegs('o', 'q', 'd', 1), axe: [8, 3.25], fist: 'o', H: 28 }));
+  lazySpr('brute8', () => typeof BRUTE_ART !== 'undefined' ? buildArt8(BRUTE_ART, null, 4) : buildUnit8({ body: BR8, hand: BR8_HAND, legs: orcLegs('o', 'q', 'd', 1), axe: [8, 3.25], fist: 'o', H: 28 })); // surovec z PixelLabu (brute-art.js): chôdza a úder kyjom
   lazySpr('warlord8', () => buildUnit8({ body: BR8, hand: BR8_HAND, legs: orcLegs('o', 'q', 'd', 1), axe: [8, 3.25], fist: 'o', H: 28, pal: PAL_WARLORD }));
   // šaman z PixelLabu, jemná kresba (shaman-art.js): kúzlo len šikmo (zapichnutie palice-totemu), stará kresba ostáva ako záloha
   lazySpr('shaman8', () => typeof SHAMAN_ART !== 'undefined' ? buildArt8(SHAMAN_ART, null, 3.4) : buildUnit8({ body: SH8, hand: SH8_HAND, legs: orcLegs('P', 'p', 'q'), spear: 9, tip: ['w', 'o'], fist: 'o' }));

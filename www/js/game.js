@@ -194,6 +194,10 @@
   const ARCHER_PRIO = e => e.d.fly || e.d.heals || e.d.sapper;            // lukostrelci: najprv letci, šamani a podkopníci
   const RIDER_PRIO = e => e.d.ranged || e.d.heals || e.d.sapper;          // jazdci: strelci, šamani, podkopníci
   const SPEAR_REACH = 15, SPEAR_VS_CAV = 3, RIDER_CHARGE = 2, CHARGE_RUN = 30;
+  // orkský surovec (miesto kopijníka): dôjde k nepriateľovi, napriahne sa a udrie kyjom – úder omráči; potom chvíľu oddychuje
+  // (nebije súvisle ako ostatní), preto je jeden úder silnejší
+  const BRUTE_CD = 2.2, BRUTE_MUL = 2.4, BRUTE_STUN = 1.4, BRUTE_REACH = 9;
+  const isBrute = u => u.ktype === 'spear' && isOrc();
   const knightHp = b => 40 * lvlMul(b, 0.3) * (1 + 0.05 * perk('drill')) * (1 + 0.1 * tal('command'));
   const knightDmg = b => 6 * lvlMul(b, 0.35) * (1 + 0.05 * perk('drill')) * (1 + 0.1 * tal('command'));
   const hallMax = () => Math.round((400 + 200 * (st.hallLvl - 1)) * (1 + 0.06 * perk('foundations')));
@@ -2364,7 +2368,7 @@
     if (u.auraT > 0) { u.auraT -= dt; dmg *= TOTEM.dmg; } // aura šamanovho totemu
     if (t) {
       const d = Math.hypot(t.x - u.x, t.y - u.y);
-      const spear = u.ktype === 'spear', rider = u.ktype === 'rider', reach = spear ? SPEAR_REACH : rider ? 11 : 8, off = spear ? 12 : rider ? 7 : 5; // kopijník bodá spoza rytiera, kôň (vlk) je dlhší a širší
+      const spear = u.ktype === 'spear', brute = isBrute(u), rider = u.ktype === 'rider', reach = brute ? BRUTE_REACH : spear ? SPEAR_REACH : rider ? 11 : 8, off = brute ? 7 : spear ? 12 : rider ? 7 : 5; // kopijník bodá spoza rytiera, surovec bije kyjom zblízka, kôň (vlk) je dlhší a širší
       // strana útoku sa zvolí raz pri novom cieli – pri odtláčaní susedov by sa inak prehadzovala a kone by poskakovali
       if (u.atkT !== t) { u.atkT = t; u.atkSide = u.x < t.x ? -1 : 1; u.inReach = false; u.bestD = d; u.noProg = 0; }
       // tesne pri cieli, no tlačenica či hradba ho ďalej nepustí (pol sekundy sa nepriblížil): udrie odtiaľ, kde stojí
@@ -2389,9 +2393,15 @@
       else {
         if (!t.foe) t.foe = u;
         if (u.cd <= 0) {
-          u.cd = (u.isKing ? heroDef().cd * (1 - 0.12 * tal('swift')) : 0.8) * rageMul(u); u.swing = u.isKing ? 0.3 : 0.15; // kráľov úder má dlhší švih (3 snímky)
-          AUDIO.play(u.isKing ? 'kingHit' : 'clang');
+          u.cd = (u.isKing ? heroDef().cd * (1 - 0.12 * tal('swift')) : brute ? BRUTE_CD : 0.8) * rageMul(u); u.swing = u.isKing ? 0.3 : 0.15; // kráľov úder má dlhší švih (3 snímky)
+          AUDIO.play(u.isKing ? 'kingHit' : brute ? 'thud' : 'clang');
           let mul = 1;
+          if (brute) { // úder kyjom: silný, omráči (bossa a obra len krátko), zviri prach
+            mul *= BRUTE_MUL;
+            t.stunT = Math.max(t.stunT || 0, t.d.boss || t.d.giant ? BRUTE_STUN * 0.35 : BRUTE_STUN);
+            st.shake = Math.max(st.shake, 0.05);
+            for (let k = 0; k < 7; k++) part(t.x + (Math.random() - 0.5) * 8, t.y - 1, (Math.random() - 0.5) * 30, -Math.random() * 16, 0.4, k % 2 ? '#a88a5a' : '#c6a272', 80);
+          }
           if (spear && t.d.cav) mul *= SPEAR_VS_CAV;                                   // kopija proti jazde
           if (u.ktype === 'rider' && (u.run || 0) >= CHARGE_RUN) {                      // úder po rozbehu
             mul *= RIDER_CHARGE;
@@ -3952,7 +3962,7 @@
     const mvx = u.x - (u._lx == null ? u.x : u._lx), mvy = u.y - (u._ly == null ? u.y : u._ly);
     u._lx = u.x; u._ly = u.y;
     const t = u.archer ? (u.aimT && !u.aimT.dead ? u.aimT : null) : u.tgt && !u.tgt.dead ? u.tgt : null;
-    const near = t && (u.archer || Math.hypot(t.x - u.x, t.y - u.y) < (u.ktype === 'spear' ? SPEAR_REACH + 5 : 14)); // kopijník bodá z diaľky
+    const near = t && (u.archer || Math.hypot(t.x - u.x, t.y - u.y) < (u.ktype === 'spear' && !isBrute(u) ? SPEAR_REACH + 5 : 14)); // kopijník bodá z diaľky, surovec zblízka
     // chôdza = jednotka sama kráča (moveTo); drobné odtlačenie susedom chôdza nie je (kôň by inak prepínal snímky klusu),
     // väčšie odtlačenie (viac ako štvrť bodu za snímku) už áno – inak by sa jednotka v rade šmýkala bez krokov
     const d = Math.hypot(mvx, mvy), walked = performance.now() - (u._walkT || 0) < 100 || d > 0.25;
@@ -4863,7 +4873,7 @@
         const m = (jv(q.c, q.r - 1) ? 1 : 0) | (j(q.c + 1, q.r) ? 2 : 0) | (jv(q.c, q.r + 1) ? 4 : 0) | (j(q.c - 1, q.r) ? 8 : 0);
         if (drag.kind === 'mud') { const ms = mudSpr(mudMask(q.c, q.r, (c, r) => inPath.has(key(c, r)) || mudAt(c, r)), 2 * x, 2 * y); g.drawImage(ms.c, x, y, T, T); }
         else if (drag.kind === 'hedge') { const hs = hedgeSpr((inPath.has(key(q.c, q.r - 1)) || hedgeAt(q.c, q.r - 1) ? 1 : 0) | (inPath.has(key(q.c + 1, q.r)) || hedgeAt(q.c + 1, q.r) ? 2 : 0) | (inPath.has(key(q.c, q.r + 1)) || hedgeAt(q.c, q.r + 1) ? 4 : 0) | (inPath.has(key(q.c - 1, q.r)) || hedgeAt(q.c - 1, q.r) ? 8 : 0)); g.drawImage(hs.c, x, y + T + 1 - hs.h, hs.w, hs.h); }
-        else if (stake) g.drawImage(BSPR.stake.c, x, y + T + 1 - BSPR.stake.h); else wallImg(g, wallsOf()[0][m + 16 * wallSide(q.c)] || wallsOf()[0][m], x, y);
+        else if (stake) g.drawImage(BSPR.stake.c, x, y + T + 1 - BSPR.stake.h, BSPR.stake.w, BSPR.stake.h); // jemná kresba: plátno 2×, kreslí sa v bodoch hry else wallImg(g, wallsOf()[0][m + 16 * wallSide(q.c)] || wallsOf()[0][m], x, y);
         if (i >= ok) { g.fillStyle = 'rgba(232,72,56,0.55)'; g.fillRect(x, y - 6, T, T + 6); }
       });
       g.globalAlpha = 1;
