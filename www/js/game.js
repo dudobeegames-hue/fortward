@@ -7418,10 +7418,12 @@
     for (const o of campLive()) { if (Math.hypot(o.x - u.x, o.y - u.y) > bd + 40) continue; const sp = campSpot(o, u); if (sp && sp.d < bd) { bd = sp.d; best = { o, sp, v: st.campV }; } }
     return (u.pt = best);
   }
+  // obranca, ku ktorému vojak dôjde (nestojí za hradbou ani na nej) – za ostatnými by sa motal okolo hradieb
+  const reachFoe = e => { const t = tileAt(e.x, e.y); return !!armyReach()[t.r * G.cols + t.c]; };
   function assaultKnight(u, dt) {
     skipTick(u, dt);
-    if (u.tgt && (u.tgt.dead || Math.hypot(u.tgt.x - u.x, u.tgt.y - u.y) > 70 || skipped(u, u.tgt))) u.tgt = null;
-    if (!u.tgt) u.tgt = u.ktype === 'rider' ? priorityEnemy(u.x, u.y, 60, e => RIDER_PRIO(e) && !skipped(u, e)) || nearestEnemy(u.x, u.y, ENGAGE + 10, true, e => !skipped(u, e)) : nearestEnemy(u.x, u.y, ENGAGE + 10, true, e => !skipped(u, e));
+    if (u.tgt && (u.tgt.dead || Math.hypot(u.tgt.x - u.x, u.tgt.y - u.y) > 70 || skipped(u, u.tgt) || !reachFoe(u.tgt))) u.tgt = null;
+    if (!u.tgt) u.tgt = u.ktype === 'rider' ? priorityEnemy(u.x, u.y, 60, e => RIDER_PRIO(e) && !skipped(u, e) && reachFoe(e)) || nearestEnemy(u.x, u.y, ENGAGE + 10, true, e => !skipped(u, e) && reachFoe(e)) : nearestEnemy(u.x, u.y, ENGAGE + 10, true, e => !skipped(u, e) && reachFoe(e));
     if (u.tgt) { updateFighter(u, dt, u.x, u.y, 60, u.dmg, false, moveKnight); return; }
     const t = nearestReachablePart(u, dt);
     if (!t) { u.flash = Math.max(0, u.flash - dt); return; } // nič na dosah (všetko zbúrané)
