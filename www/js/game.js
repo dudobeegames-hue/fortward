@@ -198,7 +198,7 @@
   const hallMax = () => Math.round((400 + 200 * (st.hallLvl - 1)) * (1 + 0.06 * perk('foundations')));
   const hallUpCost = () => Math.round(110 * Math.pow(1.7, st.hallLvl - 1) * (1 - 0.04 * perk('architects'))); // lacnejšie – radnica odomyká aj úrovne stavieb
   // stavebná zóna podľa úrovne radnice: [stĺpce, riadky] vrátane radnice (3 × 2 dole v strede); párna šírka má stĺpec navyše vpravo
-  const ZONE_SIZE = [[5, 4], [7, 4], [7, 5], [9, 5], [9, 6]];
+  const ZONE_SIZE = [[7, 4], [7, 5], [9, 5], [9, 6], [9, 7]];
   const zoneSize = () => ZONE_SIZE[Math.max(1, Math.min(ZONE_SIZE.length, st.hallLvl || 1)) - 1];
   const zoneRows = () => zoneSize()[1];
   const zoneCol0 = () => Math.max(0, G.hc0 + 1 - Math.floor((zoneSize()[0] - 1) / 2)); // stred zóny = stredný stĺpec radnice
