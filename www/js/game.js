@@ -491,7 +491,7 @@
   // V misii sa dá stavať / vylepšovať len to, čo je vyskúmané A na čo má hrad (radnica) v misii dosť vysokú úroveň (= číslo karty).
   // Položka: [druh, úroveň (0 = bez úrovne), cena, nepovinné, len pre rasu] – od 2026-11-18 sú všetky výskumy povinné
   const RES_DEF = [
-    [['hall', 1, 0], ['tower', 1, 0], ['wall', 1, 0], ['pit', 1, 80], ['wallArcher', 0, 120], ['paving', 0, 40]],
+    [['hall', 1, 0], ['tower', 1, 0], ['wall', 1, 0], ['pit', 1, 80], ['wallArcher', 0, 120], ['paving', 0, 40], ['pitch', 1, 120, 1, 'orc']], // jedový kotol za orkov má aj 1. úroveň (treba ju vyskúmať; voliteľná – neblokuje ďalšiu kartu)
     [['hall', 2, 400], ['tower', 2, 150], ['pitch', 2, 200], ['wall', 2, 150, 0, 'human'], ['mine', 1, 200], ['workshop', 1, 200], ['pit', 2, 120]],
     [['hall', 3, 900], ['tower', 3, 300], ['pitch', 3, 300], ['mage', 3, 450], ['wall', 3, 300], ['firepit', 1, 250], ['pit', 3, 220],
       ['barracks', 1, 400], ['barracks', 2, 300], ['range', 1, 400], ['range', 2, 300], ['hedge', 0, 150], ['mine', 2, 300], ['workshop', 2, 300], ['chapel', 1, 400],
@@ -556,6 +556,7 @@
   function loadRes() {
     const v = loadJSON(sk('research'), null);
     st.res = new Set(Array.isArray(v) ? v.filter(id => RES_BY[id]) : []);
+    if (st.res.has('pitch2') && !st.res.has('pitch1')) st.res.add('pitch1'); // kotol 1 pribudol neskôr – kto má 2. úroveň, má aj 1.
     if (!Array.isArray(v) && st.unlocked > 1) {
       let l = 1; while (l < MAX_LVL && st.unlocked >= LVL_FROM_OLD[l + 1]) l++;
       for (const r of RES) if (r.c <= l && r.cost) st.res.add(r.id);
@@ -4524,11 +4525,15 @@
       }
       if (b.kind === 'icetower') {
         const venom = BUILD_RACE === 'orc'; // jedový kotol: zelený svit a bublinky stúpajúce z kotla
-        g.globalCompositeOperation = 'lighter';
-        g.fillStyle = (venom ? 'rgba(120,230,70,' : 'rgba(120,200,255,') + (0.22 + Math.sin(time * 3 + b.c) * 0.1) + ')';
-        g.beginPath(); g.arc(x0 + 9, y0 + T + 1 - spr.h + 4, 4, 0, 6.29); g.fill();
-        g.globalCompositeOperation = 'source-over';
-        if (venom) { if (Math.random() < 0.08) part(x0 + 9 + (Math.random() - 0.5) * 6, y0 + T + 1 - spr.h + 3, (Math.random() - 0.5) * 3, -8 - Math.random() * 6, 0.7, Math.random() < 0.5 ? '#9cf060' : '#d8ffa0', 0); }
+        const art = venom && spr.hd; // kotol z PixelLabu: jed svieti v kresbe – bez kruhu žiary, bublinky z hrdla kotla
+        if (!art) {
+          g.globalCompositeOperation = 'lighter';
+          g.fillStyle = (venom ? 'rgba(120,230,70,' : 'rgba(120,200,255,') + (0.22 + Math.sin(time * 3 + b.c) * 0.1) + ')';
+          g.beginPath(); g.arc(x0 + 9, y0 + T + 1 - spr.h + 4, 4, 0, 6.29); g.fill();
+          g.globalCompositeOperation = 'source-over';
+        }
+        const kx = art ? x0 + 7.5 : x0 + 9, ky = y0 + T + 1 - spr.h + (art ? 9 : 3);
+        if (venom) { if (Math.random() < 0.08) part(kx + (Math.random() - 0.5) * 5, ky, (Math.random() - 0.5) * 3, -8 - Math.random() * 6, 0.7, Math.random() < 0.5 ? '#9cf060' : '#d8ffa0', 0); }
         else if (Math.random() < 0.03) part(x0 + 9 + (Math.random() - 0.5) * 6, y0 + T + 1 - spr.h + 4, 0, 6, 0.6, '#e8f8ff', 10); // padajú ľadové iskričky
       }
       if (iceMage(b) && Math.random() < 0.04) part(bx + spr.w / 2 + (Math.random() - 0.5) * 6, y0 + T + 1 - spr.h + 6, 0, 6, 0.6, '#e8f8ff', 10); // z ľadového plameňa padajú iskričky

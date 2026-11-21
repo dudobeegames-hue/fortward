@@ -1652,6 +1652,8 @@ function initBuildingSprites() {
   if (typeof ORC_ARMORY_ART !== 'undefined') OBSPR.armory = artBuilding(ORC_ARMORY_ART, 0, false);
   // orkská strážna veža z PixelLabu (orc-tower-art.js, 5 úrovní, bez strelca); oranžová vlajka ako na pevnosti veje a neprefarbí sa
   if (typeof ORC_TOWER_ART !== 'undefined') OBSPR.tower = ORC_TOWER_ART.lv.map((_, i) => artBuilding(ORC_TOWER_ART, i, 'ownFlag'));
+  // orkský jedový kotol z PixelLabu (orc-poison-art.js, 5 úrovní; stavia sa od 2.), oranžová vlajka veje
+  if (typeof ORC_POISON_ART !== 'undefined') OBSPR.icetower = ORC_POISON_ART.lv.map((_, i) => artBuilding(ORC_POISON_ART, i, 'ownFlag'));
   OBSPR.wall = [];
   for (let l = 1; l <= 5; l++) { // palisáda z PixelLabu (orc-wall-art.js, 3 × 16 variantov), chýbajúce úrovne stará kresba
     OBSPR.wall[l - 1] = []; const lv = typeof ORC_WALL_ART !== 'undefined' && ORC_WALL_ART.lv[orcWallArtIdx(l - 1)];
