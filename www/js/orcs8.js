@@ -514,8 +514,7 @@ function initOrcSprites() {
     if (typeof BEARLORD_ART !== 'undefined') {
       const set = buildArt8(BEARLORD_ART, null, 3.4); // ťažký krok medveďa (5 snímok chôdze)
       set.seq = [1, 2, 3, 4]; set.seqT = 0.3; // počas úderu (švih 0,3 s): otvorí papuľu, výpad, sklapne, vráti sa; napriahnutie = stiahnutie hlavy (1. snímka)
-      for (const v of set) v.slash = v.atk[3];
-      set[6].idle = set[6].walk[0]; // státie na sever: rotácia z PixelLabu má iné (tmavšie) farby ako pohyby – použije sa snímka chôdze
+      for (const v of set) { v.slash = v.atk[3]; v.idle = v.walk[0]; } // státie vo všetkých smeroch zo snímky chôdze: rotácie z PixelLabu majú iné farby ako pohyby (preblikávalo)
       return set;
     }
     const set = buildUnit8({ W: 40, H: 32, body: BL8_BODY, mount: BEARLORD8, legs: BEAR8_LEGS, hand: BR8R_HAND, axe: [8, 3.25], fist: 'o', stride: 4.5 });
