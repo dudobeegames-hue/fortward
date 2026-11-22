@@ -509,7 +509,15 @@ function initOrcSprites() {
   lazySpr('wolf8', () => typeof WOLF_ART !== 'undefined' ? buildArt8(WOLF_ART, null, 3.2) : buildUnit8({ W: 36, H: 28, body: WR8_BODY, mount: WOLF8, legs: WOLF8_LEGS, far: 'DK', hand: WR8_HAND, blade: 4, fist: 'o', stride: 3.5 }));
   lazySpr('bear8', () => buildUnit8({ W: 38, H: 30, body: BR8R_BODY, mount: BEAR8, legs: BEAR8_LEGS, hand: BR8R_HAND, axe: [6, 2.5], fist: 'o', stride: 4.5 }));
   // medvedí vojvoda ako hrdina: snímka švihu (slash) = stredná snímka úderu, ako má sada hrdinov
+  // z PixelLabu (bearlord-art.js): útočí medveď zahryznutím, ork sa len vezie; atk = stiahnutie hlavy, otvorenie, výpad, sklapnutie, návrat
   lazySpr('bearlord8', () => {
+    if (typeof BEARLORD_ART !== 'undefined') {
+      const set = buildArt8(BEARLORD_ART, null, 3.4); // ťažký krok medveďa (5 snímok chôdze)
+      set.seq = [1, 2, 3, 4]; set.seqT = 0.3; // počas úderu (švih 0,3 s): otvorí papuľu, výpad, sklapne, vráti sa; napriahnutie = stiahnutie hlavy (1. snímka)
+      for (const v of set) v.slash = v.atk[3];
+      set[6].idle = set[6].walk[0]; // státie na sever: rotácia z PixelLabu má iné (tmavšie) farby ako pohyby – použije sa snímka chôdze
+      return set;
+    }
     const set = buildUnit8({ W: 40, H: 32, body: BL8_BODY, mount: BEARLORD8, legs: BEAR8_LEGS, hand: BR8R_HAND, axe: [8, 3.25], fist: 'o', stride: 4.5 });
     for (const v of set) v.slash = v.atk[1];
     return set;
