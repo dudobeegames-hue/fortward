@@ -1889,7 +1889,7 @@
         e.castT = 1.6; // zapichne palicu a chvíľu stojí (aura na zemi)
         e.totemFace = diag8(hurt[0].x - e.x, hurt[0].y - e.y);
         for (const o of hurt) {
-          o.hp = Math.min(o.max, o.hp + healBase(o) * 0.12);
+          o.hp = Math.min(o.max, o.hp + healBase(o) * (e.guard ? 0.02 : 0.12)); // šaman obrancov hradu lieči slabšie (stráže stoja pohromade – inak by sa hrad nedal dobyť)
           for (let k = 0; k < 3; k++) part(o.x + (Math.random() - 0.5) * 6, o.y - o.h * 0.6, 0, -14, 0.6, '#9cd45a', 0);
         }
         for (let k = 0; k < 8; k++) { const a = k / 8 * 6.28; part(e.x + Math.cos(a) * 10, e.y - 6 + Math.sin(a) * 6, 0, -6, 0.5, '#5aff8a', 0); }
