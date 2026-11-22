@@ -207,7 +207,112 @@ function buildIsland(W, H, seed, pad, opts) {
   if (pad) { for (const n of L.nodes) n.y += pad; for (const sg of segs) for (const pt of sg) pt.y += pad; for (const o of foam.concat(waves)) o.y += pad; for (const fl of fires) for (const o of fl) o.y += pad; }
   let landTop = CH, landBot = 0;
   for (let k = 0; k < prov.length; k++) if (prov[k] !== 255) { const ry2 = (k / W) | 0; if (ry2 < landTop) landTop = ry2; if (ry2 > landBot) landBot = ry2; }
-  return { bg: c, seaAround, landTop, landBot, foam, waves, segs, nodes: L.nodes, prov, terr, fires, fort: makeOrcFort(), castle: makeMiniCastle(false) };
+  return { bg: c, seaAround, landTop, landBot, foam, waves, segs, nodes: L.nodes, prov, terr, fires, fort: mapVillage('orc'), castle: mapVillage('human') };
+}
+
+// domovský ostrov v jemnej grafike (2 pixely na bod): rovnaký tvar, cesty a hrady ako buildIsland, len terén po polovičných
+// bodoch – jemnejší dithering, drobné vlnky a pena v mori, zrnitý piesok s mokrým okrajom, trsy trávy, skaly s hranami
+// po pol bode a stromy s okrúhlou korunou (svetlo zľava, kmeň, obrys, tieň); hra z neho berie len podklad (bg)
+function buildIslandHD(W, H, seed, pad, opts, R) {
+  R = R || 2; pad = pad || 0; opts = opts || {};
+  const CH = H + 2 * pad, at = (x, y) => (y + pad) * W + x;
+  const L = mapLayout(W, H, opts.nodes, opts.bot);
+  const segs = mapPaths(L.nodes, seed);
+  const WR = W * R, HR = CH * R;
+  const c = document.createElement('canvas'); c.width = WR; c.height = HR;
+  const cx = c.getContext('2d'), img = cx.createImageData(WR, HR), d = img.data;
+  const setF = (fx, fy, col) => { if (fx < 0 || fy < 0 || fx >= WR || fy >= HR) return; const i = (fy * WR + fx) * 4; d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255; };
+  const K = hexRGB(PAL.K);
+  const near = new Float32Array(W * CH);
+  const stamp = (px, py, r) => { for (let y = Math.max(-pad, Math.floor(py - r)); y <= Math.min(H + pad - 1, py + r); y++) for (let x = Math.max(0, Math.floor(px - r)); x <= Math.min(W - 1, px + r); x++) { const v = 1 - Math.hypot(x - px, y - py) / r; if (v > near[at(x, y)]) near[at(x, y)] = v; } };
+  for (const s of segs) for (let k = 0; k < s.length; k += 3) stamp(s[k].x, s[k].y, 16);
+  for (const n of L.nodes) stamp(n.x, n.y, 26);
+  const pathD = new Float32Array(W * CH).fill(99), nodeD = new Float32Array(W * CH).fill(99);
+  const dist = (arr, px, py, r) => { for (let y = Math.max(-pad, Math.floor(py - r)); y <= Math.min(H + pad - 1, py + r); y++) for (let x = Math.max(0, Math.floor(px - r)); x <= Math.min(W - 1, px + r); x++) { const v = Math.hypot(x - px, y - py); if (v < arr[at(x, y)]) arr[at(x, y)] = v; } };
+  for (const s of segs) for (let k = 0; k < s.length; k += 2) dist(pathD, s[k].x, s[k].y, 14);
+  for (const n of L.nodes) dist(nodeD, n.x, n.y - 5, 16);
+  const icx = W / 2, icy = (L.top + L.bot) / 2, rx = W * (opts.rx || 0.47), ry = (L.bot - L.top) / 2 + 18;
+  const samp = (arr, x, y) => arr[at(Math.max(0, Math.min(W - 1, Math.floor(x))), Math.max(-pad, Math.min(H + pad - 1, Math.floor(y))))];
+  const seaRGB = (x, y, depth, fx, fy) => {
+    let v = 0.78 - Math.min(1, depth / 0.35) * 0.32 - Math.min(1, depth / 1.2) * 0.12;
+    v += (fbm(x * 0.05, y * 0.05, seed + 5) - 0.5) * 0.22 + (fbm(x * 0.18, y * 0.12, seed + 12) - 0.5) * 0.08 + (fbm(x * 0.5, y * 0.3, seed + 14) - 0.5) * 0.05;
+    const swell = Math.sin(x * 0.11 + y * 0.045 + fbm(x * 0.03, y * 0.03, seed + 13) * 6);
+    if (swell > 0.82) v += 0.07; else if (swell < -0.9) v -= 0.05;
+    const ripple = Math.sin(x * 0.7 + y * 0.35 + fbm(x * 0.08, y * 0.08, seed + 15) * 5); // drobné vlnky (len v jemnej kresbe)
+    if (ripple > 0.93 && depth > 0.05) v += 0.05;
+    if (depth < 0.06) v += (0.06 - depth) * 2.5;
+    if (depth < 0.035) v = 0.95 - (hash2(fx, fy, 71) < 0.25 ? 0.06 : 0);
+    return pickRamp(SEA, Math.max(0.22, v), fx, fy);
+  };
+  const elev = (x, y) => fbm(x * 0.045, y * 0.045, seed + 3) + (1 - (y - L.top) / (L.bot - L.top)) * 0.28;
+  const trees = [];
+  // provincie aj v jemnom rozlíšení (hranice a pásy rás po polovičných bodoch) – rovnaký výpočet ako prov v buildIsland
+  const provR = new Uint8Array(WR * HR).fill(255);
+  const provOf = (x, y) => {
+    let best = 0, bd = 1e9;
+    const jx = (fbm(x * 0.05, y * 0.05, seed + 31) - 0.5) * 18, jy = (fbm(x * 0.05, y * 0.05, seed + 37) - 0.5) * 18;
+    L.nodes.forEach((n, i) => { const d = Math.hypot(x + jx - n.x, (y + jy - n.y) * 1.15); if (d < bd) { bd = d; best = i; } });
+    return best;
+  };
+  for (let fy = 0; fy < HR; fy++) for (let fx = 0; fx < WR; fx++) {
+    const x = (fx + 0.5) / R, y = (fy + 0.5) / R - pad;
+    const nb = samp(near, x, y);
+    const dd = Math.hypot((x - icx) / rx, (y - icy) / ry) + (fbm(x * 0.035, y * 0.035, seed) - 0.5) * 0.42 - nb * 0.35;
+    if (dd <= 1) provR[fy * WR + fx] = provOf(x - 0.5, y - 0.5);
+    if (dd > 1) { const depth = dd - 1; setF(fx, fy, depth < 0.012 ? (hash2(fx, fy, 72) < 0.7 ? [238, 246, 250] : [196, 226, 240]) : seaRGB(x, y, depth, fx, fy)); continue; } // pena na brehu
+    if (dd > 0.92) { // pláž: zrnitý piesok, tmavší mokrý okraj pri vode
+      let v = 0.6 + (hash2(fx, fy, seed + 8) - 0.5) * 0.3 - (dd - 0.92) * 3;
+      if (dd > 0.985) v -= 0.18;
+      setF(fx, fy, pickRamp(SAND, v, fx, fy)); continue;
+    }
+    const e = elev(x, y);
+    if (e > 0.8 && nb < 0.2) {
+      const band = (xx, yy) => Math.floor((elev(xx, yy) - 0.8) / 0.06), bd = band(x, y), st = 1 / R;
+      let v = 0.42 + bd * 0.13 + (fbm(x * 0.25, y * 0.25, seed + 65) - 0.5) * 0.12 + (hash2(fx, fy, 67) - 0.5) * 0.05;
+      if (band(x, y - st) < bd) v += 0.2;
+      const cliff = band(x, y - st) > bd || band(x, y - 2 * st) > bd || band(x, y - 3 * st) > bd || band(x, y - 4 * st) > bd;
+      if (cliff) v = 0.18 + (fy % 2 ? 0.05 : 0) + (hash2(fx, fy, seed + 66) - 0.5) * 0.08;
+      if (band(x - st, y) > bd && !cliff) v -= 0.12;
+      setF(fx, fy, pickRamp(SANDSTONE, v, fx, fy)); continue;
+    }
+    let v = 0.55 + (fbm(x * 0.06, y * 0.06, seed + 4) - 0.5) * 0.5 + (hash2(fx, fy, seed + 2) - 0.5) * 0.14 + (fbm(x * 0.4, y * 0.4, seed + 6) - 0.5) * 0.1; // trsy trávy
+    if (e > 0.72) v -= 0.12;
+    const pd = samp(pathD, x, y), fn = fbm(x * 0.07, y * 0.07, seed + 9);
+    const nearPath = pd < 14, forest = dd < 0.85 && pd >= 4 && samp(nodeD, x, y) >= 13 && (nearPath ? fn > 0.4 : fn > 0.58 && nb < 0.15);
+    if (forest) {
+      v -= 0.2;
+      if (fx % R === 0 && fy % R === 0) { const ix = Math.floor(x), iy = Math.floor(y); if ((ix % (nearPath ? 4 : 5) === 0) && (iy % 4 === 0) && hash2(ix, iy, seed + 10) > (nearPath ? 0.15 : 0.3)) { const tx = ix + Math.floor(hash2(ix, iy, 11) * 3); if (samp(pathD, tx, iy) >= 5 && !trees.some(t => t.x === tx && t.y === iy)) trees.push({ x: tx, y: iy }); } }
+    }
+    if (hash2(fx, fy, seed + 3) > 0.985 && !forest) v += 0.2; // drobné kvietky / svetlé steblá
+    setF(fx, fy, pickRamp(RAMP.grass, v, fx, fy));
+  }
+  // stromy v jemnej kresbe: tieň na zemi, kmeň, koruna z troch chumáčov so svetlom zľava hore, obrys
+  trees.sort((a, b) => a.y - b.y);
+  const KR = K;
+  for (const t of trees) {
+    const tx = (t.x + 0.5) * R, ty = (t.y + 0.5 + pad) * R, rr = 3.4 * R;
+    for (let dy = 0; dy <= 2; dy++) for (let dx = -5; dx <= 6; dx++) if ((dx * dx) / 36 + (dy * dy) / 4 <= 1) { const i = ((ty + 5 + dy) * WR + tx + dx) * 4; if (i >= 0 && i < d.length) { d[i] *= 0.7; d[i + 1] *= 0.72; d[i + 2] *= 0.7; } }
+    for (let dy = 2; dy <= 6; dy++) { setF(tx, ty + dy, RAMP.dirt[1]); setF(tx - 1, ty + dy, RAMP.dirt[0]); }
+    const blobs = [[0, -1.5, rr], [-2.2, 1, rr * 0.8], [2.2, 1, rr * 0.8]];
+    const inside = (px, py) => blobs.some(([bx, by, br]) => (px - bx) ** 2 + ((py - by) * 1.15) ** 2 <= br * br);
+    for (let dy = -10; dy <= 8; dy++) for (let dx = -10; dx <= 10; dx++) {
+      if (!inside(dx, dy)) { if (inside(dx + 1, dy) || inside(dx - 1, dy) || inside(dx, dy + 1) || inside(dx, dy - 1)) setF(tx + dx, ty + dy, KR); continue; }
+      const lit = (-dx - dy) / 12, leaf = hash2(tx + dx >> 1, ty + dy >> 1, 91) - 0.5;
+      setF(tx + dx, ty + dy, pickRamp(RAMP.bush, 0.5 + lit * 0.6 + leaf * 0.18, tx + dx, ty + dy));
+    }
+  }
+  cx.putImageData(img, 0, 0);
+  for (const n of L.nodes) n.y += pad;
+  for (const sg of segs) for (const pt of sg) pt.y += pad;
+  return { bg: c, R, segs, nodes: L.nodes, provR };
+}
+
+// ikonka misie na mape: mini dedinka (ľudia) alebo osada (orkovia) z PixelLabu v jemnej kresbe (map-village-art.js), bez nej stará kresba
+function mapVillage(race) {
+  const art = race === 'orc' ? (typeof MAP_VILLAGE_ORC !== 'undefined' && MAP_VILLAGE_ORC) : (typeof MAP_VILLAGE_HUMAN !== 'undefined' && MAP_VILLAGE_HUMAN);
+  if (art && typeof artBuilding === 'function') return artBuilding(art, 0, false);
+  const c = race === 'orc' ? makeOrcFort() : makeMiniCastle(false);
+  return c.c ? c : { c, w: c.width, h: c.height };
 }
 
 // pevnosť orkov pri misii 10
