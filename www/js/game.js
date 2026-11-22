@@ -496,17 +496,17 @@
   // V misii sa dá stavať / vylepšovať len to, čo je vyskúmané A na čo má hrad (radnica) v misii dosť vysokú úroveň (= číslo karty).
   // Položka: [druh, úroveň (0 = bez úrovne), cena, nepovinné, len pre rasu] – od 2026-11-18 sú všetky výskumy povinné
   const RES_DEF = [
-    [['hall', 1, 0], ['tower', 1, 0], ['wall', 1, 0], ['pit', 1, 80], ['wallArcher', 0, 120], ['paving', 0, 40], ['pitch', 1, 120, 1, 'orc']], // jedový kotol za orkov má aj 1. úroveň (treba ju vyskúmať; voliteľná – neblokuje ďalšiu kartu)
-    [['hall', 2, 400], ['tower', 2, 150], ['pitch', 2, 200], ['wall', 2, 150, 0, 'human'], ['mine', 1, 200], ['workshop', 1, 200], ['pit', 2, 120]],
+    [['hall', 1, 0], ['tower', 1, 0], ['wall', 1, 0], ['pit', 1, 80], ['wallArcher', 0, 120], ['paving', 0, 40], ['mine', 1, 120], ['pitch', 1, 120, 1, 'orc']], // baňa: každý hrad (TH1–5) odomyká jednu jej úroveň // jedový kotol za orkov má aj 1. úroveň (treba ju vyskúmať; voliteľná – neblokuje ďalšiu kartu)
+    [['hall', 2, 400], ['tower', 2, 150], ['pitch', 2, 200], ['wall', 2, 150, 0, 'human'], ['mine', 2, 200], ['workshop', 1, 200], ['pit', 2, 120]],
     [['hall', 3, 900], ['tower', 3, 300], ['pitch', 3, 300], ['mage', 3, 450], ['wall', 3, 300], ['firepit', 1, 250], ['pit', 3, 220],
-      ['barracks', 1, 400], ['barracks', 2, 300], ['range', 1, 400], ['range', 2, 300], ['hedge', 0, 150], ['mine', 2, 300], ['workshop', 2, 300], ['chapel', 1, 400],
+      ['barracks', 1, 400], ['barracks', 2, 300], ['range', 1, 400], ['range', 2, 300], ['hedge', 0, 150], ['mine', 3, 300], ['workshop', 2, 300], ['chapel', 1, 400],
       ['siegeRam', 0, 450], ['spear', 0, 350], ['gobknife', 0, 250, 0, 'orc']],
     [['hall', 4, 1800], ['tower', 4, 550], ['pitch', 4, 550], ['mage', 4, 650], ['ice', 0, 400, 0, 'human'], ['wall', 4, 500, 0, 'human'], ['pit', 4, 350], ['firepit', 2, 400],
       ['barracks', 3, 550], ['barracks', 4, 500], ['stables', 1, 700], ['stables', 2, 500], ['stables', 3, 550], ['range', 3, 550], ['range', 4, 500],
-      ['falconry', 1, 700], ['falconry', 2, 500], ['falconry', 3, 550], ['mine', 3, 450], ['workshop', 3, 450], ['chapel', 2, 500], ['siegeCat', 0, 800]],
+      ['falconry', 1, 700], ['falconry', 2, 500], ['falconry', 3, 550], ['mine', 4, 450], ['workshop', 3, 450], ['chapel', 2, 500], ['siegeCat', 0, 800]],
     [['hall', 5, 3200], ['tower', 5, 900], ['pitch', 5, 900], ['mage', 5, 1000], ['ballista', 1, 1200], ['wall', 5, 800], ['pit', 5, 550], ['firepit', 3, 600],
       ['barracks', 5, 900], ['range', 5, 900], ['stables', 4, 800], ['stables', 5, 900], ['falconry', 4, 800], ['falconry', 5, 900],
-      ['mine', 4, 700], ['workshop', 4, 700], ['chapel', 3, 800]],
+      ['mine', 5, 700], ['workshop', 4, 700], ['chapel', 3, 800]],
   ];
   const RES = []; // všetky položky: { id, kind, lvl, cost, opt, c (karta 1–5) }
   RES_DEF.forEach((card, ci) => card.forEach(([kind, lvl, cost, opt, race]) => RES.push({ id: kind + (lvl || ''), kind, lvl, cost, opt: !!opt, c: ci + 1, race })));
@@ -1457,7 +1457,7 @@
     st.fireWalls = []; st.shields = []; st.fallFx = []; st.bolts = []; st.blasts = []; st.healFx = []; st.castFx = [];
     st.clouds = []; st.totems = []; st.pools = []; st.axes = [];
     const k = st.king; // zúrivosť, medvedia koža, hostina a rozbehnutý nápor sa do ďalšej vlny neprenesú
-    if (k) { k.rageT = 0; k.hideT = 0; k.feastT = 0; k.charge = null; k.stunT = 0; k.kb = null; k.tpFrom = null; } // stanovište ostáva aj po vlne (hrdina sa nevracia k radnici)
+    if (k) { k.rageT = 0; k.hideT = 0; k.feastT = 0; k.charge = null; k.stunT = 0; k.kb = null; k.tpFrom = null; k.post = null; } // po vlne sa hrdina vráti k radnici (stanovište platí len počas vlny)
     syncHeroHome();
     st.hallHolyT = 0; for (const b of st.blds) b.holyT = 0;
     for (const s of st.soldiers) s.stunT = 0;
