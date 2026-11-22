@@ -207,7 +207,7 @@ function buildIsland(W, H, seed, pad, opts) {
   if (pad) { for (const n of L.nodes) n.y += pad; for (const sg of segs) for (const pt of sg) pt.y += pad; for (const o of foam.concat(waves)) o.y += pad; for (const fl of fires) for (const o of fl) o.y += pad; }
   let landTop = CH, landBot = 0;
   for (let k = 0; k < prov.length; k++) if (prov[k] !== 255) { const ry2 = (k / W) | 0; if (ry2 < landTop) landTop = ry2; if (ry2 > landBot) landBot = ry2; }
-  return { bg: c, seaAround, landTop, landBot, foam, waves, segs, nodes: L.nodes, prov, terr, fires, fort: mapVillage('orc'), castle: mapVillage('human') };
+  return { bg: c, seaAround, landTop, landBot, foam, waves, segs, nodes: L.nodes, prov, terr, fires };
 }
 
 // domovský ostrov v jemnej grafike (2 pixely na bod): rovnaký tvar, cesty a hrady ako buildIsland, len terén po polovičných
@@ -307,12 +307,18 @@ function buildIslandHD(W, H, seed, pad, opts, R) {
   return { bg: c, R, segs, nodes: L.nodes, provR };
 }
 
-// ikonka misie na mape: mini dedinka (ľudia) alebo osada (orkovia) z PixelLabu v jemnej kresbe (map-village-art.js), bez nej stará kresba
-function mapVillage(race) {
-  const art = race === 'orc' ? (typeof MAP_VILLAGE_ORC !== 'undefined' && MAP_VILLAGE_ORC) : (typeof MAP_VILLAGE_HUMAN !== 'undefined' && MAP_VILLAGE_HUMAN);
-  if (art && typeof artBuilding === 'function') return artBuilding(art, 0, false);
-  const c = race === 'orc' ? makeOrcFort() : makeMiniCastle(false);
-  return c.c ? c : { c, w: c.width, h: c.height };
+// ikonka misie na mape: osada (tiny) alebo hlavné mesto (capital) rasy z PixelLabu v jemnej kresbe (map-village-art.js),
+// polárni sú severania; bez kresby stará kresba hradu / orkskej pevnosti
+const VILLAGE_SPR = {};
+function mapVillage(race, capital) {
+  race = race === 'polar' ? 'nordic' : race;
+  const key = race + (capital ? ':capital' : ':tiny');
+  if (VILLAGE_SPR[key]) return VILLAGE_SPR[key];
+  const set = typeof MAP_VILLAGES !== 'undefined' && (MAP_VILLAGES[race] || MAP_VILLAGES.human), art = set && (capital ? set.capital : set.tiny);
+  let spr;
+  if (art && typeof artBuilding === 'function') spr = artBuilding(art, 0, false);
+  else { const c = race === 'orc' ? makeOrcFort() : makeMiniCastle(false); spr = c.c ? c : { c, w: c.width, h: c.height }; }
+  return (VILLAGE_SPR[key] = spr);
 }
 
 // pevnosť orkov pri misii 10

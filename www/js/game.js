@@ -1400,7 +1400,7 @@
   // obtiažnosť misie: do 19. rastie s číslom misie, ďalej pomalšie (inak by počty a sila hordy pri 76 misiách prerástli všetko)
   const diffM = m => m <= 19 ? m : 19 + (m - 19) * 0.3;
   const missionHpOf = m => DIFF.missionHp[m - 1] || DIFF.missionHp[18] + 0.15 * (diffM(m) - 19);
-  const goldMul = () => (1 + DIFF.goldMission * (diffM(st.mission) - 1)) * (landDone('isles') ? 1.05 : 1); // Neutrálne zeme: +5 % zlata
+  const goldMul = () => (1 + DIFF.goldMission * (diffM(st.mission) - 1));
   const ENDLESS_HP = 1.09, ENDLESS_BASE = 0.55; // nekonečná obrana: horda začne na 55 % sily 10. misie a každá vlna pridá 9 % zdravia
   // ---- truhlica: zlatky na útok na hrad; plní sa v obranných misiách (podiel zo zabitých + neminuté zlato pri výhre) ----
   function addChest(n) { n = Math.max(0, Math.round(n)); st.chest = (st.chest || 0) + n; saveJSON(sk('chest'), st.chest); updateChest(); return n; }
@@ -5167,24 +5167,28 @@
     }
   }
 
+  // hlavné mestá rás: územie a číslo misie na ňom (ľudia: 4 na domovskom ostrove, orkovia: 2 v Oblasti orkov); ostatné uzly sú osady
+  const CAPITALS = { human: ['home', 4], orc: ['isles', 2], desert: ['dune', 3], elf: ['long', 2], undead: ['ash', 9], nordic: ['north', 4], swarm: ['swarm', 3] };
+  // rasa, ktorej osada na uzle stojí (pôvodní obyvatelia; dobytú osadu drawMapNode kreslí v rase hráča)
+  const nodeRace = i => {
+    if (curLand().home) return i < HOME_PROVINCES ? 'human' : 'orc';
+    const G0 = island.geom, p = G0 && island.order && G0.provs[island.order[i]];
+    const r = p ? p.race : 'human';
+    return r === 'polar' ? 'nordic' : r;
+  };
+  const isCapital = (i, race) => {
+    const c = CAPITALS[race], l = curLand();
+    if (!c || c[0] !== l.id) return false;
+    if (l.home) return (race === 'orc' ? MISSIONS.length - i : i + 1) === c[1]; // číslo misie z pohľadu tej rasy
+    return i + 1 === c[1];
+  };
   function drawMapNode(i, n, time) {
     const num = missionAt(i), done = num < st.unlocked, open = num === st.unlocked;
     const anim = st.mapAnim && st.mapAnim.seg === num - 2; // hrad práve odomykaný
     const status = anim ? 'locked' : done ? 'done' : open ? 'open' : 'locked';
-    // tieň
-    g.fillStyle = 'rgba(10,8,6,0.4)';
-    for (let dx = -10; dx <= 10; dx++) g.fillRect(n.x + dx, n.y + 2, 1, Math.abs(dx) > 7 ? 1 : 2);
-    let top;
-    const foeLand = (curLand().home ? num > HOME_PROVINCES : true) && !done; // mimo domovského ostrova drží všetko nepriateľ
-    if (foeLand !== isOrc()) { // orkská pevnosť: hrad hordy (za ľudí nedobytý, za orkov vlastný)
-      const f = island.fort;
-      g.drawImage(f.c, n.x - Math.floor(f.w / 2), n.y - f.h + 2, f.w, f.h);
-      top = n.y - f.h + 2;
-    } else {
-      const c = island.castle; // hrady na mape nie sú sivé ani zamknuté
-      g.drawImage(c.c, n.x - Math.floor(c.w / 2), n.y - c.h + 2, c.w, c.h);
-      top = n.y - c.h + 2;
-    }
+    const race = nodeRace(i), v = mapVillage(done ? myRace() : race, isCapital(i, race)); // osada alebo hlavné mesto rasy; dobyté patrí hráčovi (jeho rasa)
+    g.drawImage(v.c, n.x - Math.floor(v.w / 2), n.y - v.h + 2, v.w, v.h);
+    const top = n.y - v.h + 2;
     if (status === 'done') { // modrá zástava = dobyté
       const fx = n.x, fy = top - 6;
       g.fillStyle = '#4a4e60'; g.fillRect(fx, fy, 1, 7);
@@ -5976,7 +5980,7 @@
     }
     return { seaMap: true, builtH: H, // námornícke územie (island.paper je obrázok námorníckej mapy domovského ostrova); builtH = výška obrazovky pri výrobe
       land: l, w, h, geom, order, node, prov, nodes, segs: [], landTop, landBot, landLeft, landRight, foam: [], waves: [], fires: nodes.map(() => []),
-      bg: { height: h }, fort: mapVillage('orc'), castle: mapVillage('human') };
+      bg: { height: h } };
   }
   // vyfarbená mapa územia; skip = uzol, ktorý sa ešte kreslí v pôvodnej farbe (počas prefarbenia po dobytí)
   function landPaint(skip) {
@@ -5986,9 +5990,14 @@
     if (I.pimg[key]) return I.pimg[key];
     const G0 = I.geom;
     const raceOf = j => { const k = I.node[j], num = l.first + k; return num < st.unlocked && k !== skip ? myRace() : G0.provs[j].race; }, keep = I.nodes.map(n => [n.x + PPX, n.y + PPY - 4]);
-    I.pimg[key] = live ? PAPER.paintLive(G0, { raceOf, keep }) // kreslená mapa (ako domovský ostrov)
+    I.pimg[key] = live ? PAPER.paintLiveFine(G0, { raceOf, keep }, BR) // kreslená mapa v jemnej grafike (ako domovský ostrov)
       : PAPER.paint(G0, { raceOf, keep, rose: [PPX + 22, PPY + 72], roseImg: true, noEdge: true, noRhumb: I.w > W }); // kompas hore vľavo (pod okienkom hrdinu); široká mapa bez kurzových čiar
     for (const k in I.pimg) if (k !== key && !k.startsWith(st.unlocked + ':' + st.race + ':')) delete I.pimg[k]; // staré stavy preč
+    if (live && G0.fine && !I.provR) { // provincie mapy územia po polovičných bodoch (žiara aktuálnej misie, vlna dobytia)
+      const F = G0.fine, R = F.RS, w = I.w * R, h = I.h * R, pr = new Uint8Array(w * h).fill(255);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const fk = (y + PPY * R) * F.FW + x + PPX * R; if (F.fl[fk] && F.fp[fk] >= 0) pr[y * w + x] = I.node[F.fp[fk]]; }
+      I.provR = pr; I.bgR = R; I.blink = null; I.wave = null;
+    }
     return I.pimg[key];
   }
   // opálené okraje papiera na okrajoch obrazovky (mapy sa posúvajú, okraje ostávajú) – tmavý pergamen s ditheringom
@@ -6022,13 +6031,14 @@
   function renderPaperLand(time) {
     const ox = mapOX(), pa = st.provAnim, live = mapStyle !== 'paper';
     g.fillStyle = live ? 'rgb(' + SEA[2].join(',') + ')' : PAPER_BG; g.fillRect(0, 0, W, bufH());
-    const cur = landPaint(pa ? pa.i : -1);
-    g.drawImage(cur.canvas, ox - PPX, -PPY);
-    if (pa) { g.globalAlpha = provEase(pa.t); g.drawImage(landPaint(-1).canvas, ox - PPX, -PPY); g.globalAlpha = 1; } // dobytý región sa plynule zafarbí farbou hráča
+    const cur = landPaint(pa ? pa.i : -1), drawLand = p => { const f = p.fine || 1; g.drawImage(p.canvas, ox - PPX, -PPY, p.canvas.width / f, p.canvas.height / f); }; // jemná mapa má dvojnásobné rozlíšenie
+    drawLand(cur);
+    if (pa) { g.globalAlpha = provEase(pa.t); drawLand(landPaint(-1)); g.globalAlpha = 1; } // dobytý región sa plynule zafarbí farbou hráča
     if (live) { // príboj a hrebene vĺn (súradnice obrázka s pásom mora navyše)
       g.save(); g.translate(ox - PPX, -PPY);
       g.fillStyle = 'rgba(240,250,255,0.85)';
-      for (const f of cur.foam) if (Math.sin(time * 1.8 + f.ph) > 0.55) g.fillRect(f.x, f.y, 1, 1);
+      const ff = cur.fine || 1; // príboj jemnej mapy je v jemných pixeloch
+      for (const f of cur.foam) if (Math.sin(time * 1.8 + f.ph) > 0.55) g.fillRect(f.x / ff, f.y / ff, 1 / ff, 1 / ff);
       for (const w of cur.waves) {
         const a = Math.sin(time * 0.9 + w.ph); if (a < 0.2) continue;
         const x = Math.round(w.x + Math.sin(time * 0.35 + w.ph) * 2);

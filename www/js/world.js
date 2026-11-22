@@ -1,6 +1,6 @@
 'use strict';
 // Fortward – svet: domovský ostrov a ďalšie územia, všetko na jednej námorníckej (papierovej) mape sveta.
-// Misie majú jedno spoločné poradie: 1–10 domovský ostrov, 11–15 neutrálne zeme, 16–23 piesočný ostrov, 24–33 pralesný ostrov
+// Misie majú jedno spoločné poradie: 1–10 domovský ostrov, 11–15 oblasť orkov (tri ostrovy, sídlo orkov s ich hlavným mestom), 16–23 piesočný ostrov, 24–33 pralesný ostrov
 // (aj s ostrovčekom), 34–41 severná krajina, 42–51 popolavý ostrov, 52–55 ostrov roja – postup (st.unlocked), hviezdy aj obtiažnosť pokračujú.
 
 const WORLD_W = 190, WORLD_H = 360, WORLD_SEED = 7; // výška mapy sveta (pod popolavým ostrovom a ostrovom roja len pás mora)
@@ -33,9 +33,9 @@ function worldSpec() {
   const homeZones = (x, y, b) => (y - b.y0) / (b.y1 - b.y0) + (fbm(x * 0.05, y * 0.05, 503) - 0.5) * 0.1 > 0.5 ? 0 : 1;
   return { W: WORLD_W, H: WORLD_H, seed: WORLD_SEED, lands: [
     { shape: { poly: WSK.home }, amp: 4, freq: 0.1, zones: [{ n: 5, race: 'human', biome: 'grass' }, { n: 5, race: 'orc', biome: 'grass' }], zoneAt: homeZones, jitter: 3 },
-    { shape: { poly: WSK.isA }, amp: 3, freq: 0.18, zones: [{ n: 1, race: 'nordic', biome: 'dirt' }], jitter: 2 }, // celý ostrov = jedna provincia
-    { shape: { poly: WSK.isB }, amp: 3, freq: 0.18, zones: [{ n: 1, race: 'nordic', biome: 'dirt' }], jitter: 2 }, // celý ostrov = jedna provincia
-    { shape: { poly: WSK.isC }, amp: 3, freq: 0.18, zones: [{ n: 3, race: 'nordic', biome: 'dirt' }], jitter: 2 },
+    { shape: { poly: WSK.isA }, amp: 3, freq: 0.18, zones: [{ n: 1, race: 'orc', biome: 'dirt' }], jitter: 2 }, // celý ostrov = jedna provincia
+    { shape: { poly: WSK.isB }, amp: 3, freq: 0.18, zones: [{ n: 1, race: 'orc', biome: 'dirt' }], jitter: 2 }, // celý ostrov = jedna provincia
+    { shape: { poly: WSK.isC }, amp: 3, freq: 0.18, zones: [{ n: 3, race: 'orc', biome: 'dirt' }], jitter: 2 },
     { shape: { poly: WSK.long }, amp: 4, freq: 0.08, zones: [{ n: 9, race: 'elf', biome: 'jungle' }], jitter: 3 },
     { shape: { poly: WSK.north }, amp: 3.5, freq: 0.09, zones: [{ n: 6, race: 'polar', biome: 'ice' }], jitter: 3 },
     { shape: { circles: WSK.northS }, amp: 2.5, freq: 0.16, zones: [{ n: 2, race: 'polar', biome: 'ice' }], jitter: 2 },
@@ -52,9 +52,8 @@ function worldSpec() {
 // terrain = zem, cesta, dekorácie a počasie bojísk územia (prebijú tému misie; more, rieky a mlyn témy ostanú; keep = témy, ktorým ostanú vlastné dekorácie)
 const LANDS = [
   { id: 'home',  name: 'Domovský ostrov', first: 1, count: 10, home: true, wl: [0] },
-  { id: 'isles', name: 'Neutrálne zeme', first: 11, count: 5, wl: [1, 2, 3], view: { s: 3.3 }, groups: [[[1, 0], [2, 0], [3, 0]]],
-    terrain: { ground: 'darkLit', road: 'ashroad', deco: 'orc' }, // hlina ako pri pevnosti orkov
-    reward: { id: 'gold', txt: '+5 % zlata za vlny a nepriateľov' } },
+  { id: 'isles', name: 'Oblasť orkov', first: 11, count: 5, wl: [1, 2, 3], view: { s: 3.3 }, groups: [[[1, 0], [2, 0], [3, 0]]],
+    terrain: { ground: 'darkLit', road: 'ashroad', deco: 'orc' } }, // hlina ako pri pevnosti orkov
   { id: 'dune',  name: 'Piesočný ostrov', first: 16, count: 8, wl: [9], view: { s: 3.4 }, groups: [[[9, 0]]],
     terrain: { ground: 'desert', road: 'sandroad', deco: 'desert', keep: ['ruins'] } },
   { id: 'long',  name: 'Pralesný ostrov', first: 24, count: 10, wl: [4, 10], view: { s: 2.5, w: 380 }, lblDx: -40, groups: [[[4, 0], [10, 0]]],
@@ -76,8 +75,9 @@ const SEA_ROUTES = [['home', 'isles'], ['isles', 'dune'], ['dune', 'long'], ['lo
 // (zatiaľ požičané z misií domovského ostrova), giants = obri v poslednej vlne, posledná misia územia = útok na hrad
 const WORLD_MISSIONS = (() => {
   const L = [
-    { names: ['Tulenia pláž', 'Skalný maják', 'Brezový breh', 'Havranie hniezdo', 'Jarlova sieň'], themes: [0, 4, 2, 6], last: 9,
-      desc: ['Nájazdníci sa vylodili medzi tuleňmi. Zhoď ich späť do mora.', 'Maják na útese varuje lode. Neber ho nepriateľovi z rúk.', 'Na brehu sa zhromažďujú nájazdníci. Rozpráš ich skôr, než ich príde viac.', 'Strážne veže na skalách vidia celé súostrovie. Musia padnúť.', 'Rozhodujúci útok na sieň jarla. Postav vojsko zo zlatiek v truhlici.'] },
+    // Oblasť orkov: misia 2 je hlavné mesto orkov (náčelníkov tábor)
+    { names: ['Kostený breh', 'Náčelníkov tábor', 'Bahenný brod', 'Vlčia skala', 'Krvavá aréna'], themes: [0, 4, 2, 6], last: 9,
+      desc: ['Orkovia sa vylodili na pobreží posiatom kosťami. Zhoď ich späť do mora.', 'Hlavné mesto orkov a sídlo ich náčelníka. Ubráň sa najväčšej horde súostrovia.', 'Cez bahnitý brod sa valia vlčí jazdci. Zastav ich skôr, než ich príde viac.', 'Strážne veže orkov na skalách vidia celé súostrovie. Musia padnúť.', 'Rozhodujúci útok na krvavú arénu. Postav vojsko zo zlatiek v truhlici.'] },
     { names: ['Horúci breh', 'Zlatý piesok', 'Studňa nomádov', 'Kamenná oáza', 'Šakalí kaňon', 'Soľné jazero', 'Sultánova cesta', 'Palác v piesku'],
       themes: [12, 12, 4, 12, 7, 12, 12], last: 12,
       desc: ['Piesočný ostrov strážia púštni bojovníci. Ubráň sa v horúcich dunách.', 'Rozhodujúci útok na palác v piesku. Postav vojsko zo zlatiek v truhlici.'] },
