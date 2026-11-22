@@ -187,6 +187,20 @@
     background: var(--panel2); border: 2px solid var(--ink); border-radius: 10px;
     box-shadow: inset 0 -4px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.12); transition: transform .12s ease; }
   #heroHome[hidden] { display: none; }
+  /* ovládač hrdinu: priehľadný kruh vľavo dole nad tlačidlom rýchlosti, gombík ide za prstom (posun nastaví JS cez --jx/--jy) */
+  #joy { position: absolute; left: 10px; bottom: calc(env(safe-area-inset-bottom) + 56px); width: 112px; height: 112px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,242,208,.08) 0 38%, rgba(20,14,10,.22) 39% 100%);
+    border: 2px solid rgba(255,242,208,.32); box-shadow: 0 0 0 1px rgba(28,20,14,.45), inset 0 0 0 1px rgba(28,20,14,.35);
+    touch-action: none; opacity: .75; transition: opacity .15s ease; --jx: 0px; --jy: 0px; }
+  #joy[hidden] { display: none; }
+  #joy.on { opacity: 1; }
+  #joy .ring { position: absolute; inset: 22px; border-radius: 50%; border: 1px dashed rgba(255,242,208,.28); pointer-events: none; }
+  #joy .knob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
+    background: radial-gradient(circle at 38% 34%, rgba(255,250,232,.62), rgba(255,242,208,.30) 55%, rgba(200,180,140,.24));
+    border: 2px solid rgba(28,20,14,.55); box-shadow: inset 0 -3px 0 rgba(0,0,0,.18), 0 2px 4px rgba(0,0,0,.3);
+    transform: translate(var(--jx), var(--jy)); pointer-events: none; }
+  #joy.on .knob { transition: none; }
+  #joy:not(.on) .knob { transition: transform .12s ease-out; }
   #heroHome:active { transform: scale(.94); }
   #heroHome img { width: 36px; height: 36px; image-rendering: pixelated; }
   #heroHome span { font-size: 10px; font-weight: 800; letter-spacing: .5px; color: #fff2d0; }
@@ -1060,6 +1074,8 @@
     <button id="stanceBtn" class="attack" title="Armáda: útok / obrana" hidden><img alt=""><span>ÚTOK</span></button>
     <!-- hrdina na stanovišti (ťuk na bojisko) – týmto sa vráti k radnici -->
     <button id="heroHome" title="Hrdina sa vráti k radnici" hidden><img alt=""><span>DOMOV</span></button>
+    <!-- ovládač hrdinu: kruh vľavo dole, ťah gombíkom vedie hrdinu; po pustení hrdina ostane na mieste a bráni ho -->
+    <div id="joy" hidden><i class="ring"></i><i class="knob"></i></div>
     <div class="abils">
       <button id="warcryBtn" class="abil" hidden><span>POKRIK</span></button>
       <!-- kúzla: najprv ťuknúť na kúzlo, potom na miesto na bojisku -->

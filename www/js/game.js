@@ -3566,6 +3566,7 @@
           AUDIO.play('bolt');
         }
       } else if (k.escape) heroEscape(k, dt); // vychádza z hradby
+      else if (st.joy && !k.charge && heroJoy(k, dt)) { /* hráč ho vedie ovládačom */ }
       else if (k.charge) updateCharge(k, dt);
       else if (hd.range) updateSorc(k, dt);
       else {
@@ -7449,6 +7450,52 @@
     b.querySelector('img').src = atk ? UI_ICONS.swords : UI_ICONS.shieldDefend;
     b.querySelector('span').textContent = atk ? 'ÚTOK' : 'OBRANA';
   }
+  // ovládač hrdinu (kruh vľavo dole): vychýlenie gombíka = smer a rýchlosť chôdze; po pustení hrdina ostane stáť a bráni miesto (ako po dvojťuku)
+  const JOY_R = 33; // o koľko px sa gombík môže vychýliť
+  let joyId = null;
+  function joyMove(ev) {
+    const el = $('joy'), r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    let dx = ev.clientX - cx, dy = ev.clientY - cy; const d = Math.hypot(dx, dy);
+    if (d > JOY_R) { dx *= JOY_R / d; dy *= JOY_R / d; }
+    el.style.setProperty('--jx', dx + 'px'); el.style.setProperty('--jy', dy + 'px');
+    st.joy = { x: dx / JOY_R, y: dy / JOY_R };
+  }
+  function joyEnd() {
+    const el = $('joy'); joyId = null; el.classList.remove('on'); el.style.setProperty('--jx', '0px'); el.style.setProperty('--jy', '0px');
+    const k = st.king, was = st.joy && st.joy.moved; st.joy = null;
+    if (was && k && !k.dead && st.phase === 'battle') { k.post = { x: k.x, y: k.y }; k.tgt = null; k.next = null; syncHeroHome(); } // ostane, kde ho hráč doviedol
+  }
+  $('joy').addEventListener('pointerdown', ev => {
+    ev.stopPropagation(); ev.preventDefault();
+    if (!kingUp()) { AUDIO.play('deny'); hint(heroFell()); return; }
+    joyId = ev.pointerId; try { $('joy').setPointerCapture(ev.pointerId); } catch (e) { } $('joy').classList.add('on'); joyMove(ev);
+  });
+  $('joy').addEventListener('pointermove', ev => { if (ev.pointerId === joyId) { ev.stopPropagation(); joyMove(ev); } });
+  for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) $('joy').addEventListener(t, ev => { if (ev.pointerId === joyId) { ev.stopPropagation(); joyEnd(); } });
+  // ovládač je vidieť len v boji, kým hrdina stojí na nohách
+  let joyVis = null;
+  function syncJoy() {
+    const v = st.phase === 'battle' && !!st.king && !st.king.dead && !isAssault();
+    if (v === joyVis) return; joyVis = v; $('joy').hidden = !v;
+    if (!v && joyId != null) joyEnd();
+  }
+  // chôdza podľa ovládača: rovno daným smerom, hradby a radnica ju zastavia (skúsi sa aj kĺzanie pozdĺž nich), nie mimo bojiska
+  function heroJoy(k, dt) {
+    const j = st.joy, m = Math.min(1, Math.hypot(j.x, j.y));
+    if (m < 0.18) return false; // mŕtva zóna v strede: hrdina bojuje sám
+    j.moved = true; k.tgt = null; k.aim = null; k.next = null; k.post = null;
+    const s = (k.spd || 26) * waterMul(k) * (0.35 + 0.65 * m) * dt, ux = j.x / Math.hypot(j.x, j.y), uy = j.y / Math.hypot(j.x, j.y);
+    const hr = hallRect();
+    const ok = (x, y) => { if (x < G.gx0 + 4 || x > G.gx0 + G.cols * T - 4 || y < G.gy0 + 6 || y > tileY(G.rows) - 2) return false; const t = tileAt(x, y); return knightPass(t.c, t.r) && occAt(t.c, t.r) !== HALL && !(x > hr.x0 && x < hr.x1 && y > hr.y0 && y < hr.y1); };
+    const nx = k.x + ux * s, ny = k.y + uy * s;
+    if (ok(nx, ny)) { k.x = nx; k.y = ny; }
+    else if (Math.abs(ux) > 0.2 && ok(nx, k.y)) k.x = nx;
+    else if (Math.abs(uy) > 0.2 && ok(k.x, ny)) k.y = ny;
+    if (hero8(heroDef().spr)) k.face8 = dir8(ux, uy);
+    k.anim += s / 9; k._walkT = performance.now();
+    k.okX = k.x; k.okY = k.y;
+    return true;
+  }
   $('heroHome').addEventListener('click', ev => {
     ev.stopPropagation();
     const k = st.king; if (!k || !k.post) return;
@@ -8678,6 +8725,7 @@
       while (acc >= DT && st.phase === 'battle') { update(DT); acc -= DT; }
     } else { acc = 0; updateFx(dt); mapTick(dt); heroWalkHome(dt); siegeWalkHome(dt); }
     camTick(dt);
+    syncJoy(); // ovládač hrdinu len v boji, kým hrdina žije
     render(now / 1000);
     if (st.phase !== 'title') hudTick(); // na úvodnej obrazovke je HUD skrytý – neprepisovať jeho štýly každú snímku (spomaľovalo ťuky na slabších tabletoch)
     requestAnimationFrame(frame);
