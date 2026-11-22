@@ -829,6 +829,7 @@
       if (nb !== (b.nb || 0)) { const old = bMaxHp(b); b.nb = nb; b.hp = b.hp * bMaxHp(b) / old; }
     }
     computeFlow();
+    if (st.king || (st.soldiers && st.soldiers.length)) keepOutOfWalls(); // stavba pod hrdinom či vojakom: vyjdú z nej hneď
   }
 
   // políčka pod stojacimi hradbami tábora (brána je priechodná) – horda nimi neprejde
@@ -883,14 +884,41 @@
       else if (e.okX != null) { e.x = e.okX; e.y = e.okY; e.kb = null; }
     }
   }
+  // najbližšie políčko, kadiaľ vojsko prejde (nie hradba ani radnica) – stred políčka, mierne pod stred ako stanovištia
+  function freeTileNear(c, r) {
+    const seen = new Set([r * G.cols + c]), q = [[c, r]];
+    while (q.length) {
+      const [qc, qr] = q.shift();
+      if (knightPass(qc, qr) && occAt(qc, qr) !== HALL) return { x: tileX(qc) + T / 2, y: tileY(qr) + T / 2 + 2 };
+      for (const [dc, dr] of [[0, -1], [1, 0], [-1, 0], [0, 1]]) {
+        const nc = qc + dc, nr = qr + dr, k = nr * G.cols + nc;
+        if (nc < 0 || nr < 0 || nc >= G.cols || nr >= G.rows || seen.has(k)) continue;
+        seen.add(k); q.push([nc, nr]);
+      }
+    }
+    return null;
+  }
   function keepOutOfWalls() {
     const us = st.king && !st.king.dead ? st.soldiers.concat([st.king]) : st.soldiers;
     keepAshore(us);
     for (const u of us) {
       if (u.dead || u.fly) continue;
       const t = tileAt(u.x, u.y);
-      if (knightPass(t.c, t.r)) { u.okX = u.x; u.okY = u.y; }
-      else if (u.okX != null) { u.x = u.okX; u.y = u.okY; u.next = null; u.repath = 0; }
+      if (knightPass(t.c, t.r)) { u.okX = u.x; u.okY = u.y; continue; }
+      const ok = u.okX != null ? tileAt(u.okX, u.okY) : null;
+      if (ok && knightPass(ok.c, ok.r)) { u.x = u.okX; u.y = u.okY; u.next = null; u.repath = 0; continue; }
+      const p = freeTileNear(t.c, t.r); // hradbu postavili priamo pod neho: vyjde na najbližšie voľné políčko
+      if (p) { u.x = p.x; u.y = p.y; u.okX = p.x; u.okY = p.y; u.next = null; u.repath = 0; }
+    }
+    const k = st.king; // domov hrdinu (či jeho stanovište) v hradbe: presunie sa na najbližšie voľné políčko
+    if (k) for (const key of ['home', 'post']) {
+      const h = key === 'home' ? { x: k.hx, y: k.hy } : k.post;
+      if (!h || h.x == null) continue;
+      const t = tileAt(h.x, h.y);
+      if (knightPass(t.c, t.r) && occAt(t.c, t.r) !== HALL) continue;
+      const p = freeTileNear(t.c, t.r);
+      if (!p) continue;
+      if (key === 'home') { k.hx = p.x; k.hy = p.y; } else { k.post.x = p.x; k.post.y = p.y; }
     }
   }
   // Dijkstra od radnice; budovy na ceste sú drahé (treba ich rozbiť), takže horda radšej obchádza.
