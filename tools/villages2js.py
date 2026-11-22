@@ -17,7 +17,7 @@ K = (0x1c, 0x14, 0x0e)
 FILES = {
     'human': ('tiny_medieval_villag.png', 'capital_village-human.png'),
     'orc': ('village-orc.png', 'capital_orc_war_camp_se_2.png'),
-    'desert': ('tiny_desert_town_map.png', 'capital_desert_town_map_2.png'),
+    'desert': ('desert villidge.png', 'desert nomad capital.png'),
     'elf': ('tiny_elven_forest_vi.png', 'capital_elven_forest_vi_2.png'),
     'nordic': ('tiny_nordic_viking_v.png', 'capital_nordic_viking_v_2.png'),
     'undead': ('tiny_undead_necropol_2.png', 'capital_undead_necropol.png'),

@@ -906,9 +906,10 @@
       const t = tileAt(u.x, u.y);
       if (knightPass(t.c, t.r)) { u.okX = u.x; u.okY = u.y; continue; }
       const ok = u.okX != null ? tileAt(u.okX, u.okY) : null;
-      if (ok && knightPass(ok.c, ok.r)) { u.x = u.okX; u.y = u.okY; u.next = null; u.repath = 0; continue; }
-      const p = freeTileNear(t.c, t.r); // hradbu postavili priamo pod neho: vyjde na najbližšie voľné políčko
-      if (p) { u.x = p.x; u.y = p.y; u.okX = p.x; u.okY = p.y; u.next = null; u.repath = 0; }
+      const p = ok && knightPass(ok.c, ok.r) ? { x: u.okX, y: u.okY } : freeTileNear(t.c, t.r); // hradbu postavili priamo pod neho: vyjde na najbližšie voľné políčko
+      if (!p) continue;
+      if (u === st.king) { u.escape = freeTileNear(t.c, t.r) || p; continue; } // hrdina odkráča na najbližšie voľné políčko (heroEscape), vojak sa len presunie
+      u.x = p.x; u.y = p.y; u.okX = p.x; u.okY = p.y; u.next = null; u.repath = 0;
     }
     const k = st.king; // domov hrdinu (či jeho stanovište) v hradbe: presunie sa na najbližšie voľné políčko
     if (k) for (const key of ['home', 'post']) {
@@ -3564,7 +3565,8 @@
           for (let q = 0; q < 16; q++) part(k.x, k.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.5, q % 2 ? '#c8a0ff' : '#ffffff', 20);
           AUDIO.play('bolt');
         }
-      } else if (k.charge) updateCharge(k, dt);
+      } else if (k.escape) heroEscape(k, dt); // vychádza z hradby
+      else if (k.charge) updateCharge(k, dt);
       else if (hd.range) updateSorc(k, dt);
       else {
         const h = heroPos(k), aggro = hd.reach + T + 10 * tal('reach');
@@ -4294,6 +4296,39 @@
     }
     return (previewCache[key] = spriteURL({ c, w: c.width, h: c.height }, 3));
   }
+  // ikonka „hradba na vežu“: veža (rasy hráča) a okolo nej dve zelené zatočené šípky idúce za sebou (s tmavým obrysom)
+  const convertCache = {};
+  function convertIcon() {
+    const key = BUILD_RACE;
+    if (convertCache[key]) return convertCache[key];
+    const spr = bsprOf('tower', 1), R = spr.hd ? 2 : 1, sw = spr.w * R, sh = spr.h * R;
+    const N = Math.round(Math.max(sw, sh) * 1.08) + 6, c = document.createElement('canvas'); c.width = N; c.height = N;
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+    x.drawImage(spr.c, Math.round((N - sw) / 2), Math.round((N - sh) / 2) + 1, sw, sh);
+    const id = x.getImageData(0, 0, N, N), d = id.data, cx = (N - 1) / 2, cy = (N - 1) / 2, r = N * 0.4, th = Math.max(1.6, N / 26);
+    const GREEN = [[16, 48, 10], [42, 122, 34], [90, 186, 58], [176, 236, 120]];
+    const put = (px, py, col) => { const q = (py * N + px) * 4; d[q] = col[0]; d[q + 1] = col[1]; d[q + 2] = col[2]; d[q + 3] = 255; };
+    // dva oblúky po 120° (v smere hodinových ručičiek), na konci každého hrot; obrys o 1 px širší
+    const arcs = [[200, 320], [20, 140]], HEAD = 26;
+    const inArrow = (px, py, grow) => {
+      const dx = px - cx, dy = py - cy, dist = Math.hypot(dx, dy);
+      let a = Math.atan2(dy, dx) * 180 / Math.PI; if (a < 0) a += 360;
+      for (const [a0, a1] of arcs) {
+        let t = a - a0; if (t < 0) t += 360;
+        const len = a1 - a0;
+        if (t <= len && Math.abs(dist - r) <= th + grow) return t / len;            // telo šípky (t = 0 chvost, 1 pri hrote)
+        if (t > len && t <= len + HEAD && Math.abs(dist - r) <= th * 2.4 * (1 - (t - len) / HEAD) + grow) return 2; // hrot
+      }
+      return -1;
+    };
+    for (let py = 0; py < N; py++) for (let px = 0; px < N; px++) {
+      const v = inArrow(px + 0.5, py + 0.5, 0);
+      if (v >= 0) { const dist = Math.hypot(px + 0.5 - cx, py + 0.5 - cy), inner = dist < r; put(px, py, GREEN[v === 2 ? 2 : inner ? 3 - (v < 0.15 ? 1 : 0) : 1 + (v > 0.5 ? 1 : 0)]); }
+      else if (inArrow(px + 0.5, py + 0.5, 1) >= 0) put(px, py, GREEN[0]);
+    }
+    x.putImageData(id, 0, 0);
+    return (convertCache[key] = spriteURL({ c, w: N, h: N }, 1));
+  }
   // náhľad stavby po zmene (jej vlastnosti s prepísanými hodnotami)
   const after = (b, ch) => bPreview(Object.assign({ kind: b.kind, lvl: b.lvl, gate: b.gate, unit: b.unit, spec: b.spec, mode: b.mode }, ch));
 
@@ -4919,7 +4954,8 @@
         const m = (jv(q.c, q.r - 1) ? 1 : 0) | (j(q.c + 1, q.r) ? 2 : 0) | (jv(q.c, q.r + 1) ? 4 : 0) | (j(q.c - 1, q.r) ? 8 : 0);
         if (drag.kind === 'mud') { const ms = mudSpr(mudMask(q.c, q.r, (c, r) => inPath.has(key(c, r)) || mudAt(c, r)), 2 * x, 2 * y); g.drawImage(ms.c, x, y, T, T); }
         else if (drag.kind === 'hedge') { const hs = hedgeSpr((inPath.has(key(q.c, q.r - 1)) || hedgeAt(q.c, q.r - 1) ? 1 : 0) | (inPath.has(key(q.c + 1, q.r)) || hedgeAt(q.c + 1, q.r) ? 2 : 0) | (inPath.has(key(q.c, q.r + 1)) || hedgeAt(q.c, q.r + 1) ? 4 : 0) | (inPath.has(key(q.c - 1, q.r)) || hedgeAt(q.c - 1, q.r) ? 8 : 0)); g.drawImage(hs.c, x, y + T + 1 - hs.h, hs.w, hs.h); }
-        else if (stake) g.drawImage(BSPR.stake.c, x, y + T + 1 - BSPR.stake.h, BSPR.stake.w, BSPR.stake.h); // jemná kresba: plátno 2×, kreslí sa v bodoch hry else wallImg(g, wallsOf()[0][m + 16 * wallSide(q.c)] || wallsOf()[0][m], x, y);
+        else if (stake) g.drawImage(BSPR.stake.c, x, y + T + 1 - BSPR.stake.h, BSPR.stake.w, BSPR.stake.h); // jemná kresba: plátno 2×, kreslí sa v bodoch hry
+        else wallImg(g, wallsOf()[0][m + 16 * wallSide(q.c)] || wallsOf()[0][m], x, y);
         if (i >= ok) { g.fillStyle = 'rgba(232,72,56,0.55)'; g.fillRect(x, y - 6, T, T + 6); }
       });
       g.globalAlpha = 1;
@@ -5182,6 +5218,29 @@
     if (l.home) return (race === 'orc' ? MISSIONS.length - i : i + 1) === c[1]; // číslo misie z pohľadu tej rasy
     return i + 1 === c[1];
   };
+  // zástava hráča nad dobytou osadou v jemnej kresbe (pol bodu na pixel): stožiar so svetlou hranou a zlatou hlavicou,
+  // látka s obrysom, ktorá sa plynulo vlní (svetlejšia, kde stúpa), vykrojený koniec; ľudia modrá, orkovia oranžová
+  const MAP_FLAG_COL = { human: ['#162050', '#2e4a9a', '#3c64c8', '#6a8ee0', '#a8c4f8'], orc: ['#5a2408', '#a84a10', '#e87818', '#f8b048', '#ffd890'] };
+  function drawMapFlag(x, top, time, ph) {
+    const u = 0.5, X = x * 2, Y = (top - 7) * 2; // ľavý horný roh stožiara v jemných pixeloch
+    const dot = (fx, fy, col) => { g.fillStyle = col; g.fillRect(fx * u, fy * u, u, u); };
+    const C = MAP_FLAG_COL[isOrc() ? 'orc' : 'human'], CW = 11, CH = 6;
+    for (let k = 2; k < 16; k++) { dot(X - 1, Y + k, PAL.K); dot(X, Y + k, '#9a9eac'); dot(X + 1, Y + k, '#4a4e60'); dot(X + 2, Y + k, PAL.K); } // stožiar
+    dot(X, Y, '#fff070'); dot(X + 1, Y, '#f8d048'); dot(X, Y + 1, '#f8d048'); dot(X + 1, Y + 1, '#b88420'); // hlavica
+    const off = c => Math.round(Math.sin(time * 6 + ph - c * 0.55) * 1.3 * Math.min(1, c / 4)); // pri stožiari sa látka nehýbe
+    for (let c = 0; c < CW; c++) {
+      const o = off(c), slope = off(c + 1) - o, y0 = Y + 2 + o;
+      for (let r = -1; r <= CH; r++) {
+        const fx = X + 3 + c, fy = y0 + r;
+        if (c === CW - 1 && (r === 2 || r === 3)) continue; // vykrojený koniec (lastovičí chvost)
+        if ((c === CW - 2 && (r === 2 || r === 3)) || (c === CW - 1 && (r === 1 || r === 4))) { dot(fx, fy, PAL.K); continue; } // obrys výrezu
+        if (r === -1 || r === CH) { dot(fx, fy, PAL.K); continue; } // obrys hore a dole
+        let v = r === 0 ? 3 : r === CH - 1 ? 1 : 2; v += slope < 0 ? 1 : slope > 0 ? -1 : 0; // vlna: svetlo kde látka stúpa
+        dot(fx, fy, C[Math.max(0, Math.min(4, v))]);
+      }
+    }
+    for (const r of [0, 1, 4, 5]) dot(X + 3 + CW, Y + 2 + off(CW - 1) + r, PAL.K); // obrys na konci (okrem výrezu)
+  }
   function drawMapNode(i, n, time) {
     const num = missionAt(i), done = num < st.unlocked, open = num === st.unlocked;
     const anim = st.mapAnim && st.mapAnim.seg === num - 2; // hrad práve odomykaný
@@ -5189,14 +5248,8 @@
     const race = nodeRace(i), v = mapVillage(done ? myRace() : race, isCapital(i, race)); // osada alebo hlavné mesto rasy; dobyté patrí hráčovi (jeho rasa)
     g.drawImage(v.c, n.x - Math.floor(v.w / 2), n.y - v.h + 2, v.w, v.h);
     const top = n.y - v.h + 2;
-    if (status === 'done') { // modrá zástava = dobyté
-      const fx = n.x, fy = top - 6;
-      g.fillStyle = '#4a4e60'; g.fillRect(fx, fy, 1, 7);
-      const wv = Math.floor(time * 5 + i) % 2;
-      g.fillStyle = isOrc() ? '#c05a18' : '#3c64c8'; g.fillRect(fx + 1, fy + wv, 5, 3); // zástava hráča: modrá ľudia, oranžová orkovia
-      g.fillStyle = isOrc() ? '#f89838' : '#88b4ff'; g.fillRect(fx + 1, fy + wv, 2, 1);
-      g.fillStyle = '#f8d048'; g.fillRect(fx + 5, fy + 1 - wv, 1, 1);
-    } else if (status === 'open') { // skákajúca šípka
+    if (status === 'done') drawMapFlag(n.x, top, time, i); // zástava hráča = dobyté
+    else if (status === 'open') { // skákajúca šípka
       const ay = top - 8 + Math.round(Math.abs(Math.sin(time * 4)) * -3);
       for (let k = 0; k < 4; k++) { g.fillStyle = PAL.K; g.fillRect(n.x - k - 1, ay + k - 1, k * 2 + 3, 1); }
       for (let k = 0; k < 3; k++) { g.fillStyle = k === 0 ? '#fff070' : '#f8d048'; g.fillRect(n.x - (2 - k), ay + k, (2 - k) * 2 + 1, 1); }
@@ -6757,6 +6810,7 @@
   const coinTxt = n => '<img class="coin" src="' + ICONS.coin + '">' + n;
 
   function renderBuild() {
+    if (st.wallToTower && st.wallToTower !== st.sel) st.wallToTower = null; // ponuka „hradba na vežu“ patrí len zvolenej hradbe
     const pal = $('palette'); pal.innerHTML = '';
     const row = $('selRow'); row.innerHTML = '';
     // karta akcie označenej stavby – rovnako veľká ako karta stavby
@@ -6876,6 +6930,23 @@
           bulk(after(free[0], { unit: { type, lvl: 1 }, gate: false }), wd.name, free, () => wd.cost, w => { st.gold -= wd.cost; w.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit');
         }
       }
+    } else if (st.sel && st.wallToTower === st.sel) {
+      // hradba na vežu: len veže; veža vyrastie na tom istom políčku, hradba sa pritom predá – platí sa cena veže mínus to, čo by vrátil predaj hradby
+      const b = st.sel, ref = Math.floor(b.spent * sellShare());
+      selRow(convertIcon(), 'Zmeniť hradbu na vežu', 'veža vyrastie na mieste hradby · za hradbu sa odráta ' + ref + ' zlata');
+      act(after(b, {}), 'Späť', '', true, () => { st.wallToTower = null; }, '', true);
+      for (const k of (isOrc() ? ORC_ORDER : BUILD_ORDER).filter(k => BUILD_TABS.find(t => t.id === 'towers').kinds.includes(k))) {
+        const td = BUILD[k];
+        if ((td.orc && !isOrc()) || (td.human && isOrc()) || (td.w || 1) > 1) continue; // veže na jedno políčko vo farbe rasy
+        if (!open(k)) { lockAct(ICONS[k], td.short, k, true); continue; }
+        const cost = Math.max(0, costOf(k) - ref), full = bldFull(k);
+        const ok = !full && st.gold >= cost;
+        act(bPreview({ kind: k, lvl: resMin(k) }), td.short, full ? 'plné' : coinTxt(cost), ok, ok ? () => {
+          st.gold -= cost; st.blds = st.blds.filter(x => x !== b);
+          const nb = addBuilding(k, b.c, b.r);
+          st.sel = nb; st.selGroup = null; st.wallToTower = null;
+        } : full ? limitMsg(k) : 'Nedostatok zlata', 'up');
+      }
     } else if (st.sel) {
       const b = st.sel, d = BUILD[b.kind];
       let stats = '';
@@ -6952,6 +7023,8 @@
           if (!open(tid)) { lockAct(ICONS['u_' + type], wd.name, tid); continue; }
           shineTech(act(after(b, { unit: { type, lvl: 1 } }), wd.name, coinTxt(wd.cost), st.gold >= wd.cost, () => { st.gold -= wd.cost; b.unit = { type, lvl: 1, cd: 0.3, spent: wd.cost }; }, 'unit'), tid);
         }
+        // hradba na vežu: ikonka veže so zelenými šípkami otvorí ponuku len s vežami
+        if (!b.gate && !u) act(convertIcon(), 'Na vežu', '', true, () => { st.wallToTower = b; }, '', true);
       }
     } else {
       // nič nie je označené: záložky s druhmi stavieb a karty stavieb zvolenej záložky
@@ -8551,10 +8624,17 @@
 
 
   // po vlne (aj počas stavania) sa hrdina pokojne prejde späť k radnici, namiesto skoku na miesto
+  // hrdina vychádza z hradby postavenej priamo pod neho: kráča rovno na voľné políčko (aj cez hradbu, z ktorej vychádza), potom pokračuje ako zvyčajne
+  function heroEscape(k, dt) {
+    const e = k.escape, dx = e.x - k.x, dy = e.y - k.y;
+    if (Math.hypot(dx, dy) > 0.5 && hero8(heroDef().spr)) k.face8 = dir8(dx, dy);
+    if (moveTo(k, e.x, e.y, (k.spd || 26) * 1.15, dt)) { k.okX = k.x; k.okY = k.y; k.escape = null; k.next = null; k.repath = 0; }
+  }
   function heroWalkHome(dt) {
     const k = st.king;
     if (!k || k.dead || !(st.phase === 'pause' || st.phase === 'build')) return;
     k.tgt = null; k.aim = null; k.flash = Math.max(0, (k.flash || 0) - dt); k.swing = Math.max(0, (k.swing || 0) - dt); // aim: po búraní tábora by mieril na stavbu a kĺzal v postoji útoku
+    if (k.escape) { heroEscape(k, dt); return; }
     if (Math.hypot(k.hx - k.x, k.hy - k.y) <= 1) return;
     moveKnight(k, k.hx, k.hy, (k.spd || 26) * 1.15, dt); // len po ceste ako vojaci – cez hradby neprejde
   }
