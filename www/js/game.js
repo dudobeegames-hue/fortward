@@ -4010,7 +4010,7 @@
   function unit8Frame(u, set) {
     const mvx = u.x - (u._lx == null ? u.x : u._lx), mvy = u.y - (u._ly == null ? u.y : u._ly);
     u._lx = u.x; u._ly = u.y;
-    const t = u.archer ? (u.aimT && !u.aimT.dead ? u.aimT : null) : u.tgt && !u.tgt.dead ? u.tgt : null;
+    const t = u.archer ? (u.aimT && !u.aimT.dead ? u.aimT : null) : u.tgt && !u.tgt.dead && !(u.dep && st.phase !== 'battle') ? u.tgt : null; // vojsko útoku pred bojom stojí k hradu
     const near = t && (u.archer || Math.hypot(t.x - u.x, t.y - u.y) < (u.ktype === 'spear' && !isBrute(u) ? SPEAR_REACH + 5 : 14)); // kopijník bodá z diaľky, surovec zblízka
     // chôdza = jednotka sama kráča (moveTo); drobné odtlačenie susedom chôdza nie je (kôň by inak prepínal snímky klusu),
     // väčšie odtlačenie (viac ako štvrť bodu za snímku) už áno – inak by sa jednotka v rade šmýkala bez krokov
@@ -4024,7 +4024,7 @@
     if (moving && od >= 3 && Math.hypot(u._svx, u._svy) > 0.12 && !(u.archer && near && !u.retreat)) turn8(u, sd, 2);
     else if (near) turn8(u, dir8(t.x - u.x, t.y - u.y), u.archer ? 8 : 3); // lukostrelec sa otáča pomalšie (cieľ prechádza medzi smermi)
     else if (moving && (u.retreat || !(st.phase === 'battle' && u.fslot && Math.hypot(u.fslot.x - u.x, u.fslot.y - u.y) < 5))) turn8(u, sd, u.retreat ? 2 : 5); // drobné dorovnanie na miesto v šíku (po odtlačení) ho neotočí; ústup lukostrelca áno (inak cúva)
-    else if (!t) turn8(u, u.helper && !(u.helper === 'chapel' && st.phase === 'battle') ? 2 : 6, 5); // bez cieľa: vojaci aj liečiteľ v boji (v šíku) k horde, remeselník a liečiteľ mimo boja k hráčovi (na juh)
+    else if (!t) turn8(u, u.helper && !(u.helper === 'chapel' && (st.phase === 'battle' || u.dep)) ? 2 : 6, 5); // bez cieľa: vojaci aj liečiteľ v boji (v šíku) k horde, mních útočného vojska aj pred útokom k hradu; remeselník a liečiteľ mimo boja k hráčovi (na juh)
     if (u.face8 == null) u.face8 = u.helper ? 2 : 6;
     const v = set[u.face8];
     if (u.archer) { // lukostrelec: po výstrele chvíľu povolená tetiva, potom znova napne; s cieľom mieri aj pri presune v rade (striedanie s chôdzou blikalo)
@@ -7570,6 +7570,7 @@
     const us = st.soldiers.slice(n0), cx = tileX(c) + T / 2, cy = tileY(r) + T / 2 + 3;
     us.forEach((u, i) => { // oddiel stojí na svojom políčku vedľa seba
       u.dep = id; u.val = a.cost / us.length;
+      if (k === 'monk') u.face8 = 6; // mních / šaman stojí otočený na sever, k hradu (inak by sa pozeral k nám)
       if (!a.siege) { u.x = cx + (i - (us.length - 1) / 2) * 4; u.y = cy - (u.fly ? 10 : 0) + (i % 2) * 2; }
     });
     st.deps.push({ id, key: k, c, r, cost: a.cost });
