@@ -1457,14 +1457,13 @@
     st.fireWalls = []; st.shields = []; st.fallFx = []; st.bolts = []; st.blasts = []; st.healFx = []; st.castFx = [];
     st.clouds = []; st.totems = []; st.pools = []; st.axes = [];
     const k = st.king; // zúrivosť, medvedia koža, hostina a rozbehnutý nápor sa do ďalšej vlny neprenesú
-    if (k) { k.rageT = 0; k.hideT = 0; k.feastT = 0; k.charge = null; k.stunT = 0; k.kb = null; k.post = null; } // po vlne sa hrdina vráti k radnici
+    if (k) { k.rageT = 0; k.hideT = 0; k.feastT = 0; k.charge = null; k.stunT = 0; k.kb = null; k.tpFrom = null; } // stanovište ostáva aj po vlne (hrdina sa nevracia k radnici)
     syncHeroHome();
     st.hallHolyT = 0; for (const b of st.blds) b.holyT = 0;
     for (const s of st.soldiers) s.stunT = 0;
   }
   function enterBuild() {
     st.phase = 'build';
-    st.repairFlash = st.wave > 0; // po vlne kladivo (Opraviť všetko) raz preblikne
     st.moving = null;
     AUDIO.music('build');
     st.tool = null; st.sel = null;
@@ -3220,8 +3219,9 @@
     }
     if (id === 'teleport') {
       for (let q = 0; q < 18; q++) part(k.x, k.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.5, q % 2 ? '#c8a0ff' : '#ffffff', 20);
+      k.tpFrom = { x: k.x, y: k.y }; // odtiaľto sa teleportovala – sem sa po údere vráti
       k.x = Math.max(G.gx0 + 4, Math.min(G.gx0 + G.cols * T - 4, x)); k.y = y; k.tgt = null; k.next = null;
-      k.tpBack = 0.45; // po údere sa hneď vráti teleportom k radnici
+      k.tpBack = 0.45; // po údere sa hneď vráti teleportom na pôvodné miesto
       // tlaková vlna: zasiahnutých odhodí za jej okraj a na 2 s omráči (vojvodcu a veľkráľa len omráči)
       for (const e of st.enemies) {
         if (e.dead) continue;
@@ -3561,7 +3561,7 @@
         k.tpBack -= dt;
         if (k.tpBack <= 0) {
           for (let q = 0; q < 16; q++) part(k.x, k.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.5, q % 2 ? '#c8a0ff' : '#ffffff', 20);
-          const h = heroPos(k); k.x = h.x; k.y = h.y; k.tgt = null; k.next = null;
+          const h = k.tpFrom || heroPos(k); k.x = h.x; k.y = h.y; k.tgt = null; k.next = null; k.tpFrom = null; // späť, odkiaľ sa teleportovala
           for (let q = 0; q < 16; q++) part(k.x, k.y - 6, (Math.random() - 0.5) * 30, -Math.random() * 30, 0.5, q % 2 ? '#c8a0ff' : '#ffffff', 20);
           AUDIO.play('bolt');
         }
@@ -7118,11 +7118,7 @@
     rb.hidden = !rc; // Opraviť všetko len keď je niečo poškodené
     rb.querySelector('.rcost').textContent = rc || '';
     rb.disabled = !rc || st.gold < rc;
-    if (rc && st.repairFlash) { // na začiatku stavby po vlne kladivo raz preblikne neónom (ľudia modrý, orkovia oranžový)
-      st.repairFlash = false;
-      rb.classList.remove('neon'); void rb.offsetWidth; rb.classList.add('neon');
-      setTimeout(() => rb.classList.remove('neon'), 3000);
-    }
+    rb.classList.toggle('neon', !!rc); // kladivo bliká neónom celý čas stavania, kým je čo opraviť (ľudia modrý, orkovia oranžový)
     updateHud();
   }
 
@@ -7483,7 +7479,7 @@
   function heroJoy(k, dt) {
     const j = st.joy, m = Math.min(1, Math.hypot(j.x, j.y));
     if (m < 0.18) return false; // mŕtva zóna v strede: hrdina bojuje sám
-    j.moved = true; k.tgt = null; k.aim = null; k.next = null; k.post = null;
+    j.moved = true; k.tgt = null; k.aim = null; k.next = null;
     const s = (k.spd || 26) * waterMul(k) * (0.35 + 0.65 * m) * dt, ux = j.x / Math.hypot(j.x, j.y), uy = j.y / Math.hypot(j.x, j.y);
     const hr = hallRect();
     const ok = (x, y) => { if (x < G.gx0 + 4 || x > G.gx0 + G.cols * T - 4 || y < G.gy0 + 6 || y > tileY(G.rows) - 2) return false; const t = tileAt(x, y); return knightPass(t.c, t.r) && occAt(t.c, t.r) !== HALL && !(x > hr.x0 && x < hr.x1 && y > hr.y0 && y < hr.y1); };
@@ -7494,6 +7490,7 @@
     if (hero8(heroDef().spr)) k.face8 = dir8(ux, uy);
     k.anim += s / 9; k._walkT = performance.now();
     k.okX = k.x; k.okY = k.y;
+    const had = !!k.post; k.post = { x: k.x, y: k.y }; if (!had) syncHeroHome(); // stanovište ide s ním: kde ho hráč nechá, tam ostane a odtiaľ bojuje
     return true;
   }
   $('heroHome').addEventListener('click', ev => {
@@ -8682,8 +8679,9 @@
     if (!k || k.dead || !(st.phase === 'pause' || st.phase === 'build')) return;
     k.tgt = null; k.aim = null; k.flash = Math.max(0, (k.flash || 0) - dt); k.swing = Math.max(0, (k.swing || 0) - dt); // aim: po búraní tábora by mieril na stavbu a kĺzal v postoji útoku
     if (k.escape) { heroEscape(k, dt); return; }
-    if (Math.hypot(k.hx - k.x, k.hy - k.y) <= 1) return;
-    moveKnight(k, k.hx, k.hy, (k.spd || 26) * 1.15, dt); // len po ceste ako vojaci – cez hradby neprejde
+    const h = heroPos(k); // na stanovište, kde ho hráč nechal (inak k radnici)
+    if (Math.hypot(h.x - k.x, h.y - k.y) <= 1) return;
+    moveKnight(k, h.x, h.y, (k.spd || 26) * 1.15, dt); // len po ceste ako vojaci – cez hradby neprejde
   }
   // obliehacie stroje po vlne dôjdu samy na svoje štartové miesto (updateSiege mimo boja ide domov a doma sa otočí k horde)
   function siegeWalkHome(dt) {

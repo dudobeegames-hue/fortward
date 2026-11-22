@@ -756,7 +756,7 @@
   }
   /* za orkov oranžový neón namiesto modrého */
   .orcs .pcard.newFlash .face { animation-name: neonFlashOrc; }
-  #repairBtn.neon { animation: neonFlash 2.8s ease-in-out 1; } /* raz preblikne na začiatku stavby po vlne */
+  #repairBtn.neon { animation: neonFlash 2.8s ease-in-out infinite; } /* bliká celý čas stavania, kým je čo opraviť */
   .orcs #repairBtn.neon { animation-name: neonFlashOrc; }
   @keyframes neonFlashOrc {
     0%, 10% { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
