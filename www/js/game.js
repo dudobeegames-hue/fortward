@@ -1677,7 +1677,7 @@
     const spr = SPR[d.spr][0];
     const e = {
       d, x: scene.spawn[0] + spr.w / 2 + Math.random() * Math.max(1, scene.spawn[1] - scene.spawn[0] - spr.w),
-      y: G.gy0 - 2, // vrch mriežky (nad ňou je len pás krajiny pod horným panelom)
+      y: -4, entry: true, // nad horným okrajom bojiska: najprv nakráča dole cez pás krajiny na vrch mriežky (updateEnemy), nezjaví sa zrazu uprostred
       hp: d.hp * item.hpMul, max: d.hp * item.hpMul, spd: d.speed * (0.9 + Math.random() * 0.2),
       atk: Math.random() * d.atkCd, anim: Math.random() * 2, flash: 0, lunge: 0,
       jx: (Math.random() - 0.5) * 7, jy: (Math.random() - 0.5) * 5, ph: Math.random() * 6.28,
@@ -1685,7 +1685,7 @@
     };
     if (d.boss) e.hp = e.max = bossHp(e.max);
     if (d.king) { e.stompT = 3; e.summonT = 4; }
-    if (item.fromCamp && st.camp) { const k = st.camp.parts.find(o => o.role === 'keep' && o.hp > 0); e.x = k ? k.x : scene.fortX; e.y = k ? k.y + 4 : G.gy0 + 52; st.shake = 0.5; } // vyjde z pevnosti tábora (alebo spomedzi stavieb)
+    if (item.fromCamp && st.camp) { const k = st.camp.parts.find(o => o.role === 'keep' && o.hp > 0); e.x = k ? k.x : scene.fortX; e.y = k ? k.y + 4 : G.gy0 + 52; e.entry = false; st.shake = 0.5; } // vyjde z pevnosti tábora (alebo spomedzi stavieb)
     st.enemies.push(e);
     if (d.boss && !(st.boss && st.boss.d.king && !st.boss.dead)) { st.boss = e; AUDIO.play('boss'); }
     return e;
@@ -1887,6 +1887,10 @@
     if (e.frostT > 0) { // zasiahnutý mrazom: takmer stojí aj neútočí
       e.frostT -= dt; dt *= 0.12;
       if (Math.random() < 0.3) part(e.x + (Math.random() - 0.5) * e.w * 0.6, e.y - Math.random() * e.h, 0, -4, 0.5, Math.random() < 0.5 ? '#e0f4ff' : '#88c8ff', 0);
+    }
+    if (e.entry) { // príchod zhora: rovno dole cez pás krajiny nad mriežkou, potom už po svojej ceste
+      if (e.y < G.gy0 - 2.5 && !moveTo(e, e.x, G.gy0 - 2, e.spd * 1.3 * (e.chillT > 0 ? 0.5 : 1), dt)) return; // moveTo zastaví pol bodu pred cieľom – inak by tam ostal stáť
+      e.y = Math.max(e.y, G.gy0 - 2); e.entry = false;
     }
     if (e.d.king && updateOrcKing(e, dt)) return;
     if (e.d.charge && !e.guard) bearCharge(e, dt); // obranca hradu sa nerozbieha cez hradby
@@ -4128,8 +4132,11 @@
       return;
     }
     if (u.isKing && hero8(sprName)) {
-      const fr = king8Frame(u, hero8(sprName));
-      shadow(u.x, u.y, 5);
+      const set = hero8(sprName), fr = king8Frame(u, set);
+      if (fr.hd) { // jemná kresba z PixelLabu: tieň pod pätou (výška zo státia v tomto smere – v kroku neposkakuje), šírka podľa nôh – medveď šikmo nevisí nad tieňom
+        const ft = footOf(fr), gr = footOf(set[u.face8 == null ? 6 : u.face8].idle), left = Math.round(u.x - fr.w / 2);
+        shadow(left + (ft.x0 + ft.x1) / 2, Math.round(u.y - fr.h) + K8_PB + gr.y, Math.max(4, Math.min(10, Math.round((ft.x1 - ft.x0) / 2))));
+      } else shadow(u.x, u.y, 5);
       cryAura(u, true, true);
       g.drawImage(u.flash > 0 ? fr.f : fr.c, Math.round(u.x - fr.w / 2), Math.round(u.y - fr.h) + K8_PB, fr.w, fr.h); // pod chodidlami je miesto na zbraň (jemná kresba paladina: w×h v bodoch hry)
       if (sprName === 'paladin') drawSmash(u);
