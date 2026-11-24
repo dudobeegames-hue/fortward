@@ -350,7 +350,7 @@ function initSiegeSprites() {
   lazySpr('ram8', () => buildSiege8((f, act) => voxOrcRam(f, act, false)));
   lazySpr('giantRam8', () => buildSiege8((f, act) => voxOrcRam(f, act, true), 1.4));
   lazySpr('mammoth8', () => buildSiege8(voxMammoth, 2.2));
-  lazySpr('oSiegeRam8', () => SPR.ram8); // orkský baran
+  lazySpr('oSiegeRam8', () => typeof ORC_RAM_ART !== 'undefined' ? buildSiegeArt8(ORC_RAM_ART, Array(8).fill(23.5)) : SPR.ram8); // orkský baran z PixelLabu (orc-ram-art.js; o 2 body vyššie plátno ako ľudské – kotva nižšie), inak voxelový
   lazySpr('oSiegeCat8', () => buildSiege8((f, act) => orcify(voxCat(f, act))));
   lazySpr('oSiegeFire8', () => buildSiege8((f, act) => orcify(voxFire(f, act))));
   lazySpr('oSiegeTower8', () => buildSiege8((f, act) => orcify(voxTower(f, act))));

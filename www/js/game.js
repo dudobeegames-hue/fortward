@@ -496,7 +496,7 @@
   // V misii sa dá stavať / vylepšovať len to, čo je vyskúmané A na čo má hrad (radnica) v misii dosť vysokú úroveň (= číslo karty).
   // Položka: [druh, úroveň (0 = bez úrovne), cena, nepovinné, len pre rasu] – od 2026-11-18 sú všetky výskumy povinné
   const RES_DEF = [
-    [['hall', 1, 0], ['tower', 1, 0], ['wall', 1, 0], ['pit', 1, 80], ['wallArcher', 0, 120], ['paving', 0, 40], ['mine', 1, 120], ['pitch', 1, 120, 1, 'orc']], // baňa: každý hrad (TH1–5) odomyká jednu jej úroveň // jedový kotol za orkov má aj 1. úroveň (treba ju vyskúmať; voliteľná – neblokuje ďalšiu kartu)
+    [['hall', 1, 0], ['tower', 1, 0], ['wall', 1, 0], ['pit', 1, 80], ['wallArcher', 0, 120], ['paving', 0, 40], ['mine', 1, 120], ['pitch', 1, 120, 0, 'orc']], // jedový kotol za orkov má aj 1. úroveň (treba ju vyskúmať, povinná ako všetky výskumy); baňa: každý hrad (TH1–5) odomyká jednu jej úroveň
     [['hall', 2, 400], ['tower', 2, 150], ['pitch', 2, 200], ['wall', 2, 150, 0, 'human'], ['mine', 2, 200], ['workshop', 1, 200], ['pit', 2, 120]],
     [['hall', 3, 900], ['tower', 3, 300], ['pitch', 3, 300], ['mage', 3, 450], ['wall', 3, 300], ['firepit', 1, 250], ['pit', 3, 220],
       ['barracks', 1, 400], ['barracks', 2, 300], ['range', 1, 400], ['range', 2, 300], ['hedge', 0, 150], ['mine', 3, 300], ['workshop', 2, 300], ['chapel', 1, 400],
@@ -1308,6 +1308,32 @@
   // obliehacie stroje útočia len na stavby (tábor hordy) a na obrov (ich slabina), na bežnú hordu nie:
   // baranidlo ide na tábor, katapult ho ostreľuje z dostrelu; bez tábora čakajú pri šíku
   // tlačidlo obrana/útok ich neovplyvňuje – tábor hordy idú búrať vždy
+  // obliehací stroj sa nešmýka do boku: keď ide iným smerom, ako je natočený, najprv sa na mieste otočí (po osminách) a až potom sa pohne
+  const SIEGE_TURN = 0.12; // s na jednu osminu otočky
+  function siegeFace(u, want, dt) { // natočí stroj k smeru want postupne; true = už je natočený
+    if (u.face8 == null) u.face8 = want;
+    if (u.face8 === want) { u.turnT = 0; return true; }
+    u.turnT = (u.turnT || 0) + dt;
+    if (u.turnT >= SIEGE_TURN) { u.turnT = 0; u.face8 = (u.face8 + ((want - u.face8 + 8) % 8 <= 4 ? 1 : 7)) % 8; }
+    return u.face8 === want;
+  }
+  function siegeMove(u, tx, ty, spd, dt) {
+    const a = tileAt(u.x, u.y), b = tileAt(tx, ty);
+    let wx = tx, wy = ty;
+    if (a.c !== b.c || a.r !== b.r) { // cesta po políčkach ako vojaci (brány, hradby)
+      u.repath = (u.repath || 0) - dt;
+      if (u.repath <= 0 || !u.at || u.at.c !== a.c || u.at.r !== a.r || !u.goal || u.goal.c !== b.c || u.goal.r !== b.r) { u.next = knightStep(a, b); u.at = a; u.goal = b; u.repath = 0.3; }
+      if (!u.next) return false;
+      wx = tileX(u.next.c) + T / 2; wy = tileY(u.next.r) + T / 2 + 3;
+    }
+    const dx = wx - u.x, dy = wy - u.y;
+    if (Math.hypot(dx, dy) < 0.5) return true;
+    if (u.face8 == null) u.face8 = dir8(dx, dy);
+    const want = Math.atan2(dy, dx), cur = u.face8 * Math.PI / 4, diff = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
+    if (Math.abs(diff) > Math.PI / 6) { siegeFace(u, dir8(dx, dy), dt); return false; } // iný smer: otáča sa na mieste
+    u.turnT = 0;
+    return moveTo(u, wx, wy, spd, dt);
+  }
   function updateSiege(u, dt) {
     u.flash = Math.max(0, u.flash - dt); u.cd = Math.max(0, u.cd - dt); u.fired = Math.max(0, u.fired - dt);
     if (u.swing > 0) { u.swing = Math.max(0, u.swing - dt); if (u.ramHit && u.swing <= RAM_HIT) { const hit = u.ramHit; u.ramHit = null; hit(); } } // náraz padne ku koncu úderu
@@ -1315,9 +1341,9 @@
     const fm = st.form || { inf: { x: G.hallCx, y: musterYOf() }, arc: { x: G.hallCx, y: musterYOf() + 16 } };
     const side = (u.slot % 2 ? 1 : -1) * (14 + 10 * (Math.floor(u.slot / 2) % 3));
     const clampX = x => Math.max(G.gx0 + 8, Math.min(G.gx0 + G.cols * T - 8, x));
-    const spd = u.spd * 1.5 * waterMul(u), go = (x, y) => moveKnight(u, x, y, spd * backMul(u, x, y), dt); // po vlastnej ceste rýchlejšie, aby stačili šíku
+    const spd = u.spd * 1.5 * waterMul(u), go = (x, y) => siegeMove(u, x, y, spd * backMul(u, x, y), dt); // po vlastnej ceste rýchlejšie, aby stačili šíku; otáča sa na mieste
     if (st.phase !== 'battle' && u.hx != null) { // po vlne dôjde sám (rýchlejšie, ako hrdina) na svoje štartové miesto pred zónou a otočí sa k horde
-      if (Math.hypot(u.hx - u.x, u.hy - u.y) > 1) moveKnight(u, u.hx, u.hy, Math.max(30, spd * 1.4), dt); else u.face8 = 6;
+      if (Math.hypot(u.hx - u.x, u.hy - u.y) > 1) siegeMove(u, u.hx, u.hy, Math.max(30, spd * 1.4), dt); else siegeFace(u, 6, dt);
       return;
     }
     const giant = nearestGiant(u.x, u.y, GIANT_HUNT); // obor nablízku má prednosť pred táborom aj pred šíkom
@@ -1333,7 +1359,7 @@
           if (!u.next && (a.c !== b.c || a.r !== b.r)) { u.ramBad.add(slot.key); u.ramSlot = null; } // k tomuto políčku cesta nevedie – skúsi iné
           return;
         }
-        u.face8 = slot.up ? 6 : 2;
+        if (!siegeFace(u, slot.up ? 6 : 2, dt)) return; // k stavbe sa najprv otočí na mieste
         if (u.cd > 0) return;
         ramStrike(u, () => { st.shake = Math.max(st.shake, 0.08); hitCamp(slot.o, u.dmg); });
         return;
@@ -1344,8 +1370,8 @@
       if (!t) { go(clampX(fm.inf.x + side), fm.inf.y - 6); return; }
       const up = u.y >= t.y; // útočí len zdola alebo zhora: postaví sa pod cieľ (nad cieľ) a búši kolmo
       if (Math.abs(t.x - u.x) > 5 || Math.abs(t.y - u.y) > 10) { go(t.x, t.y + (up ? 6 : -6)); return; }
-      u.face8 = up ? 6 : 2;
       if (!t.foe) t.foe = u; // horda sa s ním pobije (má hrubé pancierovanie)
+      if (!siegeFace(u, up ? 6 : 2, dt)) return; // k obrovi sa najprv otočí na mieste
       if (u.cd > 0) return;
       ramStrike(u, () => { st.shake = Math.max(st.shake, 0.06); if (!t.dead && Math.hypot(t.x - u.x, t.y - u.y) < 16) damage(t, u.dmg * (t.d.giant ? 1 : 0.6), true); });
       return;
@@ -4047,7 +4073,7 @@
     const busy = set.art && (u.siege === 'cat' ? u.fired > 0.3 : u.siege === 'ram' && u.swing > 0); // pri výstrele či údere sa neotáča, ani keď ho susedia odtlačia
     if (moving && d > 0.03) { u._svx = (u._svx || 0) * 0.92 + mvx * 0.08; u._svy = (u._svy || 0) * 0.92 + mvy * 0.08; } // ťažký voz mení smer pomaly
     const sd = dir8(u._svx || 0, u._svy || 0);
-    if (moving && !busy) { u._wd = (u._wd || 0) + d; turn8(u, sd, 14); } // smer len vyhladený a s oneskorením – cik-cak po ceste ani krátke uhnutie ho neotočí
+    if (moving && !busy) u._wd = (u._wd || 0) + d; // smer jazdy nastaví pohyb (siegeMove: najprv sa otočí na mieste) – odtlačenie susedom ho neotočí
     else if ((busy || !moving) && u.aimP && (u.fired > 0 || u.cd > 0)) { // katapult z PixelLabu strieľa len na sever alebo na juh
       const ad = set.art && u.siege === 'cat' ? (u.aimP.y <= u.y ? 6 : 2) : dir8(u.aimP.x - u.x, u.aimP.y - u.y);
       if (busy) u.face8 = ad; else turn8(u, ad, 10); // pri výstrele hneď, inak s oneskorením
