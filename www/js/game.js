@@ -6291,6 +6291,15 @@
     sctx.imageSmoothingEnabled = false;
     sctx.fillStyle = '#000'; sctx.fillRect(0, 0, screen.width, screen.height);
     sctx.drawImage(buf, 0, 0, buf.width, buf.height, sx * S, (sy - Math.round(camY)) * S, W * S, bufH() * S);
+    if (st.phase !== 'map' && st.phase !== 'title' && scene && scene.bg) { // pod spodkom bojiska (za zaobleným panelom stavby) zrkadlový pás samotného terénu – inak by tam presvital čierny podklad
+      const yb = (sy - Math.round(camY) + bufH()) * S, rest = screen.height - yb;
+      if (rest > 0) {
+        const sb = scene.bg, R = scene.R || 1, rows = Math.min(sb.height, Math.ceil(rest / S * R) + R);
+        sctx.save(); sctx.translate(0, 2 * yb); sctx.scale(1, -1);
+        sctx.drawImage(sb, 0, sb.height - rows, sb.width, rows, sx * S, yb - rows / R * S, W * S, rows / R * S);
+        sctx.restore();
+      }
+    }
     if (mapRose && st.phase === 'map' && COMPASS.complete && COMPASS.width) { // kompas z obrázka v plnom rozlíšení
       const w = COMPASS.width / 3.3 * S, h = COMPASS.height / 3.3 * S; // menší kompas (≈ 30 bodov mapy)
       sctx.imageSmoothingEnabled = true; sctx.drawImage(COMPASS, (mapRose.x + sx) * S - w / 2, (mapRose.y + sy - Math.round(camY)) * S - h / 2, w, h); sctx.imageSmoothingEnabled = false;
