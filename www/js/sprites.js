@@ -1903,6 +1903,13 @@ const turnHead8 = (rows, n) => rows.map((r, i) => i < n ? '.' + r.slice(0, -1) :
 // čierny cop: zozadu stredom chrbta s kosteným korálikom, zboku visí z temena za hlavou (B tmavý, n lesk)
 const braid = (rows, col, from, to, bead) => rows.map((r, y) => y < from || y > to ? r : r.slice(0, col) + (y === bead ? 'e' : y % 2 ? 'B' : 'n') + r.slice(col + 1));
 const buildChief8 = () => {
+  // náčelník z PixelLabu (chief-art.js): útok = široký švih obojručnou sekerou (napriahnutie, švih, zásah, návrat); stará kresba ostáva ako záloha
+  if (typeof CHIEF_ART !== 'undefined') {
+    const set = buildArt8(CHIEF_ART, null, 3.2);
+    set.seq = [1, 2, 3]; set.seqT = 0.3; // počas úderu (švih 0,3 s): švih, zásah, návrat; napriahnutie = 1. snímka
+    for (const v of set) { v.slash = v.atk[2]; v.idle = v.walk[0]; } // státie zo snímky chôdze (rotácie z PixelLabu môžu mať iné farby)
+    return set;
+  }
   const N0 = braid(braid(CH8_ART.N, 5, 1, 9, 6), 6, 1, 8, -1), E0 = braid(CH8_ART.E, 3, 1, 7, 5);
   const S = outlineRows(CH8_ART.S), E = outlineRows(E0), N = outlineRows(N0);
   // dve žrde do V od pása: x = stĺpec pása v tele, y1 = výška pása, y0 = vrchol žrdí (záporné = nad hlavou), spread = rozostup vrcholov
