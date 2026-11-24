@@ -1275,7 +1275,7 @@
   function catRock(u, tx, ty, dmg, campT) {
     u.aimP = { x: tx, y: ty }; // natočí sa k cieľu
     const sx = u.x, sy = u.y - 12, dist = Math.hypot(tx - sx, ty - sy);
-    st.proj.push({ k: 'rock', arc: true, sx, sy, x: sx, y: sy, tx, ty, t: 0, dur: Math.max(0.5, dist / 120), h: 14 + dist * 0.25, dmg, splash: 20, campT, siege: true });
+    st.proj.push({ k: 'rock', arc: true, sx, sy, x: sx, y: sy, tx, ty, t: 0, dur: Math.max(0.5, dist / 120), h: 14 + dist * 0.25, dmg, splash: 20, campT, siege: true, fire: isOrc() }); // orkský vrhač hádže sud horiacej smoly
     u.cd = SIEGE.cat.cd; u.fired = 1.0; AUDIO.play('bolt');
   }
   // úder baranidla: kmeň sa napriahne a vyrazí, náraz (hit) padne RAM_HIT pred koncom
@@ -1382,9 +1382,11 @@
         else if (camp && Math.hypot(camp.x - u.x, camp.y - u.y) <= SIEGE.cat.range + 6) catRock(u, camp.x, camp.y - 4, u.dmg, camp);
       }
       if (u.fired > 0.3) return; // kým rameno letí, stojí na mieste
-      if (giant) go(clampX(giant.x + side * 0.5), Math.max(giant.y + SIEGE.cat.range - 20, fm.inf.y - 20));
-      else if (camp) go(clampX(camp.x + side * 0.5), camp.y + SIEGE.cat.range - 12);
-      else go(clampX(fm.arc.x + side * 1.4), fm.arc.y + 18);
+      // cieľ na dostrel: stojí a strieľa – nepresúva sa na presné miesto (susedné katapulty pri jednom cieli by sa odtláčali a krútili)
+      if ((giant && Math.hypot(giant.x - u.x, giant.y - u.y) <= SIEGE.cat.range + 15) || (!giant && camp && Math.hypot(camp.x - u.x, camp.y - u.y) <= SIEGE.cat.range + 6)) return;
+      const gx = giant ? clampX(giant.x + side * 0.5) : camp ? clampX(camp.x + side * 0.5) : clampX(fm.arc.x + side * 1.4);
+      const gy = giant ? Math.max(giant.y + SIEGE.cat.range - 20, fm.inf.y - 20) : camp ? camp.y + SIEGE.cat.range - 12 : fm.arc.y + 18;
+      if (Math.hypot(gx - u.x, gy - u.y) > 5) go(gx, gy); // drobné odtlačenie susedom ho nepohne ani neotočí
     }
   }
 
@@ -1480,7 +1482,7 @@
   // schopnosti hrdinu po vlne dohasnú – nič z nich (pokrik, štít, ohnivá stena, padajúca guľa, zvolené kúzlo) sa neprenesie do ďalšej vlny
   function clearHeroFx() {
     st.cryT = 0; st.spellSel = null;
-    st.fireWalls = []; st.shields = []; st.fallFx = []; st.bolts = []; st.blasts = []; st.healFx = []; st.castFx = [];
+    st.fireWalls = []; st.pitchFires = []; st.shields = []; st.fallFx = []; st.bolts = []; st.blasts = []; st.healFx = []; st.castFx = [];
     st.clouds = []; st.totems = []; st.pools = []; st.axes = [];
     const k = st.king; // zúrivosť, medvedia koža, hostina a rozbehnutý nápor sa do ďalšej vlny neprenesú
     if (k) { k.rageT = 0; k.hideT = 0; k.feastT = 0; k.charge = null; k.stunT = 0; k.kb = null; k.tpFrom = null; k.post = null; } // po vlne sa hrdina vráti k radnici (stanovište platí len počas vlny)
@@ -3614,6 +3616,20 @@
         }
       }
     }
+    // horiace stavby tábora (sud smoly z orkského vrhača): poškodenie počas horenia, plamene a dym nad stavbou
+    if (st.camp) for (const o of st.camp.parts) if (o.burnT > 0 && o.hp > 0) {
+      o.burnT -= dt; const d = o.burnDps * dt;
+      if (o.hp - d <= 0) hitCamp(o, d); else o.hp -= d;
+      if (Math.random() < 0.4) part(o.x + (Math.random() - 0.5) * 12, o.y - 6 - Math.random() * 10, (Math.random() - 0.5) * 6, -14 - Math.random() * 10, 0.5, ['#fff070', '#f89838', '#d83818', '#3e3e4c'][Math.random() * 4 | 0], -8);
+    }
+    // horiaca smola na zemi (sud z orkského vrhača): kto cez ňu ide, začne horieť
+    if (st.pitchFires && st.pitchFires.length) {
+      for (const pf of st.pitchFires) {
+        pf.t -= dt;
+        for (const e of st.enemies) if (!e.dead && !e.d.fly && Math.abs(e.y - pf.y) < 6 && Math.abs(e.x - pf.x) < pf.w / 2) { e.burnT = Math.max(e.burnT || 0, 1.5); e.burnDps = Math.max(e.burnDps || 0, pf.dps); }
+      }
+      st.pitchFires = st.pitchFires.filter(pf => pf.t > 0);
+    }
     // svätý štít a ohnivá stena dohasínajú
     for (const sh of st.shields) sh.t -= dt;
     for (const b of st.blds) if (b.holyT > 0) b.holyT -= dt; // svätý štít dohasína
@@ -3718,6 +3734,11 @@
 
   function impact(p) {
     if (p.campT) { hitCamp(p.campT, p.dmg); if (p.k !== 'rock') return; } // šíp či balvan do stavby tábora (balvan zraní aj hordu okolo)
+    if (p.k === 'rock' && p.fire) { // sud smoly z orkského vrhača: na zemi ostane horiaca smola (páli hordu), zasiahnutá stavba tábora chvíľu horí
+      (st.pitchFires || (st.pitchFires = [])).push({ x: p.tx, y: p.ty + 3, w: 22, t: 3.5, t0: 3.5, dps: p.dmg * 0.18, spots: [-7, 0, 7].map(dx => ({ dx: dx + (Math.random() - 0.5) * 3, dy: (Math.random() - 0.5) * 3, ph: Math.random() * 7 })) });
+      if (p.campT && p.campT.hp > 0) { if (!(p.campT.burnT > 0)) p.campT.fireSpots = null; p.campT.burnT = 4; p.campT.burnT0 = 4; p.campT.burnDps = p.dmg * 0.12; }
+      for (let k = 0; k < 16; k++) { const a = Math.random() * 6.28, sp = 15 + Math.random() * 35; part(p.tx, p.ty, Math.cos(a) * sp, Math.sin(a) * sp - 18, 0.45 + Math.random() * 0.3, ['#fff070', '#f89838', '#d83818', '#2a1c12'][k % 4], 60); }
+    }
     if (p.k === 'rock') {
       AUDIO.play('boom');
       for (const e of st.enemies) if (!e.dead && !e.d.fly && Math.hypot(e.x - p.tx, (e.y - 3) - p.ty) <= p.splash + (e.d.giant ? 8 : 0)) damage(e, p.dmg, p.siege);
@@ -5010,6 +5031,23 @@
   // bod jemnej mriežky: pol bodu hry (1 px bufferu) – efekty kúziel a strely sa kreslia jemnejšie ako terén
   const h2 = v => Math.round(v * 2) / 2;
   const fpx = (x, y, col, w, h) => { g.fillStyle = col; g.fillRect(h2(x), h2(y), w || 0.5, h || 0.5); };
+  // plamene z PixelLabu (fire-art.js): veľký oheň s dymom a malý plamienok, slučka 7 snímok
+  let fireSprs = null;
+  const fireFrames = () => fireSprs || (typeof FIRE_BIG_ART === 'undefined' ? null : (fireSprs = {
+    big: FIRE_BIG_ART.lv.map((_, i) => artBuilding(FIRE_BIG_ART, i, false)), small: FIRE_SMALL_ART.lv.map((_, i) => artBuilding(FIRE_SMALL_ART, i, false)) }));
+  // horiaca stavba: veľký oheň v hornej časti stavby a dva malé pri jej spodku, každý v inej fáze; na začiatku sa rozhorí, na konci dohasne
+  function drawBurning(o, sp, time) {
+    const F = fireFrames(); if (!F) return;
+    if (!o.fireSpots) { const w = sp.w; o.fireSpots = [{ dx: (Math.random() - 0.5) * w * 0.25, dy: -sp.h * 0.45, big: true, ph: Math.random() * 7 },
+      { dx: -w * 0.3, dy: -2, ph: Math.random() * 7 }, { dx: w * 0.28, dy: -1, ph: Math.random() * 7 }]; o.burnT0 = o.burnT; }
+    g.globalAlpha = Math.min(1, o.burnT / 0.6, ((o.burnT0 || 4) - o.burnT) / 0.25 + 0.2);
+    for (const s of o.fireSpots) {
+      const fr = (s.big ? F.big : F.small), f = fr[Math.floor(time * 10 + s.ph) % fr.length];
+      g.drawImage(f.c, h2(o.x + s.dx - f.w / 2), h2(o.y + s.dy - f.h), f.w, f.h);
+    }
+    g.globalAlpha = 1;
+  }
+  let barrelSpr = null; // sud horiacej smoly orkského vrhača (pripraví sa pri prvom výstrele)
   function drawProj(p) {
     const r = Math.round;
     if (p.k === 'lance') { // ťažký šíp: drevená žŕdka s kovovým hrotom a červenými pierkami
@@ -5051,6 +5089,20 @@
       g.fillStyle = '#848490'; g.fillRect(x - 2, y - 2, 3, 3);
       g.fillStyle = '#c0c0c8'; g.fillRect(x - 1, y - 1, 1, 1);
       g.fillStyle = '#3c3846'; g.fillRect(x + 1, y + 1, 2, 1); g.fillRect(x + 2, y, 1, 2);
+      return;
+    }
+    if (p.k === 'rock' && p.fire) { // sud horiacej smoly: tmavý sud s obručou, na ňom plameň po pol bode, tieň na zemi
+      g.fillStyle = 'rgba(10,8,6,0.35)'; g.fillRect(r(p.x) - 1, r(p.gy), 3, 1);
+      const x = r(p.x), y = r(p.y), fl = Math.floor(performance.now() / 80) % 2 * 0.5;
+      const bs = typeof ORC_BARREL_ART !== 'undefined' && (barrelSpr || (barrelSpr = artBuilding(ORC_BARREL_ART, 0, false))); // sud z PixelLabu (Projektil.png)
+      if (bs) g.drawImage(bs.c, h2(p.x - bs.w / 2), h2(p.y - bs.h + 2.5), bs.w, bs.h);
+      else {
+        g.fillStyle = PAL.K; g.fillRect(x - 2, y - 2, 5, 5);
+        g.fillStyle = '#3e2614'; g.fillRect(x - 1, y - 1, 3, 3);
+        g.fillStyle = '#44444f'; g.fillRect(x - 1, y, 3, 0.5);
+        fpx(x - 1, y - 2.5 - fl, '#d83818', 3, 1); fpx(x - 0.5, y - 3.5 - fl, '#f89838', 2, 1); fpx(x, y - 4 - fl, '#fff070', 1, 0.5);
+      }
+      if (Math.random() < 0.5) part(p.x, p.y - 3, (Math.random() - 0.5) * 8, -6, 0.35, Math.random() < 0.5 ? '#f89838' : '#3e3e4c', -2);
       return;
     }
     if (p.k === 'rock') {
@@ -6470,9 +6522,18 @@
         const sp = o.skin.spr(o, time); // tieň je vo vrstve tieňov (drawShadows)
         campWallSlices(g, o, o.bld, o.x - T / 2, o.y, CAMP_PIECES[foeRace()].wall); // napojenie hradby na susednú vežu
         g.drawImage(bldCanvas(sp, time, o.x * 0.07 + o.y * 0.03), Math.round(o.x - sp.w / 2) + hitJit(o.flash), o.y - sp.h + (o.skin.dy || 0), sp.w, sp.h); // vlajky vejú, ohne horia (ako stavby hráča)
+        if (o.burnT > 0) drawBurning(o, sp, time); else o.fireSpots = null; // horiaca stavba (sud smoly z orkského vrhača)
         if (o.lvl > 1 && !o.skin.lvlArt) pxText(g, String(o.lvl), Math.round(o.x + sp.w / 2) - 4, o.y - 7, '#f8d048'); // úroveň stavby bez vlastného vzhľadu
       } });
       for (const r of st.camp.rocks) objs.push({ y: 9999, f: () => drawRock(r) });
+    }
+    for (const pf of st.pitchFires || []) objs.push({ y: pf.y, f: () => { // horiaca smola: malé plamene z PixelLabu, rozhoria sa a dohasnú
+      const F = fireFrames(); if (!F) return;
+      g.globalAlpha = Math.min(1, pf.t / 0.6, (pf.t0 - pf.t) / 0.2 + 0.2);
+      for (const s of pf.spots) { const f = F.small[Math.floor(time * 10 + s.ph) % F.small.length]; g.drawImage(f.c, h2(pf.x + s.dx - f.w / 2), h2(pf.y + s.dy - f.h), f.w, f.h); }
+      g.globalAlpha = 1;
+    } });
+    if (st.camp) {
     }
     objs.sort((a, b) => a.y - b.y || (a.x || 0) - (b.x || 0) || (a.id || 0) - (b.id || 0)); // v rovnakom rade je pravejšia budova vpredu (hrad vždy), jednotky v stálom poradí
     for (const o of objs) o.f();
