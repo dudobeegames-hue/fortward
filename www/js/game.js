@@ -1377,15 +1377,20 @@
       return;
     }
     if (u.siege === 'cat') {
+      // strieľa len na cieľ na dostrel a nanajvýš 2 polia vodorovne od svojej osi (nie šikmo cez pol bojiska)
+      const reach = (t, add) => t && Math.hypot(t.x - u.x, t.y - u.y) <= SIEGE.cat.range + add && Math.abs(t.x - u.x) <= 2 * T;
       if (u.cd <= 0) { // obor na dostrel, inak stavba tábora – do bežnej hordy nestrieľa
-        if (giant && Math.hypot(giant.x - u.x, giant.y - u.y) <= SIEGE.cat.range + 15) catRock(u, giant.x, giant.y - 4, u.dmg);
-        else if (camp && Math.hypot(camp.x - u.x, camp.y - u.y) <= SIEGE.cat.range + 6) catRock(u, camp.x, camp.y - 4, u.dmg, camp);
+        if (reach(giant, 15)) catRock(u, giant.x, giant.y - 4, u.dmg);
+        else if (reach(camp, 6)) catRock(u, camp.x, camp.y - 4, u.dmg, camp);
       }
       if (u.fired > 0.3) return; // kým rameno letí, stojí na mieste
       // cieľ na dostrel: stojí a strieľa – nepresúva sa na presné miesto (susedné katapulty pri jednom cieli by sa odtláčali a krútili)
-      if ((giant && Math.hypot(giant.x - u.x, giant.y - u.y) <= SIEGE.cat.range + 15) || (!giant && camp && Math.hypot(camp.x - u.x, camp.y - u.y) <= SIEGE.cat.range + 6)) return;
+      const crowded = st.soldiers.some(o => o !== u && o.siege === 'cat' && !o.dead && Math.hypot(o.x - u.x, o.y - u.y) < 14); // iný katapult tesne vedľa: rozostúpia sa do radov
+      if ((giant ? reach(giant, 15) : reach(camp, 6)) && !crowded) return;
+      // katapulty stoja v dvoch radoch nad sebou (párne vyššie, nepárne nižšie) – pri presune do boku sa minú, neodtláčajú sa
+      const lane = (u.slot % 2 ? -1 : 1) * 10;
       const gx = giant ? clampX(giant.x + side * 0.5) : camp ? clampX(camp.x + side * 0.5) : clampX(fm.arc.x + side * 1.4);
-      const gy = giant ? Math.max(giant.y + SIEGE.cat.range - 20, fm.inf.y - 20) : camp ? camp.y + SIEGE.cat.range - 12 : fm.arc.y + 18;
+      const gy = (giant ? Math.max(giant.y + SIEGE.cat.range - 20, fm.inf.y - 20) : camp ? camp.y + SIEGE.cat.range - 12 : fm.arc.y + 18) + lane;
       if (Math.hypot(gx - u.x, gy - u.y) > 5) go(gx, gy); // drobné odtlačenie susedom ho nepohne ani neotočí
     }
   }
