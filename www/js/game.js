@@ -1346,8 +1346,8 @@
       if (Math.hypot(u.hx - u.x, u.hy - u.y) > 1) siegeMove(u, u.hx, u.hy, Math.max(30, spd * 1.4), dt); else siegeFace(u, 6, dt);
       return;
     }
-    const giant = nearestGiant(u.x, u.y, GIANT_HUNT); // obor nablízku má prednosť pred táborom aj pred šíkom
-    const camp = !giant ? nearestCampPart(u.x, u.y) : null; // tábor hordy je ich prednostný cieľ – tlačidlo obrana/útok sa ich netýka
+    let giant = nearestGiant(u.x, u.y, GIANT_HUNT); // obor nablízku má prednosť pred táborom aj pred šíkom
+    let camp = !giant ? nearestCampPart(u.x, u.y) : null; // tábor hordy je ich prednostný cieľ – tlačidlo obrana/útok sa ich netýka
     if (u.siege === 'ram') {
       if (giant) u.tgt = giant;
       if (u.swing > 0) return; // dokončí rozbehnutý úder
@@ -1377,6 +1377,7 @@
       return;
     }
     if (u.siege === 'cat') {
+      if (giant && foeSpr(giant.d.spr) === 'siegeTower') { giant = null; camp = nearestCampPart(u.x, u.y); } // na obliehaciu vežu nestrieľa
       // strieľa len na cieľ na dostrel a nanajvýš 2 polia vodorovne od svojej osi (nie šikmo cez pol bojiska)
       const reach = (t, add) => t && Math.hypot(t.x - u.x, t.y - u.y) <= SIEGE.cat.range + add && Math.abs(t.x - u.x) <= 2 * T;
       if (u.cd <= 0) { // obor na dostrel, inak stavba tábora – do bežnej hordy nestrieľa
@@ -2846,10 +2847,11 @@
     if (archers.length && !armyAttacks()) holdArchers(archers, cx, F.arcY, dt); // posledný rad, hneď za šíkom
     else if (archers.length) {
       for (const u of archers) u.hs = null;
-      let tx = cx, ty = Math.max(musterY + 16, infBack + 10);
+      // útok: rad stojí tesne za pešiakmi a ide s nimi – pred hordou necúva (inak by opustil útočiace jednotky), ustúpi len s nimi
+      let tx = cx, ty = Math.max(G.gy0 + 30, infBack + 10);
       const th = nearestFoe(F.arc.x, F.arc.y, false), cp = th ? null : nearestCampPart(F.arc.x, F.arc.y); // rad sa riadi pozemnou hordou – za letcami (sokoly, netopiere) necúva, na tie sa len otočí a strieľa, kým sú na dostrel (zvyšok vybavia veže)
-      if (th) { tx = cx + (th.x - cx) * 0.4; ty = Math.max(G.gy0 + 30, Math.min(ty, Math.max(th.y + ARCHER_RANGE - 14, infBack + 10))); } // do strán len kúsok – dostrel stačí, rad nebehá za každým nepriateľom
-      else if (cp) { tx = cp.x; ty = cp.y + ARCHER_RANGE - 12; } // horda nikde – rad lukostrelcov na dostrel od tábora
+      if (th) tx = cx + (th.x - cx) * 0.4; // do strán len kúsok – dostrel stačí, rad nebehá za každým nepriateľom
+      else if (cp) { tx = cp.x; ty = Math.min(ty + 2, cp.y + ARCHER_RANGE - 12); } // horda nikde – za pešiakmi pri tábore (na dostrel od neho)
       // presun po krokoch (aj do strán a dopredu): rad stojí a strieľa; až keď je jeho cieľové miesto o ARC_STEP ďalej, presunie sa naraz
       // (lukostrelci sklonia luk, otočia sa a prejdú, potom sa zas otočia k horde) – plynulý posun by ich nechal kĺzať či cúvať so zameraným lukom
       const far = Math.hypot(tx - F.arc.x, ty - F.arc.y);
