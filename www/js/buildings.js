@@ -31,9 +31,9 @@ function artBuilding(art, i, anim) {
   const x = c.getContext('2d'), id = x.createImageData(c.width, c.height), cols = art.pal.map(hexRGB);
   rows.forEach((r, y) => { for (let k = 0; k < r.length; k++) { if (r[k] === '.') continue; const col = cols[art.chars.indexOf(r[k])], o = (y * c.width + k) * 4; id.data[o] = col[0]; id.data[o + 1] = col[1]; id.data[o + 2] = col[2]; id.data[o + 3] = 255; } });
   if (anim === 'ice') recolorFlame(id, ICE_RAMP, i < 4); // úrovne 1–4: aj žiara pod strechou a okná; na 5. je tá istá farba v zlatých ozdobách
-  const frames = anim === 'fire' ? fireFrames(id) : anim === 'ice' ? fireFrames(id, ICE_RAMP) : anim === false ? null : flagFrames(id, anim !== 'ownFlag'); // zástavy sa prefarbia v id, preto pred vykreslením
+  const frames = anim === 'fire' ? fireFrames(id) : anim === 'orcFire' ? fireFrames(id, ORC_FIRE_RAMP) : anim === 'ice' ? fireFrames(id, ICE_RAMP) : anim === false ? null : flagFrames(id, anim !== 'ownFlag'); // zástavy sa prefarbia v id, preto pred vykreslením
   x.putImageData(id, 0, 0);
-  return lazyVariants({ c, w: c.width / 2, h: c.height / 2, hd: true, frames, noShadow: frames && frames.noShadow, fps: anim === 'fire' || anim === 'ice' ? 9 : 5, px: id }); // px: pixely na záblesk a siluetu bez čítania z plátna
+  return lazyVariants({ c, w: c.width / 2, h: c.height / 2, hd: true, frames, noShadow: frames && frames.noShadow, fps: anim === 'fire' || anim === 'ice' || anim === 'orcFire' ? 9 : 5, px: id }); // px: pixely na záblesk a siluetu bez čítania z plátna
 }
 
 // Vejúce zástavy: v hornej tretine kresby nájde žrde (zvislý pás široký 1–3 px, nad ktorým je látka širšia ako žrď)
@@ -112,6 +112,7 @@ function flagFrames(id, recolor = true) { // recolor = false: zástava si nechá
 // Plápolajúci plameň: pixely v 4 farbách ohňa v hornej tretine kresby; v každej snímke niektoré stĺpce plameňa
 // vyskočia o 1 px vyššie a farby sa o stupeň zosvetlia či stmavia (podľa náhody pevnej pre snímku)
 const FIRE_RAMP = ['#fff3b0', '#ffc83c', '#ff8a1e', '#c83c10'].map(hexRGB);
+const ORC_FIRE_RAMP = ['#fff070', '#f89838', '#e87818', '#d83818'].map(hexRGB); // plameň orkského ohnivého totemu z PixelLabu
 const ICE_RAMP = ['#f4fcff', '#c4ecff', '#80c8f0', '#3c86c8'].map(hexRGB); // ľadový plameň: tie isté 4 stupne jasu ako oheň
 // prefarbí plameň (farby FIRE_RAMP v hornej tretine kresby, pri full v celej kresbe) na inú štvoricu farieb
 function recolorFlame(id, ramp, full) {
@@ -1684,6 +1685,10 @@ function initBuildingSprites() {
   if (typeof ORC_STABLES_ART !== 'undefined') OBSPR.stables = artBuilding(ORC_STABLES_ART, 0, false);
   if (typeof ORC_FALCONRY_ART !== 'undefined') OBSPR.falconry = artBuilding(ORC_FALCONRY_ART, 0, false);
   if (typeof ORC_ARMORY_ART !== 'undefined') OBSPR.armory = artBuilding(ORC_ARMORY_ART, 0, false);
+  // orkský trebuchet z PixelLabu (orc-trebuchet-art.js): snímka 0 nabitý, 1–3 výstrel (protiváha padne, rameno vymrští balvan); nevylepšuje sa
+  if (typeof ORC_TREB_ART !== 'undefined') { OBSPR.trebFrames = ORC_TREB_ART.lv.map((_, i) => artBuilding(ORC_TREB_ART, i, false)); OBSPR.ballista = OBSPR.trebFrames[0]; OBSPR.ballistaFired = OBSPR.trebFrames[3]; }
+  // orkský ohnivý totem z PixelLabu (orc-fire-tower-art.js): 3 podoby pre úrovne 3–5 (stavia sa od TH3), bez vlajky, plameň v mise plápolá
+  if (typeof ORC_FIRE_TOWER_ART !== 'undefined') { const F = ORC_FIRE_TOWER_ART.lv.map((_, i) => artBuilding(ORC_FIRE_TOWER_ART, i, 'orcFire')); OBSPR.mage = [F[0], F[0], F[0], F[1], F[2]]; }
   // orkská strážna veža z PixelLabu (orc-tower-art.js, 5 úrovní, bez strelca); oranžová vlajka ako na pevnosti veje a neprefarbí sa
   if (typeof ORC_TOWER_ART !== 'undefined') OBSPR.tower = ORC_TOWER_ART.lv.map((_, i) => artBuilding(ORC_TOWER_ART, i, 'ownFlag'));
   // orkský jedový kotol z PixelLabu (orc-poison-art.js, 5 úrovní; stavia sa od 2.), oranžová vlajka veje

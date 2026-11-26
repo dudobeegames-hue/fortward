@@ -158,11 +158,13 @@
     shaman:  { spr: 'shaman',  hp: 45,  speed: 12, atk: 5,  atkCd: 1.2, gold: 15, blood: '#62a03a', heals: true },
     wolf:    { spr: 'wolf',    hp: 30,  speed: 40, atk: 9,  atkCd: 0.7, gold: 7,  blood: '#62a03a', cav: true, flank: true },
     bear:    { spr: 'bear',    hp: 150, speed: 22, atk: 24, atkCd: 1.2, gold: 20, blood: '#62a03a', cav: true, charge: true },
+    drone:   { spr: 'drone',   hp: 14,  speed: 28, atk: 5,  atkCd: 0.7, gold: 3,  blood: '#8aa820', hunt: true }, // trubec roja (hmyz): rýchly, slabý, chodí v kŕdľoch, ide prednostne po jednotkách
     sapper:  { spr: 'sapper',  hp: 16,  speed: 22, atk: 90, atkCd: 0.5, gold: 8,  blood: '#62a03a', sapper: true },
     // obrí bossovia: hrubé pancierovanie (veže, jednotky a kúzla ich len škrabnú), slabina sú obliehacie stroje
     giantRam: { spr: 'giantRam', hp: 1400, speed: 6, atk: 150, atkCd: 2.0, gold: 120, blood: '#6e4422', ram: true, boss: true, giant: true, title: 'Obrí baran' },
     mammoth:  { spr: 'mammoth',  hp: 1500, speed: 7, atk: 40,  atkCd: 1.4, gold: 150, blood: '#62a03a', boss: true, giant: true, howdah: true, title: 'Vojnový mamut' },
   };
+  const HUNT_R = 70; // lovec (trubec roja) si všimne jednotku či hrdinu do tejto vzdialenosti
   const GIANT_ARMOR = 0.3, GIANT_SIEGE = 1.6; // násobok poškodenia obra: bežné zásahy / obliehacie stroje
   // obri v misiách: { misia: { vlna: [druhy] } } – v 5. vlne nahradia vojvodcu, v 10. prídu popri ňom
   const GIANTS = { 7: { 10: ['giantRam'] }, 8: { 5: ['giantRam'], 10: ['mammoth'] }, 9: { 5: ['mammoth'], 10: ['giantRam', 'mammoth'] }, 10: { 5: ['giantRam', 'mammoth'] } };
@@ -174,6 +176,8 @@
   // trebuchet (balista za orkov): 1,5× dosah, 1,6× sila, ~2,2× pomalší, nevylepšuje sa
   const TREB = { range: 1.5, dmg: 1.6, cd: 2.2, splash: 22 };
   const isTreb = b => b.kind === 'ballista' && BUILD_RACE === 'orc';
+  // trebuchet po výstrele (b.fired 0.9 → 0): protiváha padne a rameno vymrští balvan (snímky 1–3), rameno chvíľu hore, potom sa pomaly vráti (3 → 1)
+  const trebSpr = b => { const F = OBSPR.trebFrames; if (!F) return OBSPR.ballistaFired; const e = 0.9 - b.fired; return F[e < 0.1 ? 1 : e < 0.2 ? 2 : b.fired > 0.3 ? 3 : b.fired > 0.15 ? 2 : 1]; };
   const fixedKind = k => !!BUILD[k].fixed || (k === 'ballista' && BUILD_RACE === 'orc'); // koly a trebuchet sa nevylepšujú
   const bCd = b => (isTreb(b) ? TREB.cd : 1) * bDef(b).cd * Math.pow(0.92, b.lvl - 1) * (b.spec ? SPECS[b.spec].cd : 1) / (1 + 0.03 * perk('reload'));
   const bRange = b => (isTreb(b) ? TREB.range : 1) * (bDef(b).range + 4 * (b.lvl - 1) + (b.spec ? SPECS[b.spec].range : 0)) * (1 + 0.02 * perk('lookouts'));
@@ -522,7 +526,7 @@
   const resMax = kind => { const L = resLevels(kind); return L.length ? L[L.length - 1].lvl : MAX_LVL; }; // najvyššia úroveň druhu v hre
   // ďalšia úroveň stavby: orkské hradby majú len 3 podoby (úr. 1 → 3 → 5, odomknú sa s TH1, TH3, TH5)
   const nextLvl = (kind, l) => { const n = resLevels(kind).find(r => r.lvl > l); return n ? n.lvl : l + 1; };
-  const dispLvl = (kind, l) => kind === 'wall' && isOrc() ? Math.ceil(l / 2) : l; // číslo úrovne, ako ho vidí hráč
+  const dispLvl = (kind, l) => kind === 'wall' && isOrc() ? Math.ceil(l / 2) : kind === 'mage' && isOrc() ? Math.max(1, l - 2) : l; // číslo úrovne, ako ho vidí hráč
   const resMin = kind => { const L = resLevels(kind); return L.length ? L[0].lvl : 1; };                    // úroveň, na ktorej sa stavba stavia (smolná veža 2, ohnivá 3)
   // najvyššia úroveň stavby v tejto misii: vyskúmaná a zároveň na ňu stačí úroveň hradu
   function kindCap(kind) {
@@ -1178,6 +1182,10 @@
     const gold = Math.round(CAMP_ROLES[o.role].gold * (1 + 0.1 * (st.mission - HOME_PROVINCES)));
     if (!isAssault()) { st.gold += gold; st.chestRun += gold; st.texts.push({ x: o.x, y: o.y - 22, s: '+' + gold, life: 1.4, max: 1.4 }); }
     if (o.role === 'wall') { st.campV++; computeFlow(); } // zbúraná hradba či brána otvorí cestu
+    if (CAMP_JOIN[o.kind] && st.camp) { // susedné hradby sa preskladajú bez zbúranej stavby – zvislý úsek dostane koncovku, nie odseknutý koniec
+      const live = st.camp.parts.filter(q => q.hp > 0);
+      for (const q of live) if (CAMP_WALLS[q.kind]) { q.mask = campWallMask(live, q); q.bld = campWallBld(live, q); }
+    }
     if (o.role === 'keep') { st.shake = 0.6; for (const q of campLive()) hitCamp(q, q.hp + 1); } // srdce padlo – zrúti sa celý tábor
     updateHud();
   }
@@ -1468,8 +1476,9 @@
       else if (r2 < pSh + pRam) type = 'ram';
       else if (r2 < pSh + pRam + pBat) type = 'bat';
       else if (r2 < pSh + pRam + pBat + pArc) type = 'garcher';
-      q.push({ type, gap: gap * (0.6 + Math.random() * 0.8), hpMul });
+      q.push({ type: st.endless ? 'drone' : type, gap: gap * (0.6 + Math.random() * 0.8), hpMul }); // nekonečná obrana: len jednotky roja (hmyz)
     }
+    if (st.endless) return q; // roj zatiaľ nemá bossov ani obrov
     const mw = missionWaves(m), bossWave = st.endless || mw >= 10 ? w % 5 === 0 : w === mw; // kratšie misie: boss len v poslednej vlne
     if (bossWave) { // boss v 5. a 10. vlne, v posledných misiách dvaja
       const tenth = st.endless ? w % 10 === 0 : w === mw; // v nekonečnej obrane je každá 10. vlna ako posledná
@@ -2029,6 +2038,23 @@
       if (e.foe && e.foe.siege && fd < SIEGE_AGGRO + 14) { footTo(e, e.foe.x + (e.x < e.foe.x ? -10 : 10), e.foe.y + 2, spd, dt); return; } // beží k obliehaciemu stroju
       e.foe = null;
     }
+    // lovec (trubec roja): ide prednostne po jednotkách a hrdinovi v okolí, budovy búra až potom;
+    // ak sa k cieľu nevie dostať (stojí pred stavbou), chvíľu lov vynechá a búra, čo mu stojí v ceste
+    if (e.d.hunt && !e.guard && !(e.huntOff > 0) && e.y > G.gy0) {
+      let tg = null, td = HUNT_R;
+      for (const s of st.soldiers) if (!s.dead && !s.fly && !(s.down > 0)) { const d = Math.hypot(s.x - e.x, s.y - e.y); if (d < td) { td = d; tg = s; } }
+      const hk = st.king; if (hk && !hk.dead && !(hk.down > 0)) { const d = Math.hypot(hk.x - e.x, hk.y - e.y); if (d < td) { td = d; tg = hk; } }
+      if (tg) {
+        e.foe = tg;
+        if (td < (tg.siege ? 17 : 12)) { e.huntJam = 0; e.aimP = { x: tg.x, y: tg.y }; attack(() => hitUnit(tg, e.d.atk * 0.7)); return; }
+        const ox = e.x, oy = e.y;
+        footTo(e, tg.x, tg.y + 2, spd, dt);
+        e.huntJam = Math.hypot(e.x - ox, e.y - oy) < spd * dt * 0.3 ? (e.huntJam || 0) + dt : 0;
+        if (e.huntJam > 0.8) { e.huntOff = 2.5; e.huntJam = 0; } // zaseknutý (stavba v ceste) – najprv ju zbúra
+        return;
+      }
+    }
+    if (e.huntOff > 0) e.huntOff -= dt;
     // goblin-lukostrelec: zastaví v dosahu a strieľa
     if (e.d.ranged && e.y > G.gy0 + 10) {
       const R = e.d.ranged;
@@ -3841,7 +3867,13 @@
     if (e.healTgt && !e.healTgt.dead && e.d.heals && set[e.healTgt.y < e.y - 2 ? 6 : 2].atk) { e.face8 = e.healTgt.y < e.y - 2 ? 6 : 2; const c = set[e.face8].atk; return c[Math.floor(performance.now() / 120) % c.length]; } // mních lieči: kúzlo len smerom hore a dole, snímky útoku dokola (ako liečiteľ hráča)
     const v = set[e.face8];
     if (set.bow) { if (e.lunge > 0) return v.atk[1]; if (busy) return v.atk[0]; }
-    else if (e.lunge > 0) return v.atk[e.lunge > 0.075 ? 1 : 2];
+    if (set.slashT) { // dlhší sek s efektom (trubec roja: ružový šľah kosákov) – úder trvá len 0,15 s, šľah ostane vidieť dlhšie
+      const now = performance.now();
+      if (e.lunge > 0 && !(now - (e._slashAt || 0) < set.slashT * 1000)) e._slashAt = now;
+      const p = (now - (e._slashAt || 0)) / 1000;
+      if (p < set.slashT) return v.atk[p < set.slashT / 2 ? 1 : 2];
+    }
+    if (e.lunge > 0 && !set.bow) return v.atk[e.lunge > 0.075 ? 1 : 2];
     else if (busy && e.atk < 0.3) return v.atk[0];
     return moving ? v.walk[Math.floor((e._wd || 0) / (set.stride || 3.2)) % v.walk.length] : v.idle; // sady hrdinov (kráľ, paladin ako nepriatelia) nemajú vlastný krok
   }
@@ -4607,7 +4639,7 @@
           { const q = vGateOf(b); if (q) drawShadow(shCtx, q.ga, q.x, q.y); } // celá brána na zvislej hradbe
           continue;
         }
-        const spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl);
+        const spr = isTreb(b) && b.fired > 0 ? trebSpr(b) : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl);
         drawShadow(shCtx, spr, tileX(b.c) + bW(b) * T / 2 - Math.floor(spr.w / 2) + artDX(b.kind), tileY(b.r) + T + 1 - spr.h);
       }
       // stavby nepriateľského tábora vrhajú rovnaký tieň ako budovy hráča (predtým len škvrna pri päte – vysoké veže akoby leteli)
@@ -4682,7 +4714,7 @@
         } else g.drawImage(us.c, 0, 0, us.w, 11, isOrc() ? Math.round(x0 + T / 2 - us.w / 2) : x0 + 1, y0 - 9, us.w, 11);
       }
     } else {
-      spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl); // trebuchet po výstrele s ramenom hore; ohnivá veža na ľad má modrý plameň
+      spr = isTreb(b) && b.fired > 0 ? trebSpr(b) : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl); // trebuchet po výstrele s ramenom hore; ohnivá veža na ľad má modrý plameň
       hallLink(b, x0, y0); // veža hneď vedľa hradu: kúsok hradby od jej stredu pod okraj hradu (ako pri hradbe vedľa hradu)
       const bx = x0 + bW(b) * T / 2 - Math.floor(spr.w / 2) + artDX(b.kind); // stred stavby (aj širšej na viacerých políčkach)
       g.drawImage(bldCanvas(spr, time, b.c * 0.7 + b.r * 0.3), bx + hitJit(b.flash), y0 + T + 1 - spr.h, spr.w, spr.h); // w, h v bodoch hry (jemná kresba má plátno 2×); zástavy vejú
@@ -4933,7 +4965,7 @@
       return;
     }
     if (TRAPS[b.kind]) { trapImg(g, BSPR[b.kind], x0, y0); return; }
-    const spr = isTreb(b) && b.fired > 0 ? OBSPR.ballistaFired : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl);
+    const spr = isTreb(b) && b.fired > 0 ? trebSpr(b) : bsprOf(iceMage(b) ? 'mageIce' : b.kind, b.lvl);
     g.drawImage(bldCanvas(spr, time, seed), x0 + bW(b) * T / 2 - Math.floor(spr.w / 2) + artDX(b.kind), y0 + T + 1 - spr.h, spr.w, spr.h);
     if (b.kind === 'ballista' && hasTurret(b)) {
       const tu = BSPR.ballistaTurret[b.face == null ? 6 : b.face], p = turretAt(b);
@@ -7143,7 +7175,7 @@
       const tab = BUILD_TABS.find(t => t.id === st.buildTab) || BUILD_TABS[0];
       for (const t of BUILD_TABS) {
         const tb = document.createElement('button');
-        const open = t.id === 'hall' || t.kinds.some(k => has(k)) || (t.id === 'siege' && Object.values(BUY).some(u => has(u.siege)));
+        const open = t.id === 'hall' || t.kinds.some(k => has(k)) || (t.id === 'siege' && !st.endless && Object.values(BUY).some(u => has(u.siege))); // v nekonečnej obrane bez obliehacích strojov
         tb.className = 'btab' + (t === tab ? ' on' : '') + (open ? '' : ' locked') + (tabShine(t) ? ' shine' : '');
         tb.title = t.name; tb.dataset.tab = t.id; tb.setAttribute('aria-label', t.name);
         tb.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + TAB_SVG[t.id] + '</svg>';
@@ -7212,6 +7244,7 @@
       });
       if (tab.id === 'siege') for (const key in BUY) { // obliehacie stroje: vyrazia so začiatkom vlny
         const u = BUY[key], icon = ICONS['u_' + u.siege];
+        if (st.endless) { act(icon, u.name, 'nedá sa', false, 'V nekonečnej obrane nie sú obliehacie stroje', 'locked', true); continue; }
         if (!open(u.siege)) { lockAct(icon, u.name, u.siege, true); continue; }
         if (campGone()) { act(icon, u.name, 'tábor zničený', false, 'Tábor hordy je zničený – obliehacie stroje už netreba', 'locked', true); continue; }
         const n = siegeCount(key), full = n >= SIEGE_MAX;
@@ -7859,7 +7892,7 @@
     if (n) toast('+' + n + ' zlatiek do truhlice');
   }
   const siegeCount = kind => st.soldiers.filter(s => s.siege === kind && !s.dead).length + st.siegeOrder.filter(o => o.key === kind).length;
-  const canSiege = key => open(BUY[key].siege) && !campGone(); // v každej misii, keď je stroj raz odomknutý, kým stojí tábor hordy
+  const canSiege = key => open(BUY[key].siege) && !campGone() && !st.endless; // v každej misii, keď je stroj raz odomknutý, kým stojí tábor hordy
   const campGone = () => !!st.camp && !isAssault() && campLive().length === 0; // celý tábor hordy zbúraný
   // kúpa stroja na miesto (x, y); bez miesta postaví stroj vedľa radnice (simulácia)
   function orderSiege(key, x, y) {

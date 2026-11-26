@@ -187,7 +187,13 @@ def thick_variants(s, cx=16, tower=None, nt=(7, 11, 13, 14, 15)):   # T-spoje a 
     tips, walk, front, rail, walk0, face = thick_parts(s)
     sh = s.height
     wood = is_wood(s)
-    oy = FOOT - sh                                 # vodorovná vzorka: päta čela na FOOT
+    vwalk = walk.copy()                            # chodník zvislého úseku: bez osamelých svetlých bodiek (radené pod sebou by tvorili bodkovanú čiaru)
+    if wood:
+        for y in range(walk.height):
+            for x in range(1, walk.width - 1):
+                c, l, r = walk.getpixel((x, y)), walk.getpixel((x - 1, y)), walk.getpixel((x + 1, y))
+                if c[3] and l[3] and l == r and c != l and sum(c[:3]) > sum(l[:3]): vwalk.putpixel((x, y), l)
+    oy = FOOT - sh                                # vodorovná vzorka: päta čela na FOOT
     wy0, wy1 = oy + walk0, oy + face               # chodník vodorovného úseku v sprite
     VW = 22                                        # šírka zvislého úseku (koly z oboch strán, chodník v strede)
     TW = tower.width if tower is not None else VW
@@ -213,7 +219,7 @@ def thick_variants(s, cx=16, tower=None, nt=(7, 11, 13, 14, 15)):   # T-spoje a 
                 top = max(0, min(cut))
             body = Image.new('RGBA', (VW, H))
             for y in range(top - (top % walk.height) - walk.height, bot, walk.height):   # chodník (dosky naprieč)
-                body.alpha_composite(walk.crop((2, 0, 2 + VW, walk.height)), (0, y))
+                body.alpha_composite(vwalk.crop((2, 0, 2 + VW, walk.height)), (0, y))
             body = body.crop((0, 0, VW, H))
             clip = Image.new('RGBA', (VW, H)); clip.alpha_composite(body.crop((0, top, VW, bot)), (0, top))
             body = clip
